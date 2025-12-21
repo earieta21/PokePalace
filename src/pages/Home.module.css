@@ -1,0 +1,35 @@
+.menuCtaRow {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.primaryBtn {
+  background: linear-gradient(180deg, #0f7a4a 0%, #0b5f3a 100%);
+  color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 11px 16px;
+  border-radius: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 16px 34px rgba(15, 122, 74, 0.22);
+  transition: transform 140ms ease;
+}
+
+.primaryBtn:hover {
+  transform: translateY(-1px);
+}
+
+.secondaryBtn {
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 11px 16px;
+  border-radius: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.secondaryBtn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}

@@ -1,0 +1,58 @@
+.moreOptionsContainer {
+  position: relative;
+  display: inline-block;
+}
+
+.toggleButton {
+  background-color: #ff9800;
+  color: #fff;
+  padding: 10px 15px;
+  font-size: 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.toggleButton:hover {
+  background-color: #e68900;
+}
+
+.optionsMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  width: 200px;
+  z-index: 10;
+}
+
+.optionsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.optionItem {
+  border-bottom: 1px solid #eee;
+}
+
+.optionItem:last-child {
+  border-bottom: none;
+}
+
+.optionItem a {
+  display: block;
+  padding: 10px 15px;
+  color: #333;
+  text-decoration: none;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.optionItem a:hover {
+  background-color: #f9f9f9;
+  color: #ff9800;
+}

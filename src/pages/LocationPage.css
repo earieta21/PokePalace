@@ -1,0 +1,46 @@
+.location-page {
+  text-align: center;
+  padding: 20px;
+}
+
+.location-page h1 {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.location-page p {
+  color: #555;
+  font-size: 1rem;
+}
+
+.search-results {
+  margin-top: 20px;
+}
+
+.search-results ul {
+  list-style: none;
+  padding: 0;
+}
+
+.search-results li {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 15px;
+  margin: 10px auto;
+  max-width: 400px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: left;
+}
+
+.search-results h3 {
+  font-size: 1.3rem;
+  margin: 0 0 5px;
+  color: #333;
+}
+
+.search-results p {
+  font-size: 1rem;
+  color: #555;
+}
