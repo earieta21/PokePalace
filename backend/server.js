@@ -22,6 +22,8 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 5001;
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+
 
 const start = async () => {
   try {
