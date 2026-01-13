@@ -1,5 +1,6 @@
-import React from "react";
-import { NavLink } from "react-router-dom";
+//import React from "react";
+import React, { useContext } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   FaHome,
   FaShoppingCart,
@@ -8,8 +9,20 @@ import {
   FaEllipsisH,
 } from "react-icons/fa";
 import styles from "./Navbar.module.css";
+import { AuthContext } from "../context/AuthContext";
 
 const Navbar = () => {
+  const { isLoggedIn, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
+
+  const handleAuthClick = () => {
+    if (isLoggedIn) {
+      navigate("/mi-cuenta");
+    } else {
+      navigate("/login");
+    }
+  };
+
   return (
     <nav className={styles.navbar}>
       <NavLink
@@ -60,17 +73,16 @@ const Navbar = () => {
         <span className={styles.label}>Points</span>
       </NavLink>
 
-      <NavLink
-        to="/more-options"
-        className={({ isActive }) =>
-          `${styles.link} ${isActive ? styles.active : ""}`
-        }
+      <button
+        onClick={handleAuthClick}
+        className={styles.link}
+        style={{ background: "none", border: "none" }}
       >
         <span className={styles.iconWrap}>
           <FaEllipsisH className={styles.icon} />
         </span>
-        <span className={styles.label}>More</span>
-      </NavLink>
+        <span className={styles.label}>{isLoggedIn ? "Cuenta" : "Login"}</span>
+      </button>
     </nav>
   );
 };

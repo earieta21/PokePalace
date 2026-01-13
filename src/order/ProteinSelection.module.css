@@ -1,7 +1,6 @@
 /* Full-width wrapper (optional si ya lo metes en un container global) */
 .container {
   width: min(980px, calc(100% - 28px));
-  margin: 14px auto 0;
   border-radius: 26px;
 
   background: rgba(255, 255, 255, 0.62);
@@ -10,6 +9,8 @@
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.1);
 
   padding: 18px;
+
+  padding-bottom: calc(18px + 120px + env(safe-area-inset-bottom));
 }
 
 /* Title - avoid global h2 selector */
@@ -103,6 +104,17 @@
   display: flex;
   justify-content: flex-end;
   margin-top: 14px;
+
+  position: sticky;
+  bottom: calc(90px + env(safe-area-inset-bottom));
+  z-index: 30;
+
+  padding-top: 10px;
+  background: linear-gradient(
+    to top,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 255, 255, 0)
+  );
 }
 
 .nextButton {
@@ -125,18 +137,20 @@
 }
 
 /* Responsive */
-@media (max-width: 860px) {
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 480px) {
   .grid {
     grid-template-columns: 1fr;
   }
-
   .imageWrap {
-    height: 150px;
+    height: 140px;
+  }
+
+  .actions {
+    justify-content: center;
+  }
+
+  .nextButton {
+    width: 100%;
+    max-width: 420px;
   }
 }
