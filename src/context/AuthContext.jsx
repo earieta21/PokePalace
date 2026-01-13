@@ -1,22 +1,69 @@
 import { createContext, useEffect, useState } from "react";
 import { API_URL } from "../config";
 
-export const AuthContext = createContext(null);
+export const AuthContext = createContext();
 
-export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem("token"));
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem("user");
-    return saved ? JSON.parse(saved) : null;
-  });
+export const AuthProvider = ({ children }) => {
+  const [token, setToken] = useState(localStorage.getItem("token") || null);
+  const [user, setUser] = useState(
+    JSON.parse(localStorage.getItem("user") || "null")
+  );
 
-  const isLoggedIn = Boolean(token);
+  const isLoggedIn = !!token;
 
-  const saveSession = ({ token, user }) => {
-    setToken(token);
-    setUser(user);
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(user));
+  const login = async ({ email, password }) => {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data?.message || "Login failed");
+    }
+
+    // Ajusta si tu backend usa otro nombre
+    const receivedToken = data.token;
+    const receivedUser = data.user;
+
+    setToken(receivedToken);
+    setUser(receivedUser);
+
+    localStorage.setItem("token", receivedToken);
+    localStorage.setItem("user", JSON.stringify(receivedUser));
+
+    return data;
+  };
+
+  const register = async ({ name, email, password }) => {
+    const res = await fetch(`${API_URL}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data?.message || "Register failed");
+    }
+
+    // si tu backend regresa token al registrarte, te loguea de una vez:
+    const receivedToken = data.token;
+    const receivedUser = data.user;
+
+    if (receivedToken) {
+      setToken(receivedToken);
+      localStorage.setItem("token", receivedToken);
+    }
+    if (receivedUser) {
+      setUser(receivedUser);
+      localStorage.setItem("user", JSON.stringify(receivedUser));
+    }
+
+    return data;
   };
 
   const logout = () => {
@@ -26,44 +73,18 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("user");
   };
 
-  // (Opcional) validar token en futuro con /me
-  useEffect(() => {
-    // por ahora, solo mantenemos sesión local
-  }, []);
-
-  const register = async ({ name, email, password }) => {
-    const res = await fetch(`${API_URL}/api/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.msg || "Error al registrar");
-
-    saveSession(data);
-    return data;
-  };
-
-  const login = async ({ email, password }) => {
-    const res = await fetch(`${API_URL}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.msg || "Error al iniciar sesión");
-
-    saveSession(data);
-    return data;
-  };
-
   return (
     <AuthContext.Provider
-      value={{ token, user, isLoggedIn, register, login, logout }}
+      value={{
+        token,
+        user,
+        isLoggedIn,
+        login,
+        register,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>
   );
-}
+};
