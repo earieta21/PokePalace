@@ -5,25 +5,21 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/auth.js";
 import orderRoutes from "./routes/orders.js";
 
-
 dotenv.config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
 app.use("/api/auth", authRoutes);
 app.use("/api/orders", orderRoutes);
 
-
-// Health check
 app.get("/", (req, res) => {
   res.send("API Poke Palace funcionando 🍣");
 });
 
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
-
 
 const start = async () => {
   try {
@@ -31,7 +27,7 @@ const start = async () => {
     console.log("✅ MongoDB conectado");
 
     app.listen(PORT, () => {
-      console.log(`✅ Backend corriendo en http://localhost:${PORT}`);
+      console.log(`✅ Server running on ${PORT}`);
     });
   } catch (err) {
     console.error("❌ Error conectando a MongoDB:", err.message);
@@ -40,3 +36,4 @@ const start = async () => {
 };
 
 start();
+
