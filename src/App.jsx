@@ -4,68 +4,107 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 
-import Navbar from "./components/Navbar";
+// Customer pages
 import Home from "./pages/Home";
 import OrderPage from "./order/OrderPage";
 import RewardsDeals from "./pages/Promotions";
 import EarnPoints from "./pages/EarnPoints";
 import MoreOptions from "./more/MoreOptions";
 import MiCuenta from "./pages/MiCuenta";
-
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import OrderSummaryPage from "./pages/OrderSummaryPage";
+import OrderTracking from "./pages/OrderTracking";
 
+// Providers
 import { OrderProvider } from "./order/OrderContext";
 import { AuthContext } from "./context/AuthContext";
+import { StaffAuthProvider } from "./context/StaffAuthContext";
 
-// ✅ Componente para proteger rutas
+// Layouts
+import CustomerLayout from "./layouts/CustomerLayout";
+import PosLayout from "./layouts/PosLayout";
+
+// Staff portal
+import EmployeePortal from "./pos/EmployeePortal";
+
+// Staff auth UI + guard
+import StaffLogin from "./pages/StaffLogin";
+import RoleRoute from "./auth/RoleRoute";
+
 const PrivateRoute = ({ children }) => {
   const { isLoggedIn } = React.useContext(AuthContext);
-  return isLoggedIn ? children : <Navigate to="/login" replace />;
+  const location = useLocation();
+
+  return isLoggedIn ? (
+    children
+  ) : (
+    <Navigate
+      to="/login"
+      replace
+      state={{ from: location.pathname + location.search }}
+    />
+  );
 };
 
 const App = () => {
   return (
     <Router>
-      <OrderProvider>
-        <Navbar />
+      <StaffAuthProvider>
+        <OrderProvider>
+          <Routes>
+            {/* ✅ Customer App */}
+            <Route element={<CustomerLayout />}>
+              <Route path="/" element={<Home />} />
 
-        <Routes>
-          <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
 
-          {/* ✅ Auth */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+              <Route path="/rewards-deals" element={<RewardsDeals />} />
+              <Route path="/earn-points" element={<EarnPoints />} />
+              <Route path="/more-options" element={<MoreOptions />} />
 
-          {/* ✅ Rutas públicas */}
-          <Route path="/rewards-deals" element={<RewardsDeals />} />
-          <Route path="/earn-points" element={<EarnPoints />} />
-          <Route path="/more-options" element={<MoreOptions />} />
+              <Route path="/order" element={<OrderPage />} />
+              <Route path="/summary" element={<OrderSummaryPage />} />
+              <Route path="/seguimiento/:orderId" element={<OrderTracking />} />
 
-          {/* 🔒 Ruta protegida */}
-          <Route
-            path="/order"
-            element={
-              <PrivateRoute>
-                <OrderPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/mi-cuenta"
-            element={
-              <PrivateRoute>
-                <MiCuenta />
-              </PrivateRoute>
-            }
-          />
+              <Route
+                path="/mi-cuenta"
+                element={
+                  <PrivateRoute>
+                    <MiCuenta />
+                  </PrivateRoute>
+                }
+              />
+            </Route>
 
-          {/* 404 simple */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </OrderProvider>
+            {/* ✅ Staff Login */}
+            <Route path="/staff/login" element={<StaffLogin />} />
+
+            {/* ✅ Staff Portal — all roles land on /pos */}
+            <Route element={<PosLayout />}>
+              <Route
+                path="/pos"
+                element={
+                  <RoleRoute
+                    allowedRoles={["cashier", "kitchen", "manager", "admin", "owner"]}
+                  >
+                    <EmployeePortal />
+                  </RoleRoute>
+                }
+              />
+              {/* Legacy kitchen route → redirect to unified portal */}
+              <Route path="/kitchen" element={<Navigate to="/pos" replace />} />
+            </Route>
+
+            {/* fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </OrderProvider>
+      </StaffAuthProvider>
     </Router>
   );
 };

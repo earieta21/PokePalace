@@ -31,3 +31,10 @@
 .location-button:hover {
   background-color: #e5533c;
 }
+
+.error {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(127, 29, 29, 0.92);
+}

@@ -1,19 +1,30 @@
 :root {
-  /* Urban Jungle / Natural Modern tokens */
-  --bg-0: #faf7f0; /* sand */
-  --bg-1: #f3efe6; /* warm stone */
-  --text: #0b0f0d; /* near-black */
-  --muted: rgba(11, 15, 13, 0.72);
+  --bg:           #F5F3EE;
+  --bg-card:      #FFFFFF;
+  --bg-muted:     #EDEAE3;
+  --bg-subtle:    #F9F8F5;
 
-  --green: #0f7a4a; /* jungle primary */
-  --green-2: #34d399; /* emerald accent */
+  --text:         #1A1917;
+  --text-2:       #5C5A56;
+  --text-3:       #9C9A96;
 
-  --card: rgba(255, 255, 255, 0.6);
-  --border: rgba(0, 0, 0, 0.08);
-  --shadow: 0 14px 34px rgba(0, 0, 0, 0.1);
+  --accent:       #4A7A5A;
+  --accent-2:     #6B9E79;
+  --accent-bg:    rgba(74, 122, 90, 0.07);
+  --accent-border:rgba(74, 122, 90, 0.22);
 
-  --radius-xl: 26px;
-  --radius-lg: 18px;
+  --border:       rgba(0, 0, 0, 0.07);
+  --border-md:    rgba(0, 0, 0, 0.11);
+
+  --shadow-xs:    0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md:    0 4px 16px rgba(0, 0, 0, 0.07);
+  --shadow-lg:    0 8px 28px rgba(0, 0, 0, 0.08);
+
+  --radius-sm:    8px;
+  --radius-md:    12px;
+  --radius-lg:    16px;
+  --radius-xl:    20px;
 
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     Roboto, Helvetica, Arial, sans-serif;
@@ -30,33 +41,16 @@
   box-sizing: border-box;
 }
 
-html,
-body {
+html, body {
   height: 100%;
 }
 
 body {
   margin: 0;
   color: var(--text);
-
-  /* Global background theme */
-  background: radial-gradient(
-      1100px 500px at 12% 10%,
-      rgba(34, 197, 94, 0.14),
-      transparent 60%
-    ),
-    radial-gradient(
-      900px 420px at 92% 18%,
-      rgba(16, 185, 129, 0.1),
-      transparent 58%
-    ),
-    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
-
-  /* Important: remove the demo flex centering */
+  background: var(--bg);
   display: block;
-
-  /* Space for bottom navbar */
-  padding-bottom: 86px;
+  padding-bottom: 90px;
 }
 
 a {
@@ -64,31 +58,22 @@ a {
   text-decoration: none;
 }
 
-a:hover {
-  color: var(--green);
-}
-
-/* Buttons (base) - individual components can override */
 button {
   border: none;
-  border-radius: 14px;
-  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
 }
 
-/* Utility container you can use anywhere */
+h1, h2, h3 {
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
 .container {
   width: min(1180px, calc(100% - 36px));
   margin: 0 auto;
-}
-
-/* Optional: basic headings */
-h1,
-h2,
-h3 {
-  margin: 0;
-  letter-spacing: -0.4px;
 }

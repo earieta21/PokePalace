@@ -1,0 +1,16 @@
+import mongoose from "mongoose";
+
+const inventorySchema = new mongoose.Schema(
+  {
+    item:     { type: String, required: true },
+    category: { type: String, default: "Other" },
+    unit:     { type: String, required: true },
+    qty:      { type: Number, required: true, min: 0 },
+    minQty:   { type: Number, default: 0 },
+    cost:     { type: Number, default: 0 },     // cost per unit in dollars
+    supplier: { type: String, default: "" },
+  },
+  { timestamps: true }
+);
+
+export default mongoose.model("Inventory", inventorySchema);

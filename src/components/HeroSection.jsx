@@ -11,8 +11,7 @@ const HeroSection = () => {
   };
 
   const handleViewMenu = () => {
-    // si todavía no tienes /menu, cámbialo o quítalo
-    navigate("/menu");
+    navigate("/order");
   };
 
   return (
@@ -30,41 +29,41 @@ const HeroSection = () => {
         <div className={styles.badge}>Urban Jungle • Natural Modern</div>
 
         <h1 className={styles.heroTitle}>
-          Fresh Poke, <span className={styles.accent}>crafted</span> your way.
+          Poke fresco, <span className={styles.accent}>hecho</span> a tu gusto.
         </h1>
 
         <p className={styles.heroSubtitle}>
-          Clean ingredients. Bold flavor. A modern vibe inspired by nature.
+          Ingredientes frescos. Sabor intenso. Una experiencia moderna inspirada en la naturaleza.
         </p>
 
         <div className={styles.actions}>
           <button className={styles.primaryBtn} onClick={handleOrderNow}>
-            Order Now
+            Ordenar Ahora
           </button>
 
           <button className={styles.secondaryBtn} onClick={handleViewMenu}>
-            View Menu
+            Ver Menú
           </button>
         </div>
 
         <div className={styles.stats}>
           <div className={styles.stat}>
             <p className={styles.statValue}>Premium</p>
-            <p className={styles.statLabel}>Quality ingredients</p>
+            <p className={styles.statLabel}>Ingredientes de calidad</p>
           </div>
 
           <div className={styles.divider} />
 
           <div className={styles.stat}>
-            <p className={styles.statValue}>Fast</p>
-            <p className={styles.statLabel}>Smooth ordering</p>
+            <p className={styles.statValue}>Rápido</p>
+            <p className={styles.statLabel}>Pedido sin complicaciones</p>
           </div>
 
           <div className={styles.divider} />
 
           <div className={styles.stat}>
-            <p className={styles.statValue}>Custom</p>
-            <p className={styles.statLabel}>Build your bowl</p>
+            <p className={styles.statValue}>A tu gusto</p>
+            <p className={styles.statLabel}>Arma tu bowl</p>
           </div>
         </div>
       </div>

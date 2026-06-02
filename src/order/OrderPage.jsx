@@ -1,58 +1,56 @@
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+
 import BaseSelection from "./BaseSelection";
 import ProteinSelection from "./ProteinSelection";
 import MarinadeSelection from "./MarinadeSelection";
 import ComplementsSelection from "./ComplementsSelection";
 import SauceSelection from "./SauceSelection";
 import ToppingsSelection from "./ToppingsSelection";
-import OrderSummary from "./OrderSummary";
-import React, { useContext, useState } from "react";
-import { AuthContext } from "../context/AuthContext";
-import { API_URL } from "../config";
 
 const OrderPage = () => {
   const [step, setStep] = useState(0);
-  const { token } = useContext(AuthContext);
-  const [saving, setSaving] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const nextStep = () => {
-    setStep((prev) => prev + 1);
+  const isGuest = Boolean(location.state?.guest);
+
+  // ✅ detecta si vienes desde summary a editar solo un paso
+  const editMode = searchParams.get("edit") === "1";
+
+  // ✅ Soporta /order?step=3 (para editar desde Summary)
+  useEffect(() => {
+    const qsStep = Number(searchParams.get("step"));
+    if (!Number.isNaN(qsStep) && qsStep >= 0 && qsStep <= 5) {
+      setStep(qsStep);
+    }
+  }, [searchParams]);
+
+  const nextStep = () => setStep((prev) => prev + 1);
+
+  // ✅ Siempre regresa a summary y mantiene guest
+  const goToSummary = () => {
+    navigate("/summary", { state: { guest: isGuest } });
+  };
+
+  // ✅ Cuando estás editando, el "Next" debe volver a summary
+  const handleNext = () => {
+    if (editMode) {
+      goToSummary();
+      return;
+    }
+    nextStep();
   };
 
   const steps = [
-    <BaseSelection onNext={nextStep} />,
-    <ProteinSelection onNext={nextStep} />,
-    <MarinadeSelection onNext={nextStep} />,
-    <ComplementsSelection onNext={nextStep} />,
-    <SauceSelection onNext={nextStep} />,
-    <ToppingsSelection onNext={nextStep} />,
-    <OrderSummary
-      onEditStep={(stepIndex) => setStep(stepIndex)}
-      onConfirm={async () => {
-        try {
-          setSaving(true);
-
-          const res = await fetch(`${API_URL}/api/orders`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(order),
-          });
-
-          const data = await res.json();
-          if (!res.ok)
-            throw new Error(data?.msg || "No se pudo guardar la orden");
-
-          alert("✅ Order saved!");
-          // opcional: reset order / mandar a mi-cuenta
-        } catch (e) {
-          alert(`❌ ${e.message}`);
-        } finally {
-          setSaving(false);
-        }
-      }}
-    />,
+    <BaseSelection key="base" onNext={handleNext} />,
+    <ProteinSelection key="protein" onNext={handleNext} />,
+    <MarinadeSelection key="marinade" onNext={handleNext} />,
+    <ComplementsSelection key="complements" onNext={handleNext} />,
+    <SauceSelection key="sauce" onNext={handleNext} />,
+    // ✅ En el último paso, siempre termina en summary
+    <ToppingsSelection key="toppings" onNext={goToSummary} />,
   ];
 
   return <div>{steps[step]}</div>;

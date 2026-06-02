@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
 import styles from "./MarinadeSelection.module.css";
 
@@ -17,88 +17,57 @@ const MarinadeSelection = ({ onNext }) => {
   const { order, updateOrder } = useOrder();
 
   const marinades = [
-    {
-      id: "citrus_marinade",
-      name: "Citrus Marinade (Marinado Cítrico)",
-      image: citrico,
-    },
-    {
-      id: "shoyu_marinade",
-      name: "Shoyu Marinade (Marinado Shoyu)",
-      image: shoyu,
-    },
-    {
-      id: "ponzu_marinade",
-      name: "Ponzu Marinade (Marinado Ponzu)",
-      image: punzu,
-    },
-    {
-      id: "spicy_marinade",
-      name: "Spicy Marinade (Marinado Spicy)",
-      image: spicy,
-    },
-    {
-      id: "sesame_marinade",
-      name: "Sesame Marinade (Marinado de Sésamo)",
-      image: sesame,
-    },
-    {
-      id: "wasabi_marinade",
-      name: "Wasabi Marinade (Marinado de Wasabi)",
-      image: wassabi,
-    },
-    {
-      id: "miso_marinade",
-      name: "Miso Marinade (Marinado de Miso)",
-      image: miso,
-    },
-    {
-      id: "garlic_ginger_marinade",
-      name: "Garlic Ginger Marinade (Marinado de Ajo y Jengibre)",
-      image: garlicGinger,
-    },
+    { id: "citrus_marinade",       name: "Marinado Cítrico",        image: citrico },
+    { id: "shoyu_marinade",        name: "Marinado Shoyu",           image: shoyu },
+    { id: "ponzu_marinade",        name: "Marinado Ponzu",           image: punzu },
+    { id: "spicy_marinade",        name: "Marinado Picante",         image: spicy },
+    { id: "sesame_marinade",       name: "Marinado de Sésamo",       image: sesame },
+    { id: "wasabi_marinade",       name: "Marinado de Wasabi",       image: wassabi },
+    { id: "miso_marinade",         name: "Marinado de Miso",         image: miso },
+    { id: "garlic_ginger_marinade",name: "Marinado de Ajo y Jengibre",image: garlicGinger },
   ];
 
   const [selectedMarinades, setSelectedMarinades] = useState(
     order.marinades || []
   );
-
-  useEffect(() => {
-    // Guardar en el key correcto: "marinades"
-    updateOrder("marinades", selectedMarinades);
-  }, [selectedMarinades, updateOrder]);
+  const [error, setError] = useState("");
 
   const toggleMarinade = (marinadeId) => {
     setSelectedMarinades((prev) => {
       if (prev.includes(marinadeId)) {
-        return prev.filter((id) => id !== marinadeId);
+        const next = prev.filter((id) => id !== marinadeId);
+        updateOrder("marinades", next);
+        return next;
       }
 
       if (prev.length >= MAX_MARINADES) {
-        alert(`You can select up to ${MAX_MARINADES} marinades.`);
+        setError(`Solo puedes elegir hasta ${MAX_MARINADES} marinados.`);
         return prev;
       }
 
-      return [...prev, marinadeId];
+      setError("");
+      const next = [...prev, marinadeId];
+      updateOrder("marinades", next);
+      return next;
     });
   };
 
   const handleNext = () => {
-    if (selectedMarinades.length > 0) {
-      // Pasamos data al step también (consistencia con tu flow)
-      onNext({ marinades: selectedMarinades });
-    } else {
-      alert("Please select at least one marinade before proceeding!");
+    if (selectedMarinades.length === 0) {
+      setError("Selecciona al menos un marinado para continuar.");
+      return;
     }
+    setError("");
+    onNext();
   };
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>Step 3 of 6</div>
-        <h2 className={styles.title}>Choose your marinades</h2>
+        <div className={styles.badge}>Paso 3 de 6</div>
+        <h2 className={styles.title}>Elige tus marinados</h2>
         <p className={styles.subtitle}>
-          Add flavor layers to your protein. Choose up to {MAX_MARINADES}.
+          Dale sabor a tu proteína. Elige hasta {MAX_MARINADES}.
         </p>
       </div>
 
@@ -127,13 +96,19 @@ const MarinadeSelection = ({ onNext }) => {
         ))}
       </div>
 
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
+
       <div className={styles.actions}>
         <span className={styles.helper}>
-          Selected {selectedMarinades.length} / {MAX_MARINADES}
+          Seleccionados {selectedMarinades.length} / {MAX_MARINADES}
         </span>
 
         <button className={styles.nextButton} onClick={handleNext}>
-          Next
+          Siguiente
         </button>
       </div>
     </div>

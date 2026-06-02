@@ -70,10 +70,9 @@
   font-size: 13px;
   font-weight: 900;
 
-  /* Jungle green */
-  color: #0f7a4a;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.22);
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
   display: inline-flex;
   padding: 6px 10px;
   border-radius: 999px;

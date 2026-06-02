@@ -13,22 +13,29 @@ const ContactForm = () => {
     setFormData({ ...formData, [name]: value });
   };
 
+  const [submitted, setSubmitted] = useState(false);
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    alert("Thank you for reaching out!");
-    setFormData({ name: "", email: "", message: "" }); // Reset form
+    setSubmitted(true);
+    setFormData({ name: "", email: "", message: "" });
   };
 
   return (
     <div className={styles.contactForm}>
-      <h2>Contact Us</h2>
+      <h2>Contáctanos</h2>
+      {submitted && (
+        <p className={styles.success} role="status">
+          ¡Gracias por escribirnos! Nos pondremos en contacto pronto.
+        </p>
+      )}
       <form onSubmit={handleSubmit} className={styles.form}>
         <input
           type="text"
           name="name"
           value={formData.name}
           onChange={handleChange}
-          placeholder="Your Name"
+          placeholder="Tu nombre"
           className={styles.input}
         />
         <input
@@ -36,18 +43,18 @@ const ContactForm = () => {
           name="email"
           value={formData.email}
           onChange={handleChange}
-          placeholder="Your Email"
+          placeholder="Tu correo electrónico"
           className={styles.input}
         />
         <textarea
           name="message"
           value={formData.message}
           onChange={handleChange}
-          placeholder="Your Message"
+          placeholder="Tu mensaje"
           className={styles.textarea}
         />
         <button type="submit" className={styles.button}>
-          Submit
+          Enviar
         </button>
       </form>
     </div>

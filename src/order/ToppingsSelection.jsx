@@ -17,77 +17,57 @@ const ToppingsSelection = ({ onNext }) => {
   const { order, updateOrder } = useOrder();
 
   const toppings = [
-    { id: "sesame_seeds", name: "Sesame Seeds (Ajonjolí)", image: ajonjoli },
-    {
-      id: "crispy_onions",
-      name: "Crispy Onions (Cebolla Crujiente)",
-      image: onions,
-    },
-    {
-      id: "nori_strips",
-      name: "Nori Strips (Tiras de Alga Nori)",
-      image: algaNori,
-    },
-    {
-      id: "red_pepper_flakes",
-      name: "Red Pepper Flakes (Pimienta Roja en Polvo)",
-      image: pimientaRoja,
-    },
-    {
-      id: "pickled_radish",
-      name: "Pickled Radish (Rábano Encurtido)",
-      image: rabanos,
-    },
-    {
-      id: "toasted_coconut",
-      name: "Toasted Coconut Flakes (Copos de Coco Tostado)",
-      image: cocoTostado,
-    },
-    {
-      id: "pumpkin_seeds",
-      name: "Pumpkin Seeds (Pepitas)",
-      image: pumpkingSeeds,
-    },
-    { id: "furikake", name: "Furikake (Furikake)", image: furikake },
+    { id: "sesame_seeds",     name: "Ajonjolí",               image: ajonjoli },
+    { id: "crispy_onions",    name: "Cebolla Crujiente",       image: onions },
+    { id: "nori_strips",      name: "Tiras de Alga Nori",      image: algaNori },
+    { id: "red_pepper_flakes",name: "Pimienta Roja en Hojuelas",image: pimientaRoja },
+    { id: "pickled_radish",   name: "Rábano Encurtido",        image: rabanos },
+    { id: "toasted_coconut",  name: "Copos de Coco Tostado",   image: cocoTostado },
+    { id: "pumpkin_seeds",    name: "Pepitas",                 image: pumpkingSeeds },
+    { id: "furikake",         name: "Furikake",                image: furikake },
   ];
 
   const [selectedToppings, setSelectedToppings] = useState(
     order.toppings || []
   );
+  const [error, setError] = useState("");
 
   const toggleTopping = (toppingId) => {
     setSelectedToppings((prev) => {
-      // remove
       if (prev.includes(toppingId)) {
-        const updated = prev.filter((id) => id !== toppingId);
-        updateOrder("toppings", updated);
-        return updated;
+        const next = prev.filter((id) => id !== toppingId);
+        updateOrder("toppings", next);
+        return next;
       }
 
-      // add (limit)
       if (prev.length >= MAX_TOPPINGS) {
-        alert(`You can select up to ${MAX_TOPPINGS} toppings.`);
+        setError(`Solo puedes elegir hasta ${MAX_TOPPINGS} toppings.`);
         return prev;
       }
 
-      const updated = [...prev, toppingId];
-      updateOrder("toppings", updated);
-      return updated;
+      setError("");
+      const next = [...prev, toppingId];
+      updateOrder("toppings", next);
+      return next;
     });
   };
 
   const handleNext = () => {
-    if (selectedToppings.length > 0) onNext({ toppings: selectedToppings });
-    else alert("Please select at least one topping before proceeding!");
+    if (selectedToppings.length === 0) {
+      setError("Selecciona al menos un topping para continuar.");
+      return;
+    }
+    setError("");
+    onNext();
   };
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>Step 6 of 6</div>
-        <h2 className={styles.title}>Choose your toppings</h2>
+        <div className={styles.badge}>Paso 6 de 6</div>
+        <h2 className={styles.title}>Elige tus toppings</h2>
         <p className={styles.subtitle}>
-          Finish with crunch + texture. Choose up to {MAX_TOPPINGS}.
+          El toque final de textura y sabor. Elige hasta {MAX_TOPPINGS}.
         </p>
       </div>
 
@@ -116,13 +96,19 @@ const ToppingsSelection = ({ onNext }) => {
         ))}
       </div>
 
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
+
       <div className={styles.actions}>
         <span className={styles.helper}>
-          Selected {selectedToppings.length} / {MAX_TOPPINGS}
+          Seleccionados {selectedToppings.length} / {MAX_TOPPINGS}
         </span>
 
         <button className={styles.nextButton} onClick={handleNext}>
-          Next
+          Siguiente
         </button>
       </div>
     </div>

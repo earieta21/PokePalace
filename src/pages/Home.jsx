@@ -53,8 +53,8 @@ const Home = () => {
 
       {/* Popular Bowls */}
       <section className={styles.section}>
-        <h2 className={styles.title}>Popular Bowls</h2>
-        <p className={styles.subtitle}>Signature picks + customer favorites.</p>
+        <h2 className={styles.title}>Bowls Populares</h2>
+        <p className={styles.subtitle}>Favoritos de la casa + los más pedidos.</p>
 
         <Menu items={menuItems} />
 
@@ -63,13 +63,13 @@ const Home = () => {
             className={styles.primaryBtn}
             onClick={() => navigate("/order")}
           >
-            Build Your Bowl
+            Arma tu Bowl
           </button>
           <button
             className={styles.secondaryBtn}
             onClick={() => navigate("/order")}
           >
-            Order Signature
+            Bowls Especiales
           </button>
         </div>
       </section>

@@ -12,34 +12,36 @@ const ProteinSelection = ({ onNext }) => {
   const { order, updateOrder } = useOrder();
 
   const proteins = [
-    { id: "tuna", name: "Tuna", image: tuna },
-    { id: "salmon", name: "Salmon", image: salmon },
-    { id: "shrimp", name: "Shrimp", image: shrimp },
-    { id: "octopus", name: "Octopus", image: octopus },
-    { id: "seared_tuna", name: "Seared Tuna", image: searedTuna },
+    { id: "tuna", name: "Atún", image: tuna },
+    { id: "salmon", name: "Salmón", image: salmon },
+    { id: "shrimp", name: "Camarón", image: shrimp },
+    { id: "octopus", name: "Pulpo", image: octopus },
+    { id: "seared_tuna", name: "Atún Sellado", image: searedTuna },
   ];
 
   const [selectedProtein, setSelectedProtein] = useState(order.protein || null);
+  const [error, setError] = useState("");
 
   const handleSelection = (proteinId) => {
     setSelectedProtein(proteinId);
     updateOrder("protein", proteinId);
+    setError("");
   };
 
   const handleNext = () => {
-    if (selectedProtein) {
-      onNext({ protein: selectedProtein });
-    } else {
-      alert("Please select a protein before proceeding!");
+    if (!selectedProtein) {
+      setError("Selecciona una proteína para continuar.");
+      return;
     }
+    onNext();
   };
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>Step 2 of 6</div>
-        <h2 className={styles.title}>Choose your protein</h2>
-        <p className={styles.subtitle}>Pick the main flavor of your bowl.</p>
+        <div className={styles.badge}>Paso 2 de 6</div>
+        <h2 className={styles.title}>Elige tu proteína</h2>
+        <p className={styles.subtitle}>El ingrediente estrella de tu bowl.</p>
       </div>
 
       <div className={styles.grid}>
@@ -67,9 +69,15 @@ const ProteinSelection = ({ onNext }) => {
         ))}
       </div>
 
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
+
       <div className={styles.actions}>
         <button className={styles.nextButton} onClick={handleNext}>
-          Next
+          Siguiente
         </button>
       </div>
     </div>

@@ -22,69 +22,62 @@ const ComplementsSelection = ({ onNext }) => {
   const { order, updateOrder } = useOrder();
 
   const complements = [
-    {
-      id: "shredded_carrots",
-      name: "Zanahoria Rallada (Shredded Carrots)",
-      image: zanahoria,
-    },
-    { id: "cucumber", name: "Pepino (Cucumber)", image: pepino },
-    { id: "mango", name: "Mango (Mango)", image: mango },
-    { id: "jicama", name: "Jícama (Jicama)", image: jicama },
-    { id: "seaweed", name: "Algas (Seaweed)", image: algas },
-    { id: "avocado", name: "Aguacate (Avocado)", image: aguacate },
-    { id: "edamame", name: "Edamame (Edamame)", image: edamames },
-    { id: "kale", name: "Col Rizada (Kale)", image: colRizado },
-    { id: "peas", name: "Chícharos (Peas)", image: chicharos },
-    {
-      id: "red_bell_pepper",
-      name: "Pimiento Rojo (Red Bell Pepper)",
-      image: redpeper,
-    },
-    { id: "corn", name: "Maíz (Corn)", image: maiz },
-    { id: "pineapple", name: "Piña (Pineapple)", image: pina },
-    { id: "chia_seeds", name: "Semillas de Chía (Chia Seeds)", image: chia },
+    { id: "shredded_carrots", name: "Zanahoria Rallada",  image: zanahoria },
+    { id: "cucumber",         name: "Pepino",             image: pepino },
+    { id: "mango",            name: "Mango",              image: mango },
+    { id: "jicama",           name: "Jícama",             image: jicama },
+    { id: "seaweed",          name: "Algas",              image: algas },
+    { id: "avocado",          name: "Aguacate",           image: aguacate },
+    { id: "edamame",          name: "Edamame",            image: edamames },
+    { id: "kale",             name: "Col Rizada",         image: colRizado },
+    { id: "peas",             name: "Chícharos",          image: chicharos },
+    { id: "red_bell_pepper",  name: "Pimiento Rojo",      image: redpeper },
+    { id: "corn",             name: "Maíz",               image: maiz },
+    { id: "pineapple",        name: "Piña",               image: pina },
+    { id: "chia_seeds",       name: "Semillas de Chía",   image: chia },
   ];
 
   const [selectedComplements, setSelectedComplements] = useState(
     order.complements || []
   );
+  const [error, setError] = useState("");
 
   const toggleComplement = (complementId) => {
     setSelectedComplements((prev) => {
-      // remove
       if (prev.includes(complementId)) {
-        const updated = prev.filter((id) => id !== complementId);
-        updateOrder("complements", updated);
-        return updated;
+        const next = prev.filter((id) => id !== complementId);
+        updateOrder("complements", next);
+        return next;
       }
 
-      // add (limit)
       if (prev.length >= MAX_COMPLEMENTS) {
-        alert(`You can select up to ${MAX_COMPLEMENTS} complements.`);
+        setError(`Solo puedes elegir hasta ${MAX_COMPLEMENTS} complementos.`);
         return prev;
       }
 
-      const updated = [...prev, complementId];
-      updateOrder("complements", updated);
-      return updated;
+      setError("");
+      const next = [...prev, complementId];
+      updateOrder("complements", next);
+      return next;
     });
   };
 
   const handleNext = () => {
-    if (selectedComplements.length > 0) {
-      onNext({ complements: selectedComplements });
-    } else {
-      alert("Please select at least one complement before proceeding!");
+    if (selectedComplements.length === 0) {
+      setError("Selecciona al menos un complemento para continuar.");
+      return;
     }
+    setError("");
+    onNext();
   };
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>Step 4 of 6</div>
-        <h2 className={styles.title}>Choose your complements</h2>
+        <div className={styles.badge}>Paso 4 de 6</div>
+        <h2 className={styles.title}>Elige tus complementos</h2>
         <p className={styles.subtitle}>
-          Add crunch, sweetness, and greens. Choose up to {MAX_COMPLEMENTS}.
+          Agrega textura, dulzura y verdes. Elige hasta {MAX_COMPLEMENTS}.
         </p>
       </div>
 
@@ -112,13 +105,19 @@ const ComplementsSelection = ({ onNext }) => {
         ))}
       </div>
 
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
+
       <div className={styles.actions}>
         <span className={styles.helper}>
-          Selected {selectedComplements.length} / {MAX_COMPLEMENTS}
+          Seleccionados {selectedComplements.length} / {MAX_COMPLEMENTS}
         </span>
 
         <button className={styles.nextButton} onClick={handleNext}>
-          Next
+          Siguiente
         </button>
       </div>
     </div>

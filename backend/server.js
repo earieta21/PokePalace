@@ -2,8 +2,13 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
-import authRoutes from "./routes/auth.js";
-import orderRoutes from "./routes/orders.js";
+import authRoutes        from "./routes/auth.js";
+import orderRoutes       from "./routes/orders.js";
+import staffAuthRoutes   from "./routes/staffAuth.js";
+import staffOrderRoutes  from "./routes/staffOrders.js";
+import staffInvRoutes    from "./routes/staffInventory.js";
+import staffWasteRoutes  from "./routes/staffWaste.js";
+import staffEmpRoutes    from "./routes/staffEmployees.js";
 
 dotenv.config();
 
@@ -11,19 +16,31 @@ const app = express();
 
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://pokepalace.netlify.app",
-    ],
+    origin: (origin, callback) => {
+      // Allow any localhost port (dev) + production domains
+      const allowed = [
+        /^http:\/\/localhost:\d+$/,
+        /^https:\/\/pokepalace\.netlify\.app$/,
+        /^https:\/\/pokepalace\.onrender\.com$/,
+      ];
+      if (!origin || allowed.some((r) => r.test(origin))) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked: ${origin}`));
+      }
+    },
     credentials: true,
   })
 );
-
 app.use(express.json());
 
-app.use("/api/auth", authRoutes);
-app.use("/api/orders", orderRoutes);
+app.use("/api/auth",            authRoutes);
+app.use("/api/staff-auth",     staffAuthRoutes);
+app.use("/api/orders",         orderRoutes);
+app.use("/api/staff/orders",   staffOrderRoutes);
+app.use("/api/staff/inventory",staffInvRoutes);
+app.use("/api/staff/waste",    staffWasteRoutes);
+app.use("/api/staff/employees",staffEmpRoutes);
 
 app.get("/", (req, res) => {
   res.send("API Poke Palace funcionando 🍣");

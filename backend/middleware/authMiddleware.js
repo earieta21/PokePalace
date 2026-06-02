@@ -1,8 +1,12 @@
 import jwt from "jsonwebtoken";
 
-export const protect = (req, res, next) => {
+const getBearerToken = (req) => {
   const header = req.headers.authorization || "";
-  const token = header.startsWith("Bearer ") ? header.split(" ")[1] : null;
+  return header.startsWith("Bearer ") ? header.split(" ")[1] : null;
+};
+
+export const protect = (req, res, next) => {
+  const token = getBearerToken(req);
 
   if (!token) return res.status(401).json({ msg: "No autorizado (sin token)" });
 
@@ -13,4 +17,19 @@ export const protect = (req, res, next) => {
   } catch {
     return res.status(401).json({ msg: "Token inválido" });
   }
+};
+
+export const optionalAuth = (req, res, next) => {
+  const token = getBearerToken(req);
+
+  if (!token) return next();
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.userId = decoded.id;
+  } catch {
+    return res.status(401).json({ msg: "Token inválido" });
+  }
+
+  return next();
 };

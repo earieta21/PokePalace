@@ -5,6 +5,7 @@ backend/.env
 # node
 node_modules
 backend/node_modules
+dist
 
 # macOS
 .DS_Store

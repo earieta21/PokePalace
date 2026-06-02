@@ -1,4 +1,4 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useState } from "react";
 import { API_URL } from "../config";
 
 export const AuthContext = createContext();
@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      throw new Error(data?.message || "Login failed");
+      throw new Error(data?.msg || data?.message || "No se pudo iniciar sesión");
     }
 
     // Ajusta si tu backend usa otro nombre
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      throw new Error(data?.message || "Register failed");
+      throw new Error(data?.msg || data?.message || "No se pudo crear la cuenta");
     }
 
     // si tu backend regresa token al registrarte, te loguea de una vez:

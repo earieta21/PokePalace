@@ -13,34 +13,39 @@ const BaseSelection = ({ onNext }) => {
   const { order, updateOrder } = useOrder();
 
   const bases = [
-    { id: "white_rice", name: "White Rice", image: whiteRice },
-    { id: "brown_rice", name: "Brown Rice", image: brownRice },
+    { id: "white_rice", name: "Arroz Blanco", image: whiteRice },
+    { id: "brown_rice", name: "Arroz Integral", image: brownRice },
     { id: "quinoa", name: "Quinoa", image: quinoa },
-    { id: "mixed_greens", name: "Mixed Greens", image: mixedGreens },
-    { id: "soba_noodles", name: "Soba Noodles", image: sobaNoodles },
+    { id: "mixed_greens", name: "Mezcla de Verdes", image: mixedGreens },
+    { id: "soba_noodles", name: "Fideos Soba", image: sobaNoodles },
     { id: "zoodles", name: "Zoodles", image: zoodles },
   ];
 
   const [selectedBase, setSelectedBase] = useState(order.base || null);
+  const [error, setError] = useState("");
 
   const handleSelection = (baseId) => {
     setSelectedBase(baseId);
     updateOrder("base", baseId);
+    setError("");
   };
 
   const handleNext = () => {
-    if (selectedBase) onNext({ base: selectedBase });
-    else alert("Please select a base before proceeding!");
+    if (!selectedBase) {
+      setError("Selecciona una base para continuar.");
+      return;
+    }
+    onNext();
   };
 
   return (
     <div className={styles.wrapper}>
       <div className={styles.container}>
         <div className={styles.header}>
-          <div className={styles.badge}>Step 1 of 6</div>
-          <h2 className={styles.title}>Choose your base</h2>
+          <div className={styles.badge}>Paso 1 de 6</div>
+          <h2 className={styles.title}>Elige tu base</h2>
           <p className={styles.subtitle}>
-            Start clean — rice, greens, or noodles.
+            Empieza con arroz, verdes o fideos.
           </p>
         </div>
 
@@ -68,9 +73,15 @@ const BaseSelection = ({ onNext }) => {
           ))}
         </div>
 
+        {error && (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        )}
+
         <div className={styles.actions}>
           <button className={styles.nextButton} onClick={handleNext}>
-            Next
+            Siguiente
           </button>
         </div>
       </div>

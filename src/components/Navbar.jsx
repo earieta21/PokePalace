@@ -1,32 +1,19 @@
-//import React from "react";
-import React, { useContext } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import React from "react";
+import { NavLink } from "react-router-dom";
 import {
   FaHome,
   FaShoppingCart,
   FaGift,
-  FaCoins,
   FaEllipsisH,
 } from "react-icons/fa";
 import styles from "./Navbar.module.css";
-import { AuthContext } from "../context/AuthContext";
 
 const Navbar = () => {
-  const { isLoggedIn, logout } = useContext(AuthContext);
-  const navigate = useNavigate();
-
-  const handleAuthClick = () => {
-    if (isLoggedIn) {
-      navigate("/mi-cuenta");
-    } else {
-      navigate("/login");
-    }
-  };
-
   return (
     <nav className={styles.navbar}>
       <NavLink
         to="/"
+        end
         className={({ isActive }) =>
           `${styles.link} ${isActive ? styles.active : ""}`
         }
@@ -34,7 +21,7 @@ const Navbar = () => {
         <span className={styles.iconWrap}>
           <FaHome className={styles.icon} />
         </span>
-        <span className={styles.label}>Home</span>
+        <span className={styles.label}>Inicio</span>
       </NavLink>
 
       <NavLink
@@ -46,7 +33,7 @@ const Navbar = () => {
         <span className={styles.iconWrap}>
           <FaShoppingCart className={styles.icon} />
         </span>
-        <span className={styles.label}>Order</span>
+        <span className={styles.label}>Ordenar</span>
       </NavLink>
 
       <NavLink
@@ -58,31 +45,20 @@ const Navbar = () => {
         <span className={styles.iconWrap}>
           <FaGift className={styles.icon} />
         </span>
-        <span className={styles.label}>Rewards</span>
+        <span className={styles.label}>Premios</span>
       </NavLink>
 
       <NavLink
-        to="/earn-points"
+        to="/more-options"
         className={({ isActive }) =>
           `${styles.link} ${isActive ? styles.active : ""}`
         }
       >
         <span className={styles.iconWrap}>
-          <FaCoins className={styles.icon} />
-        </span>
-        <span className={styles.label}>Points</span>
-      </NavLink>
-
-      <button
-        onClick={handleAuthClick}
-        className={styles.link}
-        style={{ background: "none", border: "none" }}
-      >
-        <span className={styles.iconWrap}>
           <FaEllipsisH className={styles.icon} />
         </span>
-        <span className={styles.label}>{isLoggedIn ? "Cuenta" : "Login"}</span>
-      </button>
+        <span className={styles.label}>Más</span>
+      </NavLink>
     </nav>
   );
 };

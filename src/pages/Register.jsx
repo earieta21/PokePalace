@@ -1,6 +1,7 @@
 import { useContext, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import styles from "./Register.module.css";
 
 export default function Register() {
   const { register } = useContext(AuthContext);
@@ -28,40 +29,72 @@ export default function Register() {
   };
 
   return (
-    <div style={{ maxWidth: 420, margin: "40px auto" }}>
-      <h2>Crear cuenta</h2>
+    <div className={styles.wrapper}>
+      <div className={styles.card}>
+        <div className={styles.header}>
+          <h2 className={styles.title}>Crear cuenta</h2>
+          <p className={styles.subTitle}>
+            Crea tu cuenta para ordenar más rápido.
+          </p>
+        </div>
 
-      <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
-        <input
-          name="name"
-          placeholder="Nombre"
-          value={form.name}
-          onChange={handleChange}
-        />
-        <input
-          name="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={handleChange}
-        />
-        <input
-          name="password"
-          type="password"
-          placeholder="Password"
-          value={form.password}
-          onChange={handleChange}
-        />
+        {error && <div className={styles.error}>{error}</div>}
 
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.field}>
+            <label className={styles.label}>Nombre</label>
+            <input
+              className={styles.input}
+              name="name"
+              placeholder="Nombre"
+              value={form.name}
+              onChange={handleChange}
+              autoComplete="name"
+              required
+            />
+          </div>
 
-        <button disabled={loading}>
-          {loading ? "Creando..." : "Crear cuenta"}
-        </button>
-      </form>
+          <div className={styles.field}>
+            <label className={styles.label}>Email</label>
+            <input
+              className={styles.input}
+              name="email"
+              type="email"
+              placeholder="Email"
+              value={form.email}
+              onChange={handleChange}
+              autoComplete="email"
+              required
+            />
+          </div>
 
-      <p style={{ marginTop: 12 }}>
-        ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
-      </p>
+          <div className={styles.field}>
+            <label className={styles.label}>Contraseña</label>
+            <input
+              className={styles.input}
+              name="password"
+              type="password"
+              placeholder="Password"
+              value={form.password}
+              onChange={handleChange}
+              autoComplete="new-password"
+              required
+              minLength={8}
+            />
+          </div>
+
+          <button className={styles.button} disabled={loading}>
+            {loading ? "Creando..." : "Crear cuenta"}
+          </button>
+        </form>
+
+        <p className={styles.footer}>
+          ¿Ya tienes cuenta?{" "}
+          <Link className={styles.link} to="/login">
+            Inicia sesión
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

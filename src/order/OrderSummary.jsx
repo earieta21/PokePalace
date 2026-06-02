@@ -11,30 +11,28 @@ import {
   TOPPING_LABELS,
 } from "./OrderLabels";
 
-const OrderSummary = ({ onEditStep, onConfirm }) => {
+const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" }) => {
   const { order } = useOrder();
 
   const {
     base = "",
     protein = "",
     marinades = [],
-    marinados = [], // compat si aún existe en tu state viejo
     sauces = [],
     complements = [],
     toppings = [],
   } = order || {};
 
-  const finalMarinades =
-    Array.isArray(marinades) && marinades.length > 0 ? marinades : marinados;
+  const finalMarinades = marinades;
 
   // Fallback: "white_rice" -> "White Rice"
   const prettifyId = (value) => {
-    if (!value || typeof value !== "string") return "Not selected";
+    if (!value || typeof value !== "string") return "No seleccionado";
     return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   const getLabel = (map, value) => {
-    if (!value) return "Not selected";
+    if (!value) return "No seleccionado";
     return map?.[value] || prettifyId(value);
   };
 
@@ -57,7 +55,7 @@ const OrderSummary = ({ onEditStep, onConfirm }) => {
         </div>
 
         <button className={styles.editButton} onClick={onEdit} type="button">
-          Edit
+          Editar
         </button>
       </div>
 
@@ -81,10 +79,10 @@ const OrderSummary = ({ onEditStep, onConfirm }) => {
     <div className={styles.wrapper}>
       <div className={styles.container}>
         <div className={styles.header}>
-          <div className={styles.badge}>Review</div>
-          <h2 className={styles.title}>Order summary</h2>
+          <div className={styles.badge}>Revisa</div>
+          <h2 className={styles.title}>Resumen de tu orden</h2>
           <p className={styles.subtitle}>
-            Double-check everything before placing your order.
+            Confirma los detalles antes de hacer tu pedido.
           </p>
         </div>
 
@@ -95,46 +93,53 @@ const OrderSummary = ({ onEditStep, onConfirm }) => {
         />
 
         <Section
-          title="Protein"
+          title="Proteína"
           value={getLabel(PROTEIN_LABELS, protein)}
           onEdit={() => onEditStep(1)}
         />
 
         <Section
-          title="Marinades"
+          title="Marinados"
           chips={marinadesLabels}
-          emptyText="No marinades selected"
+          emptyText="Sin marinados seleccionados"
           onEdit={() => onEditStep(2)}
         />
 
         <Section
-          title="Complements"
+          title="Complementos"
           chips={complementsLabels}
-          emptyText="No complements selected"
+          emptyText="Sin complementos seleccionados"
           onEdit={() => onEditStep(3)}
         />
 
         <Section
-          title="Sauces"
+          title="Salsas"
           chips={saucesLabels}
-          emptyText="No sauces selected"
+          emptyText="Sin salsas seleccionadas"
           onEdit={() => onEditStep(4)}
         />
 
         <Section
           title="Toppings"
           chips={toppingsLabels}
-          emptyText="No toppings selected"
+          emptyText="Sin toppings seleccionados"
           onEdit={() => onEditStep(5)}
         />
 
         <div className={styles.actions}>
+          {submitError && (
+            <p className={styles.submitError} role="alert">
+              {submitError}
+            </p>
+          )}
           <button
             className={styles.confirmButton}
             onClick={onConfirm}
             type="button"
+            disabled={saving}
+            aria-busy={saving}
           >
-            Confirm Order
+            {saving ? "Enviando pedido…" : "Confirmar Pedido"}
           </button>
         </div>
       </div>

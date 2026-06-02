@@ -38,7 +38,7 @@ export const register = async (req, res) => {
         points: user.points,
       },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ msg: "Error al registrar usuario" });
   }
 };
@@ -68,7 +68,7 @@ export const login = async (req, res) => {
         points: user.points,
       },
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({ msg: "Error al iniciar sesión" });
   }
 };

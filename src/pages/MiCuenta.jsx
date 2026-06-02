@@ -1,12 +1,23 @@
 import { useContext, useEffect, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
 import styles from "./MiCuenta.module.css";
 
+const STATUS_LABEL = {
+  pending:   "Recibido",
+  preparing: "En preparación",
+  ready:     "Listo",
+  completed: "Entregado",
+  cancelled: "Cancelado",
+};
+
 export default function MiCuenta() {
   const { user, token, isLoggedIn, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -14,13 +25,15 @@ export default function MiCuenta() {
     (async () => {
       try {
         setLoading(true);
+        setError("");
         const res = await fetch(`${API_URL}/api/orders/mine`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.msg || data?.message || "No se pudieron cargar tus pedidos.");
         if (res.ok) setOrders(data.orders || []);
-      } catch {
-        // no-op
+      } catch (e) {
+        setError(e.message);
       } finally {
         setLoading(false);
       }
@@ -56,7 +69,7 @@ export default function MiCuenta() {
           <div className={styles.actions}>
             <button
               className={styles.primaryBtn}
-              onClick={() => (window.location.href = "/order")}
+              onClick={() => navigate("/order")}
             >
               Ordenar
             </button>
@@ -70,6 +83,8 @@ export default function MiCuenta() {
 
         {loading ? (
           <p className={styles.muted}>Cargando...</p>
+        ) : error ? (
+          <p className={styles.muted} role="alert">{error}</p>
         ) : orders.length === 0 ? (
           <p className={styles.muted}>Aún no tienes pedidos guardados.</p>
         ) : (
@@ -78,24 +93,31 @@ export default function MiCuenta() {
               <div key={o._id} className={styles.orderCard}>
                 <div className={styles.orderTop}>
                   <p className={styles.orderDate}>
-                    {new Date(o.createdAt).toLocaleString()}
+                    {new Date(o.createdAt).toLocaleString("es-MX")}
                   </p>
-                  <span className={styles.status}>{o.status}</span>
+                  <div className={styles.orderTopRight}>
+                    <span className={`${styles.status} ${styles[`status_${o.status}`]}`}>
+                      {STATUS_LABEL[o.status] ?? o.status}
+                    </span>
+                    <Link to={`/seguimiento/${o._id}`} className={styles.trackLink}>
+                      Seguir →
+                    </Link>
+                  </div>
                 </div>
 
                 <p className={styles.line}>
                   <strong>Base:</strong> {o.base || "-"}{" "}
                   <span className={styles.muted}>•</span>{" "}
-                  <strong>Protein:</strong> {o.protein || "-"}
+                  <strong>Proteína:</strong> {o.protein || "-"}
                 </p>
 
                 <p className={styles.line}>
-                  <strong>Complements:</strong>{" "}
+                  <strong>Complementos:</strong>{" "}
                   {(o.complements || []).join(", ") || "-"}
                 </p>
 
                 <p className={styles.line}>
-                  <strong>Sauces:</strong> {(o.sauces || []).join(", ") || "-"}
+                  <strong>Salsas:</strong> {(o.sauces || []).join(", ") || "-"}
                 </p>
 
                 <p className={styles.line}>

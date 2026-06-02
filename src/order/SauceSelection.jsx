@@ -19,85 +19,57 @@ const SauceSelection = ({ onNext }) => {
   const { order, updateOrder } = useOrder();
 
   const sauces = [
-    {
-      id: "spicy_mayo",
-      name: "Spicy Mayo (Mayonesa Picante)",
-      image: spicyMayo,
-    },
-    { id: "soy_sauce", name: "Soy Sauce (Salsa de Soja)", image: soya },
-    { id: "ponzu_sauce", name: "Ponzu Sauce (Salsa Ponzu)", image: punzu },
-    {
-      id: "sesame_ginger",
-      name: "Sesame Ginger Dressing (Aderezo de Sésamo y Jengibre)",
-      image: sesameGinger,
-    },
-    {
-      id: "wasabi_vinaigrette",
-      name: "Wasabi Vinaigrette (Vinagreta de Wasabi)",
-      image: wasabi,
-    },
-    {
-      id: "sweet_chili",
-      name: "Sweet Chili Sauce (Salsa de Chile Dulce)",
-      image: sweetChili,
-    },
-    {
-      id: "garlic_sriracha",
-      name: "Garlic Sriracha Sauce (Salsa de Ajo y Sriracha)",
-      image: garlicSiracha,
-    },
-    {
-      id: "avocado_lime",
-      name: "Avocado Lime Dressing (Aderezo de Aguacate y Lima)",
-      image: avocadoLime,
-    },
-    {
-      id: "miso_dressing",
-      name: "Miso Dressing (Aderezo de Miso)",
-      image: miso,
-    },
-    {
-      id: "yuzu_kosho",
-      name: "Yuzu Kosho Sauce (Salsa Yuzu Kosho)",
-      image: yuzuKosho,
-    },
+    { id: "spicy_mayo",          name: "Mayonesa Picante",             image: spicyMayo },
+    { id: "soy_sauce",           name: "Salsa de Soja",                image: soya },
+    { id: "ponzu_sauce",         name: "Salsa Ponzu",                  image: punzu },
+    { id: "sesame_ginger",       name: "Aderezo de Sésamo y Jengibre", image: sesameGinger },
+    { id: "wasabi_vinaigrette",  name: "Vinagreta de Wasabi",          image: wasabi },
+    { id: "sweet_chili",         name: "Salsa de Chile Dulce",         image: sweetChili },
+    { id: "garlic_sriracha",     name: "Salsa de Ajo y Sriracha",      image: garlicSiracha },
+    { id: "avocado_lime",        name: "Aderezo de Aguacate y Lima",   image: avocadoLime },
+    { id: "miso_dressing",       name: "Aderezo de Miso",              image: miso },
+    { id: "yuzu_kosho",          name: "Salsa Yuzu Kosho",             image: yuzuKosho },
   ];
 
   const [selectedSauces, setSelectedSauces] = useState(order.sauces || []);
+  const [error, setError] = useState("");
 
   const toggleSauce = (sauceId) => {
     setSelectedSauces((prev) => {
-      // remove
       if (prev.includes(sauceId)) {
-        const updated = prev.filter((id) => id !== sauceId);
-        updateOrder("sauces", updated);
-        return updated;
+        const next = prev.filter((id) => id !== sauceId);
+        updateOrder("sauces", next);
+        return next;
       }
 
-      // add (limit)
       if (prev.length >= MAX_SAUCES) {
-        alert(`You can select up to ${MAX_SAUCES} sauces.`);
+        setError(`Solo puedes elegir hasta ${MAX_SAUCES} salsas.`);
         return prev;
       }
 
-      const updated = [...prev, sauceId];
-      updateOrder("sauces", updated);
-      return updated;
+      setError("");
+      const next = [...prev, sauceId];
+      updateOrder("sauces", next);
+      return next;
     });
   };
 
   const handleNext = () => {
-    if (selectedSauces.length > 0) onNext({ sauces: selectedSauces });
-    else alert("Please select at least one sauce before proceeding!");
+    if (selectedSauces.length === 0) {
+      setError("Selecciona al menos una salsa para continuar.");
+      return;
+    }
+    setError("");
+    onNext();
   };
 
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>Step 5 of 6</div>
-        <h2 className={styles.title}>Choose your sauces</h2>
+        <div className={styles.badge}>Paso 5 de 6</div>
+        <h2 className={styles.title}>Elige tus salsas</h2>
         <p className={styles.subtitle}>
-          Balance spicy, sweet, and umami. Choose up to {MAX_SAUCES}.
+          Picante, dulce y umami en perfecta armonía. Elige hasta {MAX_SAUCES}.
         </p>
       </div>
 
@@ -126,13 +98,19 @@ const SauceSelection = ({ onNext }) => {
         ))}
       </div>
 
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
+
       <div className={styles.actions}>
         <span className={styles.helper}>
-          Selected {selectedSauces.length} / {MAX_SAUCES}
+          Seleccionadas {selectedSauces.length} / {MAX_SAUCES}
         </span>
 
         <button className={styles.nextButton} onClick={handleNext}>
-          Next
+          Siguiente
         </button>
       </div>
     </div>
