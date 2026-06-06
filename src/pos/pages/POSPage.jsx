@@ -25,6 +25,10 @@ export default function POSPage({ styles }) {
 
   const [cart, setCart]         = useState([]);
   const [cliente, setCliente]   = useState("");
+  const [phone, setPhone]       = useState("");
+  const [notes, setNotes]       = useState("");
+  const [fulfillment, setFulfillment] = useState("pickup");
+  const [paymentMethod, setPaymentMethod] = useState("card_terminal");
   const [saving, setSaving]     = useState(false);
   const [success, setSuccess]   = useState("");
   const [error, setError]       = useState("");
@@ -51,11 +55,19 @@ export default function POSPage({ styles }) {
       await api.post("/api/staff/orders", {
         items: cart.map(({ id: _id, ...i }) => ({ name: i.name, price: i.price, qty: i.qty })),
         customer: cliente.trim() || "Mostrador",
+        phone: phone.trim(),
+        notes: notes.trim(),
+        fulfillment,
+        paymentMethod,
         total: parseFloat(total.toFixed(2)),
       });
       setSuccess(`Orden enviada — $${total.toFixed(2)}`);
       setCart([]);
       setCliente("");
+      setPhone("");
+      setNotes("");
+      setFulfillment("pickup");
+      setPaymentMethod("card_terminal");
       setTimeout(() => setSuccess(""), 4000);
     } catch (e) {
       setError(e.message);
@@ -99,6 +111,42 @@ export default function POSPage({ styles }) {
             value={cliente}
             onChange={(e) => setCliente(e.target.value)}
             style={{ fontSize: 12 }}
+          />
+          <input
+            className={styles.input}
+            placeholder="Telefono (opcional)"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            style={{ fontSize: 12, marginTop: 8 }}
+          />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+            <select
+              className={styles.select}
+              value={fulfillment}
+              onChange={(e) => setFulfillment(e.target.value)}
+              style={{ fontSize: 12 }}
+            >
+              <option value="pickup">Recoger</option>
+              <option value="dine_in">En restaurante</option>
+              <option value="delivery">Delivery</option>
+            </select>
+            <select
+              className={styles.select}
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              style={{ fontSize: 12 }}
+            >
+              <option value="card_terminal">Tarjeta</option>
+              <option value="cash">Efectivo</option>
+              <option value="pay_at_pickup">Pendiente</option>
+            </select>
+          </div>
+          <input
+            className={styles.input}
+            placeholder="Notas para cocina (opcional)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            style={{ fontSize: 12, marginTop: 8 }}
           />
         </div>
 

@@ -13,7 +13,6 @@ import maiz from "../assets/complements/maiz.webp";
 import mango from "../assets/complements/mango.webp";
 import pepino from "../assets/complements/pepino.webp";
 import pina from "../assets/complements/pina.webp";
-import redpeper from "../assets/complements/redpeper.webp";
 import zanahoria from "../assets/complements/zanahoria.webp";
 
 const MAX_COMPLEMENTS = 6;
@@ -31,7 +30,6 @@ const ComplementsSelection = ({ onNext }) => {
     { id: "edamame",          name: "Edamame",            image: edamames },
     { id: "kale",             name: "Col Rizada",         image: colRizado },
     { id: "peas",             name: "Chícharos",          image: chicharos },
-    { id: "red_bell_pepper",  name: "Pimiento Rojo",      image: redpeper },
     { id: "corn",             name: "Maíz",               image: maiz },
     { id: "pineapple",        name: "Piña",               image: pina },
     { id: "chia_seeds",       name: "Semillas de Chía",   image: chia },

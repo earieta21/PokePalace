@@ -77,7 +77,7 @@ export const getOrderStats = async (req, res) => {
 /* POST /api/staff/orders — POS order */
 export const createPosOrder = async (req, res) => {
   try {
-    const { items, customer, total } = req.body;
+    const { items, customer, phone, notes, fulfillment, paymentMethod, total } = req.body;
     if (!items || !items.length) {
       return res.status(400).json({ message: "items required" });
     }
@@ -86,6 +86,11 @@ export const createPosOrder = async (req, res) => {
       staffId: req.staff.id,
       items,
       customer: customer || "Walk-in",
+      phone: phone || null,
+      notes: notes || null,
+      fulfillment: fulfillment || "pickup",
+      paymentMethod: paymentMethod || "card_terminal",
+      paymentStatus: "paid",
       source: "pos",
       total: total ?? null,
       status: "pending",
@@ -126,8 +131,9 @@ export const getAnalytics = async (req, res) => {
 
     // Top proteins (from bowl orders)
     const proteinAgg = await Order.aggregate([
-      { $match: { protein: { $ne: null } } },
-      { $group: { _id: "$protein", count: { $sum: 1 } } },
+      { $match: { proteins: { $exists: true, $ne: [] } } },
+      { $unwind: "$proteins" },
+      { $group: { _id: "$proteins", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 5 },
     ]);

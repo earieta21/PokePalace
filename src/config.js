@@ -1,3 +1,3 @@
 export const API_URL =
-  import.meta.env.VITE_API_URL || "https://pokepalace.onrender.com";
-
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV ? "http://localhost:5001" : "https://pokepalace.onrender.com");

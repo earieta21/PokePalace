@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
+import { PROTEIN_LABELS } from "../order/OrderLabels";
 import styles from "./MiCuenta.module.css";
 
 const STATUS_LABEL = {
@@ -10,6 +11,19 @@ const STATUS_LABEL = {
   ready:     "Listo",
   completed: "Entregado",
   cancelled: "Cancelado",
+};
+
+const FULFILLMENT_LABEL = {
+  pickup: "Recoger",
+  dine_in: "En restaurante",
+  delivery: "Delivery",
+};
+
+const getProteinsText = (order) => {
+  if (Array.isArray(order.proteins) && order.proteins.length > 0) {
+    return order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ");
+  }
+  return order.protein || "-";
 };
 
 export default function MiCuenta() {
@@ -108,7 +122,23 @@ export default function MiCuenta() {
                 <p className={styles.line}>
                   <strong>Base:</strong> {o.base || "-"}{" "}
                   <span className={styles.muted}>•</span>{" "}
-                  <strong>Proteína:</strong> {o.protein || "-"}
+                  <strong>Proteínas:</strong> {getProteinsText(o)}
+                </p>
+
+                <p className={styles.line}>
+                  <strong>Tamaño:</strong>{" "}
+                  {o.bowlSize === "large" ? "Bowl grande" : "Bowl normal"}
+                </p>
+
+                <p className={styles.line}>
+                  <strong>Entrega:</strong>{" "}
+                  {FULFILLMENT_LABEL[o.fulfillment] ?? o.fulfillment ?? "Recoger"}{" "}
+                  {o.phone ? (
+                    <>
+                      <span className={styles.muted}>•</span>{" "}
+                      <strong>Tel:</strong> {o.phone}
+                    </>
+                  ) : null}
                 </p>
 
                 <p className={styles.line}>

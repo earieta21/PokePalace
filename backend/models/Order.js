@@ -9,6 +9,9 @@ const orderSchema = new mongoose.Schema(
     // Bowl-builder fields (customer orders)
     base:        { type: String, default: null },
     protein:     { type: String, default: null },
+    proteins:    { type: [String], default: [] },
+    bowlSize:    { type: String, enum: ["normal", "large"], default: "normal" },
+    proteinUpcharge: { type: Number, default: 0 },
     marinades:   { type: [String], default: [] },
     complements: { type: [String], default: [] },
     sauces:      { type: [String], default: [] },
@@ -19,6 +22,23 @@ const orderSchema = new mongoose.Schema(
 
     // Shared optional fields
     customer: { type: String, default: null }, // "Table 4", "Walk-in", customer name
+    phone:    { type: String, default: null },
+    notes:    { type: String, default: null },
+    fulfillment: {
+      type: String,
+      enum: ["pickup", "dine_in", "delivery"],
+      default: "pickup",
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["pay_at_pickup", "cash", "card_terminal", "online"],
+      default: "pay_at_pickup",
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "paid"],
+      default: "pending",
+    },
     source:   { type: String, enum: ["online", "pos"], default: "online" },
     total:    { type: Number, default: null },  // in dollars
 

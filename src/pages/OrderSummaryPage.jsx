@@ -21,8 +21,14 @@ export default function OrderSummaryPage() {
   };
 
   const onConfirm = async () => {
-    if (!order?.base || !order?.protein) {
-      setSubmitError("Completa al menos base y proteína antes de confirmar.");
+    const selectedProteins = Array.isArray(order?.proteins) ? order.proteins : [];
+    if (!order?.base || selectedProteins.length < 2) {
+      setSubmitError("Completa la base y selecciona 2 proteínas para confirmar.");
+      return;
+    }
+
+    if (!order?.customer?.trim() || !order?.phone?.trim()) {
+      setSubmitError("Agrega tu nombre y teléfono para confirmar el pedido.");
       return;
     }
 
@@ -41,7 +47,10 @@ export default function OrderSummaryPage() {
       const res = await fetch(`${API_URL}/api/orders`, {
         method: "POST",
         headers,
-        body: JSON.stringify(order),
+        body: JSON.stringify({
+          ...order,
+          updateCheckout: undefined,
+        }),
       });
 
       const data = await res.json().catch(() => ({}));

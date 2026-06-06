@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, useContext } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
+import { PROTEIN_LABELS } from "../order/OrderLabels";
 import styles from "./OrderTracking.module.css";
 
 const STEPS = [
@@ -14,6 +15,26 @@ const STEPS = [
 const CANCELLED = { key: "cancelled", icon: "❌", label: "Cancelado", desc: "Tu pedido fue cancelado" };
 
 const STEP_INDEX = { pending: 0, preparing: 1, ready: 2, completed: 3 };
+
+const FULFILLMENT_LABEL = {
+  pickup: "Recoger en restaurante",
+  dine_in: "Comer en restaurante",
+  delivery: "Delivery",
+};
+
+const PAYMENT_LABEL = {
+  pay_at_pickup: "Pagar al recoger",
+  cash: "Efectivo",
+  card_terminal: "Tarjeta en terminal",
+  online: "Pago en línea",
+};
+
+const getProteinsText = (order) => {
+  if (Array.isArray(order.proteins) && order.proteins.length > 0) {
+    return order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ");
+  }
+  return order.protein;
+};
 
 export default function OrderTracking() {
   const { orderId } = useParams();
@@ -30,7 +51,11 @@ export default function OrderTracking() {
       if (!res.ok) throw new Error(data?.msg || "No se pudo obtener la orden");
       setOrder(data.order);
     } catch (e) {
-      setError(e.message);
+      setError(
+        e.message === "Failed to fetch"
+          ? "No se pudo conectar con el servidor de órdenes. Revisa que el backend esté encendido."
+          : e.message
+      );
     }
   }, [orderId, token]);
 
@@ -128,10 +153,26 @@ export default function OrderTracking() {
 
       {/* Order details */}
       <section className={styles.section}>
+        <p className={styles.sectionTitle}>Datos del pedido</p>
+        <div className={styles.detailCard}>
+          {order.customer && <DetailRow label="Nombre" value={order.customer} />}
+          {order.phone && <DetailRow label="Teléfono" value={order.phone} />}
+          {order.fulfillment && (
+            <DetailRow label="Entrega" value={FULFILLMENT_LABEL[order.fulfillment] ?? order.fulfillment} />
+          )}
+          {order.paymentMethod && (
+            <DetailRow label="Pago" value={PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod} />
+          )}
+          {order.notes && <DetailRow label="Notas" value={order.notes} />}
+        </div>
+      </section>
+
+      <section className={styles.section}>
         <p className={styles.sectionTitle}>Tu bowl</p>
         <div className={styles.detailCard}>
           {order.base && <DetailRow label="Base" value={order.base} />}
-          {order.protein && <DetailRow label="Proteína" value={order.protein} />}
+          {getProteinsText(order) && <DetailRow label="Proteínas" value={getProteinsText(order)} />}
+          <DetailRow label="Tamaño" value={order.bowlSize === "large" ? "Bowl grande" : "Bowl normal"} />
           {order.marinades?.length > 0 && <DetailRow label="Marinados" value={order.marinades.join(", ")} />}
           {order.complements?.length > 0 && <DetailRow label="Complementos" value={order.complements.join(", ")} />}
           {order.sauces?.length > 0 && <DetailRow label="Salsas" value={order.sauces.join(", ")} />}

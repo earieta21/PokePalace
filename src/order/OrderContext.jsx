@@ -6,10 +6,18 @@ export const OrderProvider = ({ children }) => {
   const [order, setOrder] = useState({
     base: "",
     protein: "",
+    proteins: [],
+    bowlSize: "normal",
+    proteinUpcharge: 0,
     marinades: [],
     sauces: [],
     complements: [],
     toppings: [],
+    customer: "",
+    phone: "",
+    notes: "",
+    fulfillment: "pickup",
+    paymentMethod: "pay_at_pickup",
   });
 
   const updateOrder = (type, items) => {
@@ -19,8 +27,15 @@ export const OrderProvider = ({ children }) => {
     }));
   };
 
+  const updateCheckout = (field, value) => {
+    setOrder((prevOrder) => ({
+      ...prevOrder,
+      [field]: value,
+    }));
+  };
+
   return (
-    <OrderContext.Provider value={{ order, updateOrder }}>
+    <OrderContext.Provider value={{ order: { ...order, updateCheckout }, updateOrder }}>
       {children}
     </OrderContext.Provider>
   );

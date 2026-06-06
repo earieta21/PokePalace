@@ -1,11 +1,18 @@
 import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
+import { PROTEIN_LABELS } from "../../order/OrderLabels";
 
 const STATUS_CFG = {
   pending:   { cls: "badgeYellow", label: "Nuevo" },
   preparing: { cls: "badgeBlue",   label: "Preparando" },
   ready:     { cls: "badgeGreen",  label: "Listo" },
+};
+
+const FULFILLMENT_LABEL = {
+  pickup: "Recoger",
+  dine_in: "En restaurante",
+  delivery: "Delivery",
 };
 
 function elapsed(createdAt) {
@@ -20,9 +27,11 @@ function itemSummary(order) {
     return order.items.map((i) => `${i.name} ×${i.qty}`).join(", ");
   }
   const parts = [];
-  if (order.protein) parts.push(order.protein);
+  if (order.proteins?.length) parts.push(order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", "));
+  else if (order.protein) parts.push(order.protein);
   if (order.base)    parts.push(`en ${order.base}`);
-  return parts.join(" ") || "Bowl personalizado";
+  const size = order.bowlSize === "large" ? "Bowl grande" : "Bowl normal";
+  return `${size}: ${parts.join(" ") || "Bowl personalizado"}`;
 }
 
 export default function ActiveOrdersPage({ styles }) {
@@ -115,7 +124,12 @@ export default function ActiveOrdersPage({ styles }) {
                 </div>
                 <div className={styles.orderCardBody}>
                   <p className={styles.orderCardCustomer}>{cliente}</p>
+                  <p className={styles.orderCardItems}>
+                    {FULFILLMENT_LABEL[order.fulfillment] ?? "Recoger"}
+                    {order.phone ? ` · ${order.phone}` : ""}
+                  </p>
                   <p className={styles.orderCardItems}>{itemSummary(order)}</p>
+                  {order.notes && <p className={styles.orderCardItems}>Nota: {order.notes}</p>}
                   {order.total != null && (
                     <p className={styles.orderCardTotal}>${order.total.toFixed(2)}</p>
                   )}

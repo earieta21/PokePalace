@@ -7,17 +7,17 @@ const TIERS = [
   {
     name: "Bronce", min: 0, max: 99,
     color: "#cd7f32", bg: "rgba(205,127,50,0.10)", icon: "🥉",
-    perks: ["1 punto por cada $1 gastado", "Acceso a recompensas básicas"],
+    perks: ["1 punto por cada $10 MXN gastados", "Acceso a recompensas básicas"],
   },
   {
     name: "Plata", min: 100, max: 299,
     color: "#8a8aaa", bg: "rgba(138,138,170,0.10)", icon: "🥈",
-    perks: ["1 punto por cada $1 gastado", "5% de descuento en tu cumpleaños", "Acceso anticipado a promociones"],
+    perks: ["1 punto por cada $10 MXN gastados", "5% de descuento en tu cumpleaños", "Acceso anticipado a promociones"],
   },
   {
     name: "Oro", min: 300, max: Infinity,
     color: "#d4a017", bg: "rgba(212,160,23,0.10)", icon: "🥇",
-    perks: ["2 puntos por cada $1 gastado", "Topping gratis en cada orden", "10% de descuento en tu cumpleaños"],
+    perks: ["2 puntos por cada $10 MXN gastados", "Topping gratis en cada orden", "10% de descuento en tu cumpleaños"],
   },
 ];
 
@@ -100,7 +100,7 @@ export default function RewardsPage() {
       {/* ── Recompensas canjeables ── */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Canjea tus Puntos</h2>
-        <p className={styles.sectionSub}>$1 = 1 punto · Los puntos no expiran</p>
+        <p className={styles.sectionSub}>$10 MXN = 1 punto · Los puntos no expiran</p>
         <div className={styles.rewardsGrid}>
           {REWARDS.map((r) => {
             const canRedeem = isLoggedIn && points >= r.cost;
@@ -167,7 +167,7 @@ export default function RewardsPage() {
         <h2 className={styles.sectionTitle}>¿Cómo Ganar Puntos?</h2>
         <div className={styles.howGrid}>
           {[
-            { icon: "🥗", title: "Ordena en línea",       desc: "Gana 1 punto por cada $1 en tu pedido." },
+            { icon: "🥗", title: "Ordena en línea",       desc: "Gana 1 punto por cada $10 MXN en tu pedido." },
             { icon: "⭐", title: "Sé cliente frecuente",  desc: "Llega a nivel Oro y gana puntos dobles." },
             { icon: "🎂", title: "Cumpleaños",            desc: "Bonus de puntos el mes de tu cumpleaños." },
           ].map((item) => (

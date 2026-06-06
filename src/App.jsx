@@ -18,6 +18,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import OrderSummaryPage from "./pages/OrderSummaryPage";
 import OrderTracking from "./pages/OrderTracking";
+import LocationPage from "./pages/LocationPage";
 
 // Providers
 import { OrderProvider } from "./order/OrderContext";
@@ -66,6 +67,7 @@ const App = () => {
               <Route path="/rewards-deals" element={<RewardsDeals />} />
               <Route path="/earn-points" element={<EarnPoints />} />
               <Route path="/more-options" element={<MoreOptions />} />
+              <Route path="/ubicaciones" element={<LocationPage />} />
 
               <Route path="/order" element={<OrderPage />} />
               <Route path="/summary" element={<OrderSummaryPage />} />

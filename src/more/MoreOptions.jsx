@@ -15,7 +15,7 @@ const SECTIONS = [
   {
     title: "El Restaurante",
     items: [
-      { icon: "📍", label: "Ubicaciones",           path: null },
+      { icon: "📍", label: "Ubicaciones",           path: "/ubicaciones" },
       { icon: "🥗", label: "Menú completo",         path: "/order" },
       { icon: "🥑", label: "Información nutricional",path: null },
     ],

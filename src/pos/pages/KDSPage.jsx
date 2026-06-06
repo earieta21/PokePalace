@@ -1,11 +1,25 @@
 import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
+import { PROTEIN_LABELS } from "../../order/OrderLabels";
 
 const STATUS_CFG = {
   pending:   { cls: "badgeYellow", label: "Nuevo" },
   preparing: { cls: "badgeBlue",   label: "Preparando" },
   ready:     { cls: "badgeGreen",  label: "Listo" },
+};
+
+const FULFILLMENT_LABEL = {
+  pickup: "Recoger",
+  dine_in: "Comer aqui",
+  delivery: "Delivery",
+};
+
+const PAYMENT_LABEL = {
+  pay_at_pickup: "Paga al recoger",
+  cash: "Efectivo",
+  card_terminal: "Tarjeta",
+  online: "Online",
 };
 
 function orderLines(order) {
@@ -14,7 +28,11 @@ function orderLines(order) {
   }
   const lines = [];
   if (order.base)              lines.push(`Base: ${order.base}`);
-  if (order.protein)           lines.push(`Proteína: ${order.protein}`);
+  if (order.proteins?.length)  {
+    lines.push(`Proteínas: ${order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ")}`);
+  }
+  else if (order.protein)      lines.push(`Proteína: ${order.protein}`);
+  lines.push(order.bowlSize === "large" ? "Bowl grande" : "Bowl normal");
   if (order.marinades?.length)   lines.push(`Marinados: ${order.marinades.join(", ")}`);
   if (order.complements?.length) lines.push(`Complementos: ${order.complements.join(", ")}`);
   if (order.sauces?.length)      lines.push(`Salsas: ${order.sauces.join(", ")}`);
@@ -115,6 +133,16 @@ export default function KDSPage({ styles }) {
                 </div>
                 <div className={styles.kdsBody}>
                   <p style={{ fontSize: 11, color: "var(--p-muted)", marginBottom: 6 }}>{cliente}</p>
+                  <p style={{ fontSize: 11, color: "var(--p-muted)", marginBottom: 8 }}>
+                    {FULFILLMENT_LABEL[order.fulfillment] ?? "Recoger"}
+                    {order.phone ? ` · ${order.phone}` : ""}
+                    {order.paymentMethod ? ` · ${PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod}` : ""}
+                  </p>
+                  {order.notes && (
+                    <p style={{ fontSize: 12, color: "var(--p-text)", marginBottom: 8, fontWeight: 700 }}>
+                      Nota: {order.notes}
+                    </p>
+                  )}
                   {lines.map((line) => (
                     <div key={line} className={styles.kdsItem}><span>{line}</span></div>
                   ))}

@@ -17,6 +17,8 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
   const {
     base = "",
     protein = "",
+    proteins = [],
+    bowlSize = "normal",
     marinades = [],
     sauces = [],
     complements = [],
@@ -42,6 +44,10 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
   };
 
   const marinadesLabels = getListLabels(MARINADE_LABELS, finalMarinades);
+  const proteinLabels = getListLabels(
+    PROTEIN_LABELS,
+    Array.isArray(proteins) && proteins.length > 0 ? proteins : protein ? [protein] : []
+  );
   const complementsLabels = getListLabels(COMPLEMENT_LABELS, complements);
   const saucesLabels = getListLabels(SAUCE_LABELS, sauces);
   const toppingsLabels = getListLabels(TOPPING_LABELS, toppings);
@@ -94,9 +100,18 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
 
         <Section
           title="Proteína"
-          value={getLabel(PROTEIN_LABELS, protein)}
+          value={proteinLabels.length > 0 ? proteinLabels.join(", ") : "No seleccionado"}
           onEdit={() => onEditStep(1)}
         />
+
+        <div className={styles.sizeNotice}>
+          <span>{bowlSize === "large" ? "Bowl grande" : "Bowl normal"}</span>
+          <p>
+            {bowlSize === "large"
+              ? "3 proteínas seleccionadas · aplica costo extra"
+              : "2 proteínas incluidas"}
+          </p>
+        </div>
 
         <Section
           title="Marinados"
@@ -125,6 +140,79 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
           emptyText="Sin toppings seleccionados"
           onEdit={() => onEditStep(5)}
         />
+
+        <div className={styles.checkoutSection}>
+          <div>
+            <h3 className={styles.checkoutTitle}>Datos para el restaurante</h3>
+            <p className={styles.checkoutSubtitle}>
+              Usaremos esto para identificar tu pedido y avisarte cuando esté listo.
+            </p>
+          </div>
+
+          <div className={styles.checkoutGrid}>
+            <label className={styles.field}>
+              <span>Nombre</span>
+              <input
+                name="customer"
+                value={order.customer || ""}
+                onChange={(e) => order.updateCheckout("customer", e.target.value)}
+                placeholder="Tu nombre"
+                autoComplete="name"
+                required
+              />
+            </label>
+
+            <label className={styles.field}>
+              <span>Teléfono</span>
+              <input
+                name="phone"
+                value={order.phone || ""}
+                onChange={(e) => order.updateCheckout("phone", e.target.value)}
+                placeholder="Para avisarte"
+                autoComplete="tel"
+                inputMode="tel"
+                required
+              />
+            </label>
+
+            <label className={styles.field}>
+              <span>Entrega</span>
+              <select
+                name="fulfillment"
+                value={order.fulfillment || "pickup"}
+                onChange={(e) => order.updateCheckout("fulfillment", e.target.value)}
+              >
+                <option value="pickup">Recoger en restaurante</option>
+                <option value="dine_in">Comer en restaurante</option>
+                <option value="delivery">Delivery</option>
+              </select>
+            </label>
+
+            <label className={styles.field}>
+              <span>Pago</span>
+              <select
+                name="paymentMethod"
+                value={order.paymentMethod || "pay_at_pickup"}
+                onChange={(e) => order.updateCheckout("paymentMethod", e.target.value)}
+              >
+                <option value="pay_at_pickup">Pagar al recoger</option>
+                <option value="cash">Efectivo en restaurante</option>
+                <option value="card_terminal">Tarjeta en terminal</option>
+              </select>
+            </label>
+          </div>
+
+          <label className={styles.field}>
+            <span>Notas</span>
+            <textarea
+              name="notes"
+              value={order.notes || ""}
+              onChange={(e) => order.updateCheckout("notes", e.target.value)}
+              placeholder="Alergias, instrucciones o detalles para cocina"
+              rows="3"
+            />
+          </label>
+        </div>
 
         <div className={styles.actions}>
           {submitError && (

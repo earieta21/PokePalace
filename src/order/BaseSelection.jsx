@@ -5,8 +5,6 @@ import styles from "./BaseSelection.module.css";
 import whiteRice from "../assets/base/whiteRice.webp";
 import brownRice from "../assets/base/brownRice.webp";
 import quinoa from "../assets/base/quinoa.webp";
-import sobaNoodles from "../assets/base/sobaNoodles.webp";
-import zoodles from "../assets/base/zoodles.webp";
 import mixedGreens from "../assets/base/mixedGreens.webp";
 
 const BaseSelection = ({ onNext }) => {
@@ -16,9 +14,7 @@ const BaseSelection = ({ onNext }) => {
     { id: "white_rice", name: "Arroz Blanco", image: whiteRice },
     { id: "brown_rice", name: "Arroz Integral", image: brownRice },
     { id: "quinoa", name: "Quinoa", image: quinoa },
-    { id: "mixed_greens", name: "Mezcla de Verdes", image: mixedGreens },
-    { id: "soba_noodles", name: "Fideos Soba", image: sobaNoodles },
-    { id: "zoodles", name: "Zoodles", image: zoodles },
+    { id: "spring_mix", name: "Spring Mix", description: "Arroz con ensalada", image: mixedGreens },
   ];
 
   const [selectedBase, setSelectedBase] = useState(order.base || null);
@@ -45,7 +41,7 @@ const BaseSelection = ({ onNext }) => {
           <div className={styles.badge}>Paso 1 de 6</div>
           <h2 className={styles.title}>Elige tu base</h2>
           <p className={styles.subtitle}>
-            Empieza con arroz, verdes o fideos.
+            Elige entre arroz blanco, integral, quinoa o spring mix.
           </p>
         </div>
 
@@ -69,6 +65,9 @@ const BaseSelection = ({ onNext }) => {
               </div>
 
               <p className={styles.name}>{base.name}</p>
+              {base.description && (
+                <p className={styles.description}>{base.description}</p>
+              )}
             </button>
           ))}
         </div>

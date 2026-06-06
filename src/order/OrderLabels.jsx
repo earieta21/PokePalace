@@ -2,9 +2,8 @@ export const BASE_LABELS = {
   white_rice:    "Arroz Blanco",
   brown_rice:    "Arroz Integral",
   quinoa:        "Quinoa",
-  mixed_greens:  "Mezcla de Verdes",
-  soba_noodles:  "Fideos Soba",
-  zoodles:       "Zoodles",
+  spring_mix:    "Spring Mix (arroz con ensalada)",
+  mixed_greens:  "Spring Mix (arroz con ensalada)",
 };
 
 export const PROTEIN_LABELS = {
@@ -36,7 +35,6 @@ export const COMPLEMENT_LABELS = {
   edamame:          "Edamame",
   kale:             "Col Rizada",
   peas:             "Chícharos",
-  red_bell_pepper:  "Pimiento Rojo",
   corn:             "Maíz",
   pineapple:        "Piña",
   chia_seeds:       "Semillas de Chía",
