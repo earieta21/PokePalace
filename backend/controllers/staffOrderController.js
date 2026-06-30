@@ -74,17 +74,25 @@ export const getOrderStats = async (req, res) => {
   }
 };
 
-/* POST /api/staff/orders — POS order */
+/* POST /api/staff/orders — POS order.
+   Supports quick-menu items, a cashier-built custom bowl, or both in one ticket. */
 export const createPosOrder = async (req, res) => {
   try {
-    const { items, customer, phone, notes, fulfillment, paymentMethod, total } = req.body;
-    if (!items || !items.length) {
-      return res.status(400).json({ message: "items required" });
+    const {
+      items, customer, phone, notes, fulfillment, paymentMethod, total,
+      base, proteins, bowlSize, marinades, complements, sauces, toppings,
+    } = req.body;
+
+    const hasItems = Array.isArray(items) && items.length > 0;
+    const hasBowl = Boolean(base) && Array.isArray(proteins) && proteins.length >= 2;
+
+    if (!hasItems && !hasBowl) {
+      return res.status(400).json({ message: "items or a custom bowl are required" });
     }
 
     const order = await Order.create({
       staffId: req.staff.id,
-      items,
+      items: hasItems ? items : [],
       customer: customer || "Walk-in",
       phone: phone || null,
       notes: notes || null,
@@ -94,6 +102,17 @@ export const createPosOrder = async (req, res) => {
       source: "pos",
       total: total ?? null,
       status: "pending",
+      ...(hasBowl && {
+        base,
+        protein: proteins.join(", "),
+        proteins,
+        bowlSize: bowlSize || (proteins.length === 3 ? "large" : "normal"),
+        proteinUpcharge: proteins.length === 3 ? 1 : 0,
+        marinades: Array.isArray(marinades) ? marinades : [],
+        complements: Array.isArray(complements) ? complements : [],
+        sauces: Array.isArray(sauces) ? sauces : [],
+        toppings: Array.isArray(toppings) ? toppings : [],
+      }),
     });
 
     res.status(201).json({ order });

@@ -23,20 +23,26 @@ const PAYMENT_LABEL = {
 };
 
 function orderLines(order) {
-  if (order.source === "pos" && order.items?.length) {
-    return order.items.map((i) => `${i.name} ×${i.qty}`);
-  }
   const lines = [];
-  if (order.base)              lines.push(`Base: ${order.base}`);
-  if (order.proteins?.length)  {
-    lines.push(`Proteínas: ${order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ")}`);
+
+  if (order.items?.length) {
+    lines.push(...order.items.map((i) => `${i.name} ×${i.qty}`));
   }
-  else if (order.protein)      lines.push(`Proteína: ${order.protein}`);
-  lines.push(order.bowlSize === "large" ? "Bowl grande" : "Bowl normal");
-  if (order.marinades?.length)   lines.push(`Marinados: ${order.marinades.join(", ")}`);
-  if (order.complements?.length) lines.push(`Complementos: ${order.complements.join(", ")}`);
-  if (order.sauces?.length)      lines.push(`Salsas: ${order.sauces.join(", ")}`);
-  if (order.toppings?.length)    lines.push(`Toppings: ${order.toppings.join(", ")}`);
+
+  if (order.base) {
+    lines.push(`Base: ${order.base}`);
+    if (order.proteins?.length) {
+      lines.push(`Proteínas: ${order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ")}`);
+    } else if (order.protein) {
+      lines.push(`Proteína: ${order.protein}`);
+    }
+    lines.push(order.bowlSize === "large" ? "Bowl grande" : "Bowl normal");
+    if (order.marinades?.length)   lines.push(`Marinados: ${order.marinades.join(", ")}`);
+    if (order.complements?.length) lines.push(`Complementos: ${order.complements.join(", ")}`);
+    if (order.sauces?.length)      lines.push(`Salsas: ${order.sauces.join(", ")}`);
+    if (order.toppings?.length)    lines.push(`Toppings: ${order.toppings.join(", ")}`);
+  }
+
   return lines.length ? lines : ["Bowl personalizado"];
 }
 

@@ -23,15 +23,22 @@ function elapsed(createdAt) {
 }
 
 function itemSummary(order) {
-  if (order.source === "pos" && order.items?.length) {
-    return order.items.map((i) => `${i.name} ×${i.qty}`).join(", ");
+  const segments = [];
+
+  if (order.items?.length) {
+    segments.push(order.items.map((i) => `${i.name} ×${i.qty}`).join(", "));
   }
-  const parts = [];
-  if (order.proteins?.length) parts.push(order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", "));
-  else if (order.protein) parts.push(order.protein);
-  if (order.base)    parts.push(`en ${order.base}`);
-  const size = order.bowlSize === "large" ? "Bowl grande" : "Bowl normal";
-  return `${size}: ${parts.join(" ") || "Bowl personalizado"}`;
+
+  if (order.base) {
+    const parts = [];
+    if (order.proteins?.length) parts.push(order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", "));
+    else if (order.protein) parts.push(order.protein);
+    parts.push(`en ${order.base}`);
+    const size = order.bowlSize === "large" ? "Bowl grande" : "Bowl normal";
+    segments.push(`${size}: ${parts.join(" ")}`);
+  }
+
+  return segments.join(" + ") || "Bowl personalizado";
 }
 
 export default function ActiveOrdersPage({ styles }) {
