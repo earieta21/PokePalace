@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useContext } from "react";
+import { useCallback, useEffect, useRef, useState, useContext } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
@@ -8,7 +8,7 @@ import styles from "./OrderTracking.module.css";
 const STEPS = [
   { key: "pending",    icon: "📋", label: "Recibido",        desc: "Tu pedido fue recibido" },
   { key: "preparing",  icon: "👨‍🍳", label: "En preparación",  desc: "Estamos preparando tu bowl" },
-  { key: "ready",      icon: "🔔", label: "Listo",            desc: "¡Tu pedido está listo!" },
+  { key: "ready",      icon: "🔔", label: "Listo",            desc: "¡Tu pedido está listo para recoger!" },
   { key: "completed",  icon: "✅", label: "Entregado",        desc: "¡Buen provecho!" },
 ];
 
@@ -29,6 +29,13 @@ const PAYMENT_LABEL = {
   online: "Pago en línea",
 };
 
+const STATUS_MESSAGES = {
+  preparing: "¡Tu bowl está siendo preparado!",
+  ready:     "¡Tu pedido está listo! Pasa a recogerlo.",
+  completed: "Pedido entregado. ¡Que lo disfrutes!",
+  cancelled: "Tu pedido fue cancelado.",
+};
+
 const getProteinsText = (order) => {
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
     return order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ");
@@ -36,12 +43,28 @@ const getProteinsText = (order) => {
   return order.protein;
 };
 
+function Toast({ message, onClose }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 5000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div className={styles.toast} role="alert">
+      <span>{message}</span>
+      <button className={styles.toastClose} onClick={onClose} aria-label="Cerrar">×</button>
+    </div>
+  );
+}
+
 export default function OrderTracking() {
   const { orderId } = useParams();
   const { token } = useContext(AuthContext);
 
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState(null);
+  const prevStatusRef = useRef(null);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -49,7 +72,37 @@ export default function OrderTracking() {
       const res = await fetch(`${API_URL}/api/orders/${orderId}`, { headers });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.msg || "No se pudo obtener la orden");
-      setOrder(data.order);
+
+      const newOrder = data.order;
+      setOrder(newOrder);
+
+      // Show toast when status changes (not on first load)
+      if (prevStatusRef.current !== null && prevStatusRef.current !== newOrder.status) {
+        const msg = STATUS_MESSAGES[newOrder.status];
+        if (msg) setToast(msg);
+
+        // Play a subtle sound when the order is ready
+        if (newOrder.status === "ready") {
+          try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.4);
+          } catch {
+            // AudioContext not available — skip sound
+          }
+        }
+      }
+
+      prevStatusRef.current = newOrder.status;
     } catch (e) {
       setError(
         e.message === "Failed to fetch"
@@ -63,10 +116,10 @@ export default function OrderTracking() {
     fetchOrder();
   }, [fetchOrder]);
 
-  // Poll every 6 seconds while order is active
+  // Poll every 3 seconds while order is active
   useEffect(() => {
     if (!order || order.status === "completed" || order.status === "cancelled") return;
-    const id = setInterval(fetchOrder, 6000);
+    const id = setInterval(fetchOrder, 3000);
     return () => clearInterval(id);
   }, [fetchOrder, order]);
 
@@ -98,6 +151,10 @@ export default function OrderTracking() {
 
   return (
     <div className={styles.page}>
+      {toast && (
+        <Toast message={toast} onClose={() => setToast(null)} />
+      )}
+
       <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Seguimiento de orden</h1>
         <p className={styles.pageSubtitle}>
@@ -106,6 +163,25 @@ export default function OrderTracking() {
           {new Date(order.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
         </p>
       </div>
+
+      {/* Scheduled pickup notice */}
+      {order.isScheduled && order.scheduledPickupTime && (
+        <div className={styles.scheduledNotice}>
+          <span className={styles.scheduledIcon}>🕐</span>
+          <div>
+            <p className={styles.scheduledLabel}>Recogida programada</p>
+            <p className={styles.scheduledTime}>
+              {new Date(order.scheduledPickupTime).toLocaleString("es-MX", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Status card */}
       <div className={`${styles.statusCard} ${isDone ? styles.statusDone : ""} ${isCancelled ? styles.statusCancelled : ""}`}>
@@ -162,6 +238,12 @@ export default function OrderTracking() {
           )}
           {order.paymentMethod && (
             <DetailRow label="Pago" value={PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod} />
+          )}
+          {order.promoCode && (
+            <DetailRow label="Código promo" value={order.promoCode} />
+          )}
+          {order.discountAmount > 0 && (
+            <DetailRow label="Descuento" value={`-$${order.discountAmount.toFixed(2)}`} />
           )}
           {order.notes && <DetailRow label="Notas" value={order.notes} />}
         </div>

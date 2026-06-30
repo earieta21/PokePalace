@@ -224,6 +224,91 @@
   margin: 12px 0 0;
 }
 
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin: 8px 0 0;
+}
+
+.tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 12px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color 140ms, border-color 140ms;
+}
+
+.tabActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Favorites */
+.emptyFavorites {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px 0;
+}
+
+.emptyFavorites .primaryBtn {
+  margin-top: 10px;
+}
+
+.favName {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.favSize {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.favActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.deleteBtn {
+  background: transparent;
+  border: 1px solid rgba(229, 62, 62, 0.35);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c53030;
+  cursor: pointer;
+  transition: background 140ms;
+  white-space: nowrap;
+}
+
+.deleteBtn:hover:not(:disabled) {
+  background: rgba(229, 62, 62, 0.07);
+}
+
+.deleteBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 @media (max-width: 520px) {
   .header {
     flex-direction: column;

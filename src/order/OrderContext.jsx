@@ -18,6 +18,10 @@ export const OrderProvider = ({ children }) => {
     notes: "",
     fulfillment: "pickup",
     paymentMethod: "pay_at_pickup",
+    promoCode: "",
+    discountAmount: 0,
+    scheduledPickupTime: "",
+    isScheduled: false,
   });
 
   const updateOrder = (type, items) => {
@@ -34,8 +38,22 @@ export const OrderProvider = ({ children }) => {
     }));
   };
 
+  const loadFavorite = (favorite) => {
+    setOrder((prevOrder) => ({
+      ...prevOrder,
+      base: favorite.base || "",
+      proteins: favorite.proteins || [],
+      protein: (favorite.proteins || []).join(", "),
+      bowlSize: favorite.bowlSize || "normal",
+      marinades: favorite.marinades || [],
+      complements: favorite.complements || [],
+      sauces: favorite.sauces || [],
+      toppings: favorite.toppings || [],
+    }));
+  };
+
   return (
-    <OrderContext.Provider value={{ order: { ...order, updateCheckout }, updateOrder }}>
+    <OrderContext.Provider value={{ order: { ...order, updateCheckout }, updateOrder, loadFavorite }}>
       {children}
     </OrderContext.Provider>
   );

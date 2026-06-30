@@ -50,6 +50,9 @@ export default function OrderSummaryPage() {
         body: JSON.stringify({
           ...order,
           updateCheckout: undefined,
+          scheduledPickupTime: order.isScheduled && order.scheduledPickupTime
+            ? new Date(order.scheduledPickupTime).toISOString()
+            : undefined,
         }),
       });
 

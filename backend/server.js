@@ -4,6 +4,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes        from "./routes/auth.js";
 import orderRoutes       from "./routes/orders.js";
+import userRoutes        from "./routes/users.js";
+import promoCodeRoutes   from "./routes/promoCodes.js";
 import staffAuthRoutes   from "./routes/staffAuth.js";
 import staffOrderRoutes  from "./routes/staffOrders.js";
 import staffInvRoutes    from "./routes/staffInventory.js";
@@ -35,6 +37,8 @@ app.use(
 app.use(express.json());
 
 app.use("/api/auth",            authRoutes);
+app.use("/api/users",          userRoutes);
+app.use("/api/promo-codes",    promoCodeRoutes);
 app.use("/api/staff-auth",     staffAuthRoutes);
 app.use("/api/orders",         orderRoutes);
 app.use("/api/staff/orders",   staffOrderRoutes);

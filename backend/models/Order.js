@@ -42,6 +42,14 @@ const orderSchema = new mongoose.Schema(
     source:   { type: String, enum: ["online", "pos"], default: "online" },
     total:    { type: Number, default: null },  // in dollars
 
+    // Promo codes
+    promoCode:      { type: String, default: null },
+    discountAmount: { type: Number, default: 0 },
+
+    // Scheduled pickup
+    scheduledPickupTime: { type: Date, default: null },
+    isScheduled:         { type: Boolean, default: false },
+
     status: {
       type: String,
       enum: ["pending", "preparing", "ready", "completed", "cancelled"],
