@@ -36,6 +36,13 @@ import EmployeePortal from "./pos/EmployeePortal";
 import StaffLogin from "./pages/StaffLogin";
 import RoleRoute from "./auth/RoleRoute";
 
+// Self-service kiosk (counter tablet)
+import KioskLayout from "./kiosk/KioskLayout";
+import KioskWelcome from "./kiosk/KioskWelcome";
+import KioskOrderPage from "./kiosk/KioskOrderPage";
+import KioskSummaryPage from "./kiosk/KioskSummaryPage";
+import KioskDonePage from "./kiosk/KioskDonePage";
+
 const PrivateRoute = ({ children }) => {
   const { isLoggedIn } = React.useContext(AuthContext);
   const location = useLocation();
@@ -81,6 +88,14 @@ const App = () => {
                   </PrivateRoute>
                 }
               />
+            </Route>
+
+            {/* ✅ Self-service kiosk (counter tablet) */}
+            <Route element={<KioskLayout />}>
+              <Route path="/kiosk" element={<KioskWelcome />} />
+              <Route path="/kiosk/order" element={<KioskOrderPage />} />
+              <Route path="/kiosk/summary" element={<KioskSummaryPage />} />
+              <Route path="/kiosk/done" element={<KioskDonePage />} />
             </Route>
 
             {/* ✅ Staff Login */}
