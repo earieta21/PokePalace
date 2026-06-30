@@ -1,6 +1,10 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
+import { queueOrder, flushQueuedOrders, isNetworkError, getQueuedOrders } from "../offlineQueue";
+import CustomBowlBuilder from "../CustomBowlBuilder";
+
+const CUSTOM_BOWL_ID = "custom-bowl";
 
 const MENU = [
   { id: 1,  name: "Bowl Clásico de Atún",    price: 14.50 },
@@ -32,6 +36,29 @@ export default function POSPage({ styles }) {
   const [saving, setSaving]     = useState(false);
   const [success, setSuccess]   = useState("");
   const [error, setError]       = useState("");
+  const [queuedCount, setQueuedCount] = useState(() => getQueuedOrders().length);
+  const [mode, setMode] = useState("menu"); // "menu" | "bowl"
+
+  const tryFlushQueue = useCallback(async () => {
+    if (getQueuedOrders().length === 0) return;
+    const sent = await flushQueuedOrders(api, {
+      onSuccess: () => setQueuedCount(getQueuedOrders().length),
+    });
+    if (sent > 0) setQueuedCount(getQueuedOrders().length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staffToken]);
+
+  // Retry queued orders when the browser regains connectivity, and poll
+  // periodically in case the 'online' event doesn't fire reliably.
+  useEffect(() => {
+    window.addEventListener("online", tryFlushQueue);
+    const interval = setInterval(tryFlushQueue, 15000);
+    tryFlushQueue();
+    return () => {
+      window.removeEventListener("online", tryFlushQueue);
+      clearInterval(interval);
+    };
+  }, [tryFlushQueue]);
 
   const addItem = (item) => {
     setCart((prev) => {
@@ -44,6 +71,24 @@ export default function POSPage({ styles }) {
 
   const removeItem = (id) => setCart((prev) => prev.filter((i) => i.id !== id));
 
+  // Only one custom bowl is supported per ticket — the Order model stores a
+  // single set of bowl fields per document. A second person's bowl is a new
+  // ticket, same as ringing up two separate customers.
+  const handleAddBowl = (bowl) => {
+    setCart((prev) => [
+      ...prev.filter((i) => i.id !== CUSTOM_BOWL_ID),
+      {
+        id: CUSTOM_BOWL_ID,
+        name: `Bowl Personalizado${bowl.bowlSize === "large" ? " (Grande)" : ""}`,
+        price: bowl.price,
+        qty: 1,
+        bowl,
+      },
+    ]);
+    setSuccess(""); setError("");
+    setMode("menu");
+  };
+
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const iva      = subtotal * IVA;
   const total    = subtotal + iva;
@@ -51,46 +96,110 @@ export default function POSPage({ styles }) {
   const handleCobrar = async () => {
     if (cart.length === 0 || saving) return;
     setSaving(true); setError("");
+
+    const customBowl = cart.find((i) => i.id === CUSTOM_BOWL_ID);
+    const regularItems = cart.filter((i) => i.id !== CUSTOM_BOWL_ID);
+
+    const payload = {
+      items: regularItems.map(({ id: _id, ...i }) => ({ name: i.name, price: i.price, qty: i.qty })),
+      customer: cliente.trim() || "Mostrador",
+      phone: phone.trim(),
+      notes: notes.trim(),
+      fulfillment,
+      paymentMethod,
+      total: parseFloat(total.toFixed(2)),
+      ...(customBowl && {
+        base: customBowl.bowl.base,
+        proteins: customBowl.bowl.proteins,
+        bowlSize: customBowl.bowl.bowlSize,
+        marinades: customBowl.bowl.marinades,
+        complements: customBowl.bowl.complements,
+        sauces: customBowl.bowl.sauces,
+        toppings: customBowl.bowl.toppings,
+      }),
+    };
+
     try {
-      await api.post("/api/staff/orders", {
-        items: cart.map(({ id: _id, ...i }) => ({ name: i.name, price: i.price, qty: i.qty })),
-        customer: cliente.trim() || "Mostrador",
-        phone: phone.trim(),
-        notes: notes.trim(),
-        fulfillment,
-        paymentMethod,
-        total: parseFloat(total.toFixed(2)),
-      });
+      await api.post("/api/staff/orders", payload);
       setSuccess(`Orden enviada — $${total.toFixed(2)}`);
-      setCart([]);
-      setCliente("");
-      setPhone("");
-      setNotes("");
-      setFulfillment("pickup");
-      setPaymentMethod("card_terminal");
-      setTimeout(() => setSuccess(""), 4000);
     } catch (e) {
-      setError(e.message);
-    } finally {
-      setSaving(false);
+      if (isNetworkError(e)) {
+        queueOrder(payload);
+        setQueuedCount(getQueuedOrders().length);
+        setSuccess(`Sin conexión — orden guardada y se enviará sola ($${total.toFixed(2)})`);
+      } else {
+        setError(e.message);
+        setSaving(false);
+        return;
+      }
     }
+
+    setCart([]);
+    setCliente("");
+    setPhone("");
+    setNotes("");
+    setFulfillment("pickup");
+    setPaymentMethod("card_terminal");
+    setTimeout(() => setSuccess(""), 4000);
+    setSaving(false);
   };
 
   return (
     <div className={styles.posLayout}>
-      {/* Menú */}
+      {/* Menú / Bowl personalizado */}
       <div>
-        <h2 style={{ margin: "0 0 14px", fontSize: 12, fontWeight: 700, color: "var(--p-muted)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
-          Menú — toca para agregar
-        </h2>
-        <div className={styles.posMenuGrid}>
-          {MENU.map((item) => (
-            <button key={item.id} className={styles.posItem} onClick={() => addItem(item)} type="button">
-              <p className={styles.posItemName}>{item.name}</p>
-              <p className={styles.posItemPrice}>${item.price.toFixed(2)}</p>
-            </button>
-          ))}
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <button
+            type="button"
+            onClick={() => setMode("menu")}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              border: mode === "menu" ? "1px solid var(--p-accent, #1a1a1a)" : "1px solid var(--p-border, #ddd)",
+              background: mode === "menu" ? "var(--p-accent, #1a1a1a)" : "transparent",
+              color: mode === "menu" ? "#fff" : "var(--p-text, #222)",
+            }}
+          >
+            Menú rápido
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("bowl")}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              border: mode === "bowl" ? "1px solid var(--p-accent, #1a1a1a)" : "1px solid var(--p-border, #ddd)",
+              background: mode === "bowl" ? "var(--p-accent, #1a1a1a)" : "transparent",
+              color: mode === "bowl" ? "#fff" : "var(--p-text, #222)",
+            }}
+          >
+            Bowl Personalizado
+          </button>
         </div>
+
+        {mode === "menu" ? (
+          <>
+            <h2 style={{ margin: "0 0 14px", fontSize: 12, fontWeight: 700, color: "var(--p-muted)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+              Menú — toca para agregar
+            </h2>
+            <div className={styles.posMenuGrid}>
+              {MENU.map((item) => (
+                <button key={item.id} className={styles.posItem} onClick={() => addItem(item)} type="button">
+                  <p className={styles.posItemName}>{item.name}</p>
+                  <p className={styles.posItemPrice}>${item.price.toFixed(2)}</p>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <CustomBowlBuilder onAdd={handleAddBowl} onCancel={() => setMode("menu")} />
+        )}
       </div>
 
       {/* Carrito */}
@@ -103,6 +212,36 @@ export default function POSPage({ styles }) {
             </span>
           )}
         </div>
+
+        {queuedCount > 0 && (
+          <div
+            style={{
+              margin: "0 14px 10px",
+              padding: "8px 12px",
+              borderRadius: 8,
+              background: "#fff3cd",
+              border: "1px solid #ffe69c",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#7a5c00",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+            }}
+          >
+            <span>
+              ⚠ {queuedCount} orden{queuedCount !== 1 ? "es" : ""} sin enviar (sin conexión)
+            </span>
+            <button
+              type="button"
+              onClick={tryFlushQueue}
+              style={{ border: "none", background: "transparent", fontWeight: 700, color: "#7a5c00", cursor: "pointer" }}
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
 
         <div style={{ padding: "10px 14px 0" }}>
           <input

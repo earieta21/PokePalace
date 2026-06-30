@@ -19,11 +19,13 @@ const app = express();
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow any localhost port (dev) + production domains
+      // Allow any localhost port (dev) + production domains, including a
+      // dedicated POS subdomain (e.g. pos.pokepalace.com or pos-pokepalace.netlify.app)
       const allowed = [
         /^http:\/\/localhost:\d+$/,
-        /^https:\/\/pokepalace\.netlify\.app$/,
+        /^https:\/\/(pos[.-])?pokepalace\.netlify\.app$/,
         /^https:\/\/pokepalace\.onrender\.com$/,
+        /^https:\/\/pos\.pokepalace\.com$/,
       ];
       if (!origin || allowed.some((r) => r.test(origin))) {
         callback(null, true);
