@@ -42,6 +42,10 @@ const orderSchema = new mongoose.Schema(
     source:   { type: String, enum: ["online", "pos"], default: "online" },
     total:    { type: Number, default: null },  // in dollars
 
+    // Pricing — always computed server-side, never trusted from the client
+    subtotal: { type: Number, default: null },
+    tax:      { type: Number, default: null },
+
     // Promo codes
     promoCode:      { type: String, default: null },
     discountAmount: { type: Number, default: 0 },

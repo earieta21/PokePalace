@@ -217,6 +217,12 @@ export default function MiCuenta() {
                       <strong>Toppings:</strong>{" "}
                       {(o.toppings || []).join(", ") || "-"}
                     </p>
+
+                    {o.total != null && (
+                      <p className={styles.line}>
+                        <strong>Total:</strong> ${o.total.toFixed(2)}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

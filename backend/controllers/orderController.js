@@ -1,5 +1,6 @@
 import Order from "../models/Order.js";
 import PromoCode from "../models/PromoCode.js";
+import { computePricing } from "../pricing.js";
 
 const hasRequiredBowlFields = ({ base, proteins }) => {
   return Boolean(base && Array.isArray(proteins) && proteins.length >= 2);
@@ -72,29 +73,31 @@ export const createOrder = async (req, res) => {
       isScheduled = true;
     }
 
-    // Validate and apply promo code
-    let discountAmount = 0;
-    let resolvedPromoCode = null;
+    // Validate promo code
+    let resolvedPromo = null;
+    let promoDoc = null;
     if (promoCode?.trim()) {
-      const promo = await PromoCode.findOne({
+      promoDoc = await PromoCode.findOne({
         code: promoCode.trim().toUpperCase(),
         isActive: true,
       });
 
-      if (!promo) return res.status(400).json({ msg: "Código promocional inválido o expirado" });
-      if (promo.expiresAt && new Date() > promo.expiresAt) {
+      if (!promoDoc) return res.status(400).json({ msg: "Código promocional inválido o expirado" });
+      if (promoDoc.expiresAt && new Date() > promoDoc.expiresAt) {
         return res.status(400).json({ msg: "El código promocional ya expiró" });
       }
-      if (promo.maxUses !== null && promo.usedCount >= promo.maxUses) {
+      if (promoDoc.maxUses !== null && promoDoc.usedCount >= promoDoc.maxUses) {
         return res.status(400).json({ msg: "El código ya alcanzó su límite de usos" });
       }
 
-      resolvedPromoCode = promo.code;
-      discountAmount = promo.discountType === "fixed"
-        ? promo.discountValue
-        : null; // percent discounts require a total to be calculated
+      resolvedPromo = { discountType: promoDoc.discountType, discountValue: promoDoc.discountValue };
+    }
 
-      await PromoCode.findByIdAndUpdate(promo._id, { $inc: { usedCount: 1 } });
+    const resolvedBowlSize = bowlSize || (selectedProteins.length === 3 ? "large" : "normal");
+    const { subtotal, discount, tax, total } = computePricing(resolvedBowlSize, resolvedPromo);
+
+    if (promoDoc) {
+      await PromoCode.findByIdAndUpdate(promoDoc._id, { $inc: { usedCount: 1 } });
     }
 
     const order = await Order.create({
@@ -109,14 +112,17 @@ export const createOrder = async (req, res) => {
       base,
       protein: selectedProteins.join(", "),
       proteins: selectedProteins,
-      bowlSize: bowlSize || (selectedProteins.length === 3 ? "large" : "normal"),
+      bowlSize: resolvedBowlSize,
       proteinUpcharge: selectedProteins.length === 3 ? 1 : 0,
       marinades: Array.isArray(marinades) ? marinades : [],
       complements: Array.isArray(complements) ? complements : [],
       sauces: Array.isArray(sauces) ? sauces : [],
       toppings: Array.isArray(toppings) ? toppings : [],
-      promoCode: resolvedPromoCode,
-      discountAmount: discountAmount || 0,
+      promoCode: promoDoc?.code || null,
+      subtotal,
+      discountAmount: discount,
+      tax,
+      total,
       scheduledPickupTime: resolvedScheduledTime,
       isScheduled,
     });

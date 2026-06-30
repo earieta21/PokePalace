@@ -239,15 +239,24 @@ export default function OrderTracking() {
           {order.paymentMethod && (
             <DetailRow label="Pago" value={PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod} />
           )}
-          {order.promoCode && (
-            <DetailRow label="Código promo" value={order.promoCode} />
-          )}
-          {order.discountAmount > 0 && (
-            <DetailRow label="Descuento" value={`-$${order.discountAmount.toFixed(2)}`} />
-          )}
           {order.notes && <DetailRow label="Notas" value={order.notes} />}
         </div>
       </section>
+
+      {order.total != null && (
+        <section className={styles.section}>
+          <p className={styles.sectionTitle}>Total</p>
+          <div className={styles.detailCard}>
+            {order.subtotal != null && <DetailRow label="Subtotal" value={`$${order.subtotal.toFixed(2)}`} />}
+            {order.promoCode && <DetailRow label="Código promo" value={order.promoCode} />}
+            {order.discountAmount > 0 && (
+              <DetailRow label="Descuento" value={`-$${order.discountAmount.toFixed(2)}`} />
+            )}
+            {order.tax != null && <DetailRow label="IVA (16%)" value={`$${order.tax.toFixed(2)}`} />}
+            <DetailRow label="Total" value={`$${order.total.toFixed(2)}`} />
+          </div>
+        </section>
+      )}
 
       <section className={styles.section}>
         <p className={styles.sectionTitle}>Tu bowl</p>

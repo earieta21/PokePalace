@@ -2,6 +2,7 @@ import React, { useContext, useState } from "react";
 import { useOrder } from "./OrderContext";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
+import { computePricing } from "./pricing";
 import styles from "./OrderSummary.module.css";
 
 import {
@@ -66,6 +67,8 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
   const saucesLabels = getListLabels(SAUCE_LABELS, sauces);
   const toppingsLabels = getListLabels(TOPPING_LABELS, toppings);
 
+  const pricing = computePricing(bowlSize, promoApplied);
+
   // Time picker helpers
   const getMinTime = () => {
     const now = new Date();
@@ -94,7 +97,6 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
       if (!res.ok) throw new Error(data?.msg || "Código inválido");
       setPromoApplied(data);
       order.updateCheckout("promoCode", data.code);
-      order.updateCheckout("discountAmount", data.discountType === "fixed" ? data.discountValue : 0);
     } catch (e) {
       setPromoError(e.message);
     } finally {
@@ -107,7 +109,6 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
     setPromoInput("");
     setPromoError("");
     order.updateCheckout("promoCode", "");
-    order.updateCheckout("discountAmount", 0);
   };
 
   const handleSaveFavorite = async () => {
@@ -389,6 +390,28 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
           {promoError && <p className={styles.promoError}>{promoError}</p>}
         </div>
 
+        {/* Price breakdown */}
+        <div className={styles.priceSection}>
+          <div className={styles.priceRow}>
+            <span>Subtotal</span>
+            <span>${pricing.subtotal.toFixed(2)}</span>
+          </div>
+          {pricing.discount > 0 && (
+            <div className={`${styles.priceRow} ${styles.priceDiscountRow}`}>
+              <span>Descuento</span>
+              <span>-${pricing.discount.toFixed(2)}</span>
+            </div>
+          )}
+          <div className={styles.priceRow}>
+            <span>IVA (16%)</span>
+            <span>${pricing.tax.toFixed(2)}</span>
+          </div>
+          <div className={styles.priceTotalRow}>
+            <span>Total</span>
+            <span>${pricing.total.toFixed(2)}</span>
+          </div>
+        </div>
+
         <div className={styles.actions}>
           {submitError && (
             <p className={styles.submitError} role="alert">{submitError}</p>
@@ -400,7 +423,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
             disabled={saving}
             aria-busy={saving}
           >
-            {saving ? "Enviando pedido…" : "Confirmar Pedido"}
+            {saving ? "Enviando pedido…" : `Confirmar Pedido — $${pricing.total.toFixed(2)}`}
           </button>
         </div>
       </div>

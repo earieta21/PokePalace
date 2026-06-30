@@ -2,27 +2,29 @@ import React, { createContext, useContext, useState } from "react";
 
 const OrderContext = createContext();
 
+const blankOrder = () => ({
+  base: "",
+  protein: "",
+  proteins: [],
+  bowlSize: "normal",
+  proteinUpcharge: 0,
+  marinades: [],
+  sauces: [],
+  complements: [],
+  toppings: [],
+  customer: "",
+  phone: "",
+  notes: "",
+  fulfillment: "pickup",
+  paymentMethod: "pay_at_pickup",
+  promoCode: "",
+  discountAmount: 0,
+  scheduledPickupTime: "",
+  isScheduled: false,
+});
+
 export const OrderProvider = ({ children }) => {
-  const [order, setOrder] = useState({
-    base: "",
-    protein: "",
-    proteins: [],
-    bowlSize: "normal",
-    proteinUpcharge: 0,
-    marinades: [],
-    sauces: [],
-    complements: [],
-    toppings: [],
-    customer: "",
-    phone: "",
-    notes: "",
-    fulfillment: "pickup",
-    paymentMethod: "pay_at_pickup",
-    promoCode: "",
-    discountAmount: 0,
-    scheduledPickupTime: "",
-    isScheduled: false,
-  });
+  const [order, setOrder] = useState(blankOrder);
 
   const updateOrder = (type, items) => {
     setOrder((prevOrder) => ({
@@ -52,8 +54,11 @@ export const OrderProvider = ({ children }) => {
     }));
   };
 
+  // Used by the self-service kiosk to wipe a session clean between customers.
+  const resetOrder = () => setOrder(blankOrder());
+
   return (
-    <OrderContext.Provider value={{ order: { ...order, updateCheckout }, updateOrder, loadFavorite }}>
+    <OrderContext.Provider value={{ order: { ...order, updateCheckout }, updateOrder, loadFavorite, resetOrder }}>
       {children}
     </OrderContext.Provider>
   );
