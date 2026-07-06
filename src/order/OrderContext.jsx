@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 const OrderContext = createContext();
+const ORDER_STORAGE_KEY = "pokePalaceOrderDraft";
 
 const blankOrder = () => ({
   base: "",
@@ -21,26 +22,40 @@ const blankOrder = () => ({
   discountAmount: 0,
   scheduledPickupTime: "",
   isScheduled: false,
+  draftStep: 0,
 });
 
-export const OrderProvider = ({ children }) => {
-  const [order, setOrder] = useState(blankOrder);
+const loadSavedOrder = () => {
+  try {
+    const saved = localStorage.getItem(ORDER_STORAGE_KEY);
+    return saved ? { ...blankOrder(), ...JSON.parse(saved) } : blankOrder();
+  } catch {
+    return blankOrder();
+  }
+};
 
-  const updateOrder = (type, items) => {
+export const OrderProvider = ({ children }) => {
+  const [order, setOrder] = useState(loadSavedOrder);
+
+  useEffect(() => {
+    localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(order));
+  }, [order]);
+
+  const updateOrder = useCallback((type, items) => {
     setOrder((prevOrder) => ({
       ...prevOrder,
       [type]: items,
     }));
-  };
+  }, []);
 
-  const updateCheckout = (field, value) => {
+  const updateCheckout = useCallback((field, value) => {
     setOrder((prevOrder) => ({
       ...prevOrder,
       [field]: value,
     }));
-  };
+  }, []);
 
-  const loadFavorite = (favorite) => {
+  const loadFavorite = useCallback((favorite) => {
     setOrder((prevOrder) => ({
       ...prevOrder,
       base: favorite.base || "",
@@ -52,13 +67,21 @@ export const OrderProvider = ({ children }) => {
       sauces: favorite.sauces || [],
       toppings: favorite.toppings || [],
     }));
-  };
+  }, []);
 
   // Used by the self-service kiosk to wipe a session clean between customers.
-  const resetOrder = () => setOrder(blankOrder());
+  const resetOrder = useCallback(() => {
+    setOrder(blankOrder());
+    localStorage.removeItem(ORDER_STORAGE_KEY);
+  }, []);
+
+  const value = useMemo(
+    () => ({ order: { ...order, updateCheckout }, updateOrder, loadFavorite, resetOrder }),
+    [order, loadFavorite, resetOrder, updateCheckout, updateOrder]
+  );
 
   return (
-    <OrderContext.Provider value={{ order: { ...order, updateCheckout }, updateOrder, loadFavorite, resetOrder }}>
+    <OrderContext.Provider value={value}>
       {children}
     </OrderContext.Provider>
   );

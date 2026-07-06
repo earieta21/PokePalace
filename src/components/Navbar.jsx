@@ -6,11 +6,14 @@ import {
   FaGift,
   FaEllipsisH,
 } from "react-icons/fa";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./Navbar.module.css";
 
 const Navbar = () => {
+  const { language, t, toggleLanguage } = useLanguage();
+
   return (
-    <nav className={styles.navbar}>
+    <nav className={styles.navbar} aria-label="Main navigation">
       <NavLink
         to="/"
         end
@@ -21,7 +24,7 @@ const Navbar = () => {
         <span className={styles.iconWrap}>
           <FaHome className={styles.icon} />
         </span>
-        <span className={styles.label}>Inicio</span>
+        <span className={styles.label}>{t("nav.home")}</span>
       </NavLink>
 
       <NavLink
@@ -33,7 +36,7 @@ const Navbar = () => {
         <span className={styles.iconWrap}>
           <FaShoppingCart className={styles.icon} />
         </span>
-        <span className={styles.label}>Ordenar</span>
+        <span className={styles.label}>{t("nav.order")}</span>
       </NavLink>
 
       <NavLink
@@ -45,7 +48,7 @@ const Navbar = () => {
         <span className={styles.iconWrap}>
           <FaGift className={styles.icon} />
         </span>
-        <span className={styles.label}>Premios</span>
+        <span className={styles.label}>{t("nav.rewards")}</span>
       </NavLink>
 
       <NavLink
@@ -57,8 +60,17 @@ const Navbar = () => {
         <span className={styles.iconWrap}>
           <FaEllipsisH className={styles.icon} />
         </span>
-        <span className={styles.label}>Más</span>
+        <span className={styles.label}>{t("nav.more")}</span>
       </NavLink>
+
+      <button
+        type="button"
+        className={styles.languageButton}
+        onClick={toggleLanguage}
+        aria-label={t("language.label")}
+      >
+        {language === "es" ? "EN" : "ES"}
+      </button>
     </nav>
   );
 };

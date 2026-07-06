@@ -4,13 +4,15 @@ import OrderSummary from "../order/OrderSummary";
 import { AuthContext } from "../context/AuthContext";
 import { useOrder } from "../order/OrderContext";
 import { API_URL } from "../config";
+import { useLanguage } from "../i18n/LanguageContext";
 
 export default function OrderSummaryPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
   const { isLoggedIn, token } = useContext(AuthContext);
-  const { order } = useOrder();
+  const { order, resetOrder } = useOrder();
+  const { t } = useLanguage();
 
   const isGuest = Boolean(location.state?.guest);
   const [saving, setSaving] = useState(false);
@@ -23,12 +25,12 @@ export default function OrderSummaryPage() {
   const onConfirm = async () => {
     const selectedProteins = Array.isArray(order?.proteins) ? order.proteins : [];
     if (!order?.base || selectedProteins.length < 2) {
-      setSubmitError("Completa la base y selecciona 2 proteínas para confirmar.");
+      setSubmitError(t("summary.missingBowl"));
       return;
     }
 
     if (!order?.customer?.trim() || !order?.phone?.trim()) {
-      setSubmitError("Agrega tu nombre y teléfono para confirmar el pedido.");
+      setSubmitError(t("summary.missingContact"));
       return;
     }
 
@@ -57,8 +59,9 @@ export default function OrderSummaryPage() {
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.msg || "Could not save your order. Please try again.");
+      if (!res.ok) throw new Error(data?.msg || t("summary.saveError"));
 
+      resetOrder();
       navigate(`/seguimiento/${data.order._id}`, { replace: true });
     } catch (e) {
       setSubmitError(e.message);

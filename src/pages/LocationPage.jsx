@@ -1,34 +1,33 @@
 import "./LocationPage.css";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const LOCATION = {
   name: "Poke Palace",
-  label: "Local principal",
-  address: "Ubicación exacta en Google Maps",
   phone: "+52 663 108 6583",
-  hours: "Lunes a domingo · 11:00 AM - 9:00 PM",
-  pickup: "Pedidos para recoger y comer en restaurante",
   mapsUrl: "https://maps.app.goo.gl/XY9uU2vr8MER54CG7?g_st=ic",
 };
 
 const mapQuery = encodeURIComponent(LOCATION.mapsUrl);
 
 export default function LocationPage() {
+  const { t } = useLanguage();
+
   return (
     <main className="locationPage">
       <section className="locationHero">
         <div>
-          <p className="locationBadge">Ubicación</p>
+          <p className="locationBadge">{t("location.badge")}</p>
           <h1>{LOCATION.name}</h1>
           <p className="locationSub">
-            Encuentra nuestro local, revisa horarios y abre indicaciones para llegar.
+            {t("location.subtitle")}
           </p>
         </div>
       </section>
 
       <section className="locationCard">
-        <div className="mapPanel" aria-label="Mapa de ubicación">
+        <div className="mapPanel" aria-label={t("location.map")}>
           <iframe
-            title={`Mapa de ${LOCATION.name}`}
+            title={`${t("location.map")} ${LOCATION.name}`}
             src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
@@ -36,30 +35,30 @@ export default function LocationPage() {
         </div>
 
         <div className="detailsPanel">
-          <p className="locationKicker">{LOCATION.label}</p>
+          <p className="locationKicker">{t("location.main")}</p>
           <h2>{LOCATION.name}</h2>
 
           <div className="detailList">
             <div className="detailItem">
               <span className="detailIcon">📍</span>
               <div>
-                <strong>Dirección</strong>
-                <p>{LOCATION.address}</p>
+                <strong>{t("location.addressLabel")}</strong>
+                <p>{t("location.address")}</p>
               </div>
             </div>
 
             <div className="detailItem">
               <span className="detailIcon">🕒</span>
               <div>
-                <strong>Horario</strong>
-                <p>{LOCATION.hours}</p>
+                <strong>{t("location.hoursLabel")}</strong>
+                <p>{t("location.hours")}</p>
               </div>
             </div>
 
             <div className="detailItem">
               <span className="detailIcon">📞</span>
               <div>
-                <strong>Teléfono</strong>
+                <strong>{t("location.phoneLabel")}</strong>
                 <p>{LOCATION.phone}</p>
               </div>
             </div>
@@ -67,8 +66,8 @@ export default function LocationPage() {
             <div className="detailItem">
               <span className="detailIcon">🥗</span>
               <div>
-                <strong>Servicio</strong>
-                <p>{LOCATION.pickup}</p>
+                <strong>{t("location.serviceLabel")}</strong>
+                <p>{t("location.service")}</p>
               </div>
             </div>
           </div>
@@ -80,10 +79,10 @@ export default function LocationPage() {
               target="_blank"
               rel="noreferrer"
             >
-              Cómo llegar
+              {t("location.directions")}
             </a>
             <a className="ghostLocationBtn" href={`tel:${LOCATION.phone.replace(/\s/g, "")}`}>
-              Llamar
+              {t("location.call")}
             </a>
           </div>
         </div>

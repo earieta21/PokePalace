@@ -43,6 +43,12 @@ import KioskOrderPage from "./kiosk/KioskOrderPage";
 import KioskSummaryPage from "./kiosk/KioskSummaryPage";
 import KioskDonePage from "./kiosk/KioskDonePage";
 
+// Employee kiosk (clock-in, checklists, temps, schedule, announcements)
+import EmployeeApp from "./kiosk/EmployeeApp";
+
+// Unified staff app (PIN login + role-based tabs)
+import UnifiedStaffApp from "./staff/UnifiedStaffApp";
+
 const PrivateRoute = ({ children }) => {
   const { isLoggedIn } = React.useContext(AuthContext);
   const location = useLocation();
@@ -98,23 +104,22 @@ const App = () => {
               <Route path="/kiosk/done" element={<KioskDonePage />} />
             </Route>
 
-            {/* ✅ Staff Login */}
-            <Route path="/staff/login" element={<StaffLogin />} />
+            {/* ✅ Unified staff app — PIN login + role-based tabs */}
+            <Route path="/staff" element={<UnifiedStaffApp />} />
 
-            {/* ✅ Staff Portal — all roles land on /pos */}
+            {/* Legacy routes → redirect to unified staff app */}
+            <Route path="/empleados" element={<Navigate to="/staff" replace />} />
+            <Route path="/staff/login" element={<Navigate to="/staff" replace />} />
+            <Route path="/pos" element={<Navigate to="/staff" replace />} />
+            <Route path="/kitchen" element={<Navigate to="/staff" replace />} />
+
+            {/* ✅ Legacy email/password staff portal (kept for admin access) */}
             <Route element={<PosLayout />}>
-              <Route
-                path="/pos"
-                element={
-                  <RoleRoute
-                    allowedRoles={["cashier", "kitchen", "manager", "admin", "owner"]}
-                  >
-                    <EmployeePortal />
-                  </RoleRoute>
-                }
-              />
-              {/* Legacy kitchen route → redirect to unified portal */}
-              <Route path="/kitchen" element={<Navigate to="/pos" replace />} />
+              <Route path="/pos-legacy" element={
+                <RoleRoute allowedRoles={["cashier", "kitchen", "manager", "admin", "owner"]}>
+                  <EmployeePortal />
+                </RoleRoute>
+              } />
             </Route>
 
             {/* fallback */}

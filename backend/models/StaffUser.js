@@ -7,9 +7,12 @@ const staffUserSchema = new mongoose.Schema(
     password: { type: String, required: true },
     role: {
       type: String,
-      enum: ["admin", "cashier", "kitchen"],
+      enum: ["admin", "cashier", "kitchen", "owner", "manager", "employee"],
       required: true,
     },
+    pin: { type: String, length: 4, default: null },
+    color: { type: String, default: "emerald" },
+    locationId: { type: String, default: null },
     active: { type: Boolean, default: true },
   },
   { timestamps: true }

@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
+import { getItemLabel } from "./OrderLabels";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./ToppingsSelection.module.css";
 
 import ajonjoli from "../assets/toppings/ajonjoli.webp";
@@ -15,16 +17,17 @@ const MAX_TOPPINGS = 5;
 
 const ToppingsSelection = ({ onNext }) => {
   const { order, updateOrder } = useOrder();
+  const { language, t } = useLanguage();
 
   const toppings = [
-    { id: "sesame_seeds",     name: "Ajonjolí",               image: ajonjoli },
-    { id: "crispy_onions",    name: "Cebolla Crujiente",       image: onions },
-    { id: "nori_strips",      name: "Tiras de Alga Nori",      image: algaNori },
-    { id: "red_pepper_flakes",name: "Pimienta Roja en Hojuelas",image: pimientaRoja },
-    { id: "pickled_radish",   name: "Rábano Encurtido",        image: rabanos },
-    { id: "toasted_coconut",  name: "Copos de Coco Tostado",   image: cocoTostado },
-    { id: "pumpkin_seeds",    name: "Pepitas",                 image: pumpkingSeeds },
-    { id: "furikake",         name: "Furikake",                image: furikake },
+    { id: "sesame_seeds", image: ajonjoli },
+    { id: "crispy_onions", image: onions },
+    { id: "nori_strips", image: algaNori },
+    { id: "red_pepper_flakes", image: pimientaRoja },
+    { id: "pickled_radish", image: rabanos },
+    { id: "toasted_coconut", image: cocoTostado },
+    { id: "pumpkin_seeds", image: pumpkingSeeds },
+    { id: "furikake", image: furikake },
   ];
 
   const [selectedToppings, setSelectedToppings] = useState(
@@ -41,7 +44,7 @@ const ToppingsSelection = ({ onNext }) => {
       }
 
       if (prev.length >= MAX_TOPPINGS) {
-        setError(`Solo puedes elegir hasta ${MAX_TOPPINGS} toppings.`);
+        setError(t("order.toppingsMaxError", { max: MAX_TOPPINGS }));
         return prev;
       }
 
@@ -54,7 +57,7 @@ const ToppingsSelection = ({ onNext }) => {
 
   const handleNext = () => {
     if (selectedToppings.length === 0) {
-      setError("Selecciona al menos un topping para continuar.");
+      setError(t("order.toppingsMinError"));
       return;
     }
     setError("");
@@ -64,15 +67,17 @@ const ToppingsSelection = ({ onNext }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>Paso 6 de 6</div>
-        <h2 className={styles.title}>Elige tus toppings</h2>
+        <div className={styles.badge}>{t("order.step", { step: 6, total: 6 })}</div>
+        <h2 className={styles.title}>{t("order.toppingsTitle")}</h2>
         <p className={styles.subtitle}>
-          El toque final de textura y sabor. Elige hasta {MAX_TOPPINGS}.
+          {t("order.toppingsSubtitle", { max: MAX_TOPPINGS })}
         </p>
       </div>
 
       <div className={styles.grid}>
-        {toppings.map((topping) => (
+        {toppings.map((topping) => {
+          const name = getItemLabel("topping", topping.id, language);
+          return (
           <button
             key={topping.id}
             type="button"
@@ -84,16 +89,17 @@ const ToppingsSelection = ({ onNext }) => {
             <div className={styles.imageWrap}>
               <img
                 src={topping.image}
-                alt={topping.name}
+                alt=""
                 className={styles.image}
                 loading="lazy"
               />
               <div className={styles.imageOverlay} />
             </div>
 
-            <p className={styles.name}>{topping.name}</p>
+            <p className={styles.name}>{name}</p>
           </button>
-        ))}
+        );
+        })}
       </div>
 
       {error && (
@@ -104,11 +110,11 @@ const ToppingsSelection = ({ onNext }) => {
 
       <div className={styles.actions}>
         <span className={styles.helper}>
-          Seleccionados {selectedToppings.length} / {MAX_TOPPINGS}
+          {t("order.selected")} {selectedToppings.length} / {MAX_TOPPINGS}
         </span>
 
         <button className={styles.nextButton} onClick={handleNext}>
-          Siguiente
+          {t("order.next")}
         </button>
       </div>
     </div>

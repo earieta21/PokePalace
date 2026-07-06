@@ -1,10 +1,12 @@
 import { useContext, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./Register.module.css";
 
 export default function Register() {
   const { register } = useContext(AuthContext);
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -22,7 +24,7 @@ export default function Register() {
       await register(form);
       navigate("/order"); // ✅ al crear cuenta, manda a ordenar
     } catch (err) {
-      setError(err.message || "Error al registrar");
+      setError(err.message || t("auth.registerError"));
     } finally {
       setLoading(false);
     }
@@ -32,9 +34,9 @@ export default function Register() {
     <div className={styles.wrapper}>
       <div className={styles.card}>
         <div className={styles.header}>
-          <h2 className={styles.title}>Crear cuenta</h2>
+          <h2 className={styles.title}>{t("auth.registerTitle")}</h2>
           <p className={styles.subTitle}>
-            Crea tu cuenta para ordenar más rápido.
+            {t("auth.registerSubtitle")}
           </p>
         </div>
 
@@ -42,11 +44,11 @@ export default function Register() {
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}>
-            <label className={styles.label}>Nombre</label>
+            <label className={styles.label}>{t("auth.name")}</label>
             <input
               className={styles.input}
               name="name"
-              placeholder="Nombre"
+              placeholder={t("auth.name")}
               value={form.name}
               onChange={handleChange}
               autoComplete="name"
@@ -55,12 +57,12 @@ export default function Register() {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>Email</label>
+            <label className={styles.label}>{t("auth.email")}</label>
             <input
               className={styles.input}
               name="email"
               type="email"
-              placeholder="Email"
+              placeholder={t("auth.email")}
               value={form.email}
               onChange={handleChange}
               autoComplete="email"
@@ -69,12 +71,12 @@ export default function Register() {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>Contraseña</label>
+            <label className={styles.label}>{t("auth.password")}</label>
             <input
               className={styles.input}
               name="password"
               type="password"
-              placeholder="Password"
+              placeholder={t("auth.passwordPlaceholder")}
               value={form.password}
               onChange={handleChange}
               autoComplete="new-password"
@@ -84,14 +86,14 @@ export default function Register() {
           </div>
 
           <button className={styles.button} disabled={loading}>
-            {loading ? "Creando..." : "Crear cuenta"}
+            {loading ? t("auth.creating") : t("auth.create")}
           </button>
         </form>
 
         <p className={styles.footer}>
-          ¿Ya tienes cuenta?{" "}
+          {t("auth.haveAccount")}{" "}
           <Link className={styles.link} to="/login">
-            Inicia sesión
+            {t("auth.loginTitle")}
           </Link>
         </p>
       </div>

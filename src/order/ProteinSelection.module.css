@@ -95,8 +95,10 @@
 
 .selected {
   border-color: var(--accent);
+  border-width: 2.5px;
   background: var(--bg-card);
-  box-shadow: 0 0 0 3px var(--accent-bg), var(--shadow-sm);
+  box-shadow: 0 0 0 4px rgba(74, 122, 90, 0.22), var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .imageWrap {
@@ -130,14 +132,15 @@
   right: 8px;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
   background: var(--accent);
   color: #fff;
-  font-size: 13px;
-  font-weight: 800;
-  box-shadow: var(--shadow-sm);
+  font-size: 15px;
+  font-weight: 900;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  border: 2px solid #fff;
 }
 
 .name {

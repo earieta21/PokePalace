@@ -62,18 +62,19 @@ function ChipGroup({ title, hint, ids, labels, selected, max, onToggle }) {
               type="button"
               onClick={() => onToggle(id)}
               style={{
-                padding: "7px 12px",
+                padding: "8px 14px",
                 borderRadius: 999,
-                fontSize: 12.5,
+                fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
-                border: active ? "1px solid var(--p-accent, #1a1a1a)" : "1px solid var(--p-border, #ddd)",
-                background: active ? "var(--p-accent, #1a1a1a)" : "transparent",
-                color: active ? "#fff" : "var(--p-text, #222)",
+                border: active ? "2px solid #52b788" : "1.5px solid rgba(82,183,136,0.35)",
+                background: active ? "#52b788" : "rgba(82,183,136,0.08)",
+                color: active ? "#fff" : "inherit",
                 transition: "all 120ms ease",
+                transform: active ? "scale(1.04)" : "scale(1)",
               }}
             >
-              {labels[id] || id}
+              {active ? "✓ " : ""}{labels[id] || id}
             </button>
           );
         })}

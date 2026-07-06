@@ -1,37 +1,39 @@
 import { useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./MoreOptions.module.css";
 
 const SECTIONS = [
   {
-    title: "Mi Cuenta",
+    titleKey: "more.account",
     items: [
-      { icon: "👤", label: "Perfil y datos",       path: "/mi-cuenta" },
-      { icon: "📦", label: "Mis pedidos",           path: "/mi-cuenta" },
-      { icon: "⭐", label: "Premios y puntos",      path: "/rewards-deals" },
+      { icon: "👤", labelKey: "more.profile", path: "/mi-cuenta" },
+      { icon: "📦", labelKey: "more.orders", path: "/mi-cuenta" },
+      { icon: "⭐", labelKey: "more.points", path: "/rewards-deals" },
     ],
   },
   {
-    title: "El Restaurante",
+    titleKey: "more.restaurant",
     items: [
-      { icon: "📍", label: "Ubicaciones",           path: "/ubicaciones" },
-      { icon: "🥗", label: "Menú completo",         path: "/order" },
-      { icon: "🥑", label: "Información nutricional",path: null },
+      { icon: "📍", labelKey: "more.locations", path: "/ubicaciones" },
+      { icon: "🥗", labelKey: "more.fullMenu", path: "/order" },
+      { icon: "🥑", labelKey: "more.nutrition", path: null },
     ],
   },
   {
-    title: "Ayuda",
+    titleKey: "more.help",
     items: [
-      { icon: "💬", label: "Contáctanos",           path: null },
-      { icon: "❓", label: "Preguntas frecuentes",  path: null },
-      { icon: "⚖️", label: "Aviso de privacidad",   path: null },
+      { icon: "💬", labelKey: "more.contact", path: null },
+      { icon: "❓", labelKey: "more.faq", path: null },
+      { icon: "⚖️", labelKey: "more.privacy", path: null },
     ],
   },
 ];
 
 export default function MoreOptions() {
   const { isLoggedIn, logout } = useContext(AuthContext);
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   const handleClick = (path) => {
@@ -41,25 +43,25 @@ export default function MoreOptions() {
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Más opciones</h1>
-        <p className={styles.pageSubtitle}>Explora todo lo que Poke Palace tiene para ti.</p>
+        <h1 className={styles.pageTitle}>{t("more.title")}</h1>
+        <p className={styles.pageSubtitle}>{t("more.subtitle")}</p>
       </div>
 
       {SECTIONS.map((section) => (
-        <section key={section.title} className={styles.section}>
-          <p className={styles.sectionTitle}>{section.title}</p>
+        <section key={section.titleKey} className={styles.section}>
+          <p className={styles.sectionTitle}>{t(section.titleKey)}</p>
           <div className={styles.listCard}>
             {section.items.map((item, i) => (
               <button
-                key={item.label}
+                key={item.labelKey}
                 className={`${styles.listItem} ${i < section.items.length - 1 ? styles.listItemBorder : ""}`}
                 onClick={() => handleClick(item.path)}
                 disabled={!item.path}
               >
                 <span className={styles.itemIcon}>{item.icon}</span>
-                <span className={styles.itemLabel}>{item.label}</span>
+                <span className={styles.itemLabel}>{t(item.labelKey)}</span>
                 {item.path && <span className={styles.itemChevron}>›</span>}
-                {!item.path && <span className={styles.itemSoon}>Próximamente</span>}
+                {!item.path && <span className={styles.itemSoon}>{t("more.soon")}</span>}
               </button>
             ))}
           </div>
@@ -70,15 +72,15 @@ export default function MoreOptions() {
       <section className={styles.section}>
         {isLoggedIn ? (
           <button className={styles.logoutBtn} onClick={logout}>
-            Cerrar sesión
+            {t("more.logout")}
           </button>
         ) : (
           <div className={styles.authRow}>
             <button className={styles.primaryBtn} onClick={() => navigate("/login")}>
-              Iniciar sesión
+              {t("more.login")}
             </button>
             <button className={styles.ghostBtn} onClick={() => navigate("/register")}>
-              Crear cuenta
+              {t("more.register")}
             </button>
           </div>
         )}

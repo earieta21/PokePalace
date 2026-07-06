@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import BaseSelection from "./BaseSelection";
@@ -7,9 +7,14 @@ import MarinadeSelection from "./MarinadeSelection";
 import ComplementsSelection from "./ComplementsSelection";
 import SauceSelection from "./SauceSelection";
 import ToppingsSelection from "./ToppingsSelection";
+import { useOrder } from "./OrderContext";
 
 const OrderPage = () => {
-  const [step, setStep] = useState(0);
+  const { order, updateOrder } = useOrder();
+  const [step, setStep] = useState(() => {
+    const savedStep = Number(order.draftStep);
+    return Number.isInteger(savedStep) && savedStep >= 0 && savedStep <= 5 ? savedStep : 0;
+  });
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -19,18 +24,29 @@ const OrderPage = () => {
   // ✅ detecta si vienes desde summary a editar solo un paso
   const editMode = searchParams.get("edit") === "1";
 
+  const setOrderStep = useCallback((nextStep) => {
+    setStep(nextStep);
+    updateOrder("draftStep", nextStep);
+  }, [updateOrder]);
+
   // ✅ Soporta /order?step=3 (para editar desde Summary)
   useEffect(() => {
+    if (!searchParams.has("step")) return;
+
     const qsStep = Number(searchParams.get("step"));
     if (!Number.isNaN(qsStep) && qsStep >= 0 && qsStep <= 5) {
-      setStep(qsStep);
+      setOrderStep(qsStep);
     }
-  }, [searchParams]);
+  }, [searchParams, setOrderStep]);
 
-  const nextStep = () => setStep((prev) => prev + 1);
+  const nextStep = () => {
+    const next = Math.min(step + 1, 5);
+    setOrderStep(next);
+  };
 
   // ✅ Siempre regresa a summary y mantiene guest
   const goToSummary = () => {
+    updateOrder("draftStep", 5);
     navigate("/summary", { state: { guest: isGuest } });
   };
 

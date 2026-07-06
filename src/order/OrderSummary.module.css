@@ -157,6 +157,30 @@
   font-weight: 600;
 }
 
+.priceSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+  padding: 14px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+}
+
+.priceSummary span {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.priceSummary strong {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
+}
+
 .checkoutSection {
   padding: 18px 0 4px;
   border-top: 1px solid var(--border);

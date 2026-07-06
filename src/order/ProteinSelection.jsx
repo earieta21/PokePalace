@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
+import { LARGE_BOWL_UPCHARGE } from "./pricing";
+import { getItemLabel } from "./OrderLabels";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./ProteinSelection.module.css";
 
 import tuna from "../assets/protein/tuna.webp";
@@ -10,15 +13,16 @@ import searedTuna from "../assets/protein/searedTuna.webp";
 
 const ProteinSelection = ({ onNext }) => {
   const { order, updateOrder } = useOrder();
+  const { language, t } = useLanguage();
   const MIN_PROTEINS = 2;
   const MAX_PROTEINS = 3;
 
   const proteins = [
-    { id: "tuna", name: "Atún", image: tuna },
-    { id: "salmon", name: "Salmón", image: salmon },
-    { id: "shrimp", name: "Camarón", image: shrimp },
-    { id: "octopus", name: "Pulpo", image: octopus },
-    { id: "seared_tuna", name: "Atún Sellado", image: searedTuna },
+    { id: "tuna", image: tuna },
+    { id: "salmon", image: salmon },
+    { id: "shrimp", image: shrimp },
+    { id: "octopus", image: octopus },
+    { id: "seared_tuna", image: searedTuna },
   ];
 
   const [selectedProteins, setSelectedProteins] = useState(() => {
@@ -36,14 +40,15 @@ const ProteinSelection = ({ onNext }) => {
           : prev;
 
       if (!prev.includes(proteinId) && prev.length >= MAX_PROTEINS) {
-        setError("Puedes seleccionar máximo 3 proteínas.");
+        setError(t("order.proteinMaxError"));
         return prev;
       }
 
       updateOrder("proteins", next);
       updateOrder("protein", next.join(", "));
-      updateOrder("bowlSize", next.length === MAX_PROTEINS ? "large" : "normal");
-      updateOrder("proteinUpcharge", next.length === MAX_PROTEINS ? 1 : 0);
+      const nextSize = next.length === MAX_PROTEINS ? "large" : "normal";
+      updateOrder("bowlSize", nextSize);
+      updateOrder("proteinUpcharge", nextSize === "large" ? LARGE_BOWL_UPCHARGE : 0);
       setError("");
       return next;
     });
@@ -51,7 +56,7 @@ const ProteinSelection = ({ onNext }) => {
 
   const handleNext = () => {
     if (selectedProteins.length < MIN_PROTEINS) {
-      setError("Selecciona 2 proteínas para el bowl normal o 3 para bowl grande.");
+      setError(t("order.proteinMinError"));
       return;
     }
     onNext();
@@ -60,22 +65,27 @@ const ProteinSelection = ({ onNext }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>Paso 2 de 6</div>
-        <h2 className={styles.title}>Elige tus proteínas</h2>
+        <div className={styles.badge}>{t("order.step", { step: 2, total: 6 })}</div>
+        <h2 className={styles.title}>{t("order.proteinTitle")}</h2>
         <p className={styles.subtitle}>
-          Bowl normal: 2 proteínas. Bowl grande: 3 proteínas con costo extra.
+          {t("order.proteinSubtitle")}
         </p>
       </div>
 
       <div className={styles.selectionInfo}>
-        <span>{selectedProteins.length} / {MAX_PROTEINS} seleccionadas</span>
-        <strong>{selectedProteins.length === MAX_PROTEINS ? "Bowl grande" : "Bowl normal"}</strong>
+        <span>{t("order.proteinCount", { count: selectedProteins.length, max: MAX_PROTEINS })}</span>
+        <strong>
+          {selectedProteins.length === MAX_PROTEINS
+            ? t("order.proteinInfoLarge")
+            : t("order.proteinInfoNormal")}
+        </strong>
       </div>
 
       <div className={styles.grid}>
         {proteins.map((protein) => {
           const selectedIndex = selectedProteins.indexOf(protein.id);
           const isSelected = selectedIndex >= 0;
+          const name = getItemLabel("protein", protein.id, language);
           return (
           <button
             key={protein.id}
@@ -88,7 +98,7 @@ const ProteinSelection = ({ onNext }) => {
             <div className={styles.imageWrap}>
               <img
                 src={protein.image}
-                alt={protein.name}
+                alt=""
                 className={styles.image}
                 loading="lazy"
               />
@@ -98,7 +108,7 @@ const ProteinSelection = ({ onNext }) => {
               )}
             </div>
 
-            <p className={styles.name}>{protein.name}</p>
+            <p className={styles.name}>{name}</p>
           </button>
           );
         })}
@@ -112,7 +122,7 @@ const ProteinSelection = ({ onNext }) => {
 
       <div className={styles.actions}>
         <button className={styles.nextButton} onClick={handleNext}>
-          Siguiente
+          {t("order.next")}
         </button>
       </div>
     </div>

@@ -11,6 +11,7 @@ import staffOrderRoutes  from "./routes/staffOrders.js";
 import staffInvRoutes    from "./routes/staffInventory.js";
 import staffWasteRoutes  from "./routes/staffWaste.js";
 import staffEmpRoutes    from "./routes/staffEmployees.js";
+import kioskRoutes       from "./routes/kiosk.js";
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ app.use("/api/staff/orders",   staffOrderRoutes);
 app.use("/api/staff/inventory",staffInvRoutes);
 app.use("/api/staff/waste",    staffWasteRoutes);
 app.use("/api/staff/employees",staffEmpRoutes);
+app.use("/api/kiosk",          kioskRoutes);
 
 app.get("/", (req, res) => {
   res.send("API Poke Palace funcionando 🍣");

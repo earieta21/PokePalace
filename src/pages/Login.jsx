@@ -1,10 +1,12 @@
 import { useContext, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./Login.module.css";
 
 export default function Login() {
   const { login } = useContext(AuthContext);
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -27,7 +29,7 @@ export default function Login() {
       // ✅ después de login, regresa a donde venía (ej. /summary o /checkout)
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err.message || "Error al iniciar sesión");
+      setError(err.message || t("auth.loginError"));
     } finally {
       setLoading(false);
     }
@@ -51,15 +53,15 @@ export default function Login() {
       <div className={styles.card}>
         <div className={styles.header}>
           <div className={styles.badge}>Poke Palace</div>
-          <h2 className={styles.title}>Iniciar sesión</h2>
+          <h2 className={styles.title}>{t("auth.loginTitle")}</h2>
           <p className={styles.subtitle}>
-            Accede para guardar tus pedidos, ver historial y puntos.
+            {t("auth.loginSubtitle")}
           </p>
         </div>
 
         <form className={styles.form} onSubmit={onSubmit}>
           <div>
-            <label className={styles.label} htmlFor="login-email">Email</label>
+            <label className={styles.label} htmlFor="login-email">{t("auth.email")}</label>
             <input
               id="login-email"
               className={styles.input}
@@ -74,7 +76,7 @@ export default function Login() {
           </div>
 
           <div>
-            <label className={styles.label} htmlFor="login-password">Contraseña</label>
+            <label className={styles.label} htmlFor="login-password">{t("auth.password")}</label>
             <input
               id="login-password"
               className={styles.input}
@@ -92,7 +94,7 @@ export default function Login() {
 
           <div className={styles.actions}>
             <button className={styles.primaryBtn} disabled={loading}>
-              {loading ? "Entrando..." : "Entrar"}
+              {loading ? t("auth.entering") : t("auth.enter")}
             </button>
 
             <button
@@ -101,14 +103,14 @@ export default function Login() {
               onClick={handleGuest}
               disabled={loading}
             >
-              Continuar como invitado
+              {t("auth.guest")}
             </button>
 
             <div className={styles.secondaryRow}>
               <span>
-                ¿No tienes cuenta?{" "}
+                {t("auth.noAccount")}{" "}
                 <Link className={styles.link} to="/register">
-                  Regístrate
+                  {t("auth.registerLink")}
                 </Link>
               </span>
               <button
@@ -117,7 +119,7 @@ export default function Login() {
                 onClick={() => navigate(-1)}
                 style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
               >
-                Volver
+                {t("auth.back")}
               </button>
             </div>
           </div>
@@ -125,7 +127,7 @@ export default function Login() {
 
         <div className={styles.staffDivider} />
         <Link to="/staff/login" className={styles.staffLink}>
-          ¿Eres del personal? → Acceso al Portal
+          {t("auth.staff")}
         </Link>
       </div>
     </div>

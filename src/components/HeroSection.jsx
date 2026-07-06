@@ -2,9 +2,11 @@ import React from "react";
 import styles from "./HeroSection.module.css";
 import pokebowl from "../assets/poke.webp";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const HeroSection = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const handleOrderNow = () => {
     navigate("/order");
@@ -19,51 +21,51 @@ const HeroSection = () => {
       <div className={styles.media}>
         <img
           src={pokebowl}
-          alt="Fresh Poke Bowls"
+          alt={t("home.heroImageAlt")}
           className={styles.heroImage}
         />
         <div className={styles.overlay} />
       </div>
 
       <div className={styles.content}>
-        <div className={styles.badge}>Urban Jungle • Natural Modern</div>
+        <div className={styles.badge}>{t("home.heroBadge")}</div>
 
         <h1 className={styles.heroTitle}>
-          Poke fresco, <span className={styles.accent}>hecho</span> a tu gusto.
+          {t("home.heroTitle")}
         </h1>
 
         <p className={styles.heroSubtitle}>
-          Ingredientes frescos. Sabor intenso. Una experiencia moderna inspirada en la naturaleza.
+          {t("home.heroSubtitle")}
         </p>
 
         <div className={styles.actions}>
           <button className={styles.primaryBtn} onClick={handleOrderNow}>
-            Ordenar Ahora
+            {t("home.orderNow")}
           </button>
 
           <button className={styles.secondaryBtn} onClick={handleViewMenu}>
-            Ver Menú
+            {t("home.viewMenu")}
           </button>
         </div>
 
         <div className={styles.stats}>
           <div className={styles.stat}>
-            <p className={styles.statValue}>Premium</p>
-            <p className={styles.statLabel}>Ingredientes de calidad</p>
+            <p className={styles.statValue}>{t("home.statPremium")}</p>
+            <p className={styles.statLabel}>{t("home.statPremiumLabel")}</p>
           </div>
 
           <div className={styles.divider} />
 
           <div className={styles.stat}>
-            <p className={styles.statValue}>Rápido</p>
-            <p className={styles.statLabel}>Pedido sin complicaciones</p>
+            <p className={styles.statValue}>{t("home.statFast")}</p>
+            <p className={styles.statLabel}>{t("home.statFastLabel")}</p>
           </div>
 
           <div className={styles.divider} />
 
           <div className={styles.stat}>
-            <p className={styles.statValue}>A tu gusto</p>
-            <p className={styles.statLabel}>Arma tu bowl</p>
+            <p className={styles.statValue}>{t("home.statCustom")}</p>
+            <p className={styles.statLabel}>{t("home.statCustomLabel")}</p>
           </div>
         </div>
       </div>

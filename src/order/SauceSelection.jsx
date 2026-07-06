@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
+import { getItemLabel } from "./OrderLabels";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./SauceSelection.module.css";
 
 import avocadoLime from "../assets/dressings/avocadoLime.webp";
@@ -17,18 +19,19 @@ const MAX_SAUCES = 2;
 
 const SauceSelection = ({ onNext }) => {
   const { order, updateOrder } = useOrder();
+  const { language, t } = useLanguage();
 
   const sauces = [
-    { id: "spicy_mayo",          name: "Mayonesa Picante",             image: spicyMayo },
-    { id: "soy_sauce",           name: "Salsa de Soja",                image: soya },
-    { id: "ponzu_sauce",         name: "Salsa Ponzu",                  image: punzu },
-    { id: "sesame_ginger",       name: "Aderezo de Sésamo y Jengibre", image: sesameGinger },
-    { id: "wasabi_vinaigrette",  name: "Vinagreta de Wasabi",          image: wasabi },
-    { id: "sweet_chili",         name: "Salsa de Chile Dulce",         image: sweetChili },
-    { id: "garlic_sriracha",     name: "Salsa de Ajo y Sriracha",      image: garlicSiracha },
-    { id: "avocado_lime",        name: "Aderezo de Aguacate y Lima",   image: avocadoLime },
-    { id: "miso_dressing",       name: "Aderezo de Miso",              image: miso },
-    { id: "yuzu_kosho",          name: "Salsa Yuzu Kosho",             image: yuzuKosho },
+    { id: "spicy_mayo", image: spicyMayo },
+    { id: "soy_sauce", image: soya },
+    { id: "ponzu_sauce", image: punzu },
+    { id: "sesame_ginger", image: sesameGinger },
+    { id: "wasabi_vinaigrette", image: wasabi },
+    { id: "sweet_chili", image: sweetChili },
+    { id: "garlic_sriracha", image: garlicSiracha },
+    { id: "avocado_lime", image: avocadoLime },
+    { id: "miso_dressing", image: miso },
+    { id: "yuzu_kosho", image: yuzuKosho },
   ];
 
   const [selectedSauces, setSelectedSauces] = useState(order.sauces || []);
@@ -43,7 +46,7 @@ const SauceSelection = ({ onNext }) => {
       }
 
       if (prev.length >= MAX_SAUCES) {
-        setError(`Solo puedes elegir hasta ${MAX_SAUCES} salsas.`);
+        setError(t("order.sauceMaxError", { max: MAX_SAUCES }));
         return prev;
       }
 
@@ -56,7 +59,7 @@ const SauceSelection = ({ onNext }) => {
 
   const handleNext = () => {
     if (selectedSauces.length === 0) {
-      setError("Selecciona al menos una salsa para continuar.");
+      setError(t("order.sauceMinError"));
       return;
     }
     setError("");
@@ -66,15 +69,17 @@ const SauceSelection = ({ onNext }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>Paso 5 de 6</div>
-        <h2 className={styles.title}>Elige tus salsas</h2>
+        <div className={styles.badge}>{t("order.step", { step: 5, total: 6 })}</div>
+        <h2 className={styles.title}>{t("order.sauceTitle")}</h2>
         <p className={styles.subtitle}>
-          Picante, dulce y umami en perfecta armonía. Elige hasta {MAX_SAUCES}.
+          {t("order.sauceSubtitle", { max: MAX_SAUCES })}
         </p>
       </div>
 
       <div className={styles.grid}>
-        {sauces.map((sauce) => (
+        {sauces.map((sauce) => {
+          const name = getItemLabel("sauce", sauce.id, language);
+          return (
           <button
             key={sauce.id}
             type="button"
@@ -86,16 +91,17 @@ const SauceSelection = ({ onNext }) => {
             <div className={styles.imageWrap}>
               <img
                 src={sauce.image}
-                alt={sauce.name}
+                alt=""
                 className={styles.image}
                 loading="lazy"
               />
               <div className={styles.imageOverlay} />
             </div>
 
-            <p className={styles.name}>{sauce.name}</p>
+            <p className={styles.name}>{name}</p>
           </button>
-        ))}
+        );
+        })}
       </div>
 
       {error && (
@@ -106,11 +112,11 @@ const SauceSelection = ({ onNext }) => {
 
       <div className={styles.actions}>
         <span className={styles.helper}>
-          Seleccionadas {selectedSauces.length} / {MAX_SAUCES}
+          {t("order.selectedFem")} {selectedSauces.length} / {MAX_SAUCES}
         </span>
 
         <button className={styles.nextButton} onClick={handleNext}>
-          Siguiente
+          {t("order.next")}
         </button>
       </div>
     </div>

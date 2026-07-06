@@ -1,31 +1,65 @@
 import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./Promotions.module.css";
 
 const TIERS = [
   {
-    name: "Bronce", min: 0, max: 99,
+    key: "bronze", nameKey: "rewards.bronze", min: 0, max: 99,
     color: "#cd7f32", bg: "rgba(205,127,50,0.10)", icon: "🥉",
-    perks: ["1 punto por cada $10 MXN gastados", "Acceso a recompensas básicas"],
+    perks: {
+      es: ["1 punto por cada $10 MXN gastados", "Acceso a recompensas básicas"],
+      en: ["1 point for every $10 MXN spent", "Access to basic rewards"],
+    },
   },
   {
-    name: "Plata", min: 100, max: 299,
+    key: "silver", nameKey: "rewards.silver", min: 100, max: 299,
     color: "#8a8aaa", bg: "rgba(138,138,170,0.10)", icon: "🥈",
-    perks: ["1 punto por cada $10 MXN gastados", "5% de descuento en tu cumpleaños", "Acceso anticipado a promociones"],
+    perks: {
+      es: ["1 punto por cada $10 MXN gastados", "5% de descuento en tu cumpleaños", "Acceso anticipado a promociones"],
+      en: ["1 point for every $10 MXN spent", "5% birthday discount", "Early access to promotions"],
+    },
   },
   {
-    name: "Oro", min: 300, max: Infinity,
+    key: "gold", nameKey: "rewards.gold", min: 300, max: Infinity,
     color: "#d4a017", bg: "rgba(212,160,23,0.10)", icon: "🥇",
-    perks: ["2 puntos por cada $10 MXN gastados", "Topping gratis en cada orden", "10% de descuento en tu cumpleaños"],
+    perks: {
+      es: ["2 puntos por cada $10 MXN gastados", "Topping gratis en cada orden", "10% de descuento en tu cumpleaños"],
+      en: ["2 points for every $10 MXN spent", "Free topping on every order", "10% birthday discount"],
+    },
   },
 ];
 
 const REWARDS = [
-  { id: 1, cost: 50,  icon: "🥤", name: "Bebida Gratis",   desc: "Agua de coco o limonada de matcha" },
-  { id: 2, cost: 75,  icon: "✨", name: "Topping Extra",   desc: "Cualquier topping de tu elección" },
-  { id: 3, cost: 150, icon: "🥗", name: "Bowl Gratis",     desc: "Un bowl completo de tu elección" },
-  { id: 4, cost: 200, icon: "🐟", name: "Proteína Doble",  desc: "Doble porción de proteína en tu bowl" },
+  {
+    id: 1,
+    cost: 50,
+    icon: "🥤",
+    name: { es: "Bebida gratis", en: "Free drink" },
+    desc: { es: "Agua de coco o limonada de matcha", en: "Coconut water or matcha lemonade" },
+  },
+  {
+    id: 2,
+    cost: 75,
+    icon: "✨",
+    name: { es: "Topping extra", en: "Extra topping" },
+    desc: { es: "Cualquier topping de tu elección", en: "Any topping of your choice" },
+  },
+  {
+    id: 3,
+    cost: 150,
+    icon: "🥗",
+    name: { es: "Bowl gratis", en: "Free bowl" },
+    desc: { es: "Un bowl completo de tu elección", en: "A full bowl of your choice" },
+  },
+  {
+    id: 4,
+    cost: 200,
+    icon: "✨",
+    name: { es: "Proteína doble", en: "Double protein" },
+    desc: { es: "Doble porción de proteína en tu bowl", en: "Double protein portion in your bowl" },
+  },
 ];
 
 function getCurrentTier(points) {
@@ -38,6 +72,7 @@ function getNextTier(points) {
 
 export default function RewardsPage() {
   const { isLoggedIn, user } = useContext(AuthContext);
+  const { language, t } = useLanguage();
   const navigate = useNavigate();
   const [redeemed, setRedeemed] = useState(null);
 
@@ -60,8 +95,8 @@ export default function RewardsPage() {
 
       {/* ── Header ── */}
       <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Premios y Beneficios</h1>
-        <p className={styles.pageSubtitle}>Ordena, acumula puntos y canjea recompensas.</p>
+        <h1 className={styles.pageTitle}>{t("rewards.title")}</h1>
+        <p className={styles.pageSubtitle}>{t("rewards.subtitle")}</p>
       </div>
 
       {/* ── Points card ── */}
@@ -70,14 +105,18 @@ export default function RewardsPage() {
           <div className={styles.pointsLeft}>
             <span className={styles.tierIcon}>{tier.icon}</span>
             <div>
-              <p className={styles.tierName} style={{ color: tier.color }}>{tier.name}</p>
-              <p className={styles.pointsValue}>{points} <span className={styles.pointsLabel}>puntos</span></p>
+              <p className={styles.tierName} style={{ color: tier.color }}>{t(tier.nameKey)}</p>
+              <p className={styles.pointsValue}>{points} <span className={styles.pointsLabel}>{t("rewards.points")}</span></p>
             </div>
           </div>
           {nextTier && (
             <div className={styles.pointsRight}>
               <p className={styles.nextLabel}>
-                Faltan <strong>{nextTier.min - points} pts</strong> para nivel {nextTier.icon} {nextTier.name}
+                {t("rewards.nextTier", {
+                  points: nextTier.min - points,
+                  icon: nextTier.icon,
+                  name: t(nextTier.nameKey),
+                })}
               </p>
               <div className={styles.tierBar}>
                 <div className={styles.tierBarFill} style={{ width: `${tierProgress}%`, background: tier.color }} />
@@ -85,22 +124,22 @@ export default function RewardsPage() {
             </div>
           )}
           {!nextTier && (
-            <p className={styles.maxLabel}>¡Nivel máximo alcanzado! 🎉</p>
+            <p className={styles.maxLabel}>{t("rewards.maxTier")}</p>
           )}
         </div>
       ) : (
         <div className={styles.loginBanner}>
-          <p>Inicia sesión para ver tus puntos y canjear recompensas.</p>
+          <p>{t("rewards.loginPrompt")}</p>
           <button className={styles.loginBtn} onClick={() => navigate("/login")}>
-            Iniciar sesión
+            {t("more.login")}
           </button>
         </div>
       )}
 
       {/* ── Recompensas canjeables ── */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Canjea tus Puntos</h2>
-        <p className={styles.sectionSub}>$10 MXN = 1 punto · Los puntos no expiran</p>
+        <h2 className={styles.sectionTitle}>{t("rewards.redeemTitle")}</h2>
+        <p className={styles.sectionSub}>{t("rewards.rate")}</p>
         <div className={styles.rewardsGrid}>
           {REWARDS.map((r) => {
             const canRedeem = isLoggedIn && points >= r.cost;
@@ -109,8 +148,8 @@ export default function RewardsPage() {
             return (
               <div key={r.id} className={`${styles.rewardCard} ${canRedeem ? styles.rewardReady : ""}`}>
                 <div className={styles.rewardIcon}>{r.icon}</div>
-                <p className={styles.rewardName}>{r.name}</p>
-                <p className={styles.rewardDesc}>{r.desc}</p>
+                <p className={styles.rewardName}>{r.name[language]}</p>
+                <p className={styles.rewardDesc}>{r.desc[language]}</p>
 
                 <div className={styles.rewardProgress}>
                   <div className={styles.rewardBar}>
@@ -124,7 +163,11 @@ export default function RewardsPage() {
                   onClick={() => handleRedeem(r)}
                   disabled={!canRedeem || isSuccess}
                 >
-                  {isSuccess ? "¡Canjeado! ✓" : canRedeem ? "Canjear" : `Faltan ${r.cost - points} pts`}
+                  {isSuccess
+                    ? `${t("rewards.redeemed")} ✓`
+                    : canRedeem
+                      ? t("rewards.redeem")
+                      : t("rewards.missing", { points: r.cost - points })}
                 </button>
               </div>
             );
@@ -134,28 +177,28 @@ export default function RewardsPage() {
 
       {/* ── Niveles de lealtad ── */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Niveles de Lealtad</h2>
-        <p className={styles.sectionSub}>Sube de nivel ordenando más seguido</p>
+        <h2 className={styles.sectionTitle}>{t("rewards.tiersTitle")}</h2>
+        <p className={styles.sectionSub}>{t("rewards.tiersSub")}</p>
         <div className={styles.tiersGrid}>
-          {TIERS.map((t) => {
-            const isActive = tier.name === t.name;
+          {TIERS.map((tierItem) => {
+            const isActive = tier.key === tierItem.key;
             return (
               <div
-                key={t.name}
+                key={tierItem.key}
                 className={`${styles.tierCard} ${isActive ? styles.tierActive : ""}`}
-                style={isActive ? { borderColor: t.color, background: t.bg } : {}}
+                style={isActive ? { borderColor: tierItem.color, background: tierItem.bg } : {}}
               >
-                <div className={styles.tierCardIcon}>{t.icon}</div>
-                <p className={styles.tierCardName} style={{ color: t.color }}>{t.name}</p>
+                <div className={styles.tierCardIcon}>{tierItem.icon}</div>
+                <p className={styles.tierCardName} style={{ color: tierItem.color }}>{t(tierItem.nameKey)}</p>
                 <p className={styles.tierRange}>
-                  {t.max === Infinity ? `${t.min}+ pts` : `${t.min}–${t.max} pts`}
+                  {tierItem.max === Infinity ? `${tierItem.min}+ pts` : `${tierItem.min}–${tierItem.max} pts`}
                 </p>
                 <ul className={styles.perkList}>
-                  {t.perks.map((p) => (
+                  {tierItem.perks[language].map((p) => (
                     <li key={p} className={styles.perkItem}>✓ {p}</li>
                   ))}
                 </ul>
-                {isActive && <div className={styles.activePill} style={{ background: t.color }}>Tu nivel actual</div>}
+                {isActive && <div className={styles.activePill} style={{ background: tierItem.color }}>{t("rewards.currentTier")}</div>}
               </div>
             );
           })}
@@ -164,12 +207,24 @@ export default function RewardsPage() {
 
       {/* ── Cómo ganar puntos ── */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>¿Cómo Ganar Puntos?</h2>
+        <h2 className={styles.sectionTitle}>{t("rewards.howTitle")}</h2>
         <div className={styles.howGrid}>
           {[
-            { icon: "🥗", title: "Ordena en línea",       desc: "Gana 1 punto por cada $10 MXN en tu pedido." },
-            { icon: "⭐", title: "Sé cliente frecuente",  desc: "Llega a nivel Oro y gana puntos dobles." },
-            { icon: "🎂", title: "Cumpleaños",            desc: "Bonus de puntos el mes de tu cumpleaños." },
+            {
+              icon: "🥗",
+              title: language === "es" ? "Ordena en línea" : "Order online",
+              desc: language === "es" ? "Gana 1 punto por cada $10 MXN en tu pedido." : "Earn 1 point for every $10 MXN in your order.",
+            },
+            {
+              icon: "⭐",
+              title: language === "es" ? "Sé cliente frecuente" : "Be a regular",
+              desc: language === "es" ? "Llega a nivel Oro y gana puntos dobles." : "Reach Gold tier and earn double points.",
+            },
+            {
+              icon: "🎂",
+              title: language === "es" ? "Cumpleaños" : "Birthday",
+              desc: language === "es" ? "Bonus de puntos el mes de tu cumpleaños." : "Bonus points during your birthday month.",
+            },
           ].map((item) => (
             <div key={item.title} className={styles.howCard}>
               <span className={styles.howIcon}>{item.icon}</span>
@@ -181,7 +236,7 @@ export default function RewardsPage() {
         {!isLoggedIn && (
           <div style={{ textAlign: "center", marginTop: 24 }}>
             <button className={styles.loginBtn} onClick={() => navigate("/order")}>
-              Ordenar Ahora
+              {t("rewards.orderNow")}
             </button>
           </div>
         )}

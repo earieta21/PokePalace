@@ -2,6 +2,8 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import HeroSection from "../components/HeroSection";
 import Menu from "../components/Menu";
+import { computeBowlSubtotal } from "../order/pricing";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./Home.module.css";
 
 // Usa imágenes reales tuyas si las tienes
@@ -12,30 +14,31 @@ import bowl4 from "../assets/poke.webp";
 
 const Home = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const menuItems = [
     {
       id: "signature_emerald",
-      name: "Emerald Salmon Bowl",
-      price: "12.99",
+      name: t("menu.emeraldSalmon"),
+      price: computeBowlSubtotal("normal"),
       image: bowl1,
     },
     {
       id: "spicy_tuna_crunch",
-      name: "Spicy Tuna Crunch",
-      price: "13.49",
+      name: t("menu.spicyTuna"),
+      price: computeBowlSubtotal("normal"),
       image: bowl2,
     },
     {
       id: "tropical_shrimp",
-      name: "Tropical Shrimp Bowl",
-      price: "13.99",
+      name: t("menu.tropicalShrimp"),
+      price: computeBowlSubtotal("large"),
       image: bowl3,
     },
     {
       id: "zen_greens",
-      name: "Zen Greens Bowl",
-      price: "11.99",
+      name: t("menu.zenGreens"),
+      price: computeBowlSubtotal("normal"),
       image: bowl4,
     },
   ];
@@ -53,8 +56,8 @@ const Home = () => {
 
       {/* Popular Bowls */}
       <section className={styles.section}>
-        <h2 className={styles.title}>Bowls Populares</h2>
-        <p className={styles.subtitle}>Favoritos de la casa + los más pedidos.</p>
+        <h2 className={styles.title}>{t("home.popularTitle")}</h2>
+        <p className={styles.subtitle}>{t("home.popularSubtitle")}</p>
 
         <Menu items={menuItems} />
 
@@ -63,13 +66,13 @@ const Home = () => {
             className={styles.primaryBtn}
             onClick={() => navigate("/order")}
           >
-            Arma tu Bowl
+            {t("home.buildBowl")}
           </button>
           <button
             className={styles.secondaryBtn}
             onClick={() => navigate("/order")}
           >
-            Bowls Especiales
+            {t("home.specialBowls")}
           </button>
         </div>
       </section>

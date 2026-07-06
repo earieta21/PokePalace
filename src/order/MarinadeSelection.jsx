@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
+import { getItemLabel } from "./OrderLabels";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./MarinadeSelection.module.css";
 
 import citrico from "../assets/marinades/citrico.webp";
@@ -15,16 +17,17 @@ const MAX_MARINADES = 2;
 
 const MarinadeSelection = ({ onNext }) => {
   const { order, updateOrder } = useOrder();
+  const { language, t } = useLanguage();
 
   const marinades = [
-    { id: "citrus_marinade",       name: "Marinado Cítrico",        image: citrico },
-    { id: "shoyu_marinade",        name: "Marinado Shoyu",           image: shoyu },
-    { id: "ponzu_marinade",        name: "Marinado Ponzu",           image: punzu },
-    { id: "spicy_marinade",        name: "Marinado Picante",         image: spicy },
-    { id: "sesame_marinade",       name: "Marinado de Sésamo",       image: sesame },
-    { id: "wasabi_marinade",       name: "Marinado de Wasabi",       image: wassabi },
-    { id: "miso_marinade",         name: "Marinado de Miso",         image: miso },
-    { id: "garlic_ginger_marinade",name: "Marinado de Ajo y Jengibre",image: garlicGinger },
+    { id: "citrus_marinade", image: citrico },
+    { id: "shoyu_marinade", image: shoyu },
+    { id: "ponzu_marinade", image: punzu },
+    { id: "spicy_marinade", image: spicy },
+    { id: "sesame_marinade", image: sesame },
+    { id: "wasabi_marinade", image: wassabi },
+    { id: "miso_marinade", image: miso },
+    { id: "garlic_ginger_marinade", image: garlicGinger },
   ];
 
   const [selectedMarinades, setSelectedMarinades] = useState(
@@ -41,7 +44,7 @@ const MarinadeSelection = ({ onNext }) => {
       }
 
       if (prev.length >= MAX_MARINADES) {
-        setError(`Solo puedes elegir hasta ${MAX_MARINADES} marinados.`);
+        setError(t("order.marinadeMaxError", { max: MAX_MARINADES }));
         return prev;
       }
 
@@ -54,7 +57,7 @@ const MarinadeSelection = ({ onNext }) => {
 
   const handleNext = () => {
     if (selectedMarinades.length === 0) {
-      setError("Selecciona al menos un marinado para continuar.");
+      setError(t("order.marinadeMinError"));
       return;
     }
     setError("");
@@ -64,15 +67,17 @@ const MarinadeSelection = ({ onNext }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>Paso 3 de 6</div>
-        <h2 className={styles.title}>Elige tus marinados</h2>
+        <div className={styles.badge}>{t("order.step", { step: 3, total: 6 })}</div>
+        <h2 className={styles.title}>{t("order.marinadeTitle")}</h2>
         <p className={styles.subtitle}>
-          Dale sabor a tu proteína. Elige hasta {MAX_MARINADES}.
+          {t("order.marinadeSubtitle", { max: MAX_MARINADES })}
         </p>
       </div>
 
       <div className={styles.grid}>
-        {marinades.map((marinade) => (
+        {marinades.map((marinade) => {
+          const name = getItemLabel("marinade", marinade.id, language);
+          return (
           <button
             key={marinade.id}
             type="button"
@@ -84,16 +89,17 @@ const MarinadeSelection = ({ onNext }) => {
             <div className={styles.imageWrap}>
               <img
                 src={marinade.image}
-                alt={marinade.name}
+                alt=""
                 className={styles.image}
                 loading="lazy"
               />
               <div className={styles.imageOverlay} />
             </div>
 
-            <p className={styles.name}>{marinade.name}</p>
+            <p className={styles.name}>{name}</p>
           </button>
-        ))}
+        );
+        })}
       </div>
 
       {error && (
@@ -104,11 +110,11 @@ const MarinadeSelection = ({ onNext }) => {
 
       <div className={styles.actions}>
         <span className={styles.helper}>
-          Seleccionados {selectedMarinades.length} / {MAX_MARINADES}
+          {t("order.selected")} {selectedMarinades.length} / {MAX_MARINADES}
         </span>
 
         <button className={styles.nextButton} onClick={handleNext}>
-          Siguiente
+          {t("order.next")}
         </button>
       </div>
     </div>

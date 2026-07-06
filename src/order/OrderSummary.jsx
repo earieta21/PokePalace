@@ -3,20 +3,18 @@ import { useOrder } from "./OrderContext";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
 import { computePricing } from "./pricing";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./OrderSummary.module.css";
 
 import {
-  BASE_LABELS,
-  PROTEIN_LABELS,
-  MARINADE_LABELS,
-  COMPLEMENT_LABELS,
-  SAUCE_LABELS,
-  TOPPING_LABELS,
+  ITEM_LABELS,
 } from "./OrderLabels";
 
 const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" }) => {
   const { order } = useOrder();
   const { isLoggedIn, token } = useContext(AuthContext);
+  const { language, t } = useLanguage();
+  const labels = ITEM_LABELS[language] || ITEM_LABELS.es;
 
   const {
     base = "",
@@ -44,12 +42,12 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
   const finalMarinades = marinades;
 
   const prettifyId = (value) => {
-    if (!value || typeof value !== "string") return "No seleccionado";
+    if (!value || typeof value !== "string") return t("summary.empty");
     return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   const getLabel = (map, value) => {
-    if (!value) return "No seleccionado";
+    if (!value) return t("summary.empty");
     return map?.[value] || prettifyId(value);
   };
 
@@ -58,14 +56,14 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
     return values.map((v) => map?.[v] || prettifyId(v));
   };
 
-  const marinadesLabels = getListLabels(MARINADE_LABELS, finalMarinades);
+  const marinadesLabels = getListLabels(labels.marinade, finalMarinades);
   const proteinLabels = getListLabels(
-    PROTEIN_LABELS,
+    labels.protein,
     Array.isArray(proteins) && proteins.length > 0 ? proteins : protein ? [protein] : []
   );
-  const complementsLabels = getListLabels(COMPLEMENT_LABELS, complements);
-  const saucesLabels = getListLabels(SAUCE_LABELS, sauces);
-  const toppingsLabels = getListLabels(TOPPING_LABELS, toppings);
+  const complementsLabels = getListLabels(labels.complement, complements);
+  const saucesLabels = getListLabels(labels.sauce, sauces);
+  const toppingsLabels = getListLabels(labels.topping, toppings);
 
   const pricing = computePricing(bowlSize, promoApplied);
 
@@ -153,7 +151,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
           {value ? <p className={styles.detail}>{value}</p> : null}
         </div>
         <button className={styles.editButton} onClick={onEdit} type="button">
-          Editar
+          {t("summary.edit")}
         </button>
       </div>
       {chips ? (
@@ -174,34 +172,61 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
     <div className={styles.wrapper}>
       <div className={styles.container}>
         <div className={styles.header}>
-          <div className={styles.badge}>Revisa</div>
-          <h2 className={styles.title}>Resumen de tu orden</h2>
+          <div className={styles.badge}>{t("summary.badge")}</div>
+          <h2 className={styles.title}>{t("summary.title")}</h2>
           <p className={styles.subtitle}>
-            Confirma los detalles antes de hacer tu pedido.
+            {t("summary.subtitle")}
           </p>
         </div>
 
-        <Section title="Base" value={getLabel(BASE_LABELS, base)} onEdit={() => onEditStep(0)} />
+        <Section
+          title={t("summary.base")}
+          value={getLabel(labels.base, base)}
+          onEdit={() => onEditStep(0)}
+        />
 
         <Section
-          title="Proteína"
-          value={proteinLabels.length > 0 ? proteinLabels.join(", ") : "No seleccionado"}
+          title={t("summary.protein")}
+          value={proteinLabels.length > 0 ? proteinLabels.join(", ") : t("summary.empty")}
           onEdit={() => onEditStep(1)}
         />
 
         <div className={styles.sizeNotice}>
-          <span>{bowlSize === "large" ? "Bowl grande" : "Bowl normal"}</span>
+          <span>{bowlSize === "large" ? t("summary.large") : t("summary.normal")}</span>
           <p>
             {bowlSize === "large"
-              ? "3 proteínas seleccionadas · aplica costo extra"
-              : "2 proteínas incluidas"}
+              ? t("summary.largeDesc")
+              : t("summary.normalDesc")}
           </p>
         </div>
 
-        <Section title="Marinados" chips={marinadesLabels} emptyText="Sin marinados seleccionados" onEdit={() => onEditStep(2)} />
-        <Section title="Complementos" chips={complementsLabels} emptyText="Sin complementos seleccionados" onEdit={() => onEditStep(3)} />
-        <Section title="Salsas" chips={saucesLabels} emptyText="Sin salsas seleccionadas" onEdit={() => onEditStep(4)} />
-        <Section title="Toppings" chips={toppingsLabels} emptyText="Sin toppings seleccionados" onEdit={() => onEditStep(5)} />
+        <Section
+          title={t("summary.marinades")}
+          chips={marinadesLabels}
+          emptyText={t("summary.noMarinades")}
+          onEdit={() => onEditStep(2)}
+        />
+
+        <Section
+          title={t("summary.complements")}
+          chips={complementsLabels}
+          emptyText={t("summary.noComplements")}
+          onEdit={() => onEditStep(3)}
+        />
+
+        <Section
+          title={t("summary.sauces")}
+          chips={saucesLabels}
+          emptyText={t("summary.noSauces")}
+          onEdit={() => onEditStep(4)}
+        />
+
+        <Section
+          title={t("summary.toppings")}
+          chips={toppingsLabels}
+          emptyText={t("summary.noToppings")}
+          onEdit={() => onEditStep(5)}
+        />
 
         {/* Save as favorite */}
         {isLoggedIn && (
@@ -251,32 +276,32 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
         {/* Checkout form */}
         <div className={styles.checkoutSection}>
           <div>
-            <h3 className={styles.checkoutTitle}>Datos para el restaurante</h3>
+            <h3 className={styles.checkoutTitle}>{t("summary.checkoutTitle")}</h3>
             <p className={styles.checkoutSubtitle}>
-              Usaremos esto para identificar tu pedido y avisarte cuando esté listo.
+              {t("summary.checkoutSubtitle")}
             </p>
           </div>
 
           <div className={styles.checkoutGrid}>
             <label className={styles.field}>
-              <span>Nombre</span>
+              <span>{t("summary.name")}</span>
               <input
                 name="customer"
                 value={order.customer || ""}
                 onChange={(e) => order.updateCheckout("customer", e.target.value)}
-                placeholder="Tu nombre"
+                placeholder={t("summary.namePlaceholder")}
                 autoComplete="name"
                 required
               />
             </label>
 
             <label className={styles.field}>
-              <span>Teléfono</span>
+              <span>{t("summary.phone")}</span>
               <input
                 name="phone"
                 value={order.phone || ""}
                 onChange={(e) => order.updateCheckout("phone", e.target.value)}
-                placeholder="Para avisarte"
+                placeholder={t("summary.phonePlaceholder")}
                 autoComplete="tel"
                 inputMode="tel"
                 required
@@ -284,28 +309,28 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
             </label>
 
             <label className={styles.field}>
-              <span>Entrega</span>
+              <span>{t("summary.fulfillment")}</span>
               <select
                 name="fulfillment"
                 value={order.fulfillment || "pickup"}
                 onChange={(e) => order.updateCheckout("fulfillment", e.target.value)}
               >
-                <option value="pickup">Recoger en restaurante</option>
-                <option value="dine_in">Comer en restaurante</option>
-                <option value="delivery">Delivery</option>
+                <option value="pickup">{t("summary.pickup")}</option>
+                <option value="dine_in">{t("summary.dineIn")}</option>
+                <option value="delivery">{t("summary.delivery")}</option>
               </select>
             </label>
 
             <label className={styles.field}>
-              <span>Pago</span>
+              <span>{t("summary.payment")}</span>
               <select
                 name="paymentMethod"
                 value={order.paymentMethod || "pay_at_pickup"}
                 onChange={(e) => order.updateCheckout("paymentMethod", e.target.value)}
               >
-                <option value="pay_at_pickup">Pagar al recoger</option>
-                <option value="cash">Efectivo en restaurante</option>
-                <option value="card_terminal">Tarjeta en terminal</option>
+                <option value="pay_at_pickup">{t("summary.payAtPickup")}</option>
+                <option value="cash">{t("summary.cash")}</option>
+                <option value="card_terminal">{t("summary.cardTerminal")}</option>
               </select>
             </label>
           </div>
@@ -341,12 +366,12 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
           )}
 
           <label className={styles.field}>
-            <span>Notas</span>
+            <span>{t("summary.notes")}</span>
             <textarea
               name="notes"
               value={order.notes || ""}
               onChange={(e) => order.updateCheckout("notes", e.target.value)}
-              placeholder="Alergias, instrucciones o detalles para cocina"
+              placeholder={t("summary.notesPlaceholder")}
               rows="3"
             />
           </label>
@@ -423,7 +448,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
             disabled={saving}
             aria-busy={saving}
           >
-            {saving ? "Enviando pedido…" : `Confirmar Pedido — $${pricing.total.toFixed(2)}`}
+            {saving ? t("summary.sending") : `${t("summary.confirm")} — $${pricing.total.toFixed(2)}`}
           </button>
         </div>
       </div>

@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
+import { getItemLabel } from "./OrderLabels";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./ComplementsSelection.module.css";
 
 import aguacate from "../assets/complements/aguacate.webp";
@@ -19,20 +21,21 @@ const MAX_COMPLEMENTS = 6;
 
 const ComplementsSelection = ({ onNext }) => {
   const { order, updateOrder } = useOrder();
+  const { language, t } = useLanguage();
 
   const complements = [
-    { id: "shredded_carrots", name: "Zanahoria Rallada",  image: zanahoria },
-    { id: "cucumber",         name: "Pepino",             image: pepino },
-    { id: "mango",            name: "Mango",              image: mango },
-    { id: "jicama",           name: "Jícama",             image: jicama },
-    { id: "seaweed",          name: "Algas",              image: algas },
-    { id: "avocado",          name: "Aguacate",           image: aguacate },
-    { id: "edamame",          name: "Edamame",            image: edamames },
-    { id: "kale",             name: "Col Rizada",         image: colRizado },
-    { id: "peas",             name: "Chícharos",          image: chicharos },
-    { id: "corn",             name: "Maíz",               image: maiz },
-    { id: "pineapple",        name: "Piña",               image: pina },
-    { id: "chia_seeds",       name: "Semillas de Chía",   image: chia },
+    { id: "shredded_carrots", image: zanahoria },
+    { id: "cucumber", image: pepino },
+    { id: "mango", image: mango },
+    { id: "jicama", image: jicama },
+    { id: "seaweed", image: algas },
+    { id: "avocado", image: aguacate },
+    { id: "edamame", image: edamames },
+    { id: "kale", image: colRizado },
+    { id: "peas", image: chicharos },
+    { id: "corn", image: maiz },
+    { id: "pineapple", image: pina },
+    { id: "chia_seeds", image: chia },
   ];
 
   const [selectedComplements, setSelectedComplements] = useState(
@@ -49,7 +52,7 @@ const ComplementsSelection = ({ onNext }) => {
       }
 
       if (prev.length >= MAX_COMPLEMENTS) {
-        setError(`Solo puedes elegir hasta ${MAX_COMPLEMENTS} complementos.`);
+        setError(t("order.complementsMaxError", { max: MAX_COMPLEMENTS }));
         return prev;
       }
 
@@ -62,7 +65,7 @@ const ComplementsSelection = ({ onNext }) => {
 
   const handleNext = () => {
     if (selectedComplements.length === 0) {
-      setError("Selecciona al menos un complemento para continuar.");
+      setError(t("order.complementsMinError"));
       return;
     }
     setError("");
@@ -72,15 +75,17 @@ const ComplementsSelection = ({ onNext }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>Paso 4 de 6</div>
-        <h2 className={styles.title}>Elige tus complementos</h2>
+        <div className={styles.badge}>{t("order.step", { step: 4, total: 6 })}</div>
+        <h2 className={styles.title}>{t("order.complementsTitle")}</h2>
         <p className={styles.subtitle}>
-          Agrega textura, dulzura y verdes. Elige hasta {MAX_COMPLEMENTS}.
+          {t("order.complementsSubtitle", { max: MAX_COMPLEMENTS })}
         </p>
       </div>
 
       <div className={styles.grid}>
-        {complements.map((complement) => (
+        {complements.map((complement) => {
+          const name = getItemLabel("complement", complement.id, language);
+          return (
           <button
             key={complement.id}
             type="button"
@@ -92,15 +97,16 @@ const ComplementsSelection = ({ onNext }) => {
             <div className={styles.imageWrap}>
               <img
                 src={complement.image}
-                alt={complement.name}
+                alt=""
                 className={styles.image}
                 loading="lazy"
               />
               <div className={styles.imageOverlay} />
             </div>
-            <p className={styles.name}>{complement.name}</p>
+            <p className={styles.name}>{name}</p>
           </button>
-        ))}
+        );
+        })}
       </div>
 
       {error && (
@@ -111,11 +117,11 @@ const ComplementsSelection = ({ onNext }) => {
 
       <div className={styles.actions}>
         <span className={styles.helper}>
-          Seleccionados {selectedComplements.length} / {MAX_COMPLEMENTS}
+          {t("order.selected")} {selectedComplements.length} / {MAX_COMPLEMENTS}
         </span>
 
         <button className={styles.nextButton} onClick={handleNext}>
-          Siguiente
+          {t("order.next")}
         </button>
       </div>
     </div>

@@ -76,8 +76,28 @@
 
 .selected {
   border-color: var(--accent);
+  border-width: 2.5px;
   background: var(--bg-card);
-  box-shadow: 0 0 0 3px var(--accent-bg), var(--shadow-sm);
+  box-shadow: 0 0 0 4px rgba(74, 122, 90, 0.22), var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.selected .imageWrap::after {
+  content: "✓";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  z-index: 1;
 }
 
 .imageWrap {

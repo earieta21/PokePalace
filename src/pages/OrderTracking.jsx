@@ -2,31 +2,26 @@ import { useCallback, useEffect, useRef, useState, useContext } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
-import { PROTEIN_LABELS } from "../order/OrderLabels";
+import { getItemLabel } from "../order/OrderLabels";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./OrderTracking.module.css";
 
-const STEPS = [
-  { key: "pending",    icon: "📋", label: "Recibido",        desc: "Tu pedido fue recibido" },
-  { key: "preparing",  icon: "👨‍🍳", label: "En preparación",  desc: "Estamos preparando tu bowl" },
-  { key: "ready",      icon: "🔔", label: "Listo",            desc: "¡Tu pedido está listo para recoger!" },
-  { key: "completed",  icon: "✅", label: "Entregado",        desc: "¡Buen provecho!" },
+const STEP_CONFIG = [
+  { key: "pending", icon: "📋", labelKey: "tracking.received", descKey: "tracking.receivedDesc" },
+  { key: "preparing", icon: "👨‍🍳", labelKey: "tracking.preparing", descKey: "tracking.preparingDesc" },
+  { key: "ready", icon: "🔔", labelKey: "tracking.ready", descKey: "tracking.readyDesc" },
+  { key: "completed", icon: "✅", labelKey: "tracking.completed", descKey: "tracking.completedDesc" },
 ];
 
-const CANCELLED = { key: "cancelled", icon: "❌", label: "Cancelado", desc: "Tu pedido fue cancelado" };
+const CANCELLED = { key: "cancelled", icon: "❌", labelKey: "tracking.cancelled", descKey: "tracking.cancelledDesc" };
 
 const STEP_INDEX = { pending: 0, preparing: 1, ready: 2, completed: 3 };
 
-const FULFILLMENT_LABEL = {
-  pickup: "Recoger en restaurante",
-  dine_in: "Comer en restaurante",
-  delivery: "Delivery",
-};
-
-const PAYMENT_LABEL = {
-  pay_at_pickup: "Pagar al recoger",
-  cash: "Efectivo",
-  card_terminal: "Tarjeta en terminal",
-  online: "Pago en línea",
+const PAYMENT_KEYS = {
+  pay_at_pickup: "summary.payAtPickup",
+  cash: "summary.cash",
+  card_terminal: "summary.cardTerminal",
+  online: "summary.payment",
 };
 
 const STATUS_MESSAGES = {
@@ -36,9 +31,9 @@ const STATUS_MESSAGES = {
   cancelled: "Tu pedido fue cancelado.",
 };
 
-const getProteinsText = (order) => {
+const getProteinsText = (order, language) => {
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
-    return order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ");
+    return order.proteins.map((id) => getItemLabel("protein", id, language)).join(", ");
   }
   return order.protein;
 };
@@ -60,6 +55,7 @@ function Toast({ message, onClose }) {
 export default function OrderTracking() {
   const { orderId } = useParams();
   const { token } = useContext(AuthContext);
+  const { language, t } = useLanguage();
 
   const [order, setOrder] = useState(null);
   const [error, setError] = useState("");
@@ -71,7 +67,7 @@ export default function OrderTracking() {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await fetch(`${API_URL}/api/orders/${orderId}`, { headers });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.msg || "No se pudo obtener la orden");
+      if (!res.ok) throw new Error(data?.msg || t("tracking.loadError"));
 
       const newOrder = data.order;
       setOrder(newOrder);
@@ -106,11 +102,11 @@ export default function OrderTracking() {
     } catch (e) {
       setError(
         e.message === "Failed to fetch"
-          ? "No se pudo conectar con el servidor de órdenes. Revisa que el backend esté encendido."
+          ? t("tracking.fetchError")
           : e.message
       );
     }
-  }, [orderId, token]);
+  }, [orderId, t, token]);
 
   useEffect(() => {
     fetchOrder();
@@ -128,7 +124,7 @@ export default function OrderTracking() {
       <div className={styles.page}>
         <div className={styles.errorCard}>
           <p className={styles.errorText}>{error}</p>
-          <Link to="/mi-cuenta" className={styles.backLink}>Ver mis pedidos</Link>
+          <Link to="/mi-cuenta" className={styles.backLink}>{t("tracking.myOrders")}</Link>
         </div>
       </div>
     );
@@ -139,7 +135,7 @@ export default function OrderTracking() {
       <div className={styles.page}>
         <div className={styles.loadingCard}>
           <div className={styles.spinner} />
-          <p className={styles.loadingText}>Cargando tu pedido...</p>
+          <p className={styles.loadingText}>{t("tracking.loading")}</p>
         </div>
       </div>
     );
@@ -156,7 +152,7 @@ export default function OrderTracking() {
       )}
 
       <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Seguimiento de orden</h1>
+        <h1 className={styles.pageTitle}>{t("tracking.title")}</h1>
         <p className={styles.pageSubtitle}>
           Pedido #{order._id.slice(-6).toUpperCase()}
           {" · "}
@@ -188,14 +184,14 @@ export default function OrderTracking() {
         {isCancelled ? (
           <div className={styles.cancelledState}>
             <span className={styles.bigIcon}>{CANCELLED.icon}</span>
-            <p className={styles.statusLabel}>{CANCELLED.label}</p>
-            <p className={styles.statusDesc}>{CANCELLED.desc}</p>
+            <p className={styles.statusLabel}>{t(CANCELLED.labelKey)}</p>
+            <p className={styles.statusDesc}>{t(CANCELLED.descKey)}</p>
           </div>
         ) : (
           <div className={styles.activeState}>
-            <span className={styles.bigIcon}>{STEPS[currentStep].icon}</span>
-            <p className={styles.statusLabel}>{STEPS[currentStep].label}</p>
-            <p className={styles.statusDesc}>{STEPS[currentStep].desc}</p>
+            <span className={styles.bigIcon}>{STEP_CONFIG[currentStep].icon}</span>
+            <p className={styles.statusLabel}>{t(STEP_CONFIG[currentStep].labelKey)}</p>
+            <p className={styles.statusDesc}>{t(STEP_CONFIG[currentStep].descKey)}</p>
             {!isDone && <div className={styles.pulseDot} />}
           </div>
         )}
@@ -204,7 +200,7 @@ export default function OrderTracking() {
       {/* Stepper */}
       {!isCancelled && (
         <div className={styles.stepperWrap}>
-          {STEPS.map((step, i) => {
+          {STEP_CONFIG.map((step, i) => {
             const done = i < currentStep;
             const active = i === currentStep;
             return (
@@ -214,11 +210,11 @@ export default function OrderTracking() {
                 </div>
                 <div className={styles.stepInfo}>
                   <p className={`${styles.stepLabel} ${active ? styles.stepLabelActive : ""} ${done ? styles.stepLabelDone : ""}`}>
-                    {step.label}
+                    {t(step.labelKey)}
                   </p>
-                  {active && <p className={styles.stepDesc}>{step.desc}</p>}
+                  {active && <p className={styles.stepDesc}>{t(step.descKey)}</p>}
                 </div>
-                {i < STEPS.length - 1 && (
+                {i < STEP_CONFIG.length - 1 && (
                   <div className={`${styles.stepLine} ${done ? styles.stepLineDone : ""}`} />
                 )}
               </div>
@@ -229,17 +225,17 @@ export default function OrderTracking() {
 
       {/* Order details */}
       <section className={styles.section}>
-        <p className={styles.sectionTitle}>Datos del pedido</p>
+        <p className={styles.sectionTitle}>{t("tracking.orderData")}</p>
         <div className={styles.detailCard}>
-          {order.customer && <DetailRow label="Nombre" value={order.customer} />}
-          {order.phone && <DetailRow label="Teléfono" value={order.phone} />}
+          {order.customer && <DetailRow label={t("summary.name")} value={order.customer} />}
+          {order.phone && <DetailRow label={t("summary.phone")} value={order.phone} />}
           {order.fulfillment && (
-            <DetailRow label="Entrega" value={FULFILLMENT_LABEL[order.fulfillment] ?? order.fulfillment} />
+            <DetailRow label={t("summary.fulfillment")} value={t(`account.delivery.${order.fulfillment}`) || order.fulfillment} />
           )}
           {order.paymentMethod && (
-            <DetailRow label="Pago" value={PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod} />
+            <DetailRow label={t("summary.payment")} value={t(PAYMENT_KEYS[order.paymentMethod] || "summary.payment")} />
           )}
-          {order.notes && <DetailRow label="Notas" value={order.notes} />}
+          {order.notes && <DetailRow label={t("summary.notes")} value={order.notes} />}
         </div>
       </section>
 
@@ -259,21 +255,21 @@ export default function OrderTracking() {
       )}
 
       <section className={styles.section}>
-        <p className={styles.sectionTitle}>Tu bowl</p>
+        <p className={styles.sectionTitle}>{t("tracking.yourBowl")}</p>
         <div className={styles.detailCard}>
-          {order.base && <DetailRow label="Base" value={order.base} />}
-          {getProteinsText(order) && <DetailRow label="Proteínas" value={getProteinsText(order)} />}
-          <DetailRow label="Tamaño" value={order.bowlSize === "large" ? "Bowl grande" : "Bowl normal"} />
-          {order.marinades?.length > 0 && <DetailRow label="Marinados" value={order.marinades.join(", ")} />}
-          {order.complements?.length > 0 && <DetailRow label="Complementos" value={order.complements.join(", ")} />}
-          {order.sauces?.length > 0 && <DetailRow label="Salsas" value={order.sauces.join(", ")} />}
-          {order.toppings?.length > 0 && <DetailRow label="Toppings" value={order.toppings.join(", ")} />}
+          {order.base && <DetailRow label={t("common.base")} value={getItemLabel("base", order.base, language)} />}
+          {getProteinsText(order, language) && <DetailRow label={t("common.proteins")} value={getProteinsText(order, language)} />}
+          <DetailRow label={t("tracking.size")} value={order.bowlSize === "large" ? t("summary.large") : t("summary.normal")} />
+          {order.marinades?.length > 0 && <DetailRow label={t("summary.marinades")} value={order.marinades.map((id) => getItemLabel("marinade", id, language)).join(", ")} />}
+          {order.complements?.length > 0 && <DetailRow label={t("common.complements")} value={order.complements.map((id) => getItemLabel("complement", id, language)).join(", ")} />}
+          {order.sauces?.length > 0 && <DetailRow label={t("common.sauces")} value={order.sauces.map((id) => getItemLabel("sauce", id, language)).join(", ")} />}
+          {order.toppings?.length > 0 && <DetailRow label={t("common.toppings")} value={order.toppings.map((id) => getItemLabel("topping", id, language)).join(", ")} />}
         </div>
       </section>
 
       <div className={styles.actions}>
-        <Link to="/mi-cuenta" className={styles.ghostBtn}>Ver mis pedidos</Link>
-        <Link to="/order" className={styles.primaryBtn}>Ordenar de nuevo</Link>
+        <Link to="/mi-cuenta" className={styles.ghostBtn}>{t("tracking.myOrders")}</Link>
+        <Link to="/order" className={styles.primaryBtn}>{t("tracking.orderAgain")}</Link>
       </div>
     </div>
   );

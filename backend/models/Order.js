@@ -40,7 +40,7 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
     },
     source:   { type: String, enum: ["online", "pos"], default: "online" },
-    total:    { type: Number, default: null },  // in dollars
+    total:    { type: Number, default: null },  // in MXN
 
     // Pricing — always computed server-side, never trusted from the client
     subtotal: { type: Number, default: null },

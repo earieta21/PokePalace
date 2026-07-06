@@ -3,26 +3,13 @@ import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useOrder } from "../order/OrderContext";
 import { API_URL } from "../config";
-import { PROTEIN_LABELS, BASE_LABELS } from "../order/OrderLabels";
+import { getItemLabel } from "../order/OrderLabels";
+import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./MiCuenta.module.css";
 
-const STATUS_LABEL = {
-  pending:   "Recibido",
-  preparing: "En preparación",
-  ready:     "Listo",
-  completed: "Entregado",
-  cancelled: "Cancelado",
-};
-
-const FULFILLMENT_LABEL = {
-  pickup: "Recoger",
-  dine_in: "En restaurante",
-  delivery: "Delivery",
-};
-
-const getProteinsText = (order) => {
+const getProteinsText = (order, language) => {
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
-    return order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ");
+    return order.proteins.map((id) => getItemLabel("protein", id, language)).join(", ");
   }
   return order.protein || "-";
 };
@@ -30,6 +17,7 @@ const getProteinsText = (order) => {
 export default function MiCuenta() {
   const { user, token, isLoggedIn, logout } = useContext(AuthContext);
   const { loadFavorite } = useOrder();
+  const { language, t } = useLanguage();
   const navigate = useNavigate();
 
   const [orders, setOrders] = useState([]);
@@ -52,7 +40,7 @@ export default function MiCuenta() {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.msg || data?.message || "No se pudieron cargar tus pedidos.");
+        if (!res.ok) throw new Error(data?.msg || data?.message || t("account.loadError"));
         if (res.ok) setOrders(data.orders || []);
       } catch (e) {
         setError(e.message);
@@ -60,7 +48,7 @@ export default function MiCuenta() {
         setLoading(false);
       }
     })();
-  }, [isLoggedIn, token]);
+  }, [isLoggedIn, t, token]);
 
   useEffect(() => {
     if (!isLoggedIn || activeTab !== "favorites") return;
@@ -111,30 +99,32 @@ export default function MiCuenta() {
         <div className={styles.header}>
           <div className={styles.titleWrap}>
             <div className={styles.badge}>Poke Palace</div>
-            <h2 className={styles.title}>Mi Cuenta</h2>
+            <h2 className={styles.title}>{t("account.title")}</h2>
             <p className={styles.subtitle}>
-              Revisa tus puntos y pedidos guardados.
+              {language === "es"
+                ? "Revisa tus puntos y pedidos guardados."
+                : "Review your points and saved orders."}
             </p>
 
             <div className={styles.pillRow}>
               <div className={styles.pill}>
-                <strong>Nombre:</strong> {user?.name}
+                <strong>{t("account.name")}:</strong> {user?.name}
               </div>
               <div className={styles.pill}>
-                <strong>Email:</strong> {user?.email}
+                <strong>{t("common.email")}:</strong> {user?.email}
               </div>
               <div className={styles.pill}>
-                <strong>Puntos:</strong> {user?.points ?? 0}
+                <strong>{t("account.points")}:</strong> {user?.points ?? 0}
               </div>
             </div>
           </div>
 
           <div className={styles.actions}>
             <button className={styles.primaryBtn} onClick={() => navigate("/order")}>
-              Ordenar
+              {t("account.orderNow")}
             </button>
             <button className={styles.ghostBtn} onClick={logout}>
-              Cerrar sesión
+              {t("account.logout")}
             </button>
           </div>
         </div>
@@ -145,7 +135,7 @@ export default function MiCuenta() {
             className={`${styles.tab} ${activeTab === "orders" ? styles.tabActive : ""}`}
             onClick={() => setActiveTab("orders")}
           >
-            Historial
+            {t("account.history")}
           </button>
           <button
             className={`${styles.tab} ${activeTab === "favorites" ? styles.tabActive : ""}`}
@@ -159,11 +149,11 @@ export default function MiCuenta() {
         {activeTab === "orders" && (
           <>
             {loading ? (
-              <p className={styles.muted}>Cargando...</p>
+              <p className={styles.muted}>{t("account.loading")}</p>
             ) : error ? (
               <p className={styles.muted} role="alert">{error}</p>
             ) : orders.length === 0 ? (
-              <p className={styles.muted}>Aún no tienes pedidos guardados.</p>
+              <p className={styles.muted}>{t("account.noOrders")}</p>
             ) : (
               <div className={styles.orders}>
                 {orders.map((o) => (
@@ -174,55 +164,55 @@ export default function MiCuenta() {
                       </p>
                       <div className={styles.orderTopRight}>
                         <span className={`${styles.status} ${styles[`status_${o.status}`]}`}>
-                          {STATUS_LABEL[o.status] ?? o.status}
+                          {t(`account.status.${o.status}`)}
                         </span>
                         <Link to={`/seguimiento/${o._id}`} className={styles.trackLink}>
-                          Seguir →
+                          {language === "es" ? "Seguir" : "Track"} →
                         </Link>
                       </div>
                     </div>
 
                     <p className={styles.line}>
-                      <strong>Base:</strong> {o.base || "-"}{" "}
+                      <strong>{t("common.base")}:</strong> {o.base ? getItemLabel("base", o.base, language) : t("common.none")}{" "}
                       <span className={styles.muted}>•</span>{" "}
-                      <strong>Proteínas:</strong> {getProteinsText(o)}
+                      <strong>{t("common.proteins")}:</strong> {getProteinsText(o, language)}
                     </p>
 
                     <p className={styles.line}>
-                      <strong>Tamaño:</strong>{" "}
-                      {o.bowlSize === "large" ? "Bowl grande" : "Bowl normal"}
-                    </p>
-
-                    <p className={styles.line}>
-                      <strong>Entrega:</strong>{" "}
-                      {FULFILLMENT_LABEL[o.fulfillment] ?? o.fulfillment ?? "Recoger"}{" "}
-                      {o.phone ? (
+                      <strong>{t("tracking.size")}:</strong>{" "}
+                      {o.bowlSize === "large" ? t("summary.large") : t("summary.normal")}
+                      {o.total != null ? (
                         <>
-                          <span className={styles.muted}>•</span>{" "}
-                          <strong>Tel:</strong> {o.phone}
+                          <span className={styles.muted}> • </span>
+                          <strong>{t("common.total")}:</strong> ${o.total} MXN
                         </>
                       ) : null}
                     </p>
 
                     <p className={styles.line}>
-                      <strong>Complementos:</strong>{" "}
-                      {(o.complements || []).join(", ") || "-"}
+                      <strong>{t("summary.fulfillment")}:</strong>{" "}
+                      {o.fulfillment ? t(`account.delivery.${o.fulfillment}`) : t("account.delivery.pickup")}{" "}
+                      {o.phone ? (
+                        <>
+                          <span className={styles.muted}>•</span>{" "}
+                          <strong>{t("common.phoneShort")}:</strong> {o.phone}
+                        </>
+                      ) : null}
                     </p>
 
                     <p className={styles.line}>
-                      <strong>Salsas:</strong> {(o.sauces || []).join(", ") || "-"}
+                      <strong>{t("common.complements")}:</strong>{" "}
+                      {(o.complements || []).map((id) => getItemLabel("complement", id, language)).join(", ") || t("common.none")}
                     </p>
 
                     <p className={styles.line}>
-                      <strong>Toppings:</strong>{" "}
-                      {(o.toppings || []).join(", ") || "-"}
+                      <strong>{t("common.sauces")}:</strong> {(o.sauces || []).map((id) => getItemLabel("sauce", id, language)).join(", ") || t("common.none")}
                     </p>
 
-                    {o.total != null && (
-                      <p className={styles.line}>
-                        <strong>Total:</strong> ${o.total.toFixed(2)}
-                      </p>
-                    )}
+                    <p className={styles.line}>
+                      <strong>{t("common.toppings")}:</strong>{" "}
+                      {(o.toppings || []).map((id) => getItemLabel("topping", id, language)).join(", ") || t("common.none")}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -252,32 +242,35 @@ export default function MiCuenta() {
                     <div className={styles.orderTop}>
                       <p className={styles.favName}>{fav.name}</p>
                       <span className={styles.favSize}>
-                        {fav.bowlSize === "large" ? "Bowl grande" : "Bowl normal"}
+                        {fav.bowlSize === "large" ? t("summary.large") : t("summary.normal")}
                       </span>
                     </div>
 
                     <p className={styles.line}>
-                      <strong>Base:</strong> {BASE_LABELS?.[fav.base] || fav.base || "-"}{" "}
+                      <strong>{t("common.base")}:</strong> {fav.base ? getItemLabel("base", fav.base, language) : t("common.none")}{" "}
                       <span className={styles.muted}>•</span>{" "}
-                      <strong>Proteínas:</strong>{" "}
-                      {(fav.proteins || []).map((id) => PROTEIN_LABELS[id] ?? id).join(", ") || "-"}
+                      <strong>{t("common.proteins")}:</strong>{" "}
+                      {(fav.proteins || []).map((id) => getItemLabel("protein", id, language)).join(", ") || t("common.none")}
                     </p>
 
                     {fav.complements?.length > 0 && (
                       <p className={styles.line}>
-                        <strong>Complementos:</strong> {fav.complements.join(", ")}
+                        <strong>{t("common.complements")}:</strong>{" "}
+                        {fav.complements.map((id) => getItemLabel("complement", id, language)).join(", ")}
                       </p>
                     )}
 
                     {fav.sauces?.length > 0 && (
                       <p className={styles.line}>
-                        <strong>Salsas:</strong> {fav.sauces.join(", ")}
+                        <strong>{t("common.sauces")}:</strong>{" "}
+                        {fav.sauces.map((id) => getItemLabel("sauce", id, language)).join(", ")}
                       </p>
                     )}
 
                     {fav.toppings?.length > 0 && (
                       <p className={styles.line}>
-                        <strong>Toppings:</strong> {fav.toppings.join(", ")}
+                        <strong>{t("common.toppings")}:</strong>{" "}
+                        {fav.toppings.map((id) => getItemLabel("topping", id, language)).join(", ")}
                       </p>
                     )}
 
