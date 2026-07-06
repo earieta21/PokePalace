@@ -16,12 +16,12 @@ export default function PwaInstallPrompt() {
   const [showIos, setShowIos]         = useState(false);
   const [visible, setVisible]         = useState(false);
   const [installing, setInstalling]   = useState(false);
+  const [iosStep2, setIosStep2]       = useState(false);
   const dismissed                     = useRef(localStorage.getItem(DISMISSED_KEY) === "1");
 
   useEffect(() => {
     if (dismissed.current || isInStandalone()) return;
 
-    // Android / Chrome: capture native install prompt
     const handler = (e) => {
       e.preventDefault();
       setPromptEvent(e);
@@ -29,7 +29,6 @@ export default function PwaInstallPrompt() {
     };
     window.addEventListener("beforeinstallprompt", handler);
 
-    // iOS Safari: show manual instructions after 4 s (don't annoy immediately)
     if (isIos()) {
       const timer = setTimeout(() => {
         setShowIos(true);
@@ -56,9 +55,21 @@ export default function PwaInstallPrompt() {
     promptEvent.prompt();
     const { outcome } = await promptEvent.userChoice;
     setInstalling(false);
-    if (outcome === "accepted") {
-      setVisible(false);
+    if (outcome === "accepted") setVisible(false);
+  };
+
+  // Opens the native iOS share sheet — user selects "Agregar a inicio" inside it
+  const openIosShare = async () => {
+    try {
+      await navigator.share({
+        title: "Poke Palace",
+        text: "Pide tu bowl de poke",
+        url: window.location.origin,
+      });
+    } catch {
+      // User cancelled or share not supported — show manual fallback
     }
+    setIosStep2(true);
   };
 
   if (!visible) return null;
@@ -81,7 +92,6 @@ export default function PwaInstallPrompt() {
       alignItems: "flex-start",
       animation: "promptIn 0.35s cubic-bezier(0.34,1.56,0.64,1)",
     }}>
-      {/* Icon */}
       <img
         src="/icon.svg"
         alt="Poke Palace"
@@ -89,24 +99,44 @@ export default function PwaInstallPrompt() {
       />
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: "0 0 2px", fontSize: 14, fontWeight: 700, color: "#111" }}>
+        <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: "#111" }}>
           Instala Poke Palace
         </p>
 
         {showIos ? (
-          <p style={{ margin: "0 0 10px", fontSize: 12, color: "#555", lineHeight: 1.5 }}>
-            Toca el botón{" "}
-            <strong style={{ color: "#0a7aff" }}>Compartir</strong>{" "}
-            <span style={{ fontSize: 14 }}>⎋</span> y luego{" "}
-            <strong>"Agregar a inicio"</strong> para instalarla en tu iPhone.
-          </p>
+          iosStep2 ? (
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#555", lineHeight: 1.6 }}>
+              En el menú que se abrió, busca{" "}
+              <strong style={{ color: "#111" }}>"Agregar a inicio"</strong>{" "}
+              (puede que tengas que deslizar hacia abajo dentro del menú).
+            </p>
+          ) : (
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#555", lineHeight: 1.6 }}>
+              Toca el botón de abajo para abrir el menú de compartir de Safari,
+              luego elige <strong style={{ color: "#111" }}>"Agregar a inicio"</strong>.
+            </p>
+          )
         ) : (
-          <p style={{ margin: "0 0 10px", fontSize: 12, color: "#555", lineHeight: 1.5 }}>
+          <p style={{ margin: "0 0 10px", fontSize: 12, color: "#555", lineHeight: 1.6 }}>
             Accede rápido desde tu pantalla de inicio, sin abrir el navegador.
           </p>
         )}
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {showIos && !iosStep2 && (
+            <button
+              onClick={openIosShare}
+              style={{
+                background: "#0a7aff", color: "#fff", border: "none",
+                borderRadius: 8, padding: "7px 14px", fontSize: 13,
+                fontWeight: 700, cursor: "pointer", flexShrink: 0,
+                display: "flex", alignItems: "center", gap: 5,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>⬆</span> Compartir
+            </button>
+          )}
+
           {!showIos && (
             <button
               onClick={install}
@@ -120,6 +150,7 @@ export default function PwaInstallPrompt() {
               {installing ? "Instalando…" : "Instalar"}
             </button>
           )}
+
           <button
             onClick={dismiss}
             style={{
@@ -128,7 +159,7 @@ export default function PwaInstallPrompt() {
               cursor: "pointer", flexShrink: 0,
             }}
           >
-            Ahora no
+            {iosStep2 ? "Listo" : "Ahora no"}
           </button>
         </div>
       </div>
