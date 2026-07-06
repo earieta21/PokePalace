@@ -1,24 +1,54 @@
 {
   "name": "Poke Palace",
   "short_name": "Poke Palace",
-  "description": "Arma tu bowl de poke a tu gusto",
-  "start_url": "/",
+  "description": "Arma tu bowl de poke a tu gusto — Tijuana",
+  "start_url": "/?source=pwa",
   "display": "standalone",
   "background_color": "#F5F3EE",
   "theme_color": "#4A7A5A",
   "orientation": "portrait-primary",
+  "categories": ["food", "lifestyle"],
+  "lang": "es",
+  "shortcuts": [
+    {
+      "name": "Pedir ahora",
+      "short_name": "Pedir",
+      "description": "Arma tu bowl",
+      "url": "/order",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Mis pedidos",
+      "short_name": "Pedidos",
+      "description": "Ver historial y puntos",
+      "url": "/mi-cuenta",
+      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+    }
+  ],
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "maskable"
+      "purpose": "any"
     }
   ]
 }

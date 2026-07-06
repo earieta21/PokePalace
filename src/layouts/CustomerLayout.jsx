@@ -2,6 +2,7 @@ import Navbar from "../components/Navbar";
 import { Outlet } from "react-router-dom";
 import ErrorBoundary from "../components/ErrorBoundary";
 import ActiveOrderBanner from "../components/ActiveOrderBanner";
+import PwaInstallPrompt from "../components/PwaInstallPrompt";
 
 export default function CustomerLayout() {
   return (
@@ -14,6 +15,7 @@ export default function CustomerLayout() {
         <Outlet />
       </ErrorBoundary>
       <ActiveOrderBanner />
+      <PwaInstallPrompt />
     </>
   );
 }

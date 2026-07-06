@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Generador de íconos PWA — Poke Palace</title>
+  <style>
+    body { font-family: sans-serif; max-width: 500px; margin: 60px auto; text-align: center; color: #222; }
+    h1 { color: #4A7A5A; }
+    button { background: #4A7A5A; color: #fff; border: none; padding: 14px 32px;
+             border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 20px; }
+    button:hover { background: #3a6a4a; }
+    #status { margin-top: 16px; font-size: 14px; color: #555; min-height: 20px; }
+    canvas { border: 1px solid #eee; border-radius: 8px; margin: 8px; }
+    #preview { margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <h1>🍚 Generador de íconos PWA</h1>
+  <p>Genera los íconos PNG necesarios para que Poke Palace sea instalable en iPhone y Android.</p>
+  <div id="preview"></div>
+  <button onclick="generate()">Generar y descargar íconos</button>
+  <p id="status"></p>
+  <p style="margin-top:32px; font-size:12px; color:#999;">
+    Después de descargar, coloca los 3 archivos en <code>public/icons/</code>
+  </p>
+
+  <script>
+    function drawBowl(ctx, size) {
+      const s = size;
+
+      // Background: green rounded square
+      ctx.fillStyle = "#4A7A5A";
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(0, 0, s, s, s * 0.208);
+        ctx.fill();
+      } else {
+        ctx.fillRect(0, 0, s, s);
+      }
+
+      // Bowl body (white rounded trapezoid via bezier)
+      const bx = s * 0.22, by = s * 0.42, bw = s * 0.56, bh = s * 0.26;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.moveTo(bx + s * 0.04, by);
+      ctx.lineTo(bx + bw - s * 0.04, by);
+      ctx.quadraticCurveTo(bx + bw + s * 0.04, by + bh * 0.5, bx + bw - s * 0.06, by + bh);
+      ctx.quadraticCurveTo(s * 0.5, by + bh + s * 0.04, bx + s * 0.06, by + bh);
+      ctx.quadraticCurveTo(bx - s * 0.04, by + bh * 0.5, bx + s * 0.04, by);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bowl rim (white ellipse at top)
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.ellipse(s * 0.5, by, bw * 0.5 + s * 0.02, s * 0.06, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Rice base (light cream inside bowl)
+      ctx.fillStyle = "#F5F3EE";
+      ctx.beginPath();
+      ctx.ellipse(s * 0.5, by + s * 0.02, bw * 0.44, s * 0.055, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Toppings
+      const toppings = [
+        { x: 0.36, y: 0.41, r: 0.075, color: "#F4A261" }, // salmon
+        { x: 0.55, y: 0.38, r: 0.065, color: "#E63946" }, // tuna
+        { x: 0.68, y: 0.43, r: 0.060, color: "#90BE6D" }, // avocado
+        { x: 0.44, y: 0.35, r: 0.055, color: "#FFDE7A" }, // corn
+        { x: 0.60, y: 0.48, r: 0.045, color: "#B5EAD7" }, // cucumber
+      ];
+      toppings.forEach(({ x, y, r, color }) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(s * x, s * y, s * r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Sesame seeds on bowl
+      ctx.fillStyle = "#F5F3EE";
+      [[0.40, 0.64], [0.50, 0.61], [0.61, 0.63]].forEach(([x, y]) => {
+        ctx.beginPath();
+        ctx.ellipse(s * x, s * y, s * 0.028, s * 0.016, 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function makeCanvas(size, maskable = false) {
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+
+      if (maskable) {
+        // Full bleed green background (safe area = 80% centered)
+        ctx.fillStyle = "#4A7A5A";
+        ctx.fillRect(0, 0, size, size);
+        // Scale down icon to 80% for safe zone
+        const pad = size * 0.1;
+        ctx.save();
+        ctx.translate(pad, pad);
+        ctx.scale(0.8, 0.8);
+        drawBowl(ctx, size);
+        ctx.restore();
+      } else {
+        drawBowl(ctx, size);
+      }
+      return canvas;
+    }
+
+    function download(canvas, filename) {
+      const a = document.createElement("a");
+      a.download = filename;
+      a.href = canvas.toDataURL("image/png");
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function generate() {
+      const status = document.getElementById("status");
+      status.textContent = "Generando…";
+
+      setTimeout(() => {
+        const sizes = [
+          { size: 192,  file: "icon-192.png",          maskable: false },
+          { size: 512,  file: "icon-512.png",          maskable: false },
+          { size: 512,  file: "icon-maskable-512.png", maskable: true  },
+        ];
+
+        sizes.forEach(({ size, file, maskable }) => {
+          const c = makeCanvas(size, maskable);
+          download(c, file);
+        });
+
+        // Show preview
+        const preview = document.getElementById("preview");
+        preview.innerHTML = "<p><strong>Vista previa (192px):</strong></p>";
+        const c192 = makeCanvas(192, false);
+        c192.style.width = "96px";
+        c192.style.height = "96px";
+        preview.appendChild(c192);
+        const cm = makeCanvas(192, true);
+        cm.style.width = "96px";
+        cm.style.height = "96px";
+        preview.appendChild(cm);
+        preview.innerHTML += "<br><small>Normal · Maskable</small>";
+
+        status.textContent = "✅ 3 archivos descargados. Ponlos en public/icons/ y vuelve a hacer deploy.";
+      }, 100);
+    }
+
+    // Auto-preview on load
+    window.addEventListener("load", () => {
+      const preview = document.getElementById("preview");
+      preview.innerHTML = "<p><strong>Vista previa:</strong></p>";
+      const c192 = makeCanvas(192, false);
+      c192.style.width = "96px"; c192.style.height = "96px";
+      preview.appendChild(c192);
+      const cm = makeCanvas(192, true);
+      cm.style.width = "96px"; cm.style.height = "96px";
+      preview.appendChild(cm);
+      preview.innerHTML += "<br><small>Normal · Maskable (con safe zone)</small>";
+    });
+  </script>
+</body>
+</html>
