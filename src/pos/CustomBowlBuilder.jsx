@@ -17,15 +17,15 @@ const COMPLEMENT_IDS = Object.keys(COMPLEMENT_LABELS);
 const SAUCE_IDS = Object.keys(SAUCE_LABELS);
 const TOPPING_IDS = Object.keys(TOPPING_LABELS);
 
-const MIN_PROTEINS = 2;
+const MIN_PROTEINS = 1;
 const MAX_PROTEINS = 3;
 const MAX_MARINADES = 2;
 const MAX_COMPLEMENTS = 6;
 const MAX_SAUCES = 2;
 const MAX_TOPPINGS = 5;
 
-export const BOWL_BASE_PRICE = 13.0;
-export const LARGE_BOWL_UPCHARGE = 1.0;
+export const BOWL_BASE_PRICE = 249;
+export const LARGE_BOWL_UPCHARGE = 40;
 
 const emptyDraft = () => ({
   base: null,
@@ -92,7 +92,7 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
 
   const handleAdd = () => {
     if (!draft.base) return setError("Selecciona una base.");
-    if (draft.proteins.length < MIN_PROTEINS) return setError(`Selecciona al menos ${MIN_PROTEINS} proteínas.`);
+    if (draft.proteins.length < MIN_PROTEINS) return setError("Selecciona al menos 1 proteína.");
 
     onAdd({
       base: draft.base,
@@ -120,7 +120,7 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
 
       <ChipGroup
         title="Proteínas"
-        hint=" · 3 = bowl grande (+$1)"
+        hint=" · 3 = bowl grande (+$40 MXN)"
         ids={PROTEIN_IDS}
         labels={PROTEIN_LABELS}
         selected={draft.proteins}
@@ -182,7 +182,7 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
             cursor: "pointer",
           }}
         >
-          Agregar bowl — ${price.toFixed(2)}
+          Agregar bowl — ${price} MXN
         </button>
         <button
           type="button"
