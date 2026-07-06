@@ -3,6 +3,7 @@ import { requireStaffAuth } from "../middleware/requireStaffAuth.js";
 import {
   getAllOrders,
   updateOrderStatus,
+  markAsPaid,
   getOrderStats,
   createPosOrder,
   getAnalytics,
@@ -20,5 +21,6 @@ router.get  ("/finance",       seniorStaff, getFinance);
 router.get  ("/",              anyStaff,    getAllOrders);
 router.post ("/",              anyStaff,    createPosOrder);
 router.patch("/:id/status",    anyStaff,    updateOrderStatus);
+router.patch("/:id/pay",       anyStaff,    markAsPaid);
 
 export default router;

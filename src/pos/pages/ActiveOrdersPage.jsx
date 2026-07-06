@@ -78,6 +78,13 @@ export default function ActiveOrdersPage({ styles }) {
     } catch (e) { setError(e.message); }
   };
 
+  const markPaid = async (order) => {
+    try {
+      const { order: updated } = await api.patch(`/api/staff/orders/${order._id}/pay`, {});
+      setOrders((prev) => prev.map((o) => (o._id === updated._id ? updated : o)));
+    } catch (e) { setError(e.message); }
+  };
+
   return (
     <div>
       <div className={styles.pageHeader}>
@@ -142,6 +149,13 @@ export default function ActiveOrdersPage({ styles }) {
                   )}
                 </div>
                 <div className={styles.orderCardFooter}>
+                  {order.paymentStatus === "paid" ? (
+                    <span className={styles.paidBadge}>✓ Pagado</span>
+                  ) : (
+                    <button className={styles.btnPay} onClick={() => markPaid(order)}>
+                      Cobrado{order.total != null ? ` $${order.total.toLocaleString("es-MX")} MXN` : ""}
+                    </button>
+                  )}
                   {order.status === "ready" ? (
                     <button className={styles.btnGhost} style={{ flex: 1 }} onClick={() => dismiss(order)}>
                       Descartar

@@ -28,6 +28,21 @@ export const getAllOrders = async (req, res) => {
   }
 };
 
+/* PATCH /api/staff/orders/:id/pay */
+export const markAsPaid = async (req, res) => {
+  try {
+    const order = await Order.findByIdAndUpdate(
+      req.params.id,
+      { paymentStatus: "paid" },
+      { new: true }
+    ).populate("user", "name email");
+    if (!order) return res.status(404).json({ message: "Orden no encontrada" });
+    res.json({ order });
+  } catch (err) {
+    res.status(500).json({ message: "Error al marcar pago", err: err.message });
+  }
+};
+
 /* PATCH /api/staff/orders/:id/status */
 export const updateOrderStatus = async (req, res) => {
   try {

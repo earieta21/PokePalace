@@ -1,7 +1,14 @@
 import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
-import { PROTEIN_LABELS } from "../../order/OrderLabels";
+import {
+  PROTEIN_LABELS,
+  BASE_LABELS,
+  MARINADE_LABELS,
+  COMPLEMENT_LABELS,
+  SAUCE_LABELS,
+  TOPPING_LABELS,
+} from "../../order/OrderLabels";
 
 const STATUS_CFG = {
   pending:   { cls: "badgeYellow", label: "Nuevo" },
@@ -29,18 +36,24 @@ function orderLines(order) {
     lines.push(...order.items.map((i) => `${i.name} ×${i.qty}`));
   }
 
+  const label = (map, id) => map[id] ?? id;
+
   if (order.base) {
-    lines.push(`Base: ${order.base}`);
+    lines.push(`Base: ${label(BASE_LABELS, order.base)}`);
     if (order.proteins?.length) {
-      lines.push(`Proteínas: ${order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ")}`);
+      lines.push(`Proteínas: ${order.proteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
     } else if (order.protein) {
       lines.push(`Proteína: ${order.protein}`);
     }
     lines.push(order.bowlSize === "large" ? "Bowl grande" : "Bowl normal");
-    if (order.marinades?.length)   lines.push(`Marinados: ${order.marinades.join(", ")}`);
-    if (order.complements?.length) lines.push(`Complementos: ${order.complements.join(", ")}`);
-    if (order.sauces?.length)      lines.push(`Salsas: ${order.sauces.join(", ")}`);
-    if (order.toppings?.length)    lines.push(`Toppings: ${order.toppings.join(", ")}`);
+    if (order.marinades?.length)
+      lines.push(`Marinados: ${order.marinades.map((id) => label(MARINADE_LABELS, id)).join(", ")}`);
+    if (order.complements?.length)
+      lines.push(`Complementos: ${order.complements.map((id) => label(COMPLEMENT_LABELS, id)).join(", ")}`);
+    if (order.sauces?.length)
+      lines.push(`Salsas: ${order.sauces.map((id) => label(SAUCE_LABELS, id)).join(", ")}`);
+    if (order.toppings?.length)
+      lines.push(`Toppings: ${order.toppings.map((id) => label(TOPPING_LABELS, id)).join(", ")}`);
   }
 
   return lines.length ? lines : ["Bowl personalizado"];

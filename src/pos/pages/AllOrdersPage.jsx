@@ -46,7 +46,7 @@ export default function AllOrdersPage({ styles }) {
         <div>
           <h1 className={styles.pageTitle}>Todas las Órdenes</h1>
           <p className={styles.pageSubtitle}>
-            {loading ? "Cargando…" : `${visible.length} órdenes · $${total.toFixed(2)} total`}
+            {loading ? "Cargando…" : `${visible.length} órdenes · $${total.toLocaleString("es-MX")} MXN total`}
           </p>
         </div>
         <button className={styles.btnGhost}>Exportar CSV</button>
@@ -104,7 +104,7 @@ export default function AllOrdersPage({ styles }) {
                       {SOURCE_LABEL[o.source] ?? o.source}
                     </span>
                   </td>
-                  <td className={styles.tdMono}>{o.total != null ? `$${o.total.toFixed(2)}` : "—"}</td>
+                  <td className={styles.tdMono}>{o.total != null ? `$${o.total.toLocaleString("es-MX")} MXN` : "—"}</td>
                   <td><span className={`${styles.badge} ${styles[cls]}`}>{label}</span></td>
                 </tr>
               );

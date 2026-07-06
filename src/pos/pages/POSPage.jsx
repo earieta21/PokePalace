@@ -7,21 +7,21 @@ import CustomBowlBuilder from "../CustomBowlBuilder";
 const CUSTOM_BOWL_ID = "custom-bowl";
 
 const MENU = [
-  { id: 1,  name: "Bowl Clásico de Atún",    price: 14.50 },
-  { id: 2,  name: "Bowl Salmón y Aguacate",  price: 15.00 },
-  { id: 3,  name: "Bowl Camarón Picante",    price: 13.50 },
-  { id: 4,  name: "Bowl Vegano",             price: 12.00 },
-  { id: 5,  name: "Pollo Teriyaki",          price: 13.00 },
-  { id: 6,  name: "Edamame",                 price:  4.50 },
-  { id: 7,  name: "Sopa de Miso",            price:  3.50 },
-  { id: 8,  name: "Ensalada de Algas",       price:  5.00 },
-  { id: 9,  name: "Agua de Coco",            price:  4.00 },
-  { id: 10, name: "Limonada de Matcha",      price:  4.50 },
-  { id: 11, name: "Agua Mineral",            price:  2.50 },
-  { id: 12, name: "Smoothie de Mango",       price:  5.50 },
+  { id: 1,  name: "Bowl Clásico de Atún",    price: 249 },
+  { id: 2,  name: "Bowl Salmón y Aguacate",  price: 289 },
+  { id: 3,  name: "Bowl Camarón Picante",    price: 249 },
+  { id: 4,  name: "Bowl Vegano",             price: 229 },
+  { id: 5,  name: "Pollo Teriyaki",          price: 239 },
+  { id: 6,  name: "Edamame",                 price:  69 },
+  { id: 7,  name: "Sopa de Miso",            price:  49 },
+  { id: 8,  name: "Ensalada de Algas",       price:  79 },
+  { id: 9,  name: "Agua de Coco",            price:  55 },
+  { id: 10, name: "Limonada de Matcha",      price:  65 },
+  { id: 11, name: "Agua Mineral",            price:  30 },
+  { id: 12, name: "Smoothie de Mango",       price:  89 },
 ];
 
-const IVA = 0.16;
+const IVA = 0; // IVA incluido en precio
 
 export default function POSPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
@@ -121,12 +121,12 @@ export default function POSPage({ styles }) {
 
     try {
       await api.post("/api/staff/orders", payload);
-      setSuccess(`Orden enviada — $${total.toFixed(2)}`);
+      setSuccess(`Orden enviada — $${total.toLocaleString("es-MX")} MXN`);
     } catch (e) {
       if (isNetworkError(e)) {
         queueOrder(payload);
         setQueuedCount(getQueuedOrders().length);
-        setSuccess(`Sin conexión — orden guardada y se enviará sola ($${total.toFixed(2)})`);
+        setSuccess(`Sin conexión — orden guardada y se enviará sola ($${total.toLocaleString("es-MX")} MXN)`);
       } else {
         setError(e.message);
         setSaving(false);
@@ -192,7 +192,7 @@ export default function POSPage({ styles }) {
               {MENU.map((item) => (
                 <button key={item.id} className={styles.posItem} onClick={() => addItem(item)} type="button">
                   <p className={styles.posItemName}>{item.name}</p>
-                  <p className={styles.posItemPrice}>${item.price.toFixed(2)}</p>
+                  <p className={styles.posItemPrice}>${item.price} MXN</p>
                 </button>
               ))}
             </div>
@@ -296,7 +296,7 @@ export default function POSPage({ styles }) {
             <div key={item.id} className={styles.posCartItem}>
               <span className={styles.posCartItemName}>{item.name}</span>
               <span className={styles.posCartQty}>×{item.qty}</span>
-              <span className={styles.posCartLinePrice}>${(item.price * item.qty).toFixed(2)}</span>
+              <span className={styles.posCartLinePrice}>${(item.price * item.qty).toLocaleString("es-MX")}</span>
               <button className={styles.posRemoveBtn} onClick={() => removeItem(item.id)} type="button" aria-label={`Quitar ${item.name}`}>×</button>
             </div>
           ))}
@@ -306,15 +306,19 @@ export default function POSPage({ styles }) {
           {success && <p className={styles.posSuccess} role="status">✓ {success}</p>}
           {error   && <p style={{ color: "red", fontSize: 12, marginBottom: 8 }} role="alert">{error}</p>}
 
-          <div className={styles.posTotalRow}><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
-          <div className={styles.posTotalRow}><span>IVA (16%)</span><span>${iva.toFixed(2)}</span></div>
-          <div className={styles.posTotalFinal}><span>Total</span><span>${total.toFixed(2)}</span></div>
+          <div className={styles.posTotalFinal}>
+            <span>Total</span>
+            <span>${total.toLocaleString("es-MX")} MXN</span>
+          </div>
+          <p style={{ margin: "0 0 12px", fontSize: 11, color: "var(--p-muted)", textAlign: "right" }}>
+            IVA incluido
+          </p>
 
           <button
             className={styles.btnPrimary} style={{ width: "100%" }}
             onClick={handleCobrar} disabled={cart.length === 0 || saving} type="button"
           >
-            {saving ? "Enviando…" : `Cobrar $${total.toFixed(2)}`}
+            {saving ? "Enviando…" : `Cobrar $${total.toLocaleString("es-MX")} MXN`}
           </button>
 
           {cart.length > 0 && (

@@ -51,7 +51,7 @@ export default function DashboardPage({ styles }) {
         <div className={styles.statCard}>
           <p className={styles.statLabel}>Ingresos Hoy</p>
           <p className={styles.statValue}>
-            {loading ? "—" : stats?.revenue ? `$${stats.revenue.toFixed(2)}` : "$0"}
+            {loading ? "—" : stats?.revenue ? `$${stats.revenue.toLocaleString("es-MX")} MXN` : "$0 MXN"}
           </p>
           <p className={styles.statSub}>Órdenes POS</p>
         </div>
@@ -99,7 +99,7 @@ export default function DashboardPage({ styles }) {
                           {SOURCE_LABEL[o.source] ?? o.source}
                         </span>
                       </td>
-                      <td className={styles.tdMono}>{o.total != null ? `$${o.total.toFixed(2)}` : "—"}</td>
+                      <td className={styles.tdMono}>{o.total != null ? `$${o.total.toLocaleString("es-MX")} MXN` : "—"}</td>
                       <td><span className={`${styles.badge} ${styles[cls]}`}>{label}</span></td>
                     </tr>
                   );
