@@ -20,14 +20,14 @@ const ToppingsSelection = ({ onNext, onBack }) => {
   const { language, t } = useLanguage();
 
   const toppings = [
-    { id: "sesame_seeds", image: ajonjoli },
-    { id: "crispy_onions", image: onions },
-    { id: "nori_strips", image: algaNori },
-    { id: "red_pepper_flakes", image: pimientaRoja },
-    { id: "pickled_radish", image: rabanos },
-    { id: "toasted_coconut", image: cocoTostado },
-    { id: "pumpkin_seeds", image: pumpkingSeeds },
-    { id: "furikake", image: furikake },
+    { id: "sesame_seeds",      image: ajonjoli,      desc: "Ajonjolí tostado, crujiente" },
+    { id: "crispy_onions",     image: onions,        desc: "Cebolla frita en hojuelas" },
+    { id: "nori_strips",       image: algaNori,      desc: "Alga seca japonesa en tiras" },
+    { id: "red_pepper_flakes", image: pimientaRoja,  desc: "Pimiento rojo seco y picante" },
+    { id: "pickled_radish",    image: rabanos,       desc: "Rábano en vinagre, ligeramente ácido" },
+    { id: "toasted_coconut",   image: cocoTostado,   desc: "Coco tostado, toque dulce tropical" },
+    { id: "pumpkin_seeds",     image: pumpkingSeeds, desc: "Pepitas tostadas y saladas" },
+    { id: "furikake",          image: furikake,      desc: "Mezcla japonesa: alga, sésamo y umami" },
   ];
 
   const [selectedToppings, setSelectedToppings] = useState(
@@ -93,6 +93,7 @@ const ToppingsSelection = ({ onNext, onBack }) => {
             </div>
 
             <p className={styles.name}>{name}</p>
+            {topping.desc && <p className={styles.itemDesc}>{topping.desc}</p>}
           </button>
         );
         })}

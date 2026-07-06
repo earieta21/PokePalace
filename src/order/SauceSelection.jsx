@@ -22,16 +22,16 @@ const SauceSelection = ({ onNext, onBack }) => {
   const { language, t } = useLanguage();
 
   const sauces = [
-    { id: "spicy_mayo", image: spicyMayo },
-    { id: "soy_sauce", image: soya },
-    { id: "ponzu_sauce", image: punzu },
-    { id: "sesame_ginger", image: sesameGinger },
-    { id: "wasabi_vinaigrette", image: wasabi },
-    { id: "sweet_chili", image: sweetChili },
-    { id: "garlic_sriracha", image: garlicSiracha },
-    { id: "avocado_lime", image: avocadoLime },
-    { id: "miso_dressing", image: miso },
-    { id: "yuzu_kosho", image: yuzuKosho },
+    { id: "spicy_mayo",         image: spicyMayo,    desc: "Mayonesa con sriracha y limón" },
+    { id: "soy_sauce",          image: soya,         desc: "Soya japonesa para mojar" },
+    { id: "ponzu_sauce",        image: punzu,        desc: "Agridulce con soya y cítrico" },
+    { id: "sesame_ginger",      image: sesameGinger, desc: "Jengibre, sésamo y miel" },
+    { id: "wasabi_vinaigrette", image: wasabi,       desc: "Toque picante suave y cítrico" },
+    { id: "sweet_chili",        image: sweetChili,   desc: "Dulce con jalapeño y ajo" },
+    { id: "garlic_sriracha",    image: garlicSiracha,desc: "Ajo asado con chile sriracha" },
+    { id: "avocado_lime",       image: avocadoLime,  desc: "Cremoso con aguacate y lima" },
+    { id: "miso_dressing",      image: miso,         desc: "Fermentado de soya, rico en umami" },
+    { id: "yuzu_kosho",         image: yuzuKosho,    desc: "Pasta japonesa de cítrico y chile" },
   ];
 
   const [selectedSauces, setSelectedSauces] = useState(order.sauces || []);
@@ -95,6 +95,7 @@ const SauceSelection = ({ onNext, onBack }) => {
             </div>
 
             <p className={styles.name}>{name}</p>
+            {sauce.desc && <p className={styles.itemDesc}>{sauce.desc}</p>}
           </button>
         );
         })}

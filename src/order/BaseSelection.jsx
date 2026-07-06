@@ -42,8 +42,7 @@ const BaseSelection = ({ onNext, onBack }) => {
   };
 
   return (
-    <div className={styles.wrapper}>
-      <div className={styles.container}>
+    <div className={styles.container}>
         <div className={styles.header}>
           <div className={styles.badge}>{t("order.step", { step: 1, total: 6 })}</div>
           <h2 className={styles.title}>{t("order.baseTitle")}</h2>
@@ -97,7 +96,6 @@ const BaseSelection = ({ onNext, onBack }) => {
           </button>
         </div>
       </div>
-    </div>
   );
 };
 

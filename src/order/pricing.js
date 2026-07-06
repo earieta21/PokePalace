@@ -1,8 +1,8 @@
 // Mirrors backend/pricing.js for display purposes only. The server always
 // recomputes the authoritative price when the order is actually created.
-export const BOWL_BASE_PRICE = 13.0;
-export const LARGE_BOWL_UPCHARGE = 1.0;
-export const TAX_RATE = 0.16;
+export const BOWL_BASE_PRICE = 249;
+export const LARGE_BOWL_UPCHARGE = 40;
+export const TAX_RATE = 0; // IVA incluido en precio
 
 const round2 = (n) => Math.round(n * 100) / 100;
 

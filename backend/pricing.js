@@ -1,9 +1,9 @@
 // Single source of truth for bowl pricing. Mirrored in src/order/pricing.js
 // for client-side display — the server always recomputes from scratch and
 // never trusts a price submitted by the client.
-export const BOWL_BASE_PRICE = 13.0;
-export const LARGE_BOWL_UPCHARGE = 1.0;
-export const TAX_RATE = 0.16;
+export const BOWL_BASE_PRICE = 249;
+export const LARGE_BOWL_UPCHARGE = 40;
+export const TAX_RATE = 0; // IVA incluido en precio
 
 const round2 = (n) => Math.round(n * 100) / 100;
 

@@ -417,24 +417,29 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
 
         {/* Price breakdown */}
         <div className={styles.priceSection}>
-          <div className={styles.priceRow}>
-            <span>Subtotal</span>
-            <span>${pricing.subtotal.toFixed(2)}</span>
-          </div>
           {pricing.discount > 0 && (
-            <div className={`${styles.priceRow} ${styles.priceDiscountRow}`}>
-              <span>Descuento</span>
-              <span>-${pricing.discount.toFixed(2)}</span>
+            <>
+              <div className={styles.priceRow}>
+                <span>Subtotal</span>
+                <span>${pricing.subtotal.toFixed(2)}</span>
+              </div>
+              <div className={`${styles.priceRow} ${styles.priceDiscountRow}`}>
+                <span>Descuento</span>
+                <span>-${pricing.discount.toFixed(2)}</span>
+              </div>
+            </>
+          )}
+          {pricing.tax > 0 && (
+            <div className={styles.priceRow}>
+              <span>IVA (16%)</span>
+              <span>${pricing.tax.toFixed(2)}</span>
             </div>
           )}
-          <div className={styles.priceRow}>
-            <span>IVA (16%)</span>
-            <span>${pricing.tax.toFixed(2)}</span>
-          </div>
           <div className={styles.priceTotalRow}>
             <span>Total</span>
-            <span>${pricing.total.toFixed(2)}</span>
+            <span>${pricing.total.toFixed(2)} MXN</span>
           </div>
+          <p className={styles.ivaNote}>Precio con IVA incluido</p>
         </div>
 
         <div className={styles.actions}>

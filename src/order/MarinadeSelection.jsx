@@ -20,14 +20,14 @@ const MarinadeSelection = ({ onNext, onBack }) => {
   const { language, t } = useLanguage();
 
   const marinades = [
-    { id: "citrus_marinade", image: citrico },
-    { id: "shoyu_marinade", image: shoyu },
-    { id: "ponzu_marinade", image: punzu },
-    { id: "spicy_marinade", image: spicy },
-    { id: "sesame_marinade", image: sesame },
-    { id: "wasabi_marinade", image: wassabi },
-    { id: "miso_marinade", image: miso },
-    { id: "garlic_ginger_marinade", image: garlicGinger },
+    { id: "citrus_marinade",        image: citrico,      desc: "Naranja, limón y aceite de sésamo" },
+    { id: "shoyu_marinade",         image: shoyu,        desc: "Salsa de soya japonesa clásica" },
+    { id: "ponzu_marinade",         image: punzu,        desc: "Cítrico con soya y dashi" },
+    { id: "spicy_marinade",         image: spicy,        desc: "Chile fresco y jengibre picante" },
+    { id: "sesame_marinade",        image: sesame,       desc: "Sésamo tostado y aceite de girasol" },
+    { id: "wasabi_marinade",        image: wassabi,      desc: "Toque picante suave con jengibre" },
+    { id: "miso_marinade",          image: miso,         desc: "Pasta de soya fermentada, umami" },
+    { id: "garlic_ginger_marinade", image: garlicGinger, desc: "Ajo fresco y jengibre picado" },
   ];
 
   const [selectedMarinades, setSelectedMarinades] = useState(
@@ -93,6 +93,7 @@ const MarinadeSelection = ({ onNext, onBack }) => {
             </div>
 
             <p className={styles.name}>{name}</p>
+            {marinade.desc && <p className={styles.itemDesc}>{marinade.desc}</p>}
           </button>
         );
         })}

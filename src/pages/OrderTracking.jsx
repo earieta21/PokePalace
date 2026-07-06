@@ -179,6 +179,14 @@ export default function OrderTracking() {
         </div>
       )}
 
+      {/* Estimated time */}
+      {(order.status === "pending" || order.status === "preparing") && (
+        <div className={styles.estimatedTime}>
+          <span>⏱</span>
+          <span>Tiempo estimado de preparación: <strong>8–12 min</strong></span>
+        </div>
+      )}
+
       {/* Status card */}
       <div className={`${styles.statusCard} ${isDone ? styles.statusDone : ""} ${isCancelled ? styles.statusCancelled : ""}`}>
         {isCancelled ? (

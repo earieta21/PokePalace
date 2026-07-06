@@ -9,9 +9,46 @@ import SauceSelection from "./SauceSelection";
 import ToppingsSelection from "./ToppingsSelection";
 import { useOrder } from "./OrderContext";
 import { BASE_LABELS, PROTEIN_LABELS } from "./OrderLabels";
+import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "./pricing";
 
 const TOTAL_STEPS = 6;
 const STEP_NAMES = ["Base", "Proteínas", "Marinados", "Complementos", "Salsas", "Toppings"];
+
+const PRESETS = [
+  {
+    name: "Clásico Salmón",
+    tag: "El más pedido",
+    base: "white_rice",
+    proteins: ["salmon", "tuna"],
+    bowlSize: "normal",
+    marinades: ["shoyu_marinade"],
+    complements: ["avocado", "cucumber", "edamame"],
+    sauces: ["spicy_mayo", "soy_sauce"],
+    toppings: ["sesame_seeds", "nori_strips"],
+  },
+  {
+    name: "Tropical Camarón",
+    tag: "Fresco y ligero",
+    base: "spring_mix",
+    proteins: ["shrimp", "salmon"],
+    bowlSize: "normal",
+    marinades: ["citrus_marinade"],
+    complements: ["mango", "pineapple", "avocado"],
+    sauces: ["sweet_chili", "avocado_lime"],
+    toppings: ["sesame_seeds", "crispy_onions"],
+  },
+  {
+    name: "Atún Picante",
+    tag: "Con mucho sabor",
+    base: "brown_rice",
+    proteins: ["tuna", "seared_tuna"],
+    bowlSize: "normal",
+    marinades: ["spicy_marinade"],
+    complements: ["cucumber", "edamame", "corn"],
+    sauces: ["garlic_sriracha", "spicy_mayo"],
+    toppings: ["red_pepper_flakes", "furikake"],
+  },
+];
 
 function StepProgress({ step }) {
   return (
@@ -53,6 +90,32 @@ function StepProgress({ step }) {
   );
 }
 
+function PriceChip({ order }) {
+  const isLarge = Array.isArray(order.proteins) && order.proteins.length >= 3;
+  const price = isLarge ? BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE : BOWL_BASE_PRICE;
+  return (
+    <div style={{
+      display: "flex",
+      justifyContent: "flex-end",
+      padding: "2px 20px 4px",
+      maxWidth: 960,
+      margin: "0 auto",
+    }}>
+      <span style={{
+        background: "var(--accent-bg)",
+        border: "1px solid var(--accent-border)",
+        color: "var(--accent)",
+        borderRadius: 999,
+        padding: "4px 12px",
+        fontSize: 13,
+        fontWeight: 700,
+      }}>
+        ${price} MXN{isLarge ? " · Bowl grande" : ""}
+      </span>
+    </div>
+  );
+}
+
 function BowlMiniSummary({ order, step }) {
   if (step === 0) return null;
 
@@ -82,7 +145,7 @@ function BowlMiniSummary({ order, step }) {
       display: "flex",
       alignItems: "center",
       gap: 4,
-      padding: "4px 20px 8px",
+      padding: "4px 20px 6px",
       overflowX: "auto",
       scrollbarWidth: "none",
       msOverflowStyle: "none",
@@ -105,8 +168,64 @@ function BowlMiniSummary({ order, step }) {
   );
 }
 
+function PresetBowls({ onSelect }) {
+  return (
+    <div style={{ padding: "6px 20px 0", maxWidth: 960, margin: "0 auto" }}>
+      <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 600, color: "var(--text-3)", letterSpacing: "0.3px", textTransform: "uppercase" }}>
+        Empezar desde un bowl de la casa
+      </p>
+      <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" }}>
+        {PRESETS.map((preset) => (
+          <button
+            key={preset.name}
+            type="button"
+            onClick={() => onSelect(preset)}
+            style={{
+              flexShrink: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 4,
+              padding: "12px 14px",
+              background: "var(--bg-card)",
+              border: "1.5px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              cursor: "pointer",
+              textAlign: "left",
+              minWidth: 150,
+              transition: "border-color 150ms ease, box-shadow 150ms ease",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(74,122,90,0.15)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.boxShadow = "none"; }}
+          >
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: "2px 7px",
+              borderRadius: 999, background: "var(--accent-bg)",
+              border: "1px solid var(--accent-border)", color: "var(--accent)",
+              letterSpacing: "0.3px",
+            }}>
+              {preset.tag}
+            </span>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text)", lineHeight: 1.2 }}>
+              {preset.name}
+            </span>
+            <span style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 500 }}>
+              {preset.proteins.length === 3 ? `$${BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE}` : `$${BOWL_BASE_PRICE}`} MXN · Personalizable
+            </span>
+          </button>
+        ))}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 4px" }}>
+        <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+        <span style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 500 }}>o arma el tuyo desde cero</span>
+        <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+      </div>
+    </div>
+  );
+}
+
 const OrderPage = () => {
-  const { order, updateOrder } = useOrder();
+  const { order, updateOrder, loadFavorite } = useOrder();
   const [step, setStep] = useState(() => {
     const savedStep = Number(order.draftStep);
     return Number.isInteger(savedStep) && savedStep >= 0 && savedStep <= 5 ? savedStep : 0;
@@ -157,6 +276,11 @@ const OrderPage = () => {
     nextStep();
   };
 
+  const handleSelectPreset = (preset) => {
+    loadFavorite(preset);
+    navigate("/summary", { state: { guest: isGuest } });
+  };
+
   const steps = [
     <BaseSelection key="base" onNext={handleNext} onBack={prevStep} />,
     <ProteinSelection key="protein" onNext={handleNext} onBack={prevStep} />,
@@ -169,7 +293,11 @@ const OrderPage = () => {
   return (
     <div>
       <StepProgress step={step} />
+      <PriceChip order={order} />
       <BowlMiniSummary order={order} step={step} />
+      {step === 0 && !order.base && (
+        <PresetBowls onSelect={handleSelectPreset} />
+      )}
       {steps[step]}
     </div>
   );
