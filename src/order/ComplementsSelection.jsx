@@ -19,7 +19,7 @@ import zanahoria from "../assets/complements/zanahoria.webp";
 
 const MAX_COMPLEMENTS = 6;
 
-const ComplementsSelection = ({ onNext }) => {
+const ComplementsSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
 
@@ -64,10 +64,6 @@ const ComplementsSelection = ({ onNext }) => {
   };
 
   const handleNext = () => {
-    if (selectedComplements.length === 0) {
-      setError(t("order.complementsMinError"));
-      return;
-    }
     setError("");
     onNext();
   };
@@ -116,13 +112,19 @@ const ComplementsSelection = ({ onNext }) => {
       )}
 
       <div className={styles.actions}>
-        <span className={styles.helper}>
-          {t("order.selected")} {selectedComplements.length} / {MAX_COMPLEMENTS}
-        </span>
-
-        <button className={styles.nextButton} onClick={handleNext}>
-          {t("order.next")}
+        <button className={styles.backButton} type="button" onClick={onBack}>
+          ← Atrás
         </button>
+        <div className={styles.rightActions}>
+          {selectedComplements.length === 0 && (
+            <button className={styles.skipBtn} type="button" onClick={onNext}>
+              Omitir
+            </button>
+          )}
+          <button className={styles.nextButton} onClick={handleNext}>
+            {t("order.next")} {selectedComplements.length > 0 ? `(${selectedComplements.length})` : ""}
+          </button>
+        </div>
       </div>
     </div>
   );

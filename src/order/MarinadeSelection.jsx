@@ -15,7 +15,7 @@ import wassabi from "../assets/marinades/wassabi.webp";
 
 const MAX_MARINADES = 2;
 
-const MarinadeSelection = ({ onNext }) => {
+const MarinadeSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
 
@@ -56,10 +56,6 @@ const MarinadeSelection = ({ onNext }) => {
   };
 
   const handleNext = () => {
-    if (selectedMarinades.length === 0) {
-      setError(t("order.marinadeMinError"));
-      return;
-    }
     setError("");
     onNext();
   };
@@ -109,13 +105,19 @@ const MarinadeSelection = ({ onNext }) => {
       )}
 
       <div className={styles.actions}>
-        <span className={styles.helper}>
-          {t("order.selected")} {selectedMarinades.length} / {MAX_MARINADES}
-        </span>
-
-        <button className={styles.nextButton} onClick={handleNext}>
-          {t("order.next")}
+        <button className={styles.backButton} type="button" onClick={onBack}>
+          ← Atrás
         </button>
+        <div className={styles.rightActions}>
+          {selectedMarinades.length === 0 && (
+            <button className={styles.skipBtn} type="button" onClick={onNext}>
+              Omitir
+            </button>
+          )}
+          <button className={styles.nextButton} onClick={handleNext}>
+            {t("order.next")} {selectedMarinades.length > 0 ? `(${selectedMarinades.length})` : ""}
+          </button>
+        </div>
       </div>
     </div>
   );

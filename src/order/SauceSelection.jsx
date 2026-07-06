@@ -17,7 +17,7 @@ import yuzuKosho from "../assets/dressings/yuzuKosho.webp";
 
 const MAX_SAUCES = 2;
 
-const SauceSelection = ({ onNext }) => {
+const SauceSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
 
@@ -58,10 +58,6 @@ const SauceSelection = ({ onNext }) => {
   };
 
   const handleNext = () => {
-    if (selectedSauces.length === 0) {
-      setError(t("order.sauceMinError"));
-      return;
-    }
     setError("");
     onNext();
   };
@@ -111,13 +107,19 @@ const SauceSelection = ({ onNext }) => {
       )}
 
       <div className={styles.actions}>
-        <span className={styles.helper}>
-          {t("order.selectedFem")} {selectedSauces.length} / {MAX_SAUCES}
-        </span>
-
-        <button className={styles.nextButton} onClick={handleNext}>
-          {t("order.next")}
+        <button className={styles.backButton} type="button" onClick={onBack}>
+          ← Atrás
         </button>
+        <div className={styles.rightActions}>
+          {selectedSauces.length === 0 && (
+            <button className={styles.skipBtn} type="button" onClick={onNext}>
+              Omitir
+            </button>
+          )}
+          <button className={styles.nextButton} onClick={handleNext}>
+            {t("order.next")} {selectedSauces.length > 0 ? `(${selectedSauces.length})` : ""}
+          </button>
+        </div>
       </div>
     </div>
   );

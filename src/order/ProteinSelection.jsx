@@ -11,7 +11,7 @@ import shrimp from "../assets/protein/shrimp.webp";
 import octopus from "../assets/protein/octopus.webp";
 import searedTuna from "../assets/protein/searedTuna.webp";
 
-const ProteinSelection = ({ onNext }) => {
+const ProteinSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
   const MIN_PROTEINS = 2;
@@ -121,6 +121,9 @@ const ProteinSelection = ({ onNext }) => {
       )}
 
       <div className={styles.actions}>
+        <button className={styles.backButton} type="button" onClick={onBack}>
+          ← Atrás
+        </button>
         <button className={styles.nextButton} onClick={handleNext}>
           {t("order.next")}
         </button>

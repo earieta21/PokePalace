@@ -15,7 +15,7 @@ import rabanos from "../assets/toppings/rabanos.webp";
 
 const MAX_TOPPINGS = 5;
 
-const ToppingsSelection = ({ onNext }) => {
+const ToppingsSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
 
@@ -56,10 +56,6 @@ const ToppingsSelection = ({ onNext }) => {
   };
 
   const handleNext = () => {
-    if (selectedToppings.length === 0) {
-      setError(t("order.toppingsMinError"));
-      return;
-    }
     setError("");
     onNext();
   };
@@ -109,13 +105,19 @@ const ToppingsSelection = ({ onNext }) => {
       )}
 
       <div className={styles.actions}>
-        <span className={styles.helper}>
-          {t("order.selected")} {selectedToppings.length} / {MAX_TOPPINGS}
-        </span>
-
-        <button className={styles.nextButton} onClick={handleNext}>
-          {t("order.next")}
+        <button className={styles.backButton} type="button" onClick={onBack}>
+          ← Atrás
         </button>
+        <div className={styles.rightActions}>
+          {selectedToppings.length === 0 && (
+            <button className={styles.skipBtn} type="button" onClick={onNext}>
+              Omitir
+            </button>
+          )}
+          <button className={styles.nextButton} onClick={handleNext}>
+            {t("order.next")} {selectedToppings.length > 0 ? `(${selectedToppings.length})` : ""}
+          </button>
+        </div>
       </div>
     </div>
   );

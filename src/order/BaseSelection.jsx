@@ -9,7 +9,7 @@ import brownRice from "../assets/base/brownRice.webp";
 import quinoa from "../assets/base/quinoa.webp";
 import mixedGreens from "../assets/base/mixedGreens.webp";
 
-const BaseSelection = ({ onNext }) => {
+const BaseSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
 
@@ -89,6 +89,9 @@ const BaseSelection = ({ onNext }) => {
         )}
 
         <div className={styles.actions}>
+          <button className={styles.backButton} type="button" onClick={onBack}>
+            ← Atrás
+          </button>
           <button className={styles.nextButton} onClick={handleNext}>
             {t("order.next")}
           </button>
