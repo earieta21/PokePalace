@@ -16,7 +16,7 @@ const getProteinsText = (order, language) => {
 
 export default function MiCuenta() {
   const { user, token, isLoggedIn, logout, refreshUser } = useContext(AuthContext);
-  const { loadFavorite } = useOrder();
+  const { loadFavorite, reorder } = useOrder();
   const { language, t } = useLanguage();
   const navigate = useNavigate();
 
@@ -74,6 +74,11 @@ export default function MiCuenta() {
 
   const handleOrderFromFavorite = (fav) => {
     loadFavorite(fav);
+    navigate("/order");
+  };
+
+  const handleReorder = (order) => {
+    reorder(order);
     navigate("/order");
   };
 
@@ -265,6 +270,19 @@ export default function MiCuenta() {
                       <strong>{t("common.toppings")}:</strong>{" "}
                       {(o.toppings || []).map((id) => getItemLabel("topping", id, language)).join(", ") || t("common.none")}
                     </p>
+
+                    {/* Reorder button — only for completed orders with a base */}
+                    {o.status === "completed" && o.base && (
+                      <div style={{ marginTop: 10 }}>
+                        <button
+                          className={styles.primaryBtn}
+                          onClick={() => handleReorder(o)}
+                          style={{ fontSize: 13 }}
+                        >
+                          🔄 Repetir pedido
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

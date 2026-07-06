@@ -69,6 +69,27 @@ export const OrderProvider = ({ children }) => {
     }));
   }, []);
 
+  const reorder = useCallback((pastOrder) => {
+    setOrder((prev) => ({
+      ...prev,
+      base: pastOrder.base || "",
+      proteins: pastOrder.proteins || [],
+      protein: (pastOrder.proteins || []).join(", "),
+      bowlSize: pastOrder.bowlSize || "normal",
+      marinades: pastOrder.marinades || [],
+      complements: pastOrder.complements || [],
+      sauces: pastOrder.sauces || [],
+      toppings: pastOrder.toppings || [],
+      customer: pastOrder.customer || prev.customer,
+      phone: pastOrder.phone || prev.phone,
+      fulfillment: pastOrder.fulfillment || "pickup",
+      paymentMethod: "pay_at_pickup",
+      promoCode: "",
+      notes: "",
+      draftStep: 0,
+    }));
+  }, []);
+
   // Used by the self-service kiosk to wipe a session clean between customers.
   const resetOrder = useCallback(() => {
     setOrder(blankOrder());
@@ -76,8 +97,8 @@ export const OrderProvider = ({ children }) => {
   }, []);
 
   const value = useMemo(
-    () => ({ order: { ...order, updateCheckout }, updateOrder, loadFavorite, resetOrder }),
-    [order, loadFavorite, resetOrder, updateCheckout, updateOrder]
+    () => ({ order: { ...order, updateCheckout }, updateOrder, loadFavorite, reorder, resetOrder }),
+    [order, loadFavorite, reorder, resetOrder, updateCheckout, updateOrder]
   );
 
   return (

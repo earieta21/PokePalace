@@ -14,7 +14,6 @@ const STEP_CONFIG = [
 ];
 
 const CANCELLED = { key: "cancelled", icon: "❌", labelKey: "tracking.cancelled", descKey: "tracking.cancelledDesc" };
-
 const STEP_INDEX = { pending: 0, preparing: 1, ready: 2, completed: 3 };
 
 const PAYMENT_KEYS = {
@@ -31,12 +30,44 @@ const STATUS_MESSAGES = {
   cancelled: "Tu pedido fue cancelado.",
 };
 
+const CANCEL_WINDOW_MS = 5 * 60 * 1000;
+
 const getProteinsText = (order, language) => {
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
     return order.proteins.map((id) => getItemLabel("protein", id, language)).join(", ");
   }
   return order.protein;
 };
+
+// Request browser notification permission and return whether it was granted.
+async function requestNotifPermission() {
+  if (!("Notification" in window)) return false;
+  if (Notification.permission === "granted") return true;
+  if (Notification.permission === "denied") return false;
+  const result = await Notification.requestPermission();
+  return result === "granted";
+}
+
+async function fireNotification(title, body, orderId) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    // Prefer service worker notification so it works when tab is in background
+    const reg = await navigator.serviceWorker?.getRegistration?.();
+    if (reg) {
+      reg.showNotification(title, {
+        body,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        tag: `order-${orderId}`,
+        data: { url: `/seguimiento/${orderId}` },
+      });
+    } else {
+      new Notification(title, { body });
+    }
+  } catch {
+    // Notifications not supported — silently ignore
+  }
+}
 
 function Toast({ message, onClose }) {
   useEffect(() => {
@@ -57,10 +88,16 @@ export default function OrderTracking() {
   const { token } = useContext(AuthContext);
   const { language, t } = useLanguage();
 
-  const [order, setOrder] = useState(null);
-  const [error, setError] = useState("");
-  const [toast, setToast] = useState(null);
-  const prevStatusRef = useRef(null);
+  const [order, setOrder]               = useState(null);
+  const [error, setError]               = useState("");
+  const [toast, setToast]               = useState(null);
+  const [notifGranted, setNotifGranted] = useState(Notification?.permission === "granted");
+  const [cancelling, setCancelling]     = useState(false);
+  const [cancelError, setCancelError]   = useState("");
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  const prevStatusRef  = useRef(null);
+  const notifAskedRef  = useRef(false);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -72,45 +109,37 @@ export default function OrderTracking() {
       const newOrder = data.order;
       setOrder(newOrder);
 
-      // Show toast when status changes (not on first load)
       if (prevStatusRef.current !== null && prevStatusRef.current !== newOrder.status) {
         const msg = STATUS_MESSAGES[newOrder.status];
         if (msg) setToast(msg);
 
-        // Play a subtle sound when the order is ready
         if (newOrder.status === "ready") {
+          // Play subtle sound
           try {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
+            const osc  = ctx.createOscillator();
             const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
+            osc.connect(gain); gain.connect(ctx.destination);
             osc.type = "sine";
             osc.frequency.setValueAtTime(880, ctx.currentTime);
             osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
             gain.gain.setValueAtTime(0.3, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.4);
-          } catch {
-            // AudioContext not available — skip sound
-          }
+            osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4);
+          } catch { /* AudioContext not available */ }
+
+          // Fire browser notification (works even when tab is in background)
+          fireNotification("¡Tu pedido está listo! 🔔", "Pasa a recoger tu bowl de Poke Palace.", orderId);
         }
       }
 
       prevStatusRef.current = newOrder.status;
     } catch (e) {
-      setError(
-        e.message === "Failed to fetch"
-          ? t("tracking.fetchError")
-          : e.message
-      );
+      setError(e.message === "Failed to fetch" ? t("tracking.fetchError") : e.message);
     }
   }, [orderId, t, token]);
 
-  useEffect(() => {
-    fetchOrder();
-  }, [fetchOrder]);
+  useEffect(() => { fetchOrder(); }, [fetchOrder]);
 
   // Poll every 3 seconds while order is active
   useEffect(() => {
@@ -118,6 +147,38 @@ export default function OrderTracking() {
     const id = setInterval(fetchOrder, 3000);
     return () => clearInterval(id);
   }, [fetchOrder, order]);
+
+  // Ask for notification permission once when order is active
+  useEffect(() => {
+    if (!order || notifAskedRef.current) return;
+    if (order.status === "completed" || order.status === "cancelled") return;
+    if (!("Notification" in window) || Notification.permission !== "default") return;
+    notifAskedRef.current = true;
+    // Small delay so page has settled
+    setTimeout(async () => {
+      const granted = await requestNotifPermission();
+      setNotifGranted(granted);
+    }, 2000);
+  }, [order]);
+
+  const handleCancel = async () => {
+    setCancelling(true);
+    setCancelError("");
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res  = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, { method: "PATCH", headers });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.msg || "Error al cancelar");
+      setOrder(data.order);
+      setToast("Pedido cancelado.");
+      setShowCancelConfirm(false);
+    } catch (e) {
+      setCancelError(e.message);
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   if (error) {
     return (
@@ -143,13 +204,15 @@ export default function OrderTracking() {
 
   const isCancelled = order.status === "cancelled";
   const currentStep = isCancelled ? -1 : (STEP_INDEX[order.status] ?? 0);
-  const isDone = order.status === "completed";
+  const isDone      = order.status === "completed";
+  const isPending   = order.status === "pending";
+  const ageMs       = Date.now() - new Date(order.createdAt).getTime();
+  const canCancel   = isPending && ageMs < CANCEL_WINDOW_MS;
+  const minsLeft    = canCancel ? Math.ceil((CANCEL_WINDOW_MS - ageMs) / 60000) : 0;
 
   return (
     <div className={styles.page}>
-      {toast && (
-        <Toast message={toast} onClose={() => setToast(null)} />
-      )}
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
 
       <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>{t("tracking.title")}</h1>
@@ -160,6 +223,32 @@ export default function OrderTracking() {
         </p>
       </div>
 
+      {/* Notification permission prompt */}
+      {"Notification" in window && !notifGranted && !isCancelled && !isDone && Notification.permission === "default" && (
+        <div style={{
+          maxWidth: 480, margin: "0 auto 12px", padding: "11px 14px",
+          background: "#f0f7f3", border: "1.5px solid #4A7A5A", borderRadius: 12,
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <span style={{ fontSize: 20 }}>🔔</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#2d2d2d" }}>¿Activar notificaciones?</p>
+            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#666" }}>
+              Te avisamos cuando tu pedido esté listo, aunque cambies de pestaña.
+            </p>
+          </div>
+          <button
+            onClick={async () => { const ok = await requestNotifPermission(); setNotifGranted(ok); }}
+            style={{
+              background: "#4A7A5A", color: "#fff", border: "none", borderRadius: 8,
+              padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+            }}
+          >
+            Activar
+          </button>
+        </div>
+      )}
+
       {/* Scheduled pickup notice */}
       {order.isScheduled && order.scheduledPickupTime && (
         <div className={styles.scheduledNotice}>
@@ -168,11 +257,8 @@ export default function OrderTracking() {
             <p className={styles.scheduledLabel}>Recogida programada</p>
             <p className={styles.scheduledTime}>
               {new Date(order.scheduledPickupTime).toLocaleString("es-MX", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
+                weekday: "short", month: "short", day: "numeric",
+                hour: "2-digit", minute: "2-digit",
               })}
             </p>
           </div>
@@ -209,7 +295,7 @@ export default function OrderTracking() {
       {!isCancelled && (
         <div className={styles.stepperWrap}>
           {STEP_CONFIG.map((step, i) => {
-            const done = i < currentStep;
+            const done   = i < currentStep;
             const active = i === currentStep;
             return (
               <div key={step.key} className={styles.stepRow}>
@@ -228,6 +314,66 @@ export default function OrderTracking() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Cancel order block — only while pending and within 5-min window */}
+      {canCancel && (
+        <div style={{
+          maxWidth: 480, margin: "0 auto 4px", padding: "12px 16px",
+          background: "#fff5f5", border: "1.5px solid #fca5a5", borderRadius: 14,
+        }}>
+          {!showCancelConfirm ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <p style={{ margin: 0, fontSize: 12, color: "#7f1d1d" }}>
+                Puedes cancelar en los próximos <strong>{minsLeft} min</strong>.
+              </p>
+              <button
+                onClick={() => setShowCancelConfirm(true)}
+                style={{
+                  background: "transparent", border: "1.5px solid #ef4444", color: "#ef4444",
+                  borderRadius: 8, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Cancelar pedido
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#7f1d1d" }}>
+                ¿Seguro que deseas cancelar?
+              </p>
+              {order.pointsRedeemed > 0 && (
+                <p style={{ margin: "0 0 10px", fontSize: 11, color: "#6b7280" }}>
+                  Se reintegrarán {order.pointsRedeemed} puntos a tu cuenta.
+                </p>
+              )}
+              {cancelError && <p style={{ margin: "0 0 8px", fontSize: 12, color: "#dc2626" }}>{cancelError}</p>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => setShowCancelConfirm(false)}
+                  style={{
+                    flex: 1, background: "#f3f4f6", border: "none", borderRadius: 8,
+                    padding: "8px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  }}
+                >
+                  No, mantener
+                </button>
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  style={{
+                    flex: 1, background: "#ef4444", color: "#fff", border: "none", borderRadius: 8,
+                    padding: "8px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                    opacity: cancelling ? 0.6 : 1,
+                  }}
+                >
+                  {cancelling ? "Cancelando…" : "Sí, cancelar"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

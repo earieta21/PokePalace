@@ -158,6 +158,37 @@ export const createOrder = async (req, res) => {
   }
 };
 
+const CANCEL_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+export const cancelOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ msg: "Orden no encontrada" });
+
+    if (order.user && req.userId && String(order.user) !== String(req.userId)) {
+      return res.status(403).json({ msg: "No autorizado" });
+    }
+
+    if (order.status !== "pending") {
+      return res.status(400).json({ msg: "Solo puedes cancelar mientras tu orden está pendiente" });
+    }
+
+    if (Date.now() - new Date(order.createdAt).getTime() > CANCEL_WINDOW_MS) {
+      return res.status(400).json({ msg: "Ya pasó el tiempo límite para cancelar (5 min)" });
+    }
+
+    if (order.pointsRedeemed > 0 && order.user) {
+      await User.findByIdAndUpdate(order.user, { $inc: { points: order.pointsRedeemed } });
+    }
+
+    order.status = "cancelled";
+    await order.save();
+    res.json({ order });
+  } catch {
+    res.status(500).json({ msg: "Error cancelando la orden" });
+  }
+};
+
 export const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.userId })

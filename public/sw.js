@@ -26,3 +26,16 @@ self.addEventListener("fetch", (e) => {
     caches.match(e.request).then((cached) => cached || fetch(e.request))
   );
 });
+
+// Open the tracking page when the user taps a notification
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = e.notification.data?.url || "/mi-cuenta";
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      const existing = clients.find((c) => c.url.includes(url));
+      if (existing) return existing.focus();
+      return self.clients.openWindow(url);
+    })
+  );
+});
