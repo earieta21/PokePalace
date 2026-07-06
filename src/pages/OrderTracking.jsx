@@ -4,6 +4,7 @@ import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
 import { getItemLabel } from "../order/OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
+import { clearActiveOrder } from "../components/ActiveOrderBanner";
 import styles from "./OrderTracking.module.css";
 
 const STEP_CONFIG = [
@@ -140,6 +141,11 @@ export default function OrderTracking() {
       }
 
       prevStatusRef.current = newOrder.status;
+
+      // Clean up banner tracking when order reaches a terminal state
+      if (newOrder.status === "completed" || newOrder.status === "cancelled") {
+        clearActiveOrder();
+      }
     } catch (e) {
       setError(e.message === "Failed to fetch" ? t("tracking.fetchError") : e.message);
     }

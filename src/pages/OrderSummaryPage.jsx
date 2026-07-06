@@ -5,6 +5,7 @@ import { AuthContext } from "../context/AuthContext";
 import { useOrder } from "../order/OrderContext";
 import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
+import { saveActiveOrder } from "../components/ActiveOrderBanner";
 
 const POINTS_PER_REWARD = 100;
 const REWARD_VALUE_MXN  = 25;
@@ -75,6 +76,7 @@ export default function OrderSummaryPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.msg || t("summary.saveError"));
 
+      saveActiveOrder(data.order._id);
       resetOrder();
       refreshUser?.(); // update points balance after redemption
       navigate(`/seguimiento/${data.order._id}`, { replace: true });
