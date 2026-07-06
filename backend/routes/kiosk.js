@@ -1,7 +1,7 @@
 import express from "express";
 import { requireStaffAuth } from "../middleware/requireStaffAuth.js";
 import {
-  getKioskEmployees, createKioskEmployee, removeKioskEmployee,
+  getKioskEmployees, createKioskEmployee, updateKioskEmployee, removeKioskEmployee,
   clockIn, clockOut, getTimeRecords,
   getChecklist, toggleChecklistItem,
   addTempRecord, getTempRecords,
@@ -17,6 +17,7 @@ const managerOnly = requireStaffAuth(["owner", "manager", "admin"]);
 // Employees
 router.get   ("/employees",      getKioskEmployees);
 router.post  ("/employees",      managerOnly, createKioskEmployee);
+router.patch ("/employees/:id",  managerOnly, updateKioskEmployee);
 router.delete("/employees/:id",  managerOnly, removeKioskEmployee);
 
 // Time

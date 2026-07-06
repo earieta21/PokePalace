@@ -8,7 +8,7 @@ const POINTS_PER_REWARD = 100;
 const REWARD_VALUE_MXN  = 25;
 
 const hasRequiredBowlFields = ({ base, proteins }) => {
-  return Boolean(base && Array.isArray(proteins) && proteins.length >= 2);
+  return Boolean(base && Array.isArray(proteins) && proteins.length >= 1);
 };
 
 const OPEN_HOUR = 10;
@@ -58,7 +58,7 @@ export const createOrder = async (req, res) => {
         : [];
 
     if (!hasRequiredBowlFields({ base, proteins: selectedProteins })) {
-      return res.status(400).json({ msg: "Selecciona una base y 2 proteínas para confirmar" });
+      return res.status(400).json({ msg: "Selecciona una base y al menos 1 proteína para confirmar" });
     }
 
     if (selectedProteins.length > 3) {

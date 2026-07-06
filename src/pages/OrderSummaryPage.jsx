@@ -37,7 +37,7 @@ export default function OrderSummaryPage() {
 
   const onConfirm = async () => {
     const selectedProteins = Array.isArray(order?.proteins) ? order.proteins : [];
-    if (!order?.base || selectedProteins.length < 2) {
+    if (!order?.base || selectedProteins.length < 1) {
       setSubmitError(t("summary.missingBowl"));
       return;
     }

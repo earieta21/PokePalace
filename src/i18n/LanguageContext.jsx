@@ -108,7 +108,7 @@ const TRANSLATIONS = {
     "summary.notesPlaceholder": "Alergias, instrucciones o detalles para cocina",
     "summary.confirm": "Confirmar pedido",
     "summary.sending": "Enviando pedido...",
-    "summary.missingBowl": "Completa la base y selecciona 2 proteínas para confirmar.",
+    "summary.missingBowl": "Completa la base y selecciona al menos 1 proteína para confirmar.",
     "summary.missingContact": "Agrega tu nombre y teléfono para confirmar el pedido.",
     "summary.saveError": "No pudimos guardar tu pedido. Inténtalo de nuevo.",
 
@@ -333,7 +333,7 @@ const TRANSLATIONS = {
     "summary.notesPlaceholder": "Allergies, instructions, or kitchen notes",
     "summary.confirm": "Confirm order",
     "summary.sending": "Sending order...",
-    "summary.missingBowl": "Complete the base and choose 2 proteins to confirm.",
+    "summary.missingBowl": "Complete the base and choose at least 1 protein to confirm.",
     "summary.missingContact": "Add your name and phone number to confirm the order.",
     "summary.saveError": "We couldn't save your order. Please try again.",
 

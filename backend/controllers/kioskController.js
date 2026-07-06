@@ -22,7 +22,7 @@ export const getKioskEmployees = async (req, res) => {
 };
 
 export const createKioskEmployee = async (req, res) => {
-  const { name, role, pin, color, locationId } = req.body;
+  const { name, role, pin, color, locationId, hourlyRate } = req.body;
   if (!name?.trim() || !pin || String(pin).length !== 4) {
     return res.status(400).json({ message: "Nombre y PIN de 4 dígitos requeridos" });
   }
@@ -43,16 +43,34 @@ export const createKioskEmployee = async (req, res) => {
       password,
       locationId,
       active: true,
+      hourlyRate: hourlyRate ? parseFloat(hourlyRate) : 0,
     });
 
     res.status(201).json({
       employee: {
         _id: employee._id, name: employee.name,
-        role: employee.role, color: employee.color, locationId: employee.locationId,
+        role: employee.role, color: employee.color,
+        locationId: employee.locationId, hourlyRate: employee.hourlyRate,
       },
     });
   } catch (err) {
     res.status(500).json({ message: "Error creando empleado", err: err.message });
+  }
+};
+
+export const updateKioskEmployee = async (req, res) => {
+  try {
+    const allowed = ["hourlyRate", "color", "role"];
+    const update  = {};
+    allowed.forEach((k) => { if (req.body[k] !== undefined) update[k] = req.body[k]; });
+    if (update.hourlyRate !== undefined) update.hourlyRate = parseFloat(update.hourlyRate) || 0;
+
+    const employee = await StaffUser.findByIdAndUpdate(req.params.id, update, { new: true })
+      .select("-password -pin");
+    if (!employee) return res.status(404).json({ message: "Empleado no encontrado" });
+    res.json({ employee });
+  } catch (err) {
+    res.status(500).json({ message: "Error actualizando empleado", err: err.message });
   }
 };
 

@@ -284,6 +284,16 @@ export default function UnifiedStaffApp() {
     setSchedule(draft);
   }
 
+  async function updateEmployee(id, patch) {
+    const r = await fetch(`${API_URL}/api/kiosk/employees/${id}`, {
+      method: "PATCH", headers: authHeaders,
+      body: JSON.stringify(patch),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || "Error"); }
+    const { employee } = await r.json();
+    if (employee) setEmployees((p) => p.map((e) => sid(e._id) === sid(id) ? { ...e, ...employee } : e));
+  }
+
   async function addEmployee(form) {
     const r = await fetch(`${API_URL}/api/kiosk/employees`, {
       method: "POST", headers: authHeaders,
@@ -358,7 +368,7 @@ export default function UnifiedStaffApp() {
           {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
           {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
           {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
-          {tab === "panel"   && <PanelTab employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} />}
+          {tab === "panel"   && <PanelTab employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} />}
           {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "cocina"  && <KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "hist"    && <OrderHistoryPage styles={posStyles} />}
@@ -828,7 +838,7 @@ function AnnouncementsTab({ employees, announcements, isManager, onAdd, onRemove
 /* ============================================================================
    PANEL — ASISTENCIA + EQUIPO
    ========================================================================== */
-function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee }) {
+function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee, onUpdateEmployee }) {
   const [view, setView] = useState("hoy");
   const empById = (id) => employees.find((e) => sid(e._id) === sid(id));
   const weekAgo = Date.now() - 7 * 86400000;
@@ -844,6 +854,7 @@ function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee }) {
   });
 
   const activeNow = hoursByEmp.filter((h) => h.open);
+  const totalPayroll = hoursByEmp.reduce((s, { emp, mins }) => s + (mins / 60) * (emp.hourlyRate || 0), 0);
 
   function exportCSV() {
     const rows = [["Empleado","Rol","Fecha","Entrada","Salida","Minutos"]];
@@ -875,7 +886,7 @@ function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee }) {
       </div>
 
       <div className="flex gap-2">
-        {[["hoy","Ahora"],["semana","7 días"],["equipo","Equipo"]].map(([id, label]) => (
+        {[["hoy","Ahora"],["semana","7 días"],["nomina","Nómina"],["equipo","Equipo"]].map(([id, label]) => (
           <button key={id} onClick={() => setView(id)}
             className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border transition ${view===id?"bg-emerald-600 text-white border-emerald-500":"bg-slate-800 text-slate-400 border-white/5"}`}>
             {label}
@@ -928,14 +939,103 @@ function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee }) {
         </div>
       )}
 
-      {view === "equipo" && <TeamManager employees={employees} onAdd={onAddEmployee} onRemove={onRemoveEmployee} />}
+      {view === "nomina" && (
+        <PayrollView hoursByEmp={hoursByEmp} totalPayroll={totalPayroll} onUpdate={onUpdateEmployee} />
+      )}
+
+      {view === "equipo" && <TeamManager employees={employees} onAdd={onAddEmployee} onRemove={onRemoveEmployee} onUpdate={onUpdateEmployee} />}
     </div>
   );
 }
 
-function TeamManager({ employees, onAdd, onRemove }) {
+function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
+  const [editId, setEditId]   = useState(null);
+  const [editRate, setEditRate] = useState("");
+  const [saving, setSaving]   = useState(false);
+
+  const saveRate = async (emp) => {
+    setSaving(true);
+    try {
+      await onUpdate(emp._id, { hourlyRate: parseFloat(editRate) || 0 });
+      setEditId(null);
+    } catch { /* silently ignore */ }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-slate-800 rounded-2xl border border-emerald-500/20 p-4">
+        <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Nómina estimada — últimos 7 días</p>
+        <p className="text-3xl font-black text-emerald-400">${totalPayroll.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MXN</p>
+        <p className="text-xs text-slate-500 mt-1">Basado en horas trabajadas × sueldo/hora configurado</p>
+      </div>
+
+      <div className="bg-slate-800 rounded-2xl border border-white/5 divide-y divide-white/5">
+        {hoursByEmp.map(({ emp, mins }) => {
+          const hours = mins / 60;
+          const pay   = hours * (emp.hourlyRate || 0);
+          const col   = getColor(emp.color);
+          const isEditing = editId === emp._id;
+          return (
+            <div key={sid(emp._id)} className="flex items-center gap-3 p-4">
+              <span className={`w-9 h-9 rounded-xl ${col.bg} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
+                {initials(emp.name)}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate">{emp.name.split(" ")[0]}</p>
+                <p className="text-[11px] text-slate-500">{fmtHM(mins)} trabajadas</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {isEditing ? (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-slate-400">$</span>
+                      <input type="number" min="0" step="10" value={editRate}
+                        onChange={(e) => setEditRate(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveRate(emp); if (e.key === "Escape") setEditId(null); }}
+                        autoFocus
+                        className="w-20 bg-slate-700 border border-white/10 rounded-lg px-2 py-1 text-xs text-white text-right focus:outline-none focus:border-emerald-500 font-mono"
+                        placeholder="0"
+                      />
+                      <span className="text-xs text-slate-400">/hr</span>
+                    </div>
+                    <button onClick={() => saveRate(emp)} disabled={saving}
+                      className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded-lg transition">
+                      {saving ? "…" : "OK"}
+                    </button>
+                    <button onClick={() => setEditId(null)} className="text-xs text-slate-400 hover:text-white transition">✕</button>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-right">
+                      {emp.hourlyRate > 0 ? (
+                        <>
+                          <p className="text-sm font-bold">${pay.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
+                          <p className="text-[10px] text-slate-500">${emp.hourlyRate}/hr</p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-slate-500 italic">Sin tarifa</p>
+                      )}
+                    </div>
+                    <button onClick={() => { setEditId(emp._id); setEditRate(String(emp.hourlyRate || "")); }}
+                      className="text-[10px] text-slate-500 hover:text-emerald-400 bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg transition">
+                      Editar
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-xs text-slate-500 text-center">Toca "Editar" en cada empleado para configurar su sueldo por hora (MXN).</p>
+    </div>
+  );
+}
+
+function TeamManager({ employees, onAdd, onRemove, onUpdate }) {
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: "", role: "employee", pin: "", color: "emerald" });
+  const [form, setForm] = useState({ name: "", role: "employee", pin: "", color: "emerald", hourlyRate: "" });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
@@ -944,7 +1044,11 @@ function TeamManager({ employees, onAdd, onRemove }) {
     if (!form.name.trim()) return setError("Escribe el nombre");
     if (form.pin.length !== 4) return setError("El PIN debe tener 4 dígitos");
     setError(""); setSaving(true);
-    try { await onAdd(form); setForm({ name:"", role:"employee", pin:"", color:"emerald" }); setAdding(false); }
+    try {
+      await onAdd({ ...form, hourlyRate: parseFloat(form.hourlyRate) || 0 });
+      setForm({ name:"", role:"employee", pin:"", color:"emerald", hourlyRate:"" });
+      setAdding(false);
+    }
     catch (e) { setError(e.message); }
     finally { setSaving(false); }
   }
@@ -972,6 +1076,7 @@ function TeamManager({ employees, onAdd, onRemove }) {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm truncate">{e.name}</p>
                 <p className={`text-xs ${col.text}`}>{ROLE_LABEL[e.role]||e.role}</p>
+                {e.hourlyRate > 0 && <p className="text-[10px] text-slate-500 mt-0.5">${e.hourlyRate}/hr</p>}
               </div>
               {confirmId === sid(e._id)
                 ? <div className="flex gap-1 shrink-0">
@@ -1003,6 +1108,10 @@ function TeamManager({ employees, onAdd, onRemove }) {
               onChange={(e) => setForm({...form, pin:e.target.value.replace(/\D/g,"").slice(0,4)})}
               className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 tracking-widest" />
           </div>
+          <input value={form.hourlyRate} type="number" min="0" step="10" inputMode="decimal"
+            onChange={(e) => setForm({...form, hourlyRate:e.target.value})}
+            placeholder="Sueldo por hora (MXN) — opcional"
+            className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500" />
           <div>
             <p className="text-xs text-slate-400 mb-2">Color de avatar</p>
             <div className="flex gap-2 flex-wrap">

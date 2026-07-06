@@ -1,6 +1,7 @@
 import Order from "../models/Order.js";
 import Inventory from "../models/Inventory.js";
 import User from "../models/User.js";
+import Expense from "../models/Expense.js";
 
 /* ── inventory auto-deduction ── */
 async function deductInventory(order) {
@@ -268,21 +269,26 @@ export const getFinance = async (req, res) => {
       const next = new Date(d);
       next.setMonth(next.getMonth() + 1);
 
-      const monthOrders = await Order.find({
-        createdAt: { $gte: d, $lt: next },
-      });
+      // YYYY-MM prefix for string-date Expense docs
+      const monthPrefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const nextPrefix  = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+
+      const [monthOrders, expenses] = await Promise.all([
+        Order.find({ createdAt: { $gte: d, $lt: next } }),
+        Expense.find({ date: { $gte: monthPrefix + "-01", $lt: nextPrefix + "-01" } }),
+      ]);
 
       const revenue = monthOrders
         .filter((o) => o.total != null)
         .reduce((s, o) => s + o.total, 0);
+      const costs = expenses.reduce((s, e) => s + e.amount, 0);
 
       months.push({
         month: d.toLocaleDateString("en-US", { month: "short" }),
         orders: monthOrders.length,
         revenue: parseFloat(revenue.toFixed(2)),
-        // Costs are estimated at ~40% of revenue (no cost model yet)
-        costs: parseFloat((revenue * 0.4).toFixed(2)),
-        profit: parseFloat((revenue * 0.6).toFixed(2)),
+        costs:   parseFloat(costs.toFixed(2)),
+        profit:  parseFloat((revenue - costs).toFixed(2)),
       });
     }
 

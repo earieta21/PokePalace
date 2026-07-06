@@ -10,10 +10,11 @@ const staffUserSchema = new mongoose.Schema(
       enum: ["admin", "cashier", "kitchen", "owner", "manager", "employee"],
       required: true,
     },
-    pin: { type: String, length: 4, default: null },
-    color: { type: String, default: "emerald" },
+    pin:        { type: String, length: 4, default: null },
+    color:      { type: String, default: "emerald" },
     locationId: { type: String, default: null },
-    active: { type: Boolean, default: true },
+    active:     { type: Boolean, default: true },
+    hourlyRate: { type: Number, default: 0 }, // MXN por hora
   },
   { timestamps: true }
 );
