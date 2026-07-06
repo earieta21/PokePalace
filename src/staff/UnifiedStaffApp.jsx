@@ -3,7 +3,7 @@ import {
   Clock, LogIn, LogOut, CheckSquare, Thermometer, Calendar, Megaphone,
   TrendingUp, ChevronLeft, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
-  ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity,
+  ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
 } from "lucide-react";
 import { StaffAuthContext } from "../context/StaffAuthContext";
 import { API_URL } from "../config";
@@ -14,6 +14,7 @@ import KDSPage from "../pos/pages/KDSPage";
 import OrderHistoryPage from "../pos/pages/OrderHistoryPage";
 import FinancePage from "../pos/pages/FinancePage";
 import SalesDashboardPage from "../pos/pages/SalesDashboardPage";
+import InventoryPage from "../pos/pages/InventoryPage";
 import posStyles from "../pos/EmployeePortal.module.css";
 
 /* ============================================================================
@@ -88,9 +89,9 @@ const TABS_BY_ROLE = {
   employee: ["inicio", "tareas", "temp", "horario", "avisos"],
   cashier:  ["pos", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
   kitchen:  ["cocina", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
-  manager:  ["pos", "cocina", "hist", "ventas", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  admin:    ["pos", "cocina", "hist", "ventas", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  owner:    ["pos", "cocina", "hist", "ventas", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  manager:  ["pos", "cocina", "hist", "ventas", "fin", "inv", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  admin:    ["pos", "cocina", "hist", "ventas", "fin", "inv", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  owner:    ["pos", "cocina", "hist", "ventas", "fin", "inv", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
 };
 
 const TAB_META = {
@@ -98,6 +99,7 @@ const TAB_META = {
   cocina:  { label: "Cocina",   icon: UtensilsCrossed },
   hist:    { label: "Historial", icon: ClipboardList  },
   ventas:  { label: "Ventas",   icon: Activity        },
+  inv:     { label: "Inventario", icon: Package       },
   fin:     { label: "Finanzas", icon: BarChart3       },
   panel:   { label: "Panel",    icon: TrendingUp      },
   inicio:  { label: "Inicio",   icon: Clock           },
@@ -127,6 +129,7 @@ export default function UnifiedStaffApp() {
 
   const [tab, setTab] = useState(null); // set after login based on role
   const [now, setNow] = useState(Date.now());
+  const [lowStockCount, setLowStockCount] = useState(0);
 
   // Load employee list for login screen
   useEffect(() => {
@@ -135,6 +138,17 @@ export default function UnifiedStaffApp() {
       .then((d) => { setEmployees(d.employees || []); setLoadingEmps(false); })
       .catch(() => setLoadingEmps(false));
   }, []);
+
+  // Load low-stock count after login (for badge on Inventario tab)
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_URL}/api/staff/inventory/low-stock`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((d) => setLowStockCount(d.count ?? 0))
+      .catch(() => {});
+  }, [token]);
 
   // Load kiosk data after login
   useEffect(() => {
@@ -208,7 +222,7 @@ export default function UnifiedStaffApp() {
   }
 
   function handleLogout() {
-    setToken(null); setMe(null); setTab(null);
+    setToken(null); setMe(null); setTab(null); setLowStockCount(0);
     setTime([]); setChecklist({}); setTemps([]); setSchedule({}); setAnnouncements([]);
   }
 
@@ -349,11 +363,12 @@ export default function UnifiedStaffApp() {
           {tab === "cocina"  && <KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "hist"    && <OrderHistoryPage styles={posStyles} />}
           {tab === "ventas"  && <SalesDashboardPage styles={posStyles} />}
+          {tab === "inv"     && <InventoryPage styles={posStyles} />}
           {tab === "fin"     && <FinancePage styles={posStyles} />}
         </main>
 
         {/* Bottom nav */}
-        <BottomNav tab={tab} setTab={setTab} tabs={myTabs} openEntry={openEntry} />
+        <BottomNav tab={tab} setTab={setTab} tabs={myTabs} openEntry={openEntry} lowStockCount={lowStockCount} />
       </div>
     </StaffAuthContext.Provider>
   );
@@ -1018,7 +1033,7 @@ function TeamManager({ employees, onAdd, onRemove }) {
 /* ============================================================================
    BOTTOM NAV
    ========================================================================== */
-function BottomNav({ tab, setTab, tabs, openEntry }) {
+function BottomNav({ tab, setTab, tabs, openEntry, lowStockCount }) {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20 bg-slate-900/95 backdrop-blur border-t border-white/5">
       <div className="max-w-5xl mx-auto flex justify-around px-2 py-2 overflow-x-auto">
@@ -1030,6 +1045,11 @@ function BottomNav({ tab, setTab, tabs, openEntry }) {
               className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all relative shrink-0 ${isActive ? "text-emerald-400" : "text-slate-500 hover:text-slate-300"}`}>
               {id === "inicio" && openEntry && (
                 <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              )}
+              {id === "inv" && lowStockCount > 0 && (
+                <span className="absolute -top-0.5 right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                  {lowStockCount > 9 ? "9+" : lowStockCount}
+                </span>
               )}
               <Icon className={`w-5 h-5 ${isActive ? "scale-110" : ""} transition-transform`} />
               <span className={`text-[10px] font-medium whitespace-nowrap ${isActive ? "text-emerald-400" : ""}`}>{label}</span>

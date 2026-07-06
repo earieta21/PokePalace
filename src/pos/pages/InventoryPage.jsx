@@ -8,12 +8,22 @@ const UNITS = ["kg", "pz", "L", "paq", "botellas", "manojos", "bolsas", "latas"]
 
 const EMPTY_FORM = {
   item: "", category: "Proteínas", unit: "kg",
-  qty: "", minQty: "", cost: "", supplier: "",
+  qty: "", minQty: "", cost: "", supplier: "", menuKeys: "",
 };
 
+// Hint shown below the menuKeys input so staff know what keys to use
+const MENU_KEYS_HINT = [
+  "Proteínas: salmon · tuna · shrimp · chicken · tofu · crab · yellowtail · octopus",
+  "Bases: white_rice · brown_rice · salad · quinoa",
+  "Marinadas: citrus_marinade · soy_ginger · spicy_mayo · sesame_oil",
+  "Complementos: avocado · corn · cucumber · edamame · mango · jalapeño",
+  "Salsas: ponzu · teriyaki · sriracha · sweet_chili · peanut",
+  "Toppings: sesame · seaweed · crispy_onion · masago",
+].join("  |  ");
+
 function statusOf(item) {
-  if (item.qty <= 0)          return "critical";
-  if (item.qty < item.minQty) return "low";
+  if (item.qty <= 0)           return "critical";
+  if (item.qty < item.minQty)  return "low";
   return "ok";
 }
 
@@ -23,6 +33,9 @@ const STATUS_CFG = {
   critical: { cls: "badgeRed",    label: "Crítico" },
 };
 
+const parseKeys = (str) =>
+  str.split(",").map((k) => k.trim().toLowerCase()).filter(Boolean);
+
 export default function InventoryPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
   const api = createStaffApi(staffToken);
@@ -30,7 +43,7 @@ export default function InventoryPage({ styles }) {
   const [items, setItems]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
-  const [filter, setFilter]   = useState("All");
+  const [filter, setFilter]   = useState("Todos");
   const [search, setSearch]   = useState("");
 
   // Add-item form
@@ -39,17 +52,23 @@ export default function InventoryPage({ styles }) {
   const [saving, setSaving]     = useState(false);
   const [formError, setFormError] = useState("");
 
-  // Inline qty edit
-  const [editing, setEditing] = useState(null);
-  const [editQty, setEditQty] = useState("");
+  // Inline edit: qty + menuKeys together
+  const [editing, setEditing]   = useState(null); // item._id
+  const [editForm, setEditForm] = useState({ qty: "", menuKeys: "" });
   const [editSaving, setEditSaving] = useState(false);
 
-  useEffect(() => {
+  // Hint expand
+  const [showHint, setShowHint] = useState(false);
+
+  const load = () => {
+    setLoading(true);
     api.get("/api/staff/inventory")
       .then((d) => setItems(d.items ?? []))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [staffToken]);
+  };
+
+  useEffect(() => { load(); }, [staffToken]);
 
   const visible = items.filter((row) => {
     const matchCat    = filter === "Todos" || row.category === filter;
@@ -73,37 +92,47 @@ export default function InventoryPage({ styles }) {
         minQty:   form.minQty ? parseFloat(form.minQty) : 0,
         cost:     form.cost   ? parseFloat(form.cost)   : 0,
         supplier: form.supplier,
+        menuKeys: parseKeys(form.menuKeys),
       });
       setItems((prev) => [...prev, created]);
       setForm(EMPTY_FORM);
       setShowForm(false);
-    } catch (e) {
-      setFormError(e.message);
+    } catch (err) {
+      setFormError(err.message);
     } finally {
       setSaving(false);
     }
   };
 
-  /* ── Inline qty edit ── */
-  const saveQty = async (item) => {
-    if (editQty === "" || isNaN(editQty)) { setEditing(null); return; }
+  /* ── Inline edit ── */
+  const startEdit = (row) => {
+    setEditing(row._id);
+    setEditForm({
+      qty:      String(row.qty),
+      menuKeys: (row.menuKeys || []).join(", "),
+    });
+  };
+
+  const saveEdit = async (row) => {
     setEditSaving(true);
     try {
-      const { item: updated } = await api.patch(`/api/staff/inventory/${item._id}`, {
-        qty: parseFloat(editQty),
+      const { item: updated } = await api.patch(`/api/staff/inventory/${row._id}`, {
+        qty:      parseFloat(editForm.qty) || 0,
+        menuKeys: parseKeys(editForm.menuKeys),
       });
       setItems((prev) => prev.map((i) => (i._id === updated._id ? updated : i)));
-    } catch (e) { setError(e.message); }
-    finally { setEditSaving(false); setEditing(null); }
+      setEditing(null);
+    } catch (err) { setError(err.message); }
+    finally { setEditSaving(false); }
   };
 
   /* ── Delete ── */
-  const handleDelete = async (item) => {
-    if (!window.confirm(`¿Eliminar "${item.item}"?`)) return;
+  const handleDelete = async (row) => {
+    if (!window.confirm(`¿Eliminar "${row.item}"?`)) return;
     try {
-      await api.delete(`/api/staff/inventory/${item._id}`);
-      setItems((prev) => prev.filter((i) => i._id !== item._id));
-    } catch (e) { setError(e.message); }
+      await api.delete(`/api/staff/inventory/${row._id}`);
+      setItems((prev) => prev.filter((i) => i._id !== row._id));
+    } catch (err) { setError(err.message); }
   };
 
   const totalValue = items.reduce((s, i) => s + i.qty * i.cost, 0);
@@ -115,32 +144,42 @@ export default function InventoryPage({ styles }) {
         <div>
           <h1 className={styles.pageTitle}>Inventario</h1>
           <p className={styles.pageSubtitle}>
-            {loading ? "Cargando…" : `${items.length} artículos · $${totalValue.toFixed(2)} valor total`}
+            {loading ? "Cargando…" : `${items.length} artículos · $${totalValue.toFixed(0)} valor total`}
+            {lowCount > 0 && !loading && (
+              <span style={{
+                marginLeft: 10, background: "#e74c3c", color: "#fff",
+                fontSize: 11, fontWeight: 700, borderRadius: 10,
+                padding: "1px 7px",
+              }}>
+                {lowCount} bajo stock
+              </span>
+            )}
           </p>
         </div>
-        <button
-          className={styles.btnPrimary}
-          onClick={() => { setShowForm((v) => !v); setFormError(""); }}
-        >
-          {showForm ? "Cancelar" : "+ Agregar Artículo"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className={styles.btnGhost} onClick={load}>Actualizar</button>
+          <button
+            className={styles.btnPrimary}
+            onClick={() => { setShowForm((v) => !v); setFormError(""); }}
+          >
+            {showForm ? "Cancelar" : "+ Agregar"}
+          </button>
+        </div>
       </div>
 
       {/* ── Add item form ── */}
       {showForm && (
         <div className={styles.card} style={{ marginBottom: 20 }}>
-          <p className={styles.cardTitle}>Nuevo Artículo de Inventario</p>
+          <p className={styles.cardTitle}>Nuevo artículo</p>
           <form onSubmit={handleAdd}>
             {formError && (
-              <p style={{ color: "red", fontSize: 12, marginBottom: 12 }} role="alert">
-                {formError}
-              </p>
+              <p style={{ color: "red", fontSize: 12, marginBottom: 12 }}>{formError}</p>
             )}
 
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
-                <label className={styles.label}>Nombre del artículo *</label>
-                <input className={styles.input} placeholder="ej. Atún Ahi" value={form.item} onChange={f("item")} required />
+                <label className={styles.label}>Nombre *</label>
+                <input className={styles.input} placeholder="ej. Salmón" value={form.item} onChange={f("item")} required />
               </div>
               <div className={styles.formGroup}>
                 <label className={styles.label}>Categoría</label>
@@ -152,7 +191,7 @@ export default function InventoryPage({ styles }) {
 
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
-                <label className={styles.label}>Cantidad actual *</label>
+                <label className={styles.label}>Cantidad *</label>
                 <input className={styles.input} type="number" min="0" step="0.01" placeholder="0" value={form.qty} onChange={f("qty")} required />
               </div>
               <div className={styles.formGroup}>
@@ -165,7 +204,7 @@ export default function InventoryPage({ styles }) {
 
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
-                <label className={styles.label}>Cant. mínima (alerta)</label>
+                <label className={styles.label}>Cantidad mínima (alerta)</label>
                 <input className={styles.input} type="number" min="0" step="0.01" placeholder="0" value={form.minQty} onChange={f("minQty")} />
               </div>
               <div className={styles.formGroup}>
@@ -179,9 +218,33 @@ export default function InventoryPage({ styles }) {
               <input className={styles.input} placeholder="ej. Ocean Fresh" value={form.supplier} onChange={f("supplier")} />
             </div>
 
-            <div style={{ display: "flex", gap: 8 }}>
+            {/* menuKeys field */}
+            <div className={styles.formGroup}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <label className={styles.label} style={{ margin: 0 }}>Claves de menú (separadas por coma)</label>
+                <button type="button" onClick={() => setShowHint((v) => !v)}
+                  style={{ fontSize: 11, color: "var(--p-muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                  {showHint ? "Ocultar" : "Ver claves disponibles"}
+                </button>
+              </div>
+              {showHint && (
+                <p style={{ fontSize: 10.5, color: "var(--p-muted)", lineHeight: 1.6, marginBottom: 6, background: "var(--p-bg)", padding: "8px 10px", borderRadius: 6 }}>
+                  {MENU_KEYS_HINT}
+                </p>
+              )}
+              <input className={styles.input}
+                placeholder="ej. salmon, salmon_spicy, salmon_citrus"
+                value={form.menuKeys}
+                onChange={f("menuKeys")}
+              />
+              <p style={{ fontSize: 11, color: "var(--p-muted)", margin: "4px 0 0" }}>
+                El sistema descuenta 1 unidad de este artículo por cada bowl/orden que incluya alguna de estas claves.
+              </p>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               <button className={styles.btnPrimary} type="submit" disabled={saving}>
-                {saving ? "Guardando…" : "Agregar al Inventario"}
+                {saving ? "Guardando…" : "Agregar"}
               </button>
               <button className={styles.btnGhost} type="button" onClick={() => setShowForm(false)}>
                 Cancelar
@@ -193,18 +256,18 @@ export default function InventoryPage({ styles }) {
 
       {/* ── Stats ── */}
       {!loading && (
-        <div className={styles.statsRow}>
+        <div className={styles.statsRow} style={{ marginBottom: 20 }}>
           <div className={styles.statCard}>
-            <p className={styles.statLabel}>Total Artículos</p>
+            <p className={styles.statLabel}>Total artículos</p>
             <p className={styles.statValue}>{items.length}</p>
           </div>
           <div className={styles.statCard}>
-            <p className={styles.statLabel}>Requieren Atención</p>
-            <p className={styles.statValue}>{lowCount}</p>
+            <p className={styles.statLabel}>Bajo stock</p>
+            <p className={`${styles.statValue} ${lowCount > 0 ? styles.statAccent : ""}`}>{lowCount}</p>
             <p className={styles.statSub}>Bajo o crítico</p>
           </div>
           <div className={styles.statCard}>
-            <p className={styles.statLabel}>Valor Total</p>
+            <p className={styles.statLabel}>Valor total</p>
             <p className={styles.statValue}>${totalValue.toFixed(0)}</p>
           </div>
         </div>
@@ -213,31 +276,26 @@ export default function InventoryPage({ styles }) {
       {error && <p style={{ color: "red", fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
       {/* ── Filters ── */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <input
           className={styles.input}
-          style={{ maxWidth: 220 }}
-          placeholder="Buscar artículos…"
+          style={{ maxWidth: 200 }}
+          placeholder="Buscar…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {FILTER_CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setFilter(cat)}
+            <button key={cat} onClick={() => setFilter(cat)}
               style={{
-                padding: "7px 14px",
-                borderRadius: "var(--p-radius-sm)",
+                padding: "6px 13px", borderRadius: "var(--p-radius-sm)",
                 border: "1px solid var(--p-border)",
                 background: filter === cat ? "var(--p-g2)" : "var(--p-surface)",
                 color: filter === cat ? "#fff" : "var(--p-ink)",
                 fontSize: 12, fontWeight: 600, cursor: "pointer",
                 fontFamily: "Syne, sans-serif", transition: "background 120ms",
               }}
-            >
-              {cat}
-            </button>
+            >{cat}</button>
           ))}
         </div>
       </div>
@@ -247,100 +305,108 @@ export default function InventoryPage({ styles }) {
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Artículo</th><th>Categoría</th><th>Cant.</th><th>Unidad</th>
-              <th>Mín.</th><th>Costo/U.</th><th>Valor</th><th>Estado</th><th></th>
+              <th>Artículo</th>
+              <th>Cat.</th>
+              <th>Cant.</th>
+              <th>U.</th>
+              <th>Mín.</th>
+              <th>Estado</th>
+              <th>Claves de menú</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={9} style={{ textAlign: "center", padding: 24, color: "var(--p-muted)" }}>
-                  Cargando inventario…
-                </td>
-              </tr>
+              <tr><td colSpan={8} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>Cargando inventario…</td></tr>
             ) : visible.length === 0 ? (
-              <tr>
-                <td colSpan={9} style={{ textAlign: "center", padding: 24, color: "var(--p-muted)" }}>
-                  Sin artículos que coincidan
-                </td>
-              </tr>
-            ) : (
-              visible.map((row) => {
-                const status = statusOf(row);
-                const { cls, label } = STATUS_CFG[status];
-                const isEditing = editing === row._id;
+              <tr><td colSpan={8} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>Sin artículos que coincidan</td></tr>
+            ) : visible.map((row) => {
+              const status    = statusOf(row);
+              const { cls, label } = STATUS_CFG[status];
+              const isEditing = editing === row._id;
 
-                return (
-                  <tr key={row._id}>
-                    <td style={{ fontWeight: 500 }}>{row.item}</td>
-                    <td>
-                      <span className={`${styles.badge} ${styles.badgeGray}`}>{row.category}</span>
-                    </td>
-                    <td className={styles.tdMono}>
+              return (
+                <tr key={row._id} style={{ background: status === "critical" ? "rgba(231,76,60,0.04)" : status === "low" ? "rgba(241,196,15,0.04)" : undefined }}>
+                  <td style={{ fontWeight: 600 }}>{row.item}</td>
+                  <td><span className={`${styles.badge} ${styles.badgeGray}`}>{row.category}</span></td>
+
+                  {/* Qty — editable */}
+                  <td className={styles.tdMono}>
+                    {isEditing ? (
+                      <input type="number" min="0" step="0.01"
+                        value={editForm.qty}
+                        onChange={(e) => setEditForm((p) => ({ ...p, qty: e.target.value }))}
+                        onKeyDown={(e) => e.key === "Escape" && setEditing(null)}
+                        autoFocus
+                        style={{ width: 60, padding: "3px 6px", fontFamily: "DM Mono,monospace", fontSize: 12, border: "1px solid var(--p-g3)", borderRadius: 4, outline: "none" }}
+                      />
+                    ) : row.qty}
+                  </td>
+
+                  <td className={styles.tdMuted}>{row.unit}</td>
+                  <td className={styles.tdMono}>{row.minQty}</td>
+                  <td><span className={`${styles.badge} ${styles[cls]}`}>{label}</span></td>
+
+                  {/* menuKeys — editable */}
+                  <td>
+                    {isEditing ? (
+                      <input
+                        value={editForm.menuKeys}
+                        onChange={(e) => setEditForm((p) => ({ ...p, menuKeys: e.target.value }))}
+                        onKeyDown={(e) => e.key === "Escape" && setEditing(null)}
+                        placeholder="salmon, white_rice, avocado…"
+                        style={{ width: "100%", minWidth: 160, padding: "3px 7px", fontSize: 11, border: "1px solid var(--p-g3)", borderRadius: 4, outline: "none", fontFamily: "DM Mono,monospace" }}
+                      />
+                    ) : (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                        {(row.menuKeys || []).length === 0 ? (
+                          <span style={{ fontSize: 11, color: "var(--p-muted)", fontStyle: "italic" }}>Sin vincular</span>
+                        ) : (row.menuKeys).map((k) => (
+                          <span key={k} style={{
+                            fontSize: 10, fontFamily: "DM Mono,monospace",
+                            background: "var(--p-bg)", border: "1px solid var(--p-border)",
+                            borderRadius: 4, padding: "1px 5px", color: "var(--p-ink)",
+                          }}>{k}</span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+
+                  {/* Actions */}
+                  <td>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                       {isEditing ? (
-                        <input
-                          type="number" min="0" step="0.01"
-                          value={editQty}
-                          onChange={(e) => setEditQty(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter")  saveQty(row);
-                            if (e.key === "Escape") setEditing(null);
-                          }}
-                          autoFocus
-                          style={{
-                            width: 70, padding: "3px 6px",
-                            fontFamily: "DM Mono, monospace", fontSize: 12,
-                            border: "1px solid var(--p-g3)", borderRadius: 4, outline: "none",
-                          }}
-                        />
-                      ) : (
-                        row.qty
-                      )}
-                    </td>
-                    <td className={styles.tdMuted}>{row.unit}</td>
-                    <td className={styles.tdMono}>{row.minQty}</td>
-                    <td className={styles.tdMono}>${row.cost.toFixed(2)}</td>
-                    <td className={styles.tdMono}>${(row.qty * row.cost).toFixed(2)}</td>
-                    <td>
-                      <span className={`${styles.badge} ${styles[cls]}`}>{label}</span>
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: 4 }}>
-                        {isEditing ? (
-                          <button
-                            className={styles.btnPrimary}
-                            style={{ padding: "4px 10px", fontSize: 12 }}
-                            onClick={() => saveQty(row)}
-                            disabled={editSaving}
-                          >
+                        <>
+                          <button className={styles.btnPrimary}
+                            style={{ padding: "4px 10px", fontSize: 11 }}
+                            onClick={() => saveEdit(row)} disabled={editSaving}>
                             {editSaving ? "…" : "Guardar"}
                           </button>
-                        ) : (
-                          <button
-                            className={styles.btnGhost}
-                            style={{ padding: "4px 10px", fontSize: 12 }}
-                            onClick={() => { setEditing(row._id); setEditQty(row.qty); }}
-                          >
-                            Editar cant.
+                          <button className={styles.btnGhost}
+                            style={{ padding: "4px 8px", fontSize: 11 }}
+                            onClick={() => setEditing(null)}>
+                            ✕
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete(row)}
-                          style={{
-                            background: "none", border: "none", cursor: "pointer",
-                            color: "var(--p-muted)", fontSize: 16, padding: "0 4px",
-                            lineHeight: 1, transition: "color 120ms",
-                          }}
-                          title="Eliminar artículo"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
+                        </>
+                      ) : (
+                        <>
+                          <button className={styles.btnGhost}
+                            style={{ padding: "4px 10px", fontSize: 11 }}
+                            onClick={() => startEdit(row)}>
+                            Editar
+                          </button>
+                          <button onClick={() => handleDelete(row)}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--p-muted)", fontSize: 16, padding: "0 2px", lineHeight: 1, transition: "color 120ms" }}
+                            onMouseEnter={(ev) => (ev.currentTarget.style.color = "#c0392b")}
+                            onMouseLeave={(ev) => (ev.currentTarget.style.color = "var(--p-muted)")}
+                            title="Eliminar">×</button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
