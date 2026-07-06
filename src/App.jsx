@@ -1,4 +1,4 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -7,18 +7,28 @@ import {
   useLocation,
 } from "react-router-dom";
 
-// Customer pages
+// Customer pages — loaded eagerly (always needed)
 import Home from "./pages/Home";
-import OrderPage from "./order/OrderPage";
-import RewardsDeals from "./pages/Promotions";
-import EarnPoints from "./pages/EarnPoints";
-import MoreOptions from "./more/MoreOptions";
-import MiCuenta from "./pages/MiCuenta";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import OrderSummaryPage from "./pages/OrderSummaryPage";
-import OrderTracking from "./pages/OrderTracking";
-import LocationPage from "./pages/LocationPage";
+
+// Customer pages — lazy loaded
+const OrderPage        = lazy(() => import("./order/OrderPage"));
+const RewardsDeals     = lazy(() => import("./pages/Promotions"));
+const EarnPoints       = lazy(() => import("./pages/EarnPoints"));
+const MoreOptions      = lazy(() => import("./more/MoreOptions"));
+const MiCuenta         = lazy(() => import("./pages/MiCuenta"));
+const OrderSummaryPage = lazy(() => import("./pages/OrderSummaryPage"));
+const OrderTracking    = lazy(() => import("./pages/OrderTracking"));
+const LocationPage     = lazy(() => import("./pages/LocationPage"));
+
+// Kiosk & staff — lazy loaded (never used by regular customers)
+const KioskLayout      = lazy(() => import("./kiosk/KioskLayout"));
+const KioskWelcome     = lazy(() => import("./kiosk/KioskWelcome"));
+const KioskOrderPage   = lazy(() => import("./kiosk/KioskOrderPage"));
+const KioskSummaryPage = lazy(() => import("./kiosk/KioskSummaryPage"));
+const KioskDonePage    = lazy(() => import("./kiosk/KioskDonePage"));
+const UnifiedStaffApp  = lazy(() => import("./staff/UnifiedStaffApp"));
 
 // Providers
 import { OrderProvider } from "./order/OrderContext";
@@ -29,18 +39,14 @@ import { AvailabilityProvider } from "./context/AvailabilityContext";
 // Layouts
 import CustomerLayout from "./layouts/CustomerLayout";
 
-// Self-service kiosk (counter tablet)
-import KioskLayout from "./kiosk/KioskLayout";
-import KioskWelcome from "./kiosk/KioskWelcome";
-import KioskOrderPage from "./kiosk/KioskOrderPage";
-import KioskSummaryPage from "./kiosk/KioskSummaryPage";
-import KioskDonePage from "./kiosk/KioskDonePage";
-
-// Employee kiosk (clock-in, checklists, temps, schedule, announcements)
-import EmployeeApp from "./kiosk/EmployeeApp";
-
-// Unified staff app (PIN login + role-based tabs)
-import UnifiedStaffApp from "./staff/UnifiedStaffApp";
+function PageLoader() {
+  return (
+    <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 32, height: 32, border: "3px solid #e5e7eb", borderTopColor: "#4A7A5A", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
 
 const PrivateRoute = ({ children }) => {
   const { isLoggedIn } = React.useContext(AuthContext);
@@ -63,6 +69,7 @@ const App = () => {
       <StaffAuthProvider>
         <AvailabilityProvider>
         <OrderProvider>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* ✅ Customer App */}
             <Route element={<CustomerLayout />}>
@@ -111,6 +118,7 @@ const App = () => {
             {/* fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </OrderProvider>
         </AvailabilityProvider>
       </StaffAuthProvider>

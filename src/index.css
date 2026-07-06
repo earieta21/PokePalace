@@ -1,4 +1,6 @@
-@import "tailwindcss";
+/* Tailwind utilities scoped to staff app — avoids overriding customer styles */
+@import "tailwindcss" layer(tailwind);
+@layer tailwind;
 
 :root {
   --bg:           #F5F3EE;
