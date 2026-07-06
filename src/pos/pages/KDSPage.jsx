@@ -107,6 +107,15 @@ export default function KDSPage({ styles }) {
     } catch (e) { setError(e.message); }
   };
 
+  const cancel = async (order) => {
+    try {
+      await api.patch(`/api/staff/orders/${order._id}/status`, { status: "cancelled" });
+      setOrders((prev) => prev.filter((o) => o._id !== order._id));
+    } catch (e) { setError(e.message); }
+  };
+
+  const [confirming, setConfirming] = useState(null);
+
   const pending = orders.filter((o) => o.status !== "ready").length;
 
   return (
@@ -174,6 +183,17 @@ export default function KDSPage({ styles }) {
                   ) : (
                     <button className={styles.kdsBtnReady} onClick={() => advance(order)}>
                       {order.status === "pending" ? "Iniciar Preparación" : "Marcar Listo"}
+                    </button>
+                  )}
+                  {confirming === order._id ? (
+                    <div className={styles.kdsCancelConfirm}>
+                      <span>¿Cancelar orden?</span>
+                      <button className={styles.kdsCancelYes} onClick={() => { cancel(order); setConfirming(null); }}>Sí</button>
+                      <button className={styles.kdsCancelNo}  onClick={() => setConfirming(null)}>No</button>
+                    </div>
+                  ) : (
+                    <button className={styles.kdsBtnCancel} onClick={() => setConfirming(order._id)}>
+                      Cancelar orden
                     </button>
                   )}
                 </div>

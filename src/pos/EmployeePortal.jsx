@@ -18,6 +18,7 @@ import EmployeesPage from "./pages/EmployeesPage";
 import AuditPage from "./pages/AuditPage";
 import FinancePage from "./pages/FinancePage";
 import SchedulePage from "./pages/SchedulePage";
+import OrderHistoryPage from "./pages/OrderHistoryPage";
 
 /* ── Page registry ── */
 const PAGE_MAP = {
@@ -30,6 +31,7 @@ const PAGE_MAP = {
   inv:   { label: "Inventario",          Component: InventoryPage },
   waste: { label: "Registro de Merma",   Component: WastePage },
   orm:   { label: "Todas las Órdenes",   Component: AllOrdersPage },
+  hist:  { label: "Historial",           Component: OrderHistoryPage },
   anal:  { label: "Análisis",            Component: AnalyticsPage },
   emp:   { label: "Empleados",           Component: EmployeesPage },
   audit: { label: "Auditoría",           Component: AuditPage },
@@ -39,11 +41,11 @@ const PAGE_MAP = {
 
 /* ── Nav items per role ── */
 const NAV_BY_ROLE = {
-  kitchen: ["kds", "stk", "prep"],
-  cashier: ["pos", "orc"],
-  manager: ["dash", "inv", "waste", "orm", "audit", "sched"],
-  admin:   ["dash", "inv", "waste", "orm", "anal", "emp", "audit", "fin"],
-  owner:   ["dash", "inv", "waste", "orm", "anal", "emp", "audit", "fin"],
+  kitchen: ["kds", "stk", "prep", "hist"],
+  cashier: ["pos", "orc", "hist"],
+  manager: ["dash", "inv", "waste", "orm", "hist", "audit", "sched"],
+  admin:   ["dash", "inv", "waste", "orm", "hist", "anal", "emp", "audit", "fin"],
+  owner:   ["dash", "inv", "waste", "orm", "hist", "anal", "emp", "audit", "fin"],
 };
 
 /* ── Live clock hook ── */

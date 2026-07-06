@@ -675,6 +675,77 @@
 .kdsFooter {
   padding: 10px 14px;
   border-top: 1px solid var(--p-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kdsBtnCancel {
+  width: 100%;
+  padding: 7px 8px;
+  background: transparent;
+  border: 1px solid rgba(180, 40, 40, 0.2);
+  border-radius: var(--p-radius-sm);
+  font-family: "Syne", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9b2c2c;
+  cursor: pointer;
+  transition: background 130ms, border-color 130ms;
+}
+
+.kdsBtnCancel:hover {
+  background: rgba(180, 40, 40, 0.06);
+  border-color: rgba(180, 40, 40, 0.4);
+}
+
+.kdsCancelConfirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(180, 40, 40, 0.05);
+  border: 1px solid rgba(180, 40, 40, 0.2);
+  border-radius: var(--p-radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: #7a1c1c;
+}
+
+.kdsCancelConfirm span {
+  flex: 1;
+}
+
+.kdsCancelYes {
+  padding: 4px 10px;
+  background: #c0392b;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-family: "Syne", sans-serif;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kdsCancelYes:hover {
+  background: #a93226;
+}
+
+.kdsCancelNo {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 5px;
+  font-family: "Syne", sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--p-muted);
+  cursor: pointer;
+}
+
+.kdsCancelNo:hover {
+  background: rgba(0,0,0,0.04);
 }
 
 .kdsBtnReady {
