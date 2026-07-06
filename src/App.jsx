@@ -27,14 +27,6 @@ import { StaffAuthProvider } from "./context/StaffAuthContext";
 
 // Layouts
 import CustomerLayout from "./layouts/CustomerLayout";
-import PosLayout from "./layouts/PosLayout";
-
-// Staff portal
-import EmployeePortal from "./pos/EmployeePortal";
-
-// Staff auth UI + guard
-import StaffLogin from "./pages/StaffLogin";
-import RoleRoute from "./auth/RoleRoute";
 
 // Self-service kiosk (counter tablet)
 import KioskLayout from "./kiosk/KioskLayout";
@@ -112,15 +104,7 @@ const App = () => {
             <Route path="/staff/login" element={<Navigate to="/staff" replace />} />
             <Route path="/pos" element={<Navigate to="/staff" replace />} />
             <Route path="/kitchen" element={<Navigate to="/staff" replace />} />
-
-            {/* ✅ Legacy email/password staff portal (kept for admin access) */}
-            <Route element={<PosLayout />}>
-              <Route path="/pos-legacy" element={
-                <RoleRoute allowedRoles={["cashier", "kitchen", "manager", "admin", "owner"]}>
-                  <EmployeePortal />
-                </RoleRoute>
-              } />
-            </Route>
+            <Route path="/pos-legacy" element={<Navigate to="/staff" replace />} />
 
             {/* fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
