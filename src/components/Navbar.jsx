@@ -7,10 +7,12 @@ import {
   FaEllipsisH,
 } from "react-icons/fa";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useTheme } from "../context/ThemeContext";
 import styles from "./Navbar.module.css";
 
 const Navbar = () => {
   const { language, t, toggleLanguage } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <nav className={styles.navbar} aria-label="Main navigation">
@@ -62,6 +64,15 @@ const Navbar = () => {
         </span>
         <span className={styles.label}>{t("nav.more")}</span>
       </NavLink>
+
+      <button
+        type="button"
+        className={styles.themeButton}
+        onClick={toggleTheme}
+        aria-label={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+      >
+        {theme === "dark" ? "☀" : "🌙"}
+      </button>
 
       <button
         type="button"

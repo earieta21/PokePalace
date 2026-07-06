@@ -77,6 +77,28 @@
   color: var(--accent);
 }
 
+.themeButton {
+  position: absolute;
+  left: 10px;
+  top: -44px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--border-md);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-md);
+  font-size: 15px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  transition: background 150ms ease;
+}
+
+.themeButton:hover {
+  background: var(--accent-bg);
+}
+
 .languageButton {
   position: absolute;
   right: 10px;
