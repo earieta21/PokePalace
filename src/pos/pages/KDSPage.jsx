@@ -71,18 +71,19 @@ function playNewOrderBeep() {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return;
     const ctx = new Ctx();
-    [0, 230].forEach((delayMs) => {
+    // 3 short beeps — square wave is more piercing than triangle
+    [0, 220, 440].forEach((delayMs) => {
       const osc  = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.type = "triangle";
-      osc.frequency.value = 880;
+      osc.type = "square";
+      osc.frequency.value = 1050;
       const t = ctx.currentTime + delayMs / 1000;
-      gain.gain.setValueAtTime(0.45, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      gain.gain.setValueAtTime(0.75, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
       osc.start(t);
-      osc.stop(t + 0.3);
+      osc.stop(t + 0.18);
     });
   } catch {}
 }
@@ -95,9 +96,11 @@ export default function KDSPage({ styles }) {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
   const [alertCount, setAlertCount] = useState(0);
+  const [screenFlash, setScreenFlash] = useState(false);
   const seenIds    = useRef(new Set());
   const firstLoad  = useRef(true);
   const alertTimer = useRef(null);
+  const flashTimer = useRef(null);
 
   const load = useCallback(() => {
     api.get("/api/staff/orders?status=pending,preparing,ready&limit=30")
@@ -118,10 +121,13 @@ export default function KDSPage({ styles }) {
 
         if (newPending.length > 0) {
           playNewOrderBeep();
-          navigator.vibrate?.([300, 100, 300]);
+          navigator.vibrate?.([300, 100, 300, 100, 300]);
           setAlertCount(newPending.length);
+          setScreenFlash(true);
           clearTimeout(alertTimer.current);
+          clearTimeout(flashTimer.current);
           alertTimer.current = setTimeout(() => setAlertCount(0), 6000);
+          flashTimer.current = setTimeout(() => setScreenFlash(false), 900);
         }
       })
       .catch((e) => setError(e.message))
@@ -167,6 +173,22 @@ export default function KDSPage({ styles }) {
 
   return (
     <div>
+      {/* Screen flash on new order — visible even if not looking at the toast */}
+      {screenFlash && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9998,
+          background: "#10b981", pointerEvents: "none",
+          animation: "screenFlash 0.9s ease-out forwards",
+        }}>
+          <style>{`
+            @keyframes screenFlash {
+              0%   { opacity: 0.45; }
+              100% { opacity: 0; }
+            }
+          `}</style>
+        </div>
+      )}
+
       {/* New order alert toast */}
       {alertCount > 0 && (
         <div style={{
