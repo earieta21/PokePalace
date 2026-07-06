@@ -3,6 +3,7 @@ import { useOrder } from "./OrderContext";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./MarinadeSelection.module.css";
+import { useAvailability } from "../context/AvailabilityContext";
 
 import citrico from "../assets/marinades/citrico.webp";
 import garlicGinger from "../assets/marinades/garlicGinger.webp";
@@ -18,6 +19,7 @@ const MAX_MARINADES = 2;
 const MarinadeSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
+  const { unavailableItems } = useAvailability();
 
   const marinades = [
     { id: "citrus_marinade",        image: citrico,      desc: "Naranja, limón y aceite de sésamo" },
@@ -77,10 +79,11 @@ const MarinadeSelection = ({ onNext, onBack }) => {
           <button
             key={marinade.id}
             type="button"
+            style={{ position: "relative" }}
             className={`${styles.card} ${
               selectedMarinades.includes(marinade.id) ? styles.selected : ""
             }`}
-            onClick={() => toggleMarinade(marinade.id)}
+            onClick={() => !unavailableItems.includes(marinade.id) && toggleMarinade(marinade.id)}
           >
             <div className={styles.imageWrap}>
               <img
@@ -94,6 +97,15 @@ const MarinadeSelection = ({ onNext, onBack }) => {
 
             <p className={styles.name}>{name}</p>
             {marinade.desc && <p className={styles.itemDesc}>{marinade.desc}</p>}
+            {unavailableItems.includes(marinade.id) && (
+              <div style={{
+                position: "absolute", inset: 0, display: "flex",
+                alignItems: "center", justifyContent: "center",
+                background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
+              }}>
+                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+              </div>
+            )}
           </button>
         );
         })}

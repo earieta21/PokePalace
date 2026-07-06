@@ -4,6 +4,7 @@ import { LARGE_BOWL_UPCHARGE } from "./pricing";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./ProteinSelection.module.css";
+import { useAvailability } from "../context/AvailabilityContext";
 
 import tuna from "../assets/protein/tuna.webp";
 import salmon from "../assets/protein/salmon.webp";
@@ -14,6 +15,7 @@ import searedTuna from "../assets/protein/searedTuna.webp";
 const ProteinSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
+  const { unavailableItems } = useAvailability();
   const MIN_PROTEINS = 2;
   const MAX_PROTEINS = 3;
 
@@ -93,7 +95,8 @@ const ProteinSelection = ({ onNext, onBack }) => {
             className={`${styles.card} ${
               isSelected ? styles.selected : ""
             }`}
-            onClick={() => handleSelection(protein.id)}
+            onClick={() => !unavailableItems.includes(protein.id) && handleSelection(protein.id)}
+            style={{ position: "relative" }}
           >
             <div className={styles.imageWrap}>
               <img
@@ -109,6 +112,15 @@ const ProteinSelection = ({ onNext, onBack }) => {
             </div>
 
             <p className={styles.name}>{name}</p>
+            {unavailableItems.includes(protein.id) && (
+              <div style={{
+                position: "absolute", inset: 0, display: "flex",
+                alignItems: "center", justifyContent: "center",
+                background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
+              }}>
+                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+              </div>
+            )}
           </button>
           );
         })}

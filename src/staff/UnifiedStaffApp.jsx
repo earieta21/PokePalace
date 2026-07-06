@@ -4,7 +4,12 @@ import {
   TrendingUp, ChevronLeft, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
+  ToggleRight,
 } from "lucide-react";
+import {
+  BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
+  COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS,
+} from "../order/OrderLabels";
 import { StaffAuthContext } from "../context/StaffAuthContext";
 import { API_URL } from "../config";
 
@@ -89,9 +94,9 @@ const TABS_BY_ROLE = {
   employee: ["inicio", "tareas", "temp", "horario", "avisos"],
   cashier:  ["pos", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
   kitchen:  ["cocina", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
-  manager:  ["pos", "cocina", "hist", "ventas", "fin", "inv", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  admin:    ["pos", "cocina", "hist", "ventas", "fin", "inv", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  owner:    ["pos", "cocina", "hist", "ventas", "fin", "inv", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  manager:  ["pos", "cocina", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  admin:    ["pos", "cocina", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  owner:    ["pos", "cocina", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
 };
 
 const TAB_META = {
@@ -101,6 +106,7 @@ const TAB_META = {
   ventas:  { label: "Ventas",   icon: Activity        },
   inv:     { label: "Inventario", icon: Package       },
   fin:     { label: "Finanzas", icon: BarChart3       },
+  disponibilidad: { label: "Disponibilidad", icon: ToggleRight },
   panel:   { label: "Panel",    icon: TrendingUp      },
   inicio:  { label: "Inicio",   icon: Clock           },
   tareas:  { label: "Tareas",   icon: CheckSquare     },
@@ -368,6 +374,7 @@ export default function UnifiedStaffApp() {
           {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
           {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
           {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
+          {tab === "disponibilidad" && <AvailabilityTab token={token} />}
           {tab === "panel"   && <PanelTab employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} />}
           {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "cocina"  && <KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
@@ -830,6 +837,106 @@ function AnnouncementsTab({ employees, announcements, isManager, onAdd, onRemove
               );
             })
         }
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
+   DISPONIBILIDAD DE INGREDIENTES
+   ========================================================================== */
+const AVAIL_CATEGORIES = [
+  { label: "Bases",        items: Object.entries(BASE_LABELS).map(([id, label]) => ({ id, label })) },
+  { label: "Proteínas",    items: Object.entries(PROTEIN_LABELS).map(([id, label]) => ({ id, label })) },
+  { label: "Marinados",    items: Object.entries(MARINADE_LABELS).map(([id, label]) => ({ id, label })) },
+  { label: "Complementos", items: Object.entries(COMPLEMENT_LABELS).map(([id, label]) => ({ id, label })) },
+  { label: "Salsas",       items: Object.entries(SAUCE_LABELS).map(([id, label]) => ({ id, label })) },
+  { label: "Toppings",     items: Object.entries(TOPPING_LABELS).map(([id, label]) => ({ id, label })) },
+];
+
+function AvailabilityTab({ token }) {
+  const [unavailable, setUnavailable] = useState(null); // null = loading
+  const [saving, setSaving]           = useState(false);
+  const [saveError, setSaveError]     = useState("");
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/settings/availability`)
+      .then((r) => r.json())
+      .then((d) => setUnavailable(d.unavailableItems ?? []))
+      .catch(() => setUnavailable([]));
+  }, []);
+
+  const toggle = async (id) => {
+    const next = unavailable.includes(id)
+      ? unavailable.filter((x) => x !== id)
+      : [...unavailable, id];
+    setUnavailable(next);
+    setSaving(true);
+    try {
+      await fetch(`${API_URL}/api/settings/availability`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ unavailableItems: next }),
+      });
+    } catch {
+      setSaveError("Error al guardar. Intenta de nuevo.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const unavailableCount = unavailable?.length ?? 0;
+
+  if (unavailable === null) {
+    return <p className="text-slate-400 text-sm mt-4">Cargando…</p>;
+  }
+
+  return (
+    <div>
+      <div className="mb-5">
+        <h2 className="text-lg font-bold text-white">Disponibilidad de ingredientes</h2>
+        <p className="text-slate-400 text-sm mt-1">
+          Marca un ingrediente como <span className="text-rose-400 font-semibold">Agotado</span> para que no aparezca en el builder de bowls.
+          {unavailableCount > 0 && (
+            <span className="ml-2 bg-rose-500/20 text-rose-400 text-xs font-semibold px-2 py-0.5 rounded-full">
+              {unavailableCount} agotado{unavailableCount > 1 ? "s" : ""}
+            </span>
+          )}
+        </p>
+        {saving    && <p className="text-amber-400 text-xs mt-2">Guardando…</p>}
+        {saveError && <p className="text-rose-400 text-xs mt-2">{saveError}</p>}
+      </div>
+
+      <div className="space-y-4">
+        {AVAIL_CATEGORIES.map((cat) => (
+          <div key={cat.label} className="bg-slate-900 rounded-2xl border border-white/5 overflow-hidden">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest px-4 py-2.5 border-b border-white/5">
+              {cat.label}
+            </p>
+            <div className="divide-y divide-white/5">
+              {cat.items.map((item) => {
+                const isAvailable = !unavailable.includes(item.id);
+                return (
+                  <div key={item.id} className="flex items-center justify-between px-4 py-3">
+                    <span className={`text-sm ${isAvailable ? "text-white" : "text-slate-500 line-through"}`}>
+                      {item.label}
+                    </span>
+                    <button
+                      onClick={() => toggle(item.id)}
+                      className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${isAvailable ? "bg-emerald-600" : "bg-slate-600"}`}
+                      aria-label={isAvailable ? "Marcar como agotado" : "Marcar como disponible"}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${isAvailable ? "translate-x-5" : "translate-x-0"}`} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

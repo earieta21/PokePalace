@@ -24,6 +24,7 @@ import LocationPage from "./pages/LocationPage";
 import { OrderProvider } from "./order/OrderContext";
 import { AuthContext } from "./context/AuthContext";
 import { StaffAuthProvider } from "./context/StaffAuthContext";
+import { AvailabilityProvider } from "./context/AvailabilityContext";
 
 // Layouts
 import CustomerLayout from "./layouts/CustomerLayout";
@@ -60,6 +61,7 @@ const App = () => {
   return (
     <Router>
       <StaffAuthProvider>
+        <AvailabilityProvider>
         <OrderProvider>
           <Routes>
             {/* ✅ Customer App */}
@@ -110,6 +112,7 @@ const App = () => {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </OrderProvider>
+        </AvailabilityProvider>
       </StaffAuthProvider>
     </Router>
   );

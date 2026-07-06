@@ -3,6 +3,7 @@ import { useOrder } from "./OrderContext";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./ComplementsSelection.module.css";
+import { useAvailability } from "../context/AvailabilityContext";
 
 import aguacate from "../assets/complements/aguacate.webp";
 import algas from "../assets/complements/algas.webp";
@@ -22,6 +23,7 @@ const MAX_COMPLEMENTS = 6;
 const ComplementsSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
+  const { unavailableItems } = useAvailability();
 
   const complements = [
     { id: "shredded_carrots", image: zanahoria },
@@ -85,10 +87,11 @@ const ComplementsSelection = ({ onNext, onBack }) => {
           <button
             key={complement.id}
             type="button"
+            style={{ position: "relative" }}
             className={`${styles.card} ${
               selectedComplements.includes(complement.id) ? styles.selected : ""
             }`}
-            onClick={() => toggleComplement(complement.id)}
+            onClick={() => !unavailableItems.includes(complement.id) && toggleComplement(complement.id)}
           >
             <div className={styles.imageWrap}>
               <img
@@ -100,6 +103,15 @@ const ComplementsSelection = ({ onNext, onBack }) => {
               <div className={styles.imageOverlay} />
             </div>
             <p className={styles.name}>{name}</p>
+            {unavailableItems.includes(complement.id) && (
+              <div style={{
+                position: "absolute", inset: 0, display: "flex",
+                alignItems: "center", justifyContent: "center",
+                background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
+              }}>
+                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+              </div>
+            )}
           </button>
         );
         })}

@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import OrderSummary from "../order/OrderSummary";
 import { AuthContext } from "../context/AuthContext";
@@ -21,6 +21,7 @@ export default function OrderSummaryPage() {
   const isGuest = Boolean(location.state?.guest);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [waitMinutes, setWaitMinutes] = useState(null);
 
   // Points redemption state
   const [usePoints, setUsePoints] = useState(false);
@@ -31,6 +32,14 @@ export default function OrderSummaryPage() {
 
   // Refresh points when page mounts so balance is current
   useEffect(() => { if (isLoggedIn) refreshUser?.(); }, [isLoggedIn]);
+
+  // Fetch current wait time estimate
+  useEffect(() => {
+    fetch(`${API_URL}/api/orders/wait-time`)
+      .then((r) => r.json())
+      .then((d) => setWaitMinutes(d.waitMinutes ?? null))
+      .catch(() => {});
+  }, []);
 
   const onEditStep = (stepIndex) => {
     navigate(`/order?step=${stepIndex}&edit=1`, { state: { guest: isGuest } });
@@ -121,6 +130,28 @@ export default function OrderSummaryPage() {
                 {userPoints} puntos → <strong style={{ color: "#4A7A5A" }}>
                   ${pointsDiscount} MXN de descuento
                 </strong> en esta orden
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wait time estimate */}
+      {waitMinutes !== null && (
+        <div style={{ maxWidth: 560, margin: "16px auto 0", padding: "0 16px" }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            background: waitMinutes <= 12 ? "#f0fdf4" : waitMinutes <= 20 ? "#fffbeb" : "#fef3c7",
+            border: `1px solid ${waitMinutes <= 12 ? "#bbf7d0" : waitMinutes <= 20 ? "#fde68a" : "#fcd34d"}`,
+            borderRadius: 12, padding: "12px 16px",
+          }}>
+            <span style={{ fontSize: 20 }}>⏱</span>
+            <div>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>
+                Tiempo estimado: <strong style={{ color: waitMinutes <= 12 ? "#166534" : "#92400e" }}>~{waitMinutes} min</strong>
+              </p>
+              <p style={{ margin: "2px 0 0", fontSize: 12, color: "#666" }}>
+                {waitMinutes <= 12 ? "Poco tiempo de espera ahora" : waitMinutes <= 20 ? "Tiempo normal" : "Restaurante ocupado en este momento"}
               </p>
             </div>
           </div>

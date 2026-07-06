@@ -189,6 +189,18 @@ export const cancelOrder = async (req, res) => {
   }
 };
 
+export const getWaitTime = async (req, res) => {
+  try {
+    const activeOrders = await Order.countDocuments({
+      status: { $in: ["pending", "preparing"] },
+    });
+    const waitMinutes = Math.max(8, 8 + activeOrders * 3);
+    res.json({ activeOrders, waitMinutes });
+  } catch {
+    res.status(500).json({ msg: "Error" });
+  }
+};
+
 export const getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.userId })

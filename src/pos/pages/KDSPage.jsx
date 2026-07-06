@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useCallback } from "react";
+import { useState, useEffect, useContext, useCallback, useRef } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import {
@@ -66,17 +66,64 @@ function elapsed(createdAt) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+function playNewOrderBeep() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    [0, 230].forEach((delayMs) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "triangle";
+      osc.frequency.value = 880;
+      const t = ctx.currentTime + delayMs / 1000;
+      gain.gain.setValueAtTime(0.45, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc.start(t);
+      osc.stop(t + 0.3);
+    });
+  } catch {}
+}
+
 export default function KDSPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
   const api = createStaffApi(staffToken);
 
-  const [orders, setOrders]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState("");
+  const [orders, setOrders]       = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState("");
+  const [alertCount, setAlertCount] = useState(0);
+  const seenIds    = useRef(new Set());
+  const firstLoad  = useRef(true);
+  const alertTimer = useRef(null);
 
   const load = useCallback(() => {
     api.get("/api/staff/orders?status=pending,preparing,ready&limit=30")
-      .then((d) => setOrders(d.orders ?? []))
+      .then((d) => {
+        const incoming = d.orders ?? [];
+        setOrders(incoming);
+
+        if (firstLoad.current) {
+          firstLoad.current = false;
+          incoming.forEach((o) => seenIds.current.add(o._id));
+          return;
+        }
+
+        const newPending = incoming.filter(
+          (o) => o.status === "pending" && !seenIds.current.has(o._id)
+        );
+        incoming.forEach((o) => seenIds.current.add(o._id));
+
+        if (newPending.length > 0) {
+          playNewOrderBeep();
+          navigator.vibrate?.([300, 100, 300]);
+          setAlertCount(newPending.length);
+          clearTimeout(alertTimer.current);
+          alertTimer.current = setTimeout(() => setAlertCount(0), 6000);
+        }
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [staffToken]);
@@ -120,6 +167,27 @@ export default function KDSPage({ styles }) {
 
   return (
     <div>
+      {/* New order alert toast */}
+      {alertCount > 0 && (
+        <div style={{
+          position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)",
+          zIndex: 9999, background: "#10b981", color: "#fff",
+          padding: "12px 24px", borderRadius: 999,
+          fontWeight: 800, fontSize: 15, boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+          display: "flex", alignItems: "center", gap: 8,
+          animation: "alertIn 0.3s cubic-bezier(0.34,1.56,0.64,1)",
+        }}>
+          <span style={{ fontSize: 20 }}>🛎</span>
+          {alertCount === 1 ? "¡Pedido nuevo!" : `¡${alertCount} pedidos nuevos!`}
+          <style>{`
+            @keyframes alertIn {
+              from { opacity: 0; transform: translateX(-50%) scale(0.85); }
+              to   { opacity: 1; transform: translateX(-50%) scale(1); }
+            }
+          `}</style>
+        </div>
+      )}
+
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Pantalla de Cocina</h1>

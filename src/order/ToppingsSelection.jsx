@@ -3,6 +3,7 @@ import { useOrder } from "./OrderContext";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./ToppingsSelection.module.css";
+import { useAvailability } from "../context/AvailabilityContext";
 
 import ajonjoli from "../assets/toppings/ajonjoli.webp";
 import algaNori from "../assets/toppings/algaNori.webp";
@@ -18,6 +19,7 @@ const MAX_TOPPINGS = 5;
 const ToppingsSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
+  const { unavailableItems } = useAvailability();
 
   const toppings = [
     { id: "sesame_seeds",      image: ajonjoli,      desc: "Ajonjolí tostado, crujiente" },
@@ -77,10 +79,11 @@ const ToppingsSelection = ({ onNext, onBack }) => {
           <button
             key={topping.id}
             type="button"
+            style={{ position: "relative" }}
             className={`${styles.card} ${
               selectedToppings.includes(topping.id) ? styles.selected : ""
             }`}
-            onClick={() => toggleTopping(topping.id)}
+            onClick={() => !unavailableItems.includes(topping.id) && toggleTopping(topping.id)}
           >
             <div className={styles.imageWrap}>
               <img
@@ -94,6 +97,15 @@ const ToppingsSelection = ({ onNext, onBack }) => {
 
             <p className={styles.name}>{name}</p>
             {topping.desc && <p className={styles.itemDesc}>{topping.desc}</p>}
+            {unavailableItems.includes(topping.id) && (
+              <div style={{
+                position: "absolute", inset: 0, display: "flex",
+                alignItems: "center", justifyContent: "center",
+                background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
+              }}>
+                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+              </div>
+            )}
           </button>
         );
         })}

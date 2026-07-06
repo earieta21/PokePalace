@@ -3,6 +3,7 @@ import { useOrder } from "./OrderContext";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./BaseSelection.module.css";
+import { useAvailability } from "../context/AvailabilityContext";
 
 import whiteRice from "../assets/base/whiteRice.webp";
 import brownRice from "../assets/base/brownRice.webp";
@@ -12,6 +13,7 @@ import mixedGreens from "../assets/base/mixedGreens.webp";
 const BaseSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
+  const { unavailableItems } = useAvailability();
 
   const bases = [
     { id: "white_rice", image: whiteRice },
@@ -61,7 +63,8 @@ const BaseSelection = ({ onNext, onBack }) => {
               className={`${styles.card} ${
                 selectedBase === base.id ? styles.selected : ""
               }`}
-              onClick={() => handleSelection(base.id)}
+              onClick={() => !unavailableItems.includes(base.id) && handleSelection(base.id)}
+              style={{ position: "relative" }}
             >
               <div className={styles.imageWrap}>
                 <img
@@ -75,6 +78,15 @@ const BaseSelection = ({ onNext, onBack }) => {
               <p className={styles.name}>{name}</p>
               {base.description && (
                 <p className={styles.description}>{base.description}</p>
+              )}
+              {unavailableItems.includes(base.id) && (
+                <div style={{
+                  position: "absolute", inset: 0, display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                  background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
+                }}>
+                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+                </div>
               )}
             </button>
           );

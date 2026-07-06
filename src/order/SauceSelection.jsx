@@ -3,6 +3,7 @@ import { useOrder } from "./OrderContext";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./SauceSelection.module.css";
+import { useAvailability } from "../context/AvailabilityContext";
 
 import avocadoLime from "../assets/dressings/avocadoLime.webp";
 import garlicSiracha from "../assets/dressings/garlicSiracha.webp";
@@ -20,6 +21,7 @@ const MAX_SAUCES = 2;
 const SauceSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
+  const { unavailableItems } = useAvailability();
 
   const sauces = [
     { id: "spicy_mayo",         image: spicyMayo,    desc: "Mayonesa con sriracha y limón" },
@@ -79,10 +81,11 @@ const SauceSelection = ({ onNext, onBack }) => {
           <button
             key={sauce.id}
             type="button"
+            style={{ position: "relative" }}
             className={`${styles.card} ${
               selectedSauces.includes(sauce.id) ? styles.selected : ""
             }`}
-            onClick={() => toggleSauce(sauce.id)}
+            onClick={() => !unavailableItems.includes(sauce.id) && toggleSauce(sauce.id)}
           >
             <div className={styles.imageWrap}>
               <img
@@ -96,6 +99,15 @@ const SauceSelection = ({ onNext, onBack }) => {
 
             <p className={styles.name}>{name}</p>
             {sauce.desc && <p className={styles.itemDesc}>{sauce.desc}</p>}
+            {unavailableItems.includes(sauce.id) && (
+              <div style={{
+                position: "absolute", inset: 0, display: "flex",
+                alignItems: "center", justifyContent: "center",
+                background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
+              }}>
+                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+              </div>
+            )}
           </button>
         );
         })}
