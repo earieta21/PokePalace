@@ -39,19 +39,25 @@ const getProteinsText = (order, language) => {
   return order.protein;
 };
 
-// Request browser notification permission and return whether it was granted.
+const NotifAPI = () => window.Notification;
+const notifSupported = () => "Notification" in window;
+const notifPermission = () => notifSupported() ? NotifAPI().permission : null;
+
 async function requestNotifPermission() {
-  if (!("Notification" in window)) return false;
-  if (Notification.permission === "granted") return true;
-  if (Notification.permission === "denied") return false;
-  const result = await Notification.requestPermission();
-  return result === "granted";
+  if (!notifSupported()) return false;
+  if (notifPermission() === "granted") return true;
+  if (notifPermission() === "denied") return false;
+  try {
+    const result = await NotifAPI().requestPermission();
+    return result === "granted";
+  } catch {
+    return false;
+  }
 }
 
 async function fireNotification(title, body, orderId) {
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  if (!notifSupported() || notifPermission() !== "granted") return;
   try {
-    // Prefer service worker notification so it works when tab is in background
     const reg = await navigator.serviceWorker?.getRegistration?.();
     if (reg) {
       reg.showNotification(title, {
@@ -62,7 +68,7 @@ async function fireNotification(title, body, orderId) {
         data: { url: `/seguimiento/${orderId}` },
       });
     } else {
-      new Notification(title, { body });
+      new (NotifAPI())(title, { body });
     }
   } catch {
     // Notifications not supported — silently ignore
@@ -91,7 +97,7 @@ export default function OrderTracking() {
   const [order, setOrder]               = useState(null);
   const [error, setError]               = useState("");
   const [toast, setToast]               = useState(null);
-  const [notifGranted, setNotifGranted] = useState(Notification?.permission === "granted");
+  const [notifGranted, setNotifGranted] = useState(() => notifPermission() === "granted");
   const [cancelling, setCancelling]     = useState(false);
   const [cancelError, setCancelError]   = useState("");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -152,7 +158,7 @@ export default function OrderTracking() {
   useEffect(() => {
     if (!order || notifAskedRef.current) return;
     if (order.status === "completed" || order.status === "cancelled") return;
-    if (!("Notification" in window) || Notification.permission !== "default") return;
+    if (!notifSupported() || notifPermission() !== "default") return;
     notifAskedRef.current = true;
     // Small delay so page has settled
     setTimeout(async () => {
@@ -224,7 +230,7 @@ export default function OrderTracking() {
       </div>
 
       {/* Notification permission prompt */}
-      {"Notification" in window && !notifGranted && !isCancelled && !isDone && Notification.permission === "default" && (
+      {notifSupported() && !notifGranted && !isCancelled && !isDone && notifPermission() === "default" && (
         <div style={{
           maxWidth: 480, margin: "0 auto 12px", padding: "11px 14px",
           background: "#f0f7f3", border: "1.5px solid #4A7A5A", borderRadius: 12,
