@@ -77,9 +77,9 @@ export default function MiCuenta() {
     navigate("/order");
   };
 
-  const handleReorder = (order) => {
-    reorder(order);
-    navigate("/order");
+  const handleReorder = (pastOrder) => {
+    reorder(pastOrder);
+    navigate("/summary");
   };
 
   const handleDeleteFavorite = async (favId) => {

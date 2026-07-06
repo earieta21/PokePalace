@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
 
 const ACTIVE_ORDER_KEY = "pokeActiveOrderId";
@@ -21,6 +22,7 @@ export function clearActiveOrder() {
 
 export default function ActiveOrderBanner() {
   const location = useLocation();
+  const { token } = useContext(AuthContext);
   const [orderId, setOrderId]   = useState(() => localStorage.getItem(ACTIVE_ORDER_KEY));
   const [order, setOrder]       = useState(null);
   const [loaded, setLoaded]     = useState(false);
@@ -44,7 +46,8 @@ export default function ActiveOrderBanner() {
     const id = localStorage.getItem(ACTIVE_ORDER_KEY);
     if (!id) { setOrder(null); setLoaded(true); return; }
     try {
-      const res = await fetch(`${API_URL}/api/orders/${id}`);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${API_URL}/api/orders/${id}`, { headers });
       if (!res.ok) { clearActiveOrder(); setOrderId(null); setOrder(null); setLoaded(true); return; }
       const data = await res.json();
       const o = data.order;
@@ -67,7 +70,7 @@ export default function ActiveOrderBanner() {
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     fetchOrder();
