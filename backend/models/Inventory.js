@@ -7,8 +7,9 @@ const inventorySchema = new mongoose.Schema(
     unit:     { type: String, required: true },
     qty:      { type: Number, required: true, min: 0 },
     minQty:   { type: Number, default: 0 },
-    cost:     { type: Number, default: 0 },     // cost per unit in dollars
+    cost:     { type: Number, default: 0 },
     supplier: { type: String, default: "" },
+    menuKeys: { type: [String], default: [] }, // e.g. ["salmon","citrus_marinade"] — matched on order pay
   },
   { timestamps: true }
 );

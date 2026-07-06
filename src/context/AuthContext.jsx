@@ -66,6 +66,22 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
+  const refreshUser = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/users/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.user) {
+        setUser(data.user);
+        localStorage.setItem("user", JSON.stringify(data.user));
+      }
+    } catch {
+      // silently ignore
+    }
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
@@ -82,6 +98,7 @@ export const AuthProvider = ({ children }) => {
         login,
         register,
         logout,
+        refreshUser,
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useOrder } from "../order/OrderContext";
@@ -15,7 +15,7 @@ const getProteinsText = (order, language) => {
 };
 
 export default function MiCuenta() {
-  const { user, token, isLoggedIn, logout } = useContext(AuthContext);
+  const { user, token, isLoggedIn, logout, refreshUser } = useContext(AuthContext);
   const { loadFavorite } = useOrder();
   const { language, t } = useLanguage();
   const navigate = useNavigate();
@@ -28,6 +28,9 @@ export default function MiCuenta() {
   const [favLoading, setFavLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [activeTab, setActiveTab] = useState("orders");
+
+  // Refresh points on mount so balance is always current
+  useEffect(() => { if (isLoggedIn) refreshUser?.(); }, [isLoggedIn]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -113,10 +116,59 @@ export default function MiCuenta() {
               <div className={styles.pill}>
                 <strong>{t("common.email")}:</strong> {user?.email}
               </div>
-              <div className={styles.pill}>
-                <strong>{t("account.points")}:</strong> {user?.points ?? 0}
-              </div>
             </div>
+
+            {/* Points card */}
+            {(() => {
+              const pts   = user?.points ?? 0;
+              const STEP  = 100;
+              const VALUE = 25;
+              const filled = pts % STEP;
+              const pct    = Math.round((filled / STEP) * 100);
+              const rewards = Math.floor(pts / STEP);
+              return (
+                <div style={{
+                  marginTop: 14, padding: "14px 16px",
+                  background: "linear-gradient(135deg,#4A7A5A 0%,#6aab82 100%)",
+                  borderRadius: 14, color: "#fff",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                    <div>
+                      <p style={{ fontSize: 11, opacity: 0.8, margin: 0, fontWeight: 600, letterSpacing: "0.05em" }}>
+                        TUS PUNTOS
+                      </p>
+                      <p style={{ fontSize: 28, fontWeight: 800, margin: "2px 0 0", lineHeight: 1 }}>
+                        {pts.toLocaleString("es-MX")}
+                      </p>
+                    </div>
+                    {rewards > 0 && (
+                      <div style={{
+                        background: "rgba(255,255,255,0.2)", borderRadius: 8,
+                        padding: "4px 10px", fontSize: 12, fontWeight: 700,
+                      }}>
+                        🎁 {rewards} recompensa{rewards > 1 ? "s" : ""} disponible{rewards > 1 ? "s" : ""}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ height: 6, background: "rgba(255,255,255,0.25)", borderRadius: 3, overflow: "hidden", marginBottom: 6 }}>
+                    <div style={{
+                      width: `${pct}%`, height: "100%",
+                      background: "#fff", borderRadius: 3, transition: "width 600ms",
+                    }} />
+                  </div>
+                  <p style={{ fontSize: 11, opacity: 0.85, margin: 0 }}>
+                    {filled < STEP
+                      ? `${STEP - filled} puntos más para $${VALUE} MXN de descuento`
+                      : `¡Tienes ${rewards} recompensa${rewards > 1 ? "s" : ""} — úsala${rewards > 1 ? "s" : ""} en tu próximo pedido!`
+                    }
+                  </p>
+                  <p style={{ fontSize: 10, opacity: 0.7, margin: "6px 0 0" }}>
+                    Gana 1 punto por cada $10 MXN · 100 puntos = $25 MXN
+                  </p>
+                </div>
+              );
+            })()}
           </div>
 
           <div className={styles.actions}>

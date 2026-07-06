@@ -1,5 +1,16 @@
 import User from "../models/User.js";
 
+/* GET /api/users/me — returns fresh user profile (including updated points) */
+export const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("-password");
+    if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
+    res.json({ user });
+  } catch {
+    res.status(500).json({ msg: "Error obteniendo perfil" });
+  }
+};
+
 export const getFavorites = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("favoriteBowls");

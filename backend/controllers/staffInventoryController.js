@@ -34,6 +34,16 @@ export const updateItem = async (req, res) => {
   }
 };
 
+/* GET /api/staff/inventory/low-stock */
+export const getLowStock = async (req, res) => {
+  try {
+    const items = await Inventory.find({ $expr: { $lte: ["$qty", "$minQty"] } }).sort({ item: 1 });
+    res.json({ items, count: items.length });
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching low stock", err: err.message });
+  }
+};
+
 /* DELETE /api/staff/inventory/:id */
 export const deleteItem = async (req, res) => {
   try {

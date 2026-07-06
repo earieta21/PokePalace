@@ -1,4 +1,46 @@
 import Order from "../models/Order.js";
+import Inventory from "../models/Inventory.js";
+import User from "../models/User.js";
+
+/* ── inventory auto-deduction ── */
+async function deductInventory(order) {
+  try {
+    const keys = new Set();
+    if (order.base) keys.add(order.base);
+    (order.proteins    || []).forEach((k) => keys.add(k));
+    (order.marinades   || []).forEach((k) => keys.add(k));
+    (order.complements || []).forEach((k) => keys.add(k));
+    (order.sauces      || []).forEach((k) => keys.add(k));
+    (order.toppings    || []).forEach((k) => keys.add(k));
+    (order.items       || []).forEach((it) => {
+      if (it.name) keys.add(it.name.toLowerCase().replace(/\s+/g, "_"));
+    });
+
+    if (keys.size === 0) return;
+    const invItems = await Inventory.find({ menuKeys: { $in: [...keys] } });
+    if (invItems.length === 0) return;
+
+    await Promise.all(
+      invItems.map((it) => Inventory.findByIdAndUpdate(it._id, { $inc: { qty: -1 } }))
+    );
+    await Order.findByIdAndUpdate(order._id, { ingredientsDeducted: true });
+  } catch (err) {
+    console.error("deductInventory error:", err.message);
+  }
+}
+
+/* ── loyalty point award: 1 point per $10 MXN, online orders with user only ── */
+async function awardLoyaltyPoints(order) {
+  try {
+    if (!order.user || !order.total || order.total <= 0) return;
+    const earned = Math.floor(order.total / 10);
+    if (earned <= 0) return;
+    await User.findByIdAndUpdate(order.user, { $inc: { points: earned } });
+    await Order.findByIdAndUpdate(order._id, { loyaltyPointsEarned: earned });
+  } catch (err) {
+    console.error("awardLoyaltyPoints error:", err.message);
+  }
+}
 
 /* ── helpers ── */
 const todayStart = () => {
@@ -37,6 +79,11 @@ export const markAsPaid = async (req, res) => {
       { new: true }
     ).populate("user", "name email");
     if (!order) return res.status(404).json({ message: "Orden no encontrada" });
+
+    // Fire-and-forget: deduct inventory + award loyalty points
+    if (!order.ingredientsDeducted) deductInventory(order);
+    if (order.source === "online") awardLoyaltyPoints(order);
+
     res.json({ order });
   } catch (err) {
     res.status(500).json({ message: "Error al marcar pago", err: err.message });
@@ -130,6 +177,9 @@ export const createPosOrder = async (req, res) => {
       }),
     });
 
+    // Deduct inventory for POS orders (already paid on creation)
+    deductInventory(order);
+
     res.status(201).json({ order });
   } catch (err) {
     res.status(500).json({ message: "Error creating POS order", err: err.message });
@@ -190,7 +240,16 @@ export const getAnalytics = async (req, res) => {
       count: hourMap[h] ?? 0,
     })).filter((h) => h.hour >= 10 && h.hour <= 21); // restaurant hours
 
-    res.json({ days, topProteins: proteinAgg, peakHours });
+    // Top POS items (flat items array)
+    const posItemAgg = await Order.aggregate([
+      { $match: { source: "pos", items: { $not: { $size: 0 } } } },
+      { $unwind: "$items" },
+      { $group: { _id: "$items.name", count: { $sum: 1 }, revenue: { $sum: "$items.price" } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+    ]);
+
+    res.json({ days, topProteins: proteinAgg, peakHours, topPosItems: posItemAgg });
   } catch (err) {
     res.status(500).json({ message: "Error fetching analytics", err: err.message });
   }

@@ -3,7 +3,7 @@ import {
   Clock, LogIn, LogOut, CheckSquare, Thermometer, Calendar, Megaphone,
   TrendingUp, ChevronLeft, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
-  ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3,
+  ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity,
 } from "lucide-react";
 import { StaffAuthContext } from "../context/StaffAuthContext";
 import { API_URL } from "../config";
@@ -13,6 +13,7 @@ import POSPage from "../pos/pages/POSPage";
 import KDSPage from "../pos/pages/KDSPage";
 import OrderHistoryPage from "../pos/pages/OrderHistoryPage";
 import FinancePage from "../pos/pages/FinancePage";
+import SalesDashboardPage from "../pos/pages/SalesDashboardPage";
 import posStyles from "../pos/EmployeePortal.module.css";
 
 /* ============================================================================
@@ -87,15 +88,16 @@ const TABS_BY_ROLE = {
   employee: ["inicio", "tareas", "temp", "horario", "avisos"],
   cashier:  ["pos", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
   kitchen:  ["cocina", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
-  manager:  ["pos", "cocina", "hist", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  admin:    ["pos", "cocina", "hist", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  owner:    ["pos", "cocina", "hist", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  manager:  ["pos", "cocina", "hist", "ventas", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  admin:    ["pos", "cocina", "hist", "ventas", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  owner:    ["pos", "cocina", "hist", "ventas", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
 };
 
 const TAB_META = {
   pos:     { label: "POS",      icon: ShoppingCart   },
   cocina:  { label: "Cocina",   icon: UtensilsCrossed },
   hist:    { label: "Historial", icon: ClipboardList  },
+  ventas:  { label: "Ventas",   icon: Activity        },
   fin:     { label: "Finanzas", icon: BarChart3       },
   panel:   { label: "Panel",    icon: TrendingUp      },
   inicio:  { label: "Inicio",   icon: Clock           },
@@ -346,6 +348,7 @@ export default function UnifiedStaffApp() {
           {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "cocina"  && <KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "hist"    && <OrderHistoryPage styles={posStyles} />}
+          {tab === "ventas"  && <SalesDashboardPage styles={posStyles} />}
           {tab === "fin"     && <FinancePage styles={posStyles} />}
         </main>
 

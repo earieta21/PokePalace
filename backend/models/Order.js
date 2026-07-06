@@ -54,6 +54,13 @@ const orderSchema = new mongoose.Schema(
     scheduledPickupTime: { type: Date, default: null },
     isScheduled:         { type: Boolean, default: false },
 
+    // Loyalty
+    loyaltyPointsEarned: { type: Number, default: 0 },
+    pointsRedeemed:      { type: Number, default: 0 },
+
+    // Inventory deduction
+    ingredientsDeducted: { type: Boolean, default: false },
+
     status: {
       type: String,
       enum: ["pending", "preparing", "ready", "completed", "cancelled"],

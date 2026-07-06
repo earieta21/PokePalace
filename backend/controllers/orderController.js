@@ -1,6 +1,11 @@
 import Order from "../models/Order.js";
 import PromoCode from "../models/PromoCode.js";
+import User from "../models/User.js";
 import { computePricing } from "../pricing.js";
+
+// 100 puntos = $25 MXN
+const POINTS_PER_REWARD = 100;
+const REWARD_VALUE_MXN  = 25;
 
 const hasRequiredBowlFields = ({ base, proteins }) => {
   return Boolean(base && Array.isArray(proteins) && proteins.length >= 2);
@@ -43,6 +48,7 @@ export const createOrder = async (req, res) => {
       paymentMethod,
       promoCode,
       scheduledPickupTime,
+      pointsToRedeem,
     } = req.body;
 
     const selectedProteins = Array.isArray(proteins)
@@ -94,11 +100,29 @@ export const createOrder = async (req, res) => {
     }
 
     const resolvedBowlSize = bowlSize || (selectedProteins.length === 3 ? "large" : "normal");
-    const { subtotal, discount, tax, total } = computePricing(resolvedBowlSize, resolvedPromo);
+    const { subtotal, discount: promoDiscount, tax, total: baseTotal } = computePricing(resolvedBowlSize, resolvedPromo);
 
     if (promoDoc) {
       await PromoCode.findByIdAndUpdate(promoDoc._id, { $inc: { usedCount: 1 } });
     }
+
+    // Points redemption (logged-in users only, multiples of 100)
+    let pointsDiscount = 0;
+    let redeemedPoints = 0;
+    if (pointsToRedeem && req.userId) {
+      const redeemAmt = Math.floor(Number(pointsToRedeem) / POINTS_PER_REWARD) * POINTS_PER_REWARD;
+      if (redeemAmt >= POINTS_PER_REWARD) {
+        const userDoc = await User.findById(req.userId);
+        if (userDoc && userDoc.points >= redeemAmt) {
+          pointsDiscount = (redeemAmt / POINTS_PER_REWARD) * REWARD_VALUE_MXN;
+          redeemedPoints = redeemAmt;
+          await User.findByIdAndUpdate(req.userId, { $inc: { points: -redeemAmt } });
+        }
+      }
+    }
+
+    const totalDiscount = promoDiscount + pointsDiscount;
+    const finalTotal = Math.max(0, baseTotal - pointsDiscount);
 
     const order = await Order.create({
       user: req.userId || null,
@@ -118,11 +142,12 @@ export const createOrder = async (req, res) => {
       complements: Array.isArray(complements) ? complements : [],
       sauces: Array.isArray(sauces) ? sauces : [],
       toppings: Array.isArray(toppings) ? toppings : [],
-      promoCode: promoDoc?.code || null,
+      promoCode:      promoDoc?.code || null,
       subtotal,
-      discountAmount: discount,
+      discountAmount: totalDiscount,
       tax,
-      total,
+      total:          finalTotal,
+      pointsRedeemed: redeemedPoints,
       scheduledPickupTime: resolvedScheduledTime,
       isScheduled,
     });
