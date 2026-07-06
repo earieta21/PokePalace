@@ -1,170 +1,276 @@
-const MONTHLY = [
-  { month: "Nov",  revenue: 28400, costs: 11800, profit: 16600 },
-  { month: "Dic",  revenue: 34200, costs: 13900, profit: 20300 },
-  { month: "Ene",  revenue: 26800, costs: 11200, profit: 15600 },
-  { month: "Feb",  revenue: 29500, costs: 12100, profit: 17400 },
-  { month: "Mar",  revenue: 31200, costs: 12800, profit: 18400 },
-  { month: "Abr",  revenue: 33600, costs: 13400, profit: 20200 },
+import { useState, useEffect, useContext, useCallback } from "react";
+import { StaffAuthContext } from "../../context/StaffAuthContext";
+import { createStaffApi } from "../api";
+
+const CATEGORIES = [
+  "Ingredientes", "Renta", "Servicios", "Nómina",
+  "Empaque", "Marketing", "Mantenimiento", "Otros",
 ];
 
-const EXPENSE_BREAKDOWN = [
-  { category: "Ingredientes",     amount: 7820, pct: 58 },
-  { category: "Personal (nómina)",amount: 3200, pct: 24 },
-  { category: "Servicios",        amount: 900,  pct: 7  },
-  { category: "Empaque",          amount: 540,  pct: 4  },
-  { category: "Otros",            amount: 940,  pct: 7  },
+const PERIODS = [
+  { id: "semana",   label: "Esta semana" },
+  { id: "mes",      label: "Este mes" },
+  { id: "anterior", label: "Mes anterior" },
 ];
 
-const latest = MONTHLY[MONTHLY.length - 1];
-const maxRev = Math.max(...MONTHLY.map((m) => m.revenue));
+function getRange(period) {
+  const now = new Date();
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  if (period === "semana") {
+    const start = new Date(now);
+    const day = start.getDay();
+    start.setDate(start.getDate() - (day === 0 ? 6 : day - 1));
+    start.setHours(0, 0, 0, 0);
+    return { from: fmt(start), to: fmt(now) };
+  }
+  if (period === "anterior") {
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end   = new Date(now.getFullYear(), now.getMonth(), 0);
+    return { from: fmt(start), to: fmt(end) };
+  }
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { from: fmt(start), to: fmt(now) };
+}
+
+const fmtMXN = (n) => `$${(n ?? 0).toLocaleString("es-MX")} MXN`;
+const today  = () => new Date().toISOString().slice(0, 10);
 
 export default function FinancePage({ styles }) {
+  const { staffToken } = useContext(StaffAuthContext);
+  const api = createStaffApi(staffToken);
+
+  const [period, setPeriod]   = useState("mes");
+  const [summary, setSummary] = useState(null);
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState("");
+
+  const [form, setForm] = useState({
+    category: "Ingredientes", description: "", amount: "", date: today(),
+  });
+  const [saving, setSaving]       = useState(false);
+  const [formError, setFormError] = useState("");
+  const [confirmDel, setConfirmDel] = useState(null);
+
+  const { from, to } = getRange(period);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      api.get(`/api/staff/expenses/summary?from=${from}&to=${to}`),
+      api.get(`/api/staff/expenses?from=${from}&to=${to}`),
+    ])
+      .then(([s, e]) => { setSummary(s); setExpenses(e.expenses ?? []); })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [staffToken, from, to]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleAdd = async () => {
+    if (!form.description.trim()) return setFormError("Escribe una descripción.");
+    const amt = parseFloat(form.amount);
+    if (!form.amount || isNaN(amt) || amt <= 0) return setFormError("Ingresa un monto válido.");
+    setFormError(""); setSaving(true);
+    try {
+      const { expense } = await api.post("/api/staff/expenses", { ...form, amount: amt });
+      setExpenses((prev) => [expense, ...prev]);
+      setSummary((prev) => prev
+        ? { ...prev, expenses: prev.expenses + amt, profit: prev.profit - amt }
+        : prev
+      );
+      setForm((f) => ({ ...f, description: "", amount: "" }));
+    } catch (e) { setFormError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    const exp = expenses.find((e) => e._id === id);
+    setConfirmDel(null);
+    try {
+      await api.delete(`/api/staff/expenses/${id}`);
+      setExpenses((prev) => prev.filter((e) => e._id !== id));
+      if (exp) setSummary((prev) => prev
+        ? { ...prev, expenses: prev.expenses - exp.amount, profit: prev.profit + exp.amount }
+        : prev
+      );
+    } catch (e) { setError(e.message); }
+  };
+
+  const margin = summary?.revenue > 0
+    ? ((summary.profit / summary.revenue) * 100).toFixed(1)
+    : null;
+
+  const maxCatAmt = summary?.byCategory
+    ? Math.max(...Object.values(summary.byCategory), 1)
+    : 1;
+
   return (
     <div>
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Finanzas</h1>
-          <p className={styles.pageSubtitle}>Resumen de 6 meses</p>
+          <p className={styles.pageSubtitle}>{from} → {to}</p>
         </div>
-        <button className={styles.btnGhost}>Exportar Reporte</button>
+        <button className={styles.btnGhost} onClick={load}>Actualizar</button>
       </div>
 
-      {/* KPIs */}
-      <div className={styles.statsRow} style={{ marginBottom: 22 }}>
-        <div className={styles.statCard}>
-          <p className={styles.statLabel}>Ingresos (Abr)</p>
-          <p className={styles.statValue}>${latest.revenue.toLocaleString()}</p>
-          <p className={styles.statSub}>+7.7% vs Mar</p>
-        </div>
-        <div className={styles.statCard}>
-          <p className={styles.statLabel}>Costos (Abr)</p>
-          <p className={styles.statValue}>${latest.costs.toLocaleString()}</p>
-          <p className={styles.statSub}>39.9% de ingresos</p>
-        </div>
-        <div className={styles.statCard}>
-          <p className={`${styles.statValue} ${styles.statAccent}`} style={{ marginBottom: 4 }}>
-            ${latest.profit.toLocaleString()}
-          </p>
-          <p className={styles.statLabel}>Ganancia Neta (Abr)</p>
-          <p className={styles.statSub}>60.1% margen</p>
-        </div>
-      </div>
-
-      <div className={styles.grid2} style={{ alignItems: "start", marginBottom: 20 }}>
-        {/* Monthly chart */}
-        <div className={styles.card}>
-          <p className={styles.cardTitle}>Ingresos vs Ganancia Mensual</p>
-          <div
+      {/* Period tabs */}
+      <div style={{ display: "flex", gap: 3, background: "rgba(0,0,0,0.04)", borderRadius: 8, padding: 3, marginBottom: 22, width: "fit-content" }}>
+        {PERIODS.map((p) => (
+          <button key={p.id} type="button" onClick={() => setPeriod(p.id)}
             style={{
-              display: "flex",
-              alignItems: "flex-end",
-              gap: 10,
-              height: 120,
-              marginTop: 16,
+              padding: "6px 16px", borderRadius: 6, border: "none",
+              background: period === p.id ? "var(--p-surface)" : "transparent",
+              color: period === p.id ? "var(--p-ink)" : "var(--p-muted)",
+              fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+              boxShadow: period === p.id ? "var(--p-shadow)" : "none",
+              fontFamily: "Syne, sans-serif", transition: "background 130ms",
             }}
-          >
-            {MONTHLY.map((m) => (
-              <div
-                key={m.month}
-                style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
-              >
-                <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                  <div
-                    style={{
-                      width: "100%",
-                      background: "rgba(45,106,79,0.18)",
-                      borderRadius: "3px 3px 0 0",
-                      height: `${(m.revenue / maxRev) * 90}px`,
-                      position: "relative",
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        background: "var(--p-g2)",
-                        borderRadius: "3px 3px 0 0",
-                        height: `${(m.profit / m.revenue) * 100}%`,
-                      }}
-                    />
+          >{p.label}</button>
+        ))}
+      </div>
+
+      {error && <p style={{ color: "red", fontSize: 13, marginBottom: 12 }}>{error}</p>}
+
+      {/* KPI cards */}
+      <div className={styles.statsRow} style={{ marginBottom: 24 }}>
+        {[
+          { label: "Ingresos",     value: loading ? "—" : fmtMXN(summary?.revenue),  sub: `${summary?.orderCount ?? 0} órdenes pagadas`, accent: false },
+          { label: "Gastos",       value: loading ? "—" : fmtMXN(summary?.expenses), sub: "Registrados",          accent: false },
+          { label: "Ganancia Neta",value: loading ? "—" : fmtMXN(summary?.profit),   sub: summary?.profit < 0 ? "⚠ Pérdida" : "Antes de impuestos", accent: true },
+          { label: "Margen",       value: loading ? "—" : (margin != null ? `${margin}%` : "—"), sub: "Sobre ingresos", accent: false },
+        ].map(({ label, value, sub, accent }) => (
+          <div key={label} className={styles.statCard}>
+            <p className={styles.statLabel}>{label}</p>
+            <p className={`${styles.statValue} ${accent ? styles.statAccent : ""}`} style={{ fontSize: 16, lineHeight: 1.3, wordBreak: "break-word" }}>
+              {value}
+            </p>
+            <p className={styles.statSub}>{sub}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className={styles.grid2} style={{ alignItems: "start", gap: 20, marginBottom: 24 }}>
+
+        {/* ── Add expense form ── */}
+        <div className={styles.card}>
+          <p className={styles.cardTitle}>Registrar Gasto</p>
+
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Categoría</label>
+            <select className={styles.select} value={form.category}
+              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Descripción</label>
+            <input className={styles.input}
+              placeholder="Ej: Salmón 2 kg, CFE agosto, Gas…"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            />
+          </div>
+
+          <div className={styles.formRow}>
+            <div className={styles.formGroup} style={{ marginBottom: 0 }}>
+              <label className={styles.label}>Monto (MXN)</label>
+              <input className={styles.input} type="number" min="0" step="0.01" placeholder="0.00"
+                value={form.amount}
+                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              />
+            </div>
+            <div className={styles.formGroup} style={{ marginBottom: 0 }}>
+              <label className={styles.label}>Fecha</label>
+              <input className={styles.input} type="date"
+                value={form.date}
+                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {formError && <p style={{ color: "red", fontSize: 12, margin: "8px 0 0" }}>{formError}</p>}
+
+          <button className={styles.btnPrimary} style={{ width: "100%", marginTop: 16 }}
+            onClick={handleAdd} disabled={saving} type="button">
+            {saving ? "Guardando…" : "+ Agregar gasto"}
+          </button>
+        </div>
+
+        {/* ── Category breakdown ── */}
+        <div className={styles.card}>
+          <p className={styles.cardTitle}>Gastos por categoría</p>
+          {loading ? (
+            <p style={{ color: "var(--p-muted)", fontSize: 13 }}>Cargando…</p>
+          ) : !summary?.byCategory || Object.keys(summary.byCategory).length === 0 ? (
+            <p style={{ color: "var(--p-muted)", fontSize: 13, paddingTop: 8 }}>Sin gastos en este período.</p>
+          ) : (
+            <div className={styles.barChart} style={{ marginTop: 10 }}>
+              {Object.entries(summary.byCategory)
+                .sort(([, a], [, b]) => b - a)
+                .map(([cat, amt]) => (
+                  <div key={cat} className={styles.barRow}>
+                    <span className={styles.barLabel}>{cat}</span>
+                    <div className={styles.barTrack}>
+                      <div className={styles.barFill} style={{ width: `${(amt / maxCatAmt) * 100}%` }} />
+                    </div>
+                    <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10.5, color: "var(--p-muted)", width: 110, textAlign: "right", whiteSpace: "nowrap", flexShrink: 0 }}>
+                      ${amt.toLocaleString("es-MX")}
+                    </span>
                   </div>
-                </div>
-                <span style={{ fontSize: 11, color: "var(--p-muted)", fontWeight: 600 }}>{m.month}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 14, marginTop: 12, fontSize: 11 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 10, height: 10, background: "rgba(45,106,79,0.18)", borderRadius: 2, display: "inline-block" }} />
-              Ingresos
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 10, height: 10, background: "var(--p-g2)", borderRadius: 2, display: "inline-block" }} />
-              Ganancia
-            </span>
-          </div>
-        </div>
-
-        {/* Expense breakdown */}
-        <div className={styles.card}>
-          <p className={styles.cardTitle}>Desglose de Costos — Abr</p>
-          <div className={styles.barChart} style={{ marginTop: 14 }}>
-            {EXPENSE_BREAKDOWN.map((item) => (
-              <div key={item.category} className={styles.barRow}>
-                <span className={styles.barLabel}>{item.category}</span>
-                <div className={styles.barTrack}>
-                  <div className={styles.barFill} style={{ width: `${item.pct}%` }} />
-                </div>
-                <span className={styles.barValue}>{item.pct}%</span>
-              </div>
-            ))}
-          </div>
-          <div
-            style={{
-              marginTop: 16,
-              paddingTop: 14,
-              borderTop: "1px solid var(--p-border)",
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 13,
-            }}
-          >
-            <span style={{ fontWeight: 600, color: "var(--p-ink)" }}>Total Costos</span>
-            <span
-              style={{
-                fontFamily: "DM Mono, monospace",
-                fontWeight: 600,
-                color: "var(--p-ink)",
-              }}
-            >
-              ${latest.costs.toLocaleString()}
-            </span>
-          </div>
+                ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Monthly table */}
+      {/* ── Expense list ── */}
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
             <tr>
-              <th>Mes</th>
-              <th>Ingresos</th>
-              <th>Costos</th>
-              <th>Ganancia Neta</th>
-              <th>Margen</th>
+              <th>Fecha</th>
+              <th>Categoría</th>
+              <th>Descripción</th>
+              <th>Monto</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            {[...MONTHLY].reverse().map((m) => (
-              <tr key={m.month}>
-                <td style={{ fontWeight: 500 }}>{m.month}</td>
-                <td className={styles.tdMono}>${m.revenue.toLocaleString()}</td>
-                <td className={styles.tdMono}>${m.costs.toLocaleString()}</td>
-                <td className={`${styles.tdMono} ${styles.statAccent}`}>${m.profit.toLocaleString()}</td>
-                <td className={styles.tdMuted}>{((m.profit / m.revenue) * 100).toFixed(1)}%</td>
+            {loading ? (
+              <tr><td colSpan={5} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>Cargando…</td></tr>
+            ) : expenses.length === 0 ? (
+              <tr><td colSpan={5} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>Sin gastos registrados en este período</td></tr>
+            ) : expenses.map((e) => (
+              <tr key={e._id}>
+                <td className={styles.tdMuted}>{e.date}</td>
+                <td><span className={`${styles.badge} ${styles.badgeGray}`}>{e.category}</span></td>
+                <td style={{ fontWeight: 500 }}>{e.description}</td>
+                <td className={styles.tdMono}>${e.amount.toLocaleString("es-MX")} MXN</td>
+                <td>
+                  {confirmDel === e._id ? (
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <button onClick={() => handleDelete(e._id)}
+                        style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 5, background: "#c0392b", color: "#fff", border: "none", cursor: "pointer", fontFamily: "Syne, sans-serif" }}>
+                        Sí
+                      </button>
+                      <button onClick={() => setConfirmDel(null)}
+                        style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 5, background: "transparent", color: "var(--p-muted)", border: "1px solid var(--p-border)", cursor: "pointer", fontFamily: "Syne, sans-serif" }}>
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmDel(e._id)}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--p-muted)", fontSize: 18, padding: "0 4px", lineHeight: 1, transition: "color 120ms" }}
+                      onMouseEnter={(ev) => (ev.currentTarget.style.color = "#c0392b")}
+                      onMouseLeave={(ev) => (ev.currentTarget.style.color = "var(--p-muted)")}
+                      aria-label="Eliminar gasto">×</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

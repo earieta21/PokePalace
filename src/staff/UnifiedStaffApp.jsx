@@ -3,7 +3,7 @@ import {
   Clock, LogIn, LogOut, CheckSquare, Thermometer, Calendar, Megaphone,
   TrendingUp, ChevronLeft, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
-  ShoppingCart, UtensilsCrossed, ClipboardList,
+  ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3,
 } from "lucide-react";
 import { StaffAuthContext } from "../context/StaffAuthContext";
 import { API_URL } from "../config";
@@ -12,6 +12,7 @@ import { API_URL } from "../config";
 import POSPage from "../pos/pages/POSPage";
 import KDSPage from "../pos/pages/KDSPage";
 import OrderHistoryPage from "../pos/pages/OrderHistoryPage";
+import FinancePage from "../pos/pages/FinancePage";
 import posStyles from "../pos/EmployeePortal.module.css";
 
 /* ============================================================================
@@ -86,15 +87,16 @@ const TABS_BY_ROLE = {
   employee: ["inicio", "tareas", "temp", "horario", "avisos"],
   cashier:  ["pos", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
   kitchen:  ["cocina", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
-  manager:  ["pos", "cocina", "hist", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  admin:    ["pos", "cocina", "hist", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  owner:    ["pos", "cocina", "hist", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  manager:  ["pos", "cocina", "hist", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  admin:    ["pos", "cocina", "hist", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  owner:    ["pos", "cocina", "hist", "fin", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
 };
 
 const TAB_META = {
   pos:     { label: "POS",      icon: ShoppingCart   },
   cocina:  { label: "Cocina",   icon: UtensilsCrossed },
   hist:    { label: "Historial", icon: ClipboardList  },
+  fin:     { label: "Finanzas", icon: BarChart3       },
   panel:   { label: "Panel",    icon: TrendingUp      },
   inicio:  { label: "Inicio",   icon: Clock           },
   tareas:  { label: "Tareas",   icon: CheckSquare     },
@@ -344,6 +346,7 @@ export default function UnifiedStaffApp() {
           {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "cocina"  && <KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "hist"    && <OrderHistoryPage styles={posStyles} />}
+          {tab === "fin"     && <FinancePage styles={posStyles} />}
         </main>
 
         {/* Bottom nav */}
