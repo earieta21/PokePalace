@@ -2,7 +2,7 @@ import Order from "../models/Order.js";
 import Inventory from "../models/Inventory.js";
 import User from "../models/User.js";
 import Expense from "../models/Expense.js";
-import { sendSMS } from "../utils/notify.js";
+import { sendSMS, sendWhatsApp } from "../utils/notify.js";
 
 /* ── inventory auto-deduction ── */
 async function deductInventory(order) {
@@ -112,13 +112,21 @@ export const updateOrderStatus = async (req, res) => {
 
     res.json({ order });
 
-    // SMS al cliente cuando su pedido pasa a "listo" (una sola vez, solo pedidos online)
+    // Aviso al cliente cuando su pedido pasa a "listo" (una sola vez, solo pedidos online).
+    // Intenta WhatsApp primero; si no está configurado o falla, cae a SMS.
     if (status === "ready" && prev.status !== "ready" && order.source === "online" && order.phone) {
       const num = String(order._id).slice(-5).toUpperCase();
-      sendSMS(
-        order.phone,
-        `Poke Palace: ¡Tu pedido #${num} está listo! 🥢 Pasa a recogerlo. Plaza La Estación, Local 24.`
-      ).catch((err) => console.error("ready SMS error:", err.message));
+      const template = process.env.WHATSAPP_TEMPLATE_READY || "pedido_listo";
+      sendWhatsApp(order.phone, template, [num])
+        .then((sent) => {
+          if (!sent) {
+            return sendSMS(
+              order.phone,
+              `Poke Palace: ¡Tu pedido #${num} está listo! 🥢 Pasa a recogerlo. Plaza La Estación, Local 24.`
+            );
+          }
+        })
+        .catch((err) => console.error("ready notification error:", err.message));
     }
   } catch (err) {
     res.status(500).json({ message: "Error updating order", err: err.message });

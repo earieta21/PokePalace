@@ -29,6 +29,57 @@ export async function sendEmail({ to, subject, html }) {
   }
 }
 
+/* Normaliza teléfono mexicano a formato E.164 (+52XXXXXXXXXX) */
+function normalizeMxPhone(phone) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `+52${digits}`;
+  if (digits.startsWith("52") && digits.length === 12) return `+${digits}`;
+  return phone.startsWith("+") ? phone : `+${digits}`;
+}
+
+/* ── WhatsApp via Meta Cloud API (gratis: 1,000 conversaciones/mes) ──
+   Env vars: WHATSAPP_TOKEN (token permanente), WHATSAPP_PHONE_ID (ID del número)
+   Los mensajes iniciados por el negocio requieren una plantilla aprobada por Meta.
+   `params` llena las variables {{1}}, {{2}}… del cuerpo de la plantilla. */
+export async function sendWhatsApp(phone, templateName, params = []) {
+  const token   = process.env.WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_ID;
+  if (!token || !phoneId || !phone) return false;
+
+  try {
+    const res = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: normalizeMxPhone(phone),
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: "es_MX" },
+          components: params.length
+            ? [{
+                type: "body",
+                parameters: params.map((text) => ({ type: "text", text: String(text) })),
+              }]
+            : [],
+        },
+      }),
+    });
+    if (!res.ok) {
+      console.error("sendWhatsApp failed:", res.status, await res.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("sendWhatsApp error:", err.message);
+    return false;
+  }
+}
+
 /* ── SMS via Twilio (https://www.twilio.com — de pago, ~$1 MXN por SMS a MX) ──
    Env vars: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM (número Twilio) */
 export async function sendSMS(phone, body) {
@@ -37,11 +88,7 @@ export async function sendSMS(phone, body) {
   const from  = process.env.TWILIO_FROM;
   if (!sid || !token || !from || !phone) return;
 
-  // Normaliza teléfono mexicano: 10 dígitos → +52
-  const digits = phone.replace(/\D/g, "");
-  const to = digits.length === 10 ? `+52${digits}`
-           : digits.startsWith("52") && digits.length === 12 ? `+${digits}`
-           : phone.startsWith("+") ? phone : `+${digits}`;
+  const to = normalizeMxPhone(phone);
 
   try {
     const res = await fetch(
