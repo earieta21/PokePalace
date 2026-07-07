@@ -2,6 +2,7 @@ import Order from "../models/Order.js";
 import PromoCode from "../models/PromoCode.js";
 import User from "../models/User.js";
 import { computePricing } from "../pricing.js";
+import { sendEmail, orderConfirmationEmail } from "../utils/notify.js";
 
 // 100 puntos = $25 MXN
 const POINTS_PER_REWARD = 100;
@@ -153,6 +154,18 @@ export const createOrder = async (req, res) => {
     });
 
     res.status(201).json({ order });
+
+    // Email de confirmación (solo usuarios logueados — los invitados no dan email).
+    // Fire-and-forget después de responder: no retrasa ni rompe la creación.
+    if (req.userId) {
+      User.findById(req.userId)
+        .then((u) => {
+          if (!u?.email) return;
+          const { subject, html } = orderConfirmationEmail(order);
+          return sendEmail({ to: u.email, subject, html });
+        })
+        .catch((err) => console.error("confirmation email error:", err.message));
+    }
   } catch {
     res.status(500).json({ msg: "Error creando la orden" });
   }
