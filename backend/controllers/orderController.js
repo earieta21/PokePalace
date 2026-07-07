@@ -11,7 +11,7 @@ const hasRequiredBowlFields = ({ base, proteins }) => {
   return Boolean(base && Array.isArray(proteins) && proteins.length >= 1);
 };
 
-const OPEN_HOUR = 10;
+const OPEN_HOUR = 11;
 const CLOSE_HOUR = 21;
 
 const validateScheduledTime = (scheduledPickupTime) => {
