@@ -60,6 +60,12 @@ export default function InventoryPage({ styles }) {
   // Hint expand
   const [showHint, setShowHint] = useState(false);
 
+  // Receive shipment (restock) mode — adds to existing qty instead of overwriting
+  const [receiving, setReceiving]         = useState(false);
+  const [receiveSearch, setReceiveSearch] = useState("");
+  const [receiveQty, setReceiveQty]       = useState({}); // { itemId: "3.5" }
+  const [receiveSaving, setReceiveSaving] = useState(false);
+
   const load = () => {
     setLoading(true);
     api.get("/api/staff/inventory")
@@ -135,6 +141,40 @@ export default function InventoryPage({ styles }) {
     } catch (err) { setError(err.message); }
   };
 
+  /* ── Receive shipment ── */
+  const pendingReceiveCount = Object.values(receiveQty).filter((v) => parseFloat(v) > 0).length;
+
+  const bumpReceive = (id, delta) =>
+    setReceiveQty((p) => ({
+      ...p,
+      [id]: String(Math.max(0, (parseFloat(p[id]) || 0) + delta)),
+    }));
+
+  const submitReceiving = async () => {
+    const entries = Object.entries(receiveQty).filter(([, v]) => parseFloat(v) > 0);
+    if (entries.length === 0) return;
+    setReceiveSaving(true);
+    setError("");
+    try {
+      const results = await Promise.all(
+        entries.map(([id, v]) =>
+          api.patch(`/api/staff/inventory/${id}/restock`, { amount: parseFloat(v) })
+        )
+      );
+      setItems((prev) => {
+        const map = new Map(prev.map((i) => [i._id, i]));
+        results.forEach(({ item }) => map.set(item._id, item));
+        return [...map.values()];
+      });
+      setReceiveQty({});
+      setReceiving(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReceiveSaving(false);
+    }
+  };
+
   const totalValue = items.reduce((s, i) => s + i.qty * i.cost, 0);
   const lowCount   = items.filter((i) => statusOf(i) !== "ok").length;
 
@@ -156,16 +196,119 @@ export default function InventoryPage({ styles }) {
             )}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className={styles.btnGhost} onClick={load}>Actualizar</button>
           <button
-            className={styles.btnPrimary}
-            onClick={() => { setShowForm((v) => !v); setFormError(""); }}
+            className={receiving ? styles.btnGhost : styles.btnPrimary}
+            style={{ background: receiving ? undefined : "#4A7A5A" }}
+            onClick={() => {
+              setReceiving((v) => !v);
+              setShowForm(false);
+              if (receiving) setReceiveQty({});
+            }}
           >
-            {showForm ? "Cancelar" : "+ Agregar"}
+            {receiving ? "Cancelar" : "📦 Recibir mercancía"}
+          </button>
+          <button
+            className={styles.btnPrimary}
+            onClick={() => { setShowForm((v) => !v); setFormError(""); setReceiving(false); }}
+          >
+            {showForm ? "Cancelar" : "+ Agregar artículo"}
           </button>
         </div>
       </div>
+
+      {/* ── Receive shipment ── */}
+      {receiving && (
+        <div className={styles.card} style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+            <div>
+              <p className={styles.cardTitle}>Recibir mercancía</p>
+              <p style={{ fontSize: 12, color: "var(--p-muted)", margin: "2px 0 0" }}>
+                Captura lo que llegó — se suma a lo que ya tienes, no lo reemplaza.
+              </p>
+            </div>
+            {pendingReceiveCount > 0 && (
+              <span style={{ background: "#4A7A5A", color: "#fff", fontSize: 12, fontWeight: 700, borderRadius: 999, padding: "4px 12px" }}>
+                {pendingReceiveCount} artículo{pendingReceiveCount > 1 ? "s" : ""} con cambios
+              </span>
+            )}
+          </div>
+
+          <input
+            className={styles.input}
+            placeholder="Buscar artículo…"
+            value={receiveSearch}
+            onChange={(e) => setReceiveSearch(e.target.value)}
+            style={{ marginBottom: 16, maxWidth: 280 }}
+          />
+
+          {items.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--p-muted)" }}>Agrega artículos al inventario primero.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, maxHeight: 480, overflowY: "auto" }}>
+              {ITEM_CATEGORIES.map((cat) => {
+                const catItems = items.filter(
+                  (i) => i.category === cat && i.item.toLowerCase().includes(receiveSearch.toLowerCase())
+                );
+                if (catItems.length === 0) return null;
+                return (
+                  <div key={cat}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: "var(--p-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+                      {cat}
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {catItems.map((row) => {
+                        const val = receiveQty[row._id] ?? "";
+                        const hasValue = parseFloat(val) > 0;
+                        return (
+                          <div key={row._id} style={{
+                            display: "flex", alignItems: "center", gap: 8,
+                            padding: "8px 10px", borderRadius: 8,
+                            background: hasValue ? "rgba(74,122,90,0.08)" : "var(--p-bg)",
+                            border: hasValue ? "1px solid rgba(74,122,90,0.3)" : "1px solid transparent",
+                          }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>{row.item}</p>
+                              <p style={{ margin: 0, fontSize: 11, color: "var(--p-muted)" }}>
+                                Actual: {row.qty} {row.unit}
+                              </p>
+                            </div>
+                            <button type="button" onClick={() => bumpReceive(row._id, 1)}
+                              style={{ padding: "5px 9px", fontSize: 12, fontWeight: 700, border: "1px solid var(--p-border)", borderRadius: 6, background: "var(--p-surface)", cursor: "pointer", color: "var(--p-ink)" }}>
+                              +1
+                            </button>
+                            <button type="button" onClick={() => bumpReceive(row._id, 5)}
+                              style={{ padding: "5px 9px", fontSize: 12, fontWeight: 700, border: "1px solid var(--p-border)", borderRadius: 6, background: "var(--p-surface)", cursor: "pointer", color: "var(--p-ink)" }}>
+                              +5
+                            </button>
+                            <input
+                              type="number" min="0" step="0.01" placeholder="0"
+                              value={val}
+                              onChange={(e) => setReceiveQty((p) => ({ ...p, [row._id]: e.target.value }))}
+                              style={{ width: 62, padding: "6px 6px", fontFamily: "DM Mono,monospace", fontSize: 13, border: "1px solid var(--p-g3)", borderRadius: 6, outline: "none", textAlign: "center" }}
+                            />
+                            <span style={{ fontSize: 11, color: "var(--p-muted)", width: 34 }}>{row.unit}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+            <button className={styles.btnPrimary} disabled={pendingReceiveCount === 0 || receiveSaving} onClick={submitReceiving}>
+              {receiveSaving ? "Guardando…" : `Guardar recepción${pendingReceiveCount > 0 ? ` (${pendingReceiveCount})` : ""}`}
+            </button>
+            <button className={styles.btnGhost} onClick={() => { setReceiving(false); setReceiveQty({}); }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Add item form ── */}
       {showForm && (
