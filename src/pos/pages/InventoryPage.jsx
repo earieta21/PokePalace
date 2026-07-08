@@ -1,6 +1,10 @@
 import { useState, useEffect, useContext } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
+import {
+  BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
+  COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS,
+} from "../../order/OrderLabels";
 
 const ITEM_CATEGORIES = ["Proteínas", "Granos", "Verduras", "Salsas", "Extras", "Otro"];
 const FILTER_CATEGORIES = ["Todos", ...ITEM_CATEGORIES];
@@ -8,18 +12,23 @@ const UNITS = ["kg", "pz", "L", "paq", "botellas", "manojos", "bolsas", "latas"]
 
 const EMPTY_FORM = {
   item: "", category: "Proteínas", unit: "kg",
-  qty: "", minQty: "", cost: "", supplier: "", menuKeys: "",
+  qty: "", minQty: "", cost: "", supplier: "", menuKeys: [],
 };
 
-// Hint shown below the menuKeys input so staff know what keys to use
-const MENU_KEYS_HINT = [
-  "Proteínas: salmon · tuna · shrimp · chicken · tofu · crab · yellowtail · octopus",
-  "Bases: white_rice · brown_rice · salad · quinoa",
-  "Marinadas: citrus_marinade · soy_ginger · spicy_mayo · sesame_oil",
-  "Complementos: avocado · corn · cucumber · edamame · mango · jalapeño",
-  "Salsas: ponzu · teriyaki · sriracha · sweet_chili · peanut",
-  "Toppings: sesame · seaweed · crispy_onion · masago",
-].join("  |  ");
+// Ingredientes reales del builder — se usan para autocompletar nombre/categoría/unidad
+// y vincular el artículo al menú sin que el empleado tenga que escribir claves técnicas.
+const MENU_GROUPS = [
+  { labels: BASE_LABELS,       group: "Base",       category: "Granos",    unit: "kg" },
+  { labels: PROTEIN_LABELS,    group: "Proteína",    category: "Proteínas", unit: "kg" },
+  { labels: MARINADE_LABELS,   group: "Marinado",   category: "Salsas",    unit: "L"  },
+  { labels: COMPLEMENT_LABELS, group: "Complemento", category: "Verduras",  unit: "kg" },
+  { labels: SAUCE_LABELS,      group: "Salsa",       category: "Salsas",    unit: "botellas" },
+  { labels: TOPPING_LABELS,    group: "Topping",     category: "Extras",    unit: "paq" },
+];
+
+const MENU_ITEMS = MENU_GROUPS.flatMap(({ labels, group, category, unit }) =>
+  Object.entries(labels).map(([key, label]) => ({ key, label, group, category, unit }))
+);
 
 function statusOf(item) {
   if (item.qty <= 0)           return "critical";
@@ -57,8 +66,11 @@ export default function InventoryPage({ styles }) {
   const [editForm, setEditForm] = useState({ qty: "", menuKeys: "" });
   const [editSaving, setEditSaving] = useState(false);
 
-  // Hint expand
-  const [showHint, setShowHint] = useState(false);
+  // Advanced (optional) fields collapsed by default to keep the fast-add flow short
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Menu-item picker — search box that suggests real menu ingredients
+  const [menuSearch, setMenuSearch] = useState("");
 
   // Receive shipment (restock) mode — adds to existing qty instead of overwriting
   const [receiving, setReceiving]         = useState(false);
@@ -85,6 +97,32 @@ export default function InventoryPage({ styles }) {
   /* ── Add new item ── */
   const f = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
+  // Picking a suggestion links the menu key and — the first time — auto-fills
+  // nombre/categoría/unidad so the employee usually just has to type the quantity.
+  const menuMatches = menuSearch.trim().length > 0
+    ? MENU_ITEMS.filter((m) =>
+        m.label.toLowerCase().includes(menuSearch.trim().toLowerCase()) &&
+        !form.menuKeys.includes(m.key)
+      ).slice(0, 6)
+    : [];
+
+  const pickMenuItem = (m) => {
+    setForm((p) => {
+      const isFirstPick = p.menuKeys.length === 0 && !p.item;
+      return {
+        ...p,
+        menuKeys: [...p.menuKeys, m.key],
+        item:     isFirstPick ? m.label    : p.item,
+        category: isFirstPick ? m.category : p.category,
+        unit:     isFirstPick ? m.unit     : p.unit,
+      };
+    });
+    setMenuSearch("");
+  };
+
+  const removeMenuKey = (key) =>
+    setForm((p) => ({ ...p, menuKeys: p.menuKeys.filter((k) => k !== key) }));
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!form.item || !form.qty) return;
@@ -98,10 +136,12 @@ export default function InventoryPage({ styles }) {
         minQty:   form.minQty ? parseFloat(form.minQty) : 0,
         cost:     form.cost   ? parseFloat(form.cost)   : 0,
         supplier: form.supplier,
-        menuKeys: parseKeys(form.menuKeys),
+        menuKeys: form.menuKeys,
       });
       setItems((prev) => [...prev, created]);
       setForm(EMPTY_FORM);
+      setMenuSearch("");
+      setShowAdvanced(false);
       setShowForm(false);
     } catch (err) {
       setFormError(err.message);
@@ -319,6 +359,65 @@ export default function InventoryPage({ styles }) {
               <p style={{ color: "red", fontSize: 12, marginBottom: 12 }}>{formError}</p>
             )}
 
+            {/* Step 1 — search the real menu ingredients to auto-fill everything */}
+            <div className={styles.formGroup} style={{ position: "relative" }}>
+              <label className={styles.label}>¿Es un ingrediente del menú? Búscalo aquí</label>
+              <input
+                className={styles.input}
+                placeholder="ej. salmón, aguacate, arroz…"
+                value={menuSearch}
+                onChange={(e) => setMenuSearch(e.target.value)}
+              />
+              <p style={{ fontSize: 11, color: "var(--p-muted)", margin: "4px 0 0" }}>
+                Selecciónalo y el nombre, la categoría y la unidad se llenan solas. Si no aparece, no importa — sigue abajo y captúralo a mano.
+              </p>
+
+              {menuMatches.length > 0 && (
+                <div style={{
+                  border: "1px solid var(--p-border)", borderRadius: 8, marginTop: 6,
+                  overflow: "hidden", background: "var(--p-surface)",
+                }}>
+                  {menuMatches.map((m) => (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => pickMenuItem(m)}
+                      style={{
+                        display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between",
+                        padding: "9px 12px", background: "none", border: "none", borderBottom: "1px solid var(--p-border)",
+                        cursor: "pointer", textAlign: "left", fontFamily: "Syne, sans-serif",
+                      }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--p-ink)" }}>{m.label}</span>
+                      <span style={{ fontSize: 10, color: "var(--p-muted)", background: "var(--p-bg)", padding: "2px 8px", borderRadius: 999 }}>{m.group}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {form.menuKeys.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                  {form.menuKeys.map((key) => {
+                    const meta = MENU_ITEMS.find((m) => m.key === key);
+                    return (
+                      <span key={key} style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        fontSize: 12, fontWeight: 600, color: "#fff", background: "#4A7A5A",
+                        borderRadius: 999, padding: "4px 6px 4px 12px",
+                      }}>
+                        {meta?.label || key}
+                        <button type="button" onClick={() => removeMenuKey(key)}
+                          style={{ background: "rgba(255,255,255,0.25)", border: "none", borderRadius: "50%", width: 18, height: 18, color: "#fff", cursor: "pointer", lineHeight: 1, fontSize: 12 }}>
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Step 2 — the essentials */}
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
                 <label className={styles.label}>Nombre *</label>
@@ -345,51 +444,39 @@ export default function InventoryPage({ styles }) {
               </div>
             </div>
 
-            <div className={styles.formRow}>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Cantidad mínima (alerta)</label>
-                <input className={styles.input} type="number" min="0" step="0.01" placeholder="0" value={form.minQty} onChange={f("minQty")} />
-              </div>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Costo por unidad ($)</label>
-                <input className={styles.input} type="number" min="0" step="0.01" placeholder="0.00" value={form.cost} onChange={f("cost")} />
-              </div>
-            </div>
+            {/* Step 3 — optional details, collapsed by default */}
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              style={{ fontSize: 12, color: "var(--p-muted)", background: "none", border: "none", cursor: "pointer", padding: "4px 0 10px", fontWeight: 600 }}
+            >
+              {showAdvanced ? "− Ocultar detalles opcionales" : "+ Más detalles (mínimo, costo, proveedor)"}
+            </button>
 
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Proveedor</label>
-              <input className={styles.input} placeholder="ej. Ocean Fresh" value={form.supplier} onChange={f("supplier")} />
-            </div>
-
-            {/* menuKeys field */}
-            <div className={styles.formGroup}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <label className={styles.label} style={{ margin: 0 }}>Claves de menú (separadas por coma)</label>
-                <button type="button" onClick={() => setShowHint((v) => !v)}
-                  style={{ fontSize: 11, color: "var(--p-muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                  {showHint ? "Ocultar" : "Ver claves disponibles"}
-                </button>
-              </div>
-              {showHint && (
-                <p style={{ fontSize: 10.5, color: "var(--p-muted)", lineHeight: 1.6, marginBottom: 6, background: "var(--p-bg)", padding: "8px 10px", borderRadius: 6 }}>
-                  {MENU_KEYS_HINT}
-                </p>
-              )}
-              <input className={styles.input}
-                placeholder="ej. salmon, salmon_spicy, salmon_citrus"
-                value={form.menuKeys}
-                onChange={f("menuKeys")}
-              />
-              <p style={{ fontSize: 11, color: "var(--p-muted)", margin: "4px 0 0" }}>
-                El sistema descuenta 1 unidad de este artículo por cada bowl/orden que incluya alguna de estas claves.
-              </p>
-            </div>
+            {showAdvanced && (
+              <>
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Cantidad mínima (alerta)</label>
+                    <input className={styles.input} type="number" min="0" step="0.01" placeholder="0" value={form.minQty} onChange={f("minQty")} />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Costo por unidad ($)</label>
+                    <input className={styles.input} type="number" min="0" step="0.01" placeholder="0.00" value={form.cost} onChange={f("cost")} />
+                  </div>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Proveedor</label>
+                  <input className={styles.input} placeholder="ej. Ocean Fresh" value={form.supplier} onChange={f("supplier")} />
+                </div>
+              </>
+            )}
 
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               <button className={styles.btnPrimary} type="submit" disabled={saving}>
                 {saving ? "Guardando…" : "Agregar"}
               </button>
-              <button className={styles.btnGhost} type="button" onClick={() => setShowForm(false)}>
+              <button className={styles.btnGhost} type="button" onClick={() => { setShowForm(false); setMenuSearch(""); }}>
                 Cancelar
               </button>
             </div>
