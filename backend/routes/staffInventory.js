@@ -5,6 +5,7 @@ import {
   getLowStock,
   createItem,
   updateItem,
+  restockItem,
   deleteItem,
 } from "../controllers/staffInventoryController.js";
 
@@ -17,6 +18,7 @@ router.get   ("/low-stock", anyStaff, getLowStock);
 router.get   ("/",          anyStaff, getInventory);
 router.post  ("/",    seniorStaff, createItem);
 router.patch ("/:id", seniorStaff, updateItem);
+router.patch ("/:id/restock", anyStaff, restockItem);
 router.delete("/:id", seniorStaff, deleteItem);
 
 export default router;

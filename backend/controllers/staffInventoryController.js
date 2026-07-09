@@ -34,6 +34,29 @@ export const updateItem = async (req, res) => {
   }
 };
 
+/* PATCH /api/staff/inventory/:id/restock — body: { amount }
+   Adds `amount` to the existing qty instead of overwriting it, so staff
+   receiving a delivery doesn't have to do mental math (current + arrived). */
+export const restockItem = async (req, res) => {
+  try {
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount === 0) {
+      return res.status(400).json({ message: "Cantidad inválida" });
+    }
+    const existing = await Inventory.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: "Item not found" });
+
+    const nextQty = Math.max(0, existing.qty + amount);
+    existing.qty = nextQty;
+    existing.lastRestockAt = new Date();
+    await existing.save();
+
+    res.json({ item: existing });
+  } catch (err) {
+    res.status(400).json({ message: "Error actualizando existencia", err: err.message });
+  }
+};
+
 /* GET /api/staff/inventory/low-stock */
 export const getLowStock = async (req, res) => {
   try {

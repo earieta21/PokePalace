@@ -15,14 +15,14 @@
       "short_name": "Pedir",
       "description": "Arma tu bowl",
       "url": "/order",
-      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "Mis pedidos",
       "short_name": "Pedidos",
       "description": "Ver historial y puntos",
       "url": "/mi-cuenta",
-      "icons": [{ "src": "/icon.svg", "sizes": "any" }]
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ],
   "icons": [

@@ -10,6 +10,7 @@ const inventorySchema = new mongoose.Schema(
     cost:     { type: Number, default: 0 },
     supplier: { type: String, default: "" },
     menuKeys: { type: [String], default: [] }, // e.g. ["salmon","citrus_marinade"] — matched on order pay
+    lastRestockAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
