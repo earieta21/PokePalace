@@ -354,6 +354,115 @@
   line-height: 1.5;
 }
 
+.redeemErrorBanner {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── Won-code modal ── */
+.codeOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: rgba(20, 16, 12, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 180ms ease;
+}
+
+.codeModal {
+  width: min(340px, 100%);
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  padding: 32px 26px 26px;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+  animation: popIn 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.codeCheckmark {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.codeTitle {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.codeRewardName {
+  margin: 0 0 18px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.codeValue {
+  margin: 0 0 10px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  border: 1.5px dashed var(--border-md);
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--accent);
+}
+
+.codeHint {
+  margin: 0 0 20px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.codeCloseBtn {
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.codeCloseBtn:hover { opacity: 0.9; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 /* ── Responsive ── */
 @media (max-width: 600px) {
   .tiersGrid, .howGrid {

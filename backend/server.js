@@ -14,6 +14,8 @@ import staffEmpRoutes    from "./routes/staffEmployees.js";
 import kioskRoutes       from "./routes/kiosk.js";
 import expenseRoutes     from "./routes/expenses.js";
 import settingsRoutes    from "./routes/settings.js";
+import rewardsRoutes     from "./routes/rewards.js";
+import staffRewardsRoutes from "./routes/staffRewards.js";
 
 dotenv.config();
 
@@ -61,6 +63,8 @@ app.use("/api/staff/employees",staffEmpRoutes);
 app.use("/api/kiosk",          kioskRoutes);
 app.use("/api/staff/expenses", expenseRoutes);
 app.use("/api/settings",       settingsRoutes);
+app.use("/api/rewards",        rewardsRoutes);
+app.use("/api/staff/rewards",  staffRewardsRoutes);
 
 app.get("/", (req, res) => {
   res.send("API Poke Palace funcionando 🍣");

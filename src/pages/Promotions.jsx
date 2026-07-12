@@ -2,6 +2,7 @@ import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
+import { API_URL } from "../config";
 import styles from "./Promotions.module.css";
 
 const TIERS = [
@@ -47,18 +48,18 @@ const REWARDS = [
     desc: { es: "Cualquier topping de tu elección", en: "Any topping of your choice" },
   },
   {
-    id: 3,
-    cost: 150,
-    icon: "🥗",
-    name: { es: "Bowl gratis", en: "Free bowl" },
-    desc: { es: "Un bowl completo de tu elección", en: "A full bowl of your choice" },
-  },
-  {
     id: 4,
     cost: 200,
     icon: "✨",
     name: { es: "Proteína doble", en: "Double protein" },
     desc: { es: "Doble porción de proteína en tu bowl", en: "Double protein portion in your bowl" },
+  },
+  {
+    id: 3,
+    cost: 150,
+    icon: "🥗",
+    name: { es: "Bowl gratis", en: "Free bowl" },
+    desc: { es: "Un bowl completo de tu elección", en: "A full bowl of your choice" },
   },
 ];
 
@@ -71,10 +72,12 @@ function getNextTier(points) {
 }
 
 export default function RewardsPage() {
-  const { isLoggedIn, user } = useContext(AuthContext);
+  const { isLoggedIn, user, token, refreshUser } = useContext(AuthContext);
   const { language, t } = useLanguage();
   const navigate = useNavigate();
-  const [redeemed, setRedeemed] = useState(null);
+  const [redeeming, setRedeeming] = useState(null);   // reward.id currently in flight
+  const [redeemError, setRedeemError] = useState("");
+  const [wonCode, setWonCode] = useState(null);        // { code, rewardName }
 
   const points = user?.points ?? 0;
   const tier = getCurrentTier(points);
@@ -84,10 +87,29 @@ export default function RewardsPage() {
     ? Math.round(((points - tier.min) / (nextTier.min - tier.min)) * 100)
     : 100;
 
-  const handleRedeem = (reward) => {
-    if (points < reward.cost) return;
-    setRedeemed(reward.id);
-    setTimeout(() => setRedeemed(null), 3000);
+  const handleRedeem = async (reward) => {
+    if (points < reward.cost || redeeming) return;
+    setRedeeming(reward.id);
+    setRedeemError("");
+    try {
+      const res = await fetch(`${API_URL}/api/rewards/redeem`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ rewardId: reward.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.msg || t("rewards.redeemError"));
+
+      setWonCode({ code: data.redemption.code, rewardName: reward.name[language] });
+      await refreshUser();
+    } catch (e) {
+      setRedeemError(e.message);
+    } finally {
+      setRedeeming(null);
+    }
   };
 
   return (
@@ -140,11 +162,14 @@ export default function RewardsPage() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>{t("rewards.redeemTitle")}</h2>
         <p className={styles.sectionSub}>{t("rewards.rate")}</p>
+        {redeemError && (
+          <p className={styles.redeemErrorBanner} role="alert">{redeemError}</p>
+        )}
         <div className={styles.rewardsGrid}>
           {REWARDS.map((r) => {
             const canRedeem = isLoggedIn && points >= r.cost;
             const pct = isLoggedIn ? Math.min(100, Math.round((points / r.cost) * 100)) : 0;
-            const isSuccess = redeemed === r.id;
+            const isBusy = redeeming === r.id;
             return (
               <div key={r.id} className={`${styles.rewardCard} ${canRedeem ? styles.rewardReady : ""}`}>
                 <div className={styles.rewardIcon}>{r.icon}</div>
@@ -161,10 +186,10 @@ export default function RewardsPage() {
                 <button
                   className={`${styles.redeemBtn} ${canRedeem ? styles.redeemActive : ""}`}
                   onClick={() => handleRedeem(r)}
-                  disabled={!canRedeem || isSuccess}
+                  disabled={!canRedeem || isBusy}
                 >
-                  {isSuccess
-                    ? `${t("rewards.redeemed")} ✓`
+                  {isBusy
+                    ? t("rewards.redeeming")
                     : canRedeem
                       ? t("rewards.redeem")
                       : t("rewards.missing", { points: r.cost - points })}
@@ -241,6 +266,21 @@ export default function RewardsPage() {
           </div>
         )}
       </section>
+
+      {wonCode && (
+        <div className={styles.codeOverlay} onClick={() => setWonCode(null)}>
+          <div className={styles.codeModal} onClick={(e) => e.stopPropagation()}>
+            <p className={styles.codeCheckmark}>✓</p>
+            <p className={styles.codeTitle}>{t("rewards.wonTitle")}</p>
+            <p className={styles.codeRewardName}>{wonCode.rewardName}</p>
+            <p className={styles.codeValue}>{wonCode.code}</p>
+            <p className={styles.codeHint}>{t("rewards.codeHint")}</p>
+            <button className={styles.codeCloseBtn} onClick={() => setWonCode(null)}>
+              {t("rewards.gotIt")}
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

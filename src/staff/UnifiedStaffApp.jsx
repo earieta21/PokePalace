@@ -4,7 +4,7 @@ import {
   TrendingUp, ChevronLeft, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
-  ToggleRight,
+  ToggleRight, Gift,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -92,16 +92,17 @@ const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 // Which tabs each role sees
 const TABS_BY_ROLE = {
   employee: ["inicio", "tareas", "temp", "horario", "avisos"],
-  cashier:  ["pos", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
+  cashier:  ["pos", "premios", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
   kitchen:  ["cocina", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
-  manager:  ["pos", "cocina", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  admin:    ["pos", "cocina", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  owner:    ["pos", "cocina", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  manager:  ["pos", "cocina", "premios", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  admin:    ["pos", "cocina", "premios", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  owner:    ["pos", "cocina", "premios", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
 };
 
 const TAB_META = {
   pos:     { label: "POS",      icon: ShoppingCart   },
   cocina:  { label: "Cocina",   icon: UtensilsCrossed },
+  premios: { label: "Premios",  icon: Gift            },
   hist:    { label: "Historial", icon: ClipboardList  },
   ventas:  { label: "Ventas",   icon: Activity        },
   inv:     { label: "Inventario", icon: Package       },
@@ -374,6 +375,7 @@ export default function UnifiedStaffApp() {
           {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
           {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
           {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
+          {tab === "premios" && <RewardsRedeemTab token={token} />}
           {tab === "disponibilidad" && <AvailabilityTab token={token} />}
           {tab === "panel"   && <PanelTab employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} />}
           {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
@@ -838,6 +840,134 @@ function AnnouncementsTab({ employees, announcements, isManager, onAdd, onRemove
             })
         }
       </div>
+    </div>
+  );
+}
+
+/* ============================================================================
+   CANJEAR PREMIOS — cliente muestra su código, staff lo busca y confirma
+   ========================================================================== */
+function RewardsRedeemTab({ token }) {
+  const [code, setCode] = useState("");
+  const [redemption, setRedemption] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  const lookup = async (e) => {
+    e.preventDefault();
+    const clean = code.trim().toUpperCase();
+    if (!clean) return;
+    setLoading(true);
+    setError("");
+    setRedemption(null);
+    try {
+      const r = await fetch(`${API_URL}/api/staff/rewards/${clean}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.msg || "Código no encontrado");
+      setRedemption(data.redemption);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirm = async () => {
+    setConfirming(true);
+    setError("");
+    try {
+      const r = await fetch(`${API_URL}/api/staff/rewards/${redemption.code}/use`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.msg || "No se pudo canjear");
+      setRedemption(data.redemption);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const reset = () => { setCode(""); setRedemption(null); setError(""); };
+
+  return (
+    <div>
+      <div className="mb-5">
+        <h2 className="text-lg font-bold text-white">Canjear premios</h2>
+        <p className="text-slate-400 text-sm mt-1">
+          Pide al cliente el código de 6 caracteres que le aparece en su cuenta y búscalo aquí.
+        </p>
+      </div>
+
+      <form onSubmit={lookup} className="flex gap-2 mb-4">
+        <input
+          value={code}
+          onChange={(e) => { setCode(e.target.value.toUpperCase()); setRedemption(null); setError(""); }}
+          placeholder="Ej. A3K9QZ"
+          maxLength={6}
+          className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-white text-lg font-mono tracking-widest text-center uppercase placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50"
+        />
+        <button
+          type="submit"
+          disabled={loading || !code.trim()}
+          className="px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-semibold transition"
+        >
+          {loading ? "Buscando…" : "Buscar"}
+        </button>
+      </form>
+
+      {error && (
+        <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm rounded-xl px-4 py-3 mb-4">
+          {error}
+        </div>
+      )}
+
+      {redemption && (
+        <div className="bg-slate-900 rounded-2xl border border-white/5 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-2xl font-mono font-bold tracking-widest text-white">{redemption.code}</span>
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+              redemption.status === "used" ? "bg-slate-500/20 text-slate-400" : "bg-emerald-500/20 text-emerald-400"
+            }`}>
+              {redemption.status === "used" ? "Ya usado" : "Activo"}
+            </span>
+          </div>
+
+          <div className="space-y-1.5 mb-5">
+            <p className="text-white font-semibold">{redemption.rewardName}</p>
+            <p className="text-slate-400 text-sm">
+              Cliente: {redemption.user?.name || "—"} · {redemption.pointsCost} pts
+            </p>
+            {redemption.status === "used" && (
+              <p className="text-slate-500 text-xs">
+                Usado el {new Date(redemption.usedAt).toLocaleString("es-MX")}
+              </p>
+            )}
+          </div>
+
+          {redemption.status === "active" ? (
+            <button
+              onClick={confirm}
+              disabled={confirming}
+              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold transition"
+            >
+              {confirming ? "Confirmando…" : "✓ Confirmar y entregar premio"}
+            </button>
+          ) : (
+            <button
+              onClick={reset}
+              className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold transition"
+            >
+              Buscar otro código
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

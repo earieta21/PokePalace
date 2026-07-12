@@ -206,6 +206,20 @@
 
 .trackLink:hover { opacity: 0.75; }
 
+.rewardCode {
+  margin: 4px 0 8px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1.5px dashed var(--border-md);
+  text-align: center;
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--accent);
+}
+
 .line {
   margin: 6px 0 0;
   font-size: 13px;
