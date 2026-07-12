@@ -80,22 +80,41 @@ export const createOrder = async (req, res) => {
       isScheduled = true;
     }
 
-    // Validate promo code
+    // Validate promo code — read first for a specific error message, then
+    // reserve the use atomically so two concurrent requests can't both slip
+    // through on the last remaining use of a limited code.
     let resolvedPromo = null;
     let promoDoc = null;
     if (promoCode?.trim()) {
-      promoDoc = await PromoCode.findOne({
-        code: promoCode.trim().toUpperCase(),
-        isActive: true,
-      });
+      const codeUpper = promoCode.trim().toUpperCase();
+      const precheck = await PromoCode.findOne({ code: codeUpper, isActive: true });
 
-      if (!promoDoc) return res.status(400).json({ msg: "Código promocional inválido o expirado" });
-      if (promoDoc.expiresAt && new Date() > promoDoc.expiresAt) {
+      if (!precheck) return res.status(400).json({ msg: "Código promocional inválido o expirado" });
+      if (precheck.expiresAt && new Date() > precheck.expiresAt) {
         return res.status(400).json({ msg: "El código promocional ya expiró" });
       }
-      if (promoDoc.maxUses !== null && promoDoc.usedCount >= promoDoc.maxUses) {
+      if (precheck.maxUses !== null && precheck.usedCount >= precheck.maxUses) {
         return res.status(400).json({ msg: "El código ya alcanzó su límite de usos" });
       }
+
+      promoDoc = await PromoCode.findOneAndUpdate(
+        {
+          code: codeUpper,
+          isActive: true,
+          $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+          $expr: {
+            $or: [
+              { $eq: ["$maxUses", null] },
+              { $lt: ["$usedCount", "$maxUses"] },
+            ],
+          },
+        },
+        { $inc: { usedCount: 1 } },
+        { new: false }
+      );
+
+      // Lost the race for the last use between the precheck and now
+      if (!promoDoc) return res.status(400).json({ msg: "El código ya alcanzó su límite de usos" });
 
       resolvedPromo = { discountType: promoDoc.discountType, discountValue: promoDoc.discountValue };
     }
@@ -103,21 +122,23 @@ export const createOrder = async (req, res) => {
     const resolvedBowlSize = bowlSize || (selectedProteins.length === 3 ? "large" : "normal");
     const { subtotal, discount: promoDiscount, tax, total: baseTotal } = computePricing(resolvedBowlSize, resolvedPromo);
 
-    if (promoDoc) {
-      await PromoCode.findByIdAndUpdate(promoDoc._id, { $inc: { usedCount: 1 } });
-    }
-
-    // Points redemption (logged-in users only, multiples of 100)
+    // Points redemption (logged-in users only, multiples of 100).
+    // The conditional decrement (points: { $gte: redeemAmt }) happens in the
+    // same atomic operation as the check, so firing multiple simultaneous
+    // requests can't redeem the same points balance more than once.
     let pointsDiscount = 0;
     let redeemedPoints = 0;
     if (pointsToRedeem && req.userId) {
       const redeemAmt = Math.floor(Number(pointsToRedeem) / POINTS_PER_REWARD) * POINTS_PER_REWARD;
       if (redeemAmt >= POINTS_PER_REWARD) {
-        const userDoc = await User.findById(req.userId);
-        if (userDoc && userDoc.points >= redeemAmt) {
+        const updatedUser = await User.findOneAndUpdate(
+          { _id: req.userId, points: { $gte: redeemAmt } },
+          { $inc: { points: -redeemAmt } },
+          { new: true }
+        );
+        if (updatedUser) {
           pointsDiscount = (redeemAmt / POINTS_PER_REWARD) * REWARD_VALUE_MXN;
           redeemedPoints = redeemAmt;
-          await User.findByIdAndUpdate(req.userId, { $inc: { points: -redeemAmt } });
         }
       }
     }

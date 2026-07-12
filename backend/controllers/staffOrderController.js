@@ -31,14 +31,24 @@ async function deductInventory(order) {
   }
 }
 
-/* ── loyalty point award: 1 point per $10 MXN, online orders with user only ── */
+/* ── loyalty point award: 1 point per $10 MXN, online orders with user only ──
+   Guarded atomically on loyaltyPointsEarned so calling markAsPaid more than
+   once on the same order (double click, retry, repeated API call) can never
+   award points twice — the conditional update only succeeds the first time. */
 async function awardLoyaltyPoints(order) {
   try {
     if (!order.user || !order.total || order.total <= 0) return;
     const earned = Math.floor(order.total / 10);
     if (earned <= 0) return;
+
+    const claimed = await Order.findOneAndUpdate(
+      { _id: order._id, loyaltyPointsEarned: 0 },
+      { loyaltyPointsEarned: earned },
+      { new: true }
+    );
+    if (!claimed) return; // already awarded on a previous call — do nothing
+
     await User.findByIdAndUpdate(order.user, { $inc: { points: earned } });
-    await Order.findByIdAndUpdate(order._id, { loyaltyPointsEarned: earned });
   } catch (err) {
     console.error("awardLoyaltyPoints error:", err.message);
   }

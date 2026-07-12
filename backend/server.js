@@ -19,6 +19,10 @@ dotenv.config();
 
 const app = express();
 
+// Render sits behind a reverse proxy — trust its X-Forwarded-For header so
+// req.ip reflects the real client IP (needed for accurate rate limiting).
+app.set("trust proxy", 1);
+
 app.use(
   cors({
     origin: (origin, callback) => {
