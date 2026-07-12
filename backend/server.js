@@ -33,7 +33,6 @@ app.use(
         /^https:\/\/(pos[.-])?pokepalace\.netlify\.app$/,
         /^https:\/\/pokepalace\.onrender\.com$/,
         /^https:\/\/pos\.pokepalace\.com$/,
-        /^https:\/\/(www\.)?pokepalace\.org$/,
       ];
       if (!origin || allowed.some((r) => r.test(origin))) {
         callback(null, true);
