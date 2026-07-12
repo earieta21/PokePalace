@@ -23,9 +23,13 @@ app.use(
   cors({
     origin: (origin, callback) => {
       // Allow any localhost port (dev) + production domains, including a
-      // dedicated POS subdomain (e.g. pos.pokepalace.com or pos-pokepalace.netlify.app)
+      // dedicated POS subdomain (e.g. pos.pokepalace.org or pos-pokepalace.netlify.app).
+      // The netlify.app domains stay allowed as a fallback (deploy previews, and
+      // Netlify keeps that subdomain live alongside the custom domain).
       const allowed = [
         /^http:\/\/localhost:\d+$/,
+        /^https:\/\/(www\.)?pokepalace\.org$/,
+        /^https:\/\/pos\.pokepalace\.org$/,
         /^https:\/\/(pos[.-])?pokepalace\.netlify\.app$/,
         /^https:\/\/pokepalace\.onrender\.com$/,
         /^https:\/\/pos\.pokepalace\.com$/,
