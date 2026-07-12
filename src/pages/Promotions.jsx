@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -77,14 +77,18 @@ export default function RewardsPage() {
   const navigate = useNavigate();
   const [redeeming, setRedeeming] = useState(null);   // reward.id currently in flight
   const [redeemError, setRedeemError] = useState("");
-  const [wonCode, setWonCode] = useState(null);        // { code, rewardName }
+  const [wonCode, setWonCode] = useState(null);        // { code, rewardName, expiresAt }
 
-  const points = user?.points ?? 0;
-  const tier = getCurrentTier(points);
-  const nextTier = getNextTier(points);
+  // Refresh on mount so el nivel y el saldo estén al día (p. ej. justo tras login)
+  useEffect(() => { if (isLoggedIn) refreshUser?.(); }, [isLoggedIn]);
+
+  const points = user?.points ?? 0;                   // saldo gastable — sube y baja
+  const lifetimePoints = user?.lifetimePoints ?? 0;    // nivel — logro permanente, solo sube
+  const tier = getCurrentTier(lifetimePoints);
+  const nextTier = getNextTier(lifetimePoints);
 
   const tierProgress = nextTier
-    ? Math.round(((points - tier.min) / (nextTier.min - tier.min)) * 100)
+    ? Math.round(((lifetimePoints - tier.min) / (nextTier.min - tier.min)) * 100)
     : 100;
 
   const handleRedeem = async (reward) => {
@@ -103,7 +107,11 @@ export default function RewardsPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.msg || t("rewards.redeemError"));
 
-      setWonCode({ code: data.redemption.code, rewardName: reward.name[language] });
+      setWonCode({
+        code: data.redemption.code,
+        rewardName: reward.name[language],
+        expiresAt: data.redemption.expiresAt,
+      });
       await refreshUser();
     } catch (e) {
       setRedeemError(e.message);
@@ -129,13 +137,14 @@ export default function RewardsPage() {
             <div>
               <p className={styles.tierName} style={{ color: tier.color }}>{t(tier.nameKey)}</p>
               <p className={styles.pointsValue}>{points} <span className={styles.pointsLabel}>{t("rewards.points")}</span></p>
+              <p className={styles.pointsSubcaption}>{t("rewards.lifetimeCaption", { points: lifetimePoints })}</p>
             </div>
           </div>
           {nextTier && (
             <div className={styles.pointsRight}>
               <p className={styles.nextLabel}>
                 {t("rewards.nextTier", {
-                  points: nextTier.min - points,
+                  points: nextTier.min - lifetimePoints,
                   icon: nextTier.icon,
                   name: t(nextTier.nameKey),
                 })}
@@ -275,6 +284,11 @@ export default function RewardsPage() {
             <p className={styles.codeRewardName}>{wonCode.rewardName}</p>
             <p className={styles.codeValue}>{wonCode.code}</p>
             <p className={styles.codeHint}>{t("rewards.codeHint")}</p>
+            {wonCode.expiresAt && (
+              <p className={styles.codeExpiry}>
+                {t("rewards.expiresOn", { date: new Date(wonCode.expiresAt).toLocaleDateString(language === "es" ? "es-MX" : "en-US") })}
+              </p>
+            )}
             <button className={styles.codeCloseBtn} onClick={() => setWonCode(null)}>
               {t("rewards.gotIt")}
             </button>

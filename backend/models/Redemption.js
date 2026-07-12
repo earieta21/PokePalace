@@ -7,7 +7,8 @@ const redemptionSchema = new mongoose.Schema(
     rewardName:  { type: String, required: true }, // snapshot at redemption time
     pointsCost:  { type: Number, required: true },
     code:        { type: String, required: true, unique: true },
-    status:      { type: String, enum: ["active", "used", "cancelled"], default: "active" },
+    status:      { type: String, enum: ["active", "used", "cancelled", "expired"], default: "active" },
+    expiresAt:   { type: Date, default: null },
     usedAt:      { type: Date, default: null },
     usedBy:      { type: mongoose.Schema.Types.ObjectId, ref: "StaffUser", default: null },
   },

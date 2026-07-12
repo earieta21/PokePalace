@@ -71,6 +71,12 @@
   color: var(--text-2);
 }
 
+.pointsSubcaption {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
 .pointsRight {
   flex: 1;
   min-width: 180px;
@@ -432,10 +438,17 @@
 }
 
 .codeHint {
-  margin: 0 0 20px;
+  margin: 0 0 6px;
   font-size: 12.5px;
   color: var(--text-2);
   line-height: 1.5;
+}
+
+.codeExpiry {
+  margin: 0 0 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
 }
 
 .codeCloseBtn {

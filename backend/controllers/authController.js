@@ -36,6 +36,7 @@ export const register = async (req, res) => {
         name: user.name,
         email: user.email,
         points: user.points,
+        lifetimePoints: user.lifetimePoints,
       },
     });
   } catch {
@@ -66,6 +67,7 @@ export const login = async (req, res) => {
         name: user.name,
         email: user.email,
         points: user.points,
+        lifetimePoints: user.lifetimePoints,
       },
     });
   } catch {

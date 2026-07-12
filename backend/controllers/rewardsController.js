@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import User from "../models/User.js";
 import Redemption from "../models/Redemption.js";
+import { expireStalePoints, REDEMPTION_CODE_EXPIRY_DAYS } from "../utils/loyalty.js";
 
 // Source of truth for reward costs/names — mirrors src/pages/Promotions.jsx.
 // Never trust a cost or name submitted by the client.
@@ -27,6 +28,9 @@ export const redeemReward = async (req, res) => {
     const reward = REWARDS_CATALOG[rewardId];
     if (!reward) return res.status(400).json({ msg: "Premio inválido" });
 
+    // Saldo inactivo (12+ meses sin ganar puntos) se resetea antes de dejar gastarlo
+    await expireStalePoints(req.userId);
+
     // Atomic check-and-deduct — same pattern as points redemption at checkout,
     // so firing this twice at once can't spend the same points balance twice.
     const updatedUser = await User.findOneAndUpdate(
@@ -35,6 +39,8 @@ export const redeemReward = async (req, res) => {
       { new: true }
     );
     if (!updatedUser) return res.status(400).json({ msg: "No tienes suficientes puntos" });
+
+    const expiresAt = new Date(Date.now() + REDEMPTION_CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
     let redemption = null;
     for (let attempt = 0; attempt < 5 && !redemption; attempt++) {
@@ -45,6 +51,7 @@ export const redeemReward = async (req, res) => {
           rewardName: reward.name,
           pointsCost: reward.cost,
           code: generateCode(),
+          expiresAt,
         });
       } catch (err) {
         if (err.code !== 11000) throw err; // retry only on code collision
@@ -64,6 +71,12 @@ export const redeemReward = async (req, res) => {
 
 export const getMyRedemptions = async (req, res) => {
   try {
+    // Marca como vencidos (lazy) los códigos activos cuya fecha ya pasó
+    await Redemption.updateMany(
+      { user: req.userId, status: "active", expiresAt: { $lt: new Date() } },
+      { $set: { status: "expired" } }
+    );
+
     const redemptions = await Redemption.find({ user: req.userId })
       .sort({ createdAt: -1 })
       .limit(30);

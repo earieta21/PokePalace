@@ -932,9 +932,11 @@ function RewardsRedeemTab({ token }) {
           <div className="flex items-center justify-between mb-4">
             <span className="text-2xl font-mono font-bold tracking-widest text-white">{redemption.code}</span>
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-              redemption.status === "used" ? "bg-slate-500/20 text-slate-400" : "bg-emerald-500/20 text-emerald-400"
+              redemption.status === "used"    ? "bg-slate-500/20 text-slate-400"
+              : redemption.status === "expired" ? "bg-rose-500/20 text-rose-400"
+              : "bg-emerald-500/20 text-emerald-400"
             }`}>
-              {redemption.status === "used" ? "Ya usado" : "Activo"}
+              {redemption.status === "used" ? "Ya usado" : redemption.status === "expired" ? "Vencido" : "Activo"}
             </span>
           </div>
 
@@ -946,6 +948,16 @@ function RewardsRedeemTab({ token }) {
             {redemption.status === "used" && (
               <p className="text-slate-500 text-xs">
                 Usado el {new Date(redemption.usedAt).toLocaleString("es-MX")}
+              </p>
+            )}
+            {redemption.status === "expired" && (
+              <p className="text-rose-400 text-xs">
+                Venció el {new Date(redemption.expiresAt).toLocaleDateString("es-MX")}
+              </p>
+            )}
+            {redemption.status === "active" && redemption.expiresAt && (
+              <p className="text-slate-500 text-xs">
+                Válido hasta el {new Date(redemption.expiresAt).toLocaleDateString("es-MX")}
               </p>
             )}
           </div>

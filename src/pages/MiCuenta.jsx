@@ -415,14 +415,22 @@ export default function MiCuenta() {
                   <div key={r._id} className={styles.orderCard}>
                     <div className={styles.orderTop}>
                       <p className={styles.orderDate}>{r.rewardName}</p>
-                      <span className={`${styles.status} ${r.status === "used" ? styles.status_completed : ""}`}>
-                        {r.status === "used" ? "Usado" : "Activo"}
+                      <span className={`${styles.status} ${
+                        r.status === "used" ? styles.status_completed
+                        : r.status === "expired" ? styles.status_cancelled
+                        : ""
+                      }`}>
+                        {r.status === "used" ? "Usado" : r.status === "expired" ? "Vencido" : "Activo"}
                       </span>
                     </div>
                     <p className={styles.rewardCode}>{r.code}</p>
                     <p className={styles.line}>
                       {r.status === "used"
                         ? `Usado el ${new Date(r.usedAt).toLocaleString("es-MX")}`
+                        : r.status === "expired"
+                        ? "Este código ya venció."
+                        : r.expiresAt
+                        ? `Válido hasta el ${new Date(r.expiresAt).toLocaleDateString("es-MX")} · muéstralo en el mostrador.`
                         : "Muestra este código en el mostrador para reclamarlo."}
                     </p>
                   </div>

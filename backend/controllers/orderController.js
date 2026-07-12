@@ -3,6 +3,7 @@ import PromoCode from "../models/PromoCode.js";
 import User from "../models/User.js";
 import { computePricing } from "../pricing.js";
 import { sendEmail, orderConfirmationEmail } from "../utils/notify.js";
+import { expireStalePoints } from "../utils/loyalty.js";
 
 // 100 puntos = $25 MXN
 const POINTS_PER_REWARD = 100;
@@ -129,6 +130,7 @@ export const createOrder = async (req, res) => {
     let pointsDiscount = 0;
     let redeemedPoints = 0;
     if (pointsToRedeem && req.userId) {
+      await expireStalePoints(req.userId);
       const redeemAmt = Math.floor(Number(pointsToRedeem) / POINTS_PER_REWARD) * POINTS_PER_REWARD;
       if (redeemAmt >= POINTS_PER_REWARD) {
         const updatedUser = await User.findOneAndUpdate(
