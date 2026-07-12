@@ -1,0 +1,153 @@
+.qrPage {
+  width: min(560px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 22px 0 calc(120px + env(safe-area-inset-bottom));
+}
+
+.qrHero {
+  margin-bottom: 18px;
+}
+
+.qrBadge {
+  display: inline-flex;
+  width: fit-content;
+  margin: 0 0 8px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.qrHero h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.qrSub {
+  max-width: 480px;
+  margin: 8px 0 0;
+  color: var(--text-2);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+
+.qrCard {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  padding: 32px 28px 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.qrChip {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.qrChip img {
+  display: block;
+  width: 200px;
+  height: 200px;
+}
+
+.qrInstruction {
+  margin: 20px 0 2px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.qrTarget {
+  margin: 0 0 22px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-family: "DM Mono", ui-monospace, monospace;
+}
+
+.qrDivider {
+  width: 100%;
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0 16px;
+}
+
+.qrMeta {
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.qrMeta strong {
+  color: var(--accent);
+}
+
+.qrActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  width: 100%;
+}
+
+.qrActions a,
+.qrActions button {
+  flex: 1;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+.qrPrimaryBtn {
+  background: var(--accent);
+  color: #fff;
+}
+
+.qrGhostBtn {
+  border: 1px solid var(--border-md) !important;
+  background: var(--bg-subtle);
+  color: var(--text-2);
+}
+
+.qrHint {
+  margin: 14px 0 0;
+  color: var(--text-2);
+  font-size: 11.5px;
+}
+
+@media print {
+  body * { visibility: hidden; }
+  .qrPrintArea, .qrPrintArea * { visibility: visible; }
+  .qrPrintArea {
+    position: fixed;
+    top: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .qrActions, .qrHint, .qrBadge, .qrSub { display: none; }
+  .qrCard {
+    box-shadow: none;
+    border: 1px solid #ddd;
+    width: 3.2in;
+  }
+}

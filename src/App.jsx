@@ -21,6 +21,7 @@ const MiCuenta         = lazy(() => import("./pages/MiCuenta"));
 const OrderSummaryPage = lazy(() => import("./pages/OrderSummaryPage"));
 const OrderTracking    = lazy(() => import("./pages/OrderTracking"));
 const LocationPage     = lazy(() => import("./pages/LocationPage"));
+const QrCodePage       = lazy(() => import("./pages/QrCodePage"));
 
 // Kiosk & staff — lazy loaded (never used by regular customers)
 const KioskLayout      = lazy(() => import("./kiosk/KioskLayout"));
@@ -82,6 +83,7 @@ const App = () => {
               <Route path="/earn-points" element={<EarnPoints />} />
               <Route path="/more-options" element={<MoreOptions />} />
               <Route path="/ubicaciones" element={<LocationPage />} />
+              <Route path="/qr" element={<QrCodePage />} />
 
               <Route path="/order" element={<OrderPage />} />
               <Route path="/summary" element={<OrderSummaryPage />} />
