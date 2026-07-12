@@ -56,7 +56,7 @@ const REWARDS = [
   },
   {
     id: 3,
-    cost: 150,
+    cost: 300,
     icon: "🥗",
     name: { es: "Bowl gratis", en: "Free bowl" },
     desc: { es: "Un bowl completo de tu elección", en: "A full bowl of your choice" },

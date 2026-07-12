@@ -31,15 +31,23 @@ async function deductInventory(order) {
   }
 }
 
-/* ── loyalty point award: 1 point per $10 MXN, online orders with user only ──
-   Guarded atomically on loyaltyPointsEarned so calling markAsPaid more than
-   once on the same order (double click, retry, repeated API call) can never
-   award points twice — the conditional update only succeeds the first time. */
+/* ── loyalty point award: 1 point per $10 MXN, 2x for customers already in
+   Oro (300+ points) at the time they placed the order. Guarded atomically on
+   loyaltyPointsEarned so calling markAsPaid more than once on the same order
+   (double click, retry, repeated API call) can never award points twice —
+   the conditional update only succeeds the first time. ── */
+const GOLD_TIER_MIN_POINTS = 300;
+const GOLD_POINTS_MULTIPLIER = 2;
+
 async function awardLoyaltyPoints(order) {
   try {
     if (!order.user || !order.total || order.total <= 0) return;
-    const earned = Math.floor(order.total / 10);
-    if (earned <= 0) return;
+    const basePoints = Math.floor(order.total / 10);
+    if (basePoints <= 0) return;
+
+    const userDoc = await User.findById(order.user).select("points");
+    const isGold = (userDoc?.points ?? 0) >= GOLD_TIER_MIN_POINTS;
+    const earned = basePoints * (isGold ? GOLD_POINTS_MULTIPLIER : 1);
 
     const claimed = await Order.findOneAndUpdate(
       { _id: order._id, loyaltyPointsEarned: 0 },

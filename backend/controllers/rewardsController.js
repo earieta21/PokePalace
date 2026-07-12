@@ -8,7 +8,7 @@ export const REWARDS_CATALOG = {
   1: { name: "Bebida gratis", cost: 50 },
   2: { name: "Topping extra", cost: 75 },
   4: { name: "Proteína doble", cost: 200 },
-  3: { name: "Bowl gratis", cost: 150 },
+  3: { name: "Bowl gratis", cost: 300 },
 };
 
 // Unambiguous charset — no 0/O, 1/I/L — easier for staff to read back a code.
