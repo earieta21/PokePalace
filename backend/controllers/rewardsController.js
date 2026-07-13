@@ -2,7 +2,7 @@ import crypto from "crypto";
 import User from "../models/User.js";
 import Redemption from "../models/Redemption.js";
 import { expireStalePoints, REDEMPTION_CODE_EXPIRY_DAYS } from "../utils/loyalty.js";
-import { getRewardById } from "../../shared/rewardsCatalog.js";
+import { getRewardById } from "../config/rewardsCatalog.js";
 
 // Unambiguous charset — no 0/O, 1/I/L — easier for staff to read back a code.
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
