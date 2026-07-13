@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { API_URL } from "../config";
+import { REWARDS } from "../../shared/rewardsCatalog.js";
 import styles from "./Promotions.module.css";
 
 const TIERS = [
@@ -10,56 +11,25 @@ const TIERS = [
     key: "bronze", nameKey: "rewards.bronze", min: 0, max: 99,
     color: "#cd7f32", bg: "rgba(205,127,50,0.10)", icon: "🥉",
     perks: {
-      es: ["1 punto por cada $10 MXN gastados", "Acceso a recompensas básicas"],
-      en: ["1 point for every $10 MXN spent", "Access to basic rewards"],
+      es: ["1 punto por cada $10 MXN gastados", "Canje de puntos por premios"],
+      en: ["1 point for every $10 MXN spent", "Redeem points for rewards"],
     },
   },
   {
     key: "silver", nameKey: "rewards.silver", min: 100, max: 299,
     color: "#8a8aaa", bg: "rgba(138,138,170,0.10)", icon: "🥈",
     perks: {
-      es: ["1 punto por cada $10 MXN gastados", "5% de descuento en tu cumpleaños", "Acceso anticipado a promociones"],
-      en: ["1 point for every $10 MXN spent", "5% birthday discount", "Early access to promotions"],
+      es: ["1 punto por cada $10 MXN gastados", "Nivel Plata permanente"],
+      en: ["1 point for every $10 MXN spent", "Permanent Silver tier"],
     },
   },
   {
     key: "gold", nameKey: "rewards.gold", min: 300, max: Infinity,
     color: "#d4a017", bg: "rgba(212,160,23,0.10)", icon: "🥇",
     perks: {
-      es: ["2 puntos por cada $10 MXN gastados", "Topping gratis en cada orden", "10% de descuento en tu cumpleaños"],
-      en: ["2 points for every $10 MXN spent", "Free topping on every order", "10% birthday discount"],
+      es: ["2 puntos por cada $10 MXN gastados", "Nivel Oro permanente"],
+      en: ["2 points for every $10 MXN spent", "Permanent Gold tier"],
     },
-  },
-];
-
-const REWARDS = [
-  {
-    id: 1,
-    cost: 50,
-    icon: "🥤",
-    name: { es: "Bebida gratis", en: "Free drink" },
-    desc: { es: "Agua de coco o limonada de matcha", en: "Coconut water or matcha lemonade" },
-  },
-  {
-    id: 2,
-    cost: 75,
-    icon: "✨",
-    name: { es: "Topping extra", en: "Extra topping" },
-    desc: { es: "Cualquier topping de tu elección", en: "Any topping of your choice" },
-  },
-  {
-    id: 4,
-    cost: 200,
-    icon: "✨",
-    name: { es: "Proteína doble", en: "Double protein" },
-    desc: { es: "Doble porción de proteína en tu bowl", en: "Double protein portion in your bowl" },
-  },
-  {
-    id: 3,
-    cost: 300,
-    icon: "🥗",
-    name: { es: "Bowl gratis", en: "Free bowl" },
-    desc: { es: "Un bowl completo de tu elección", en: "A full bowl of your choice" },
   },
 ];
 
@@ -255,9 +225,9 @@ export default function RewardsPage() {
               desc: language === "es" ? "Llega a nivel Oro y gana puntos dobles." : "Reach Gold tier and earn double points.",
             },
             {
-              icon: "🎂",
-              title: language === "es" ? "Cumpleaños" : "Birthday",
-              desc: language === "es" ? "Bonus de puntos el mes de tu cumpleaños." : "Bonus points during your birthday month.",
+              icon: "🎟️",
+              title: language === "es" ? "Canjea tus puntos" : "Redeem your points",
+              desc: language === "es" ? "Elige un premio y recibe un código para mostrar en caja." : "Choose a reward and get a code to show at the counter.",
             },
           ].map((item) => (
             <div key={item.title} className={styles.howCard}>

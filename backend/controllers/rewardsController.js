@@ -2,15 +2,7 @@ import crypto from "crypto";
 import User from "../models/User.js";
 import Redemption from "../models/Redemption.js";
 import { expireStalePoints, REDEMPTION_CODE_EXPIRY_DAYS } from "../utils/loyalty.js";
-
-// Source of truth for reward costs/names — mirrors src/pages/Promotions.jsx.
-// Never trust a cost or name submitted by the client.
-export const REWARDS_CATALOG = {
-  1: { name: "Bebida gratis", cost: 50 },
-  2: { name: "Topping extra", cost: 75 },
-  4: { name: "Proteína doble", cost: 200 },
-  3: { name: "Bowl gratis", cost: 300 },
-};
+import { getRewardById } from "../../shared/rewardsCatalog.js";
 
 // Unambiguous charset — no 0/O, 1/I/L — easier for staff to read back a code.
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -23,9 +15,10 @@ function generateCode() {
 }
 
 export const redeemReward = async (req, res) => {
+  let deductedReward = null;
   try {
     const rewardId = Number(req.body.rewardId);
-    const reward = REWARDS_CATALOG[rewardId];
+    const reward = getRewardById(rewardId);
     if (!reward) return res.status(400).json({ msg: "Premio inválido" });
 
     // Saldo inactivo (12+ meses sin ganar puntos) se resetea antes de dejar gastarlo
@@ -39,6 +32,7 @@ export const redeemReward = async (req, res) => {
       { new: true }
     );
     if (!updatedUser) return res.status(400).json({ msg: "No tienes suficientes puntos" });
+    deductedReward = reward;
 
     const expiresAt = new Date(Date.now() + REDEMPTION_CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
@@ -48,7 +42,7 @@ export const redeemReward = async (req, res) => {
         redemption = await Redemption.create({
           user: req.userId,
           rewardId,
-          rewardName: reward.name,
+          rewardName: reward.name.es,
           pointsCost: reward.cost,
           code: generateCode(),
           expiresAt,
@@ -60,11 +54,28 @@ export const redeemReward = async (req, res) => {
     if (!redemption) {
       // Extremely unlikely, but refund the points rather than lose them
       await User.findByIdAndUpdate(req.userId, { $inc: { points: reward.cost } });
+      deductedReward = null;
       return res.status(500).json({ msg: "No se pudo generar el código, intenta de nuevo" });
     }
 
+    deductedReward = null;
     res.status(201).json({ redemption, points: updatedUser.points });
-  } catch {
+  } catch (err) {
+    // Once points have been deducted, every failure before a redemption is
+    // returned must compensate the balance. This avoids charging a customer
+    // for a database/validation failure while generating the code.
+    if (deductedReward) {
+      try {
+        await User.findByIdAndUpdate(req.userId, { $inc: { points: deductedReward.cost } });
+      } catch (refundError) {
+        console.error("CRITICAL: reward points refund failed", {
+          userId: req.userId,
+          rewardId: deductedReward.id,
+          error: refundError.message,
+        });
+      }
+    }
+    console.error("redeemReward error:", err.message);
     res.status(500).json({ msg: "Error canjeando el premio" });
   }
 };
