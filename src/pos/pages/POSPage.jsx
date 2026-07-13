@@ -3,7 +3,7 @@ import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { queueOrder, flushQueuedOrders, isNetworkError, getQueuedOrders } from "../offlineQueue";
 import CustomBowlBuilder from "../CustomBowlBuilder";
-import { getRewardById } from "../../../backend/config/rewardsCatalog.js";
+import { getRewardById } from "../../data/rewardsCatalog.js";
 
 const CUSTOM_BOWL_ID = "custom-bowl";
 
