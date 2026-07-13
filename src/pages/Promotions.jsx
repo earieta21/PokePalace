@@ -48,9 +48,36 @@ export default function RewardsPage() {
   const [redeeming, setRedeeming] = useState(null);   // reward.id currently in flight
   const [redeemError, setRedeemError] = useState("");
   const [wonCode, setWonCode] = useState(null);        // { code, rewardName, expiresAt }
+  const [completedOrderCount, setCompletedOrderCount] = useState(null);
 
   // Refresh on mount so el nivel y el saldo estén al día (p. ej. justo tras login)
   useEffect(() => { if (isLoggedIn) refreshUser?.(); }, [isLoggedIn]);
+
+  // Personalization uses existing account orders only. It creates no new
+  // customer profile fields and never changes prices or awards extra benefits.
+  useEffect(() => {
+    if (!isLoggedIn || !token) {
+      setCompletedOrderCount(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(`${API_URL}/api/orders/mine`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) return;
+        const completed = (data.orders || []).filter((order) => order.status === "completed");
+        setCompletedOrderCount(completed.length);
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") setCompletedOrderCount(null);
+      });
+
+    return () => controller.abort();
+  }, [isLoggedIn, token]);
 
   const points = user?.points ?? 0;                   // saldo gastable — sube y baja
   const lifetimePoints = user?.lifetimePoints ?? 0;    // nivel — logro permanente, solo sube
@@ -60,6 +87,19 @@ export default function RewardsPage() {
   const tierProgress = nextTier
     ? Math.round(((lifetimePoints - tier.min) / (nextTier.min - tier.min)) * 100)
     : 100;
+
+  const sortedRewards = [...REWARDS].sort((a, b) => a.cost - b.cost);
+  const readyReward = sortedRewards.find((reward) => points >= reward.cost) || null;
+  const nextReward = sortedRewards.find((reward) => points < reward.cost) || null;
+  const personalGoal = readyReward || nextReward || sortedRewards[0];
+  const pointsMissing = nextReward ? nextReward.cost - points : 0;
+  const earnRate = tier.key === "gold" ? 2 : 1;
+  const estimatedSpend = pointsMissing > 0 ? Math.ceil(pointsMissing / earnRate) * 10 : 0;
+  const goalProgress = personalGoal
+    ? Math.min(100, Math.round((points / personalGoal.cost) * 100))
+    : 0;
+  const favoriteName = user?.favoriteBowls?.[0]?.name || null;
+  const firstName = user?.name?.trim().split(/\s+/)[0] || "";
 
   const handleRedeem = async (reward) => {
     if (points < reward.cost || redeeming) return;
@@ -137,6 +177,69 @@ export default function RewardsPage() {
         </div>
       )}
 
+      {/* ── Personalized guidance without extra discounts ── */}
+      {isLoggedIn && personalGoal && (
+        <section className={`${styles.section} ${styles.personalCard}`}>
+          <div className={styles.personalTopRow}>
+            <div>
+              <p className={styles.personalEyebrow}>
+                {language === "es" ? `Recomendado para ti${firstName ? `, ${firstName}` : ""}` : `Recommended for you${firstName ? `, ${firstName}` : ""}`}
+              </p>
+              <h2 className={styles.personalTitle}>
+                {readyReward
+                  ? (language === "es" ? `Ya puedes canjear: ${readyReward.name.es}` : `Ready to redeem: ${readyReward.name.en}`)
+                  : (language === "es" ? `Tu siguiente meta: ${nextReward.name.es}` : `Your next goal: ${nextReward.name.en}`)}
+              </h2>
+              <p className={styles.personalLead}>
+                {readyReward
+                  ? (language === "es"
+                      ? "Usa los puntos que ya ganaste; no necesitas esperar una promoción adicional."
+                      : "Use the points you already earned; there is no need to wait for another promotion.")
+                  : (language === "es"
+                      ? `Te faltan ${pointsMissing} puntos, equivalentes a aproximadamente $${estimatedSpend} MXN en compras futuras.`
+                      : `You need ${pointsMissing} more points, about $${estimatedSpend} MXN in future purchases.`)}
+              </p>
+            </div>
+            <span className={styles.personalRewardIcon} aria-hidden="true">{personalGoal.icon}</span>
+          </div>
+
+          <div className={styles.personalProgress}>
+            <div className={styles.personalProgressTrack}>
+              <div className={styles.personalProgressFill} style={{ width: `${goalProgress}%` }} />
+            </div>
+            <span>{points} / {personalGoal.cost} pts</span>
+          </div>
+
+          <div className={styles.personalFacts}>
+            <div>
+              <strong>{completedOrderCount ?? "—"}</strong>
+              <span>{language === "es" ? "Pedidos completados en tu cuenta" : "Completed account orders"}</span>
+            </div>
+            <div>
+              <strong>{tier.icon} {t(tier.nameKey)}</strong>
+              <span>{language === "es" ? `${earnRate} ${earnRate === 1 ? "punto" : "puntos"} por cada $10` : `${earnRate} ${earnRate === 1 ? "point" : "points"} per $10`}</span>
+            </div>
+            <div>
+              <strong>{favoriteName || (language === "es" ? "Aún sin favorito" : "No favorite yet")}</strong>
+              <span>{language === "es" ? "Bowl guardado para ordenar más rápido" : "Saved bowl for faster ordering"}</span>
+            </div>
+          </div>
+
+          <div className={styles.personalActions}>
+            <a className={styles.personalPrimary} href="#rewards-catalog">
+              {readyReward
+                ? (language === "es" ? "Ver premio disponible" : "View available reward")
+                : (language === "es" ? "Ver mi progreso" : "View my progress")}
+            </a>
+            <button className={styles.personalSecondary} type="button" onClick={() => navigate(favoriteName ? "/mi-cuenta" : "/order")}>
+              {favoriteName
+                ? (language === "es" ? "Ver mi bowl favorito" : "View my favorite bowl")
+                : (language === "es" ? "Armar mi bowl" : "Build my bowl")}
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* ── Social story campaign ── */}
       <section className={`${styles.section} ${styles.storyCampaign}`}>
         <div className={styles.storyCampaignHeader}>
@@ -174,7 +277,7 @@ export default function RewardsPage() {
       </section>
 
       {/* ── Recompensas canjeables ── */}
-      <section className={styles.section}>
+      <section id="rewards-catalog" className={styles.section}>
         <h2 className={styles.sectionTitle}>{t("rewards.redeemTitle")}</h2>
         <p className={styles.sectionSub}>{t("rewards.rate")}</p>
         <p className={styles.sectionSub}>
