@@ -67,17 +67,35 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
 
   const pricing = computePricing(bowlSize, promoApplied);
 
-  // Time picker helpers
+  // Time picker helpers — mantiene el rango en línea con lo que de verdad
+  // acepta el backend (11:00–21:00), para no dejar elegir una hora que
+  // luego se va a rechazar al confirmar. Usa la hora LOCAL del navegador
+  // (no toISOString, que da UTC y desfasa el límite varias horas).
+  const OPEN_HOUR = 11;
+  const CLOSE_HOUR = 21;
+
+  const toLocalDatetimeValue = (date) => {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
   const getMinTime = () => {
     const now = new Date();
     now.setMinutes(now.getMinutes() + 15);
-    return now.toISOString().slice(0, 16);
+    if (now.getHours() < OPEN_HOUR) {
+      now.setHours(OPEN_HOUR, 0, 0, 0);
+    } else if (now.getHours() >= CLOSE_HOUR) {
+      now.setDate(now.getDate() + 1);
+      now.setHours(OPEN_HOUR, 0, 0, 0);
+    }
+    return toLocalDatetimeValue(now);
   };
 
   const getMaxTime = () => {
     const now = new Date();
-    now.setHours(20, 45, 0, 0);
-    return now.toISOString().slice(0, 16);
+    now.setHours(CLOSE_HOUR - 1, 45, 0, 0);
+    if (now < new Date()) now.setDate(now.getDate() + 1);
+    return toLocalDatetimeValue(now);
   };
 
   const handleApplyPromo = async () => {
@@ -143,11 +161,15 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
     }
   };
 
-  const Section = ({ title, value, chips, emptyText, onEdit }) => (
+  const Section = ({ icon, title, value, chips, emptyText, onEdit }) => (
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
         <div>
-          <h3 className={styles.subTitle}>{title}</h3>
+          <h3 className={styles.subTitle}>
+            <span className={styles.sectionIcon} aria-hidden="true">{icon}</span>
+            {title}
+            {chips && chips.length > 0 && <span className={styles.subTitleCount}>· {chips.length}</span>}
+          </h3>
           {value ? <p className={styles.detail}>{value}</p> : null}
         </div>
         <button className={styles.editButton} onClick={onEdit} type="button">
@@ -180,12 +202,14 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
         </div>
 
         <Section
+          icon="🍚"
           title={t("summary.base")}
           value={getLabel(labels.base, base)}
           onEdit={() => onEditStep(0)}
         />
 
         <Section
+          icon="🐟"
           title={t("summary.protein")}
           value={proteinLabels.length > 0 ? proteinLabels.join(", ") : t("summary.empty")}
           onEdit={() => onEditStep(1)}
@@ -201,6 +225,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
         </div>
 
         <Section
+          icon="✨"
           title={t("summary.marinades")}
           chips={marinadesLabels}
           emptyText={t("summary.noMarinades")}
@@ -208,6 +233,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
         />
 
         <Section
+          icon="🥗"
           title={t("summary.complements")}
           chips={complementsLabels}
           emptyText={t("summary.noComplements")}
@@ -215,6 +241,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
         />
 
         <Section
+          icon="🥣"
           title={t("summary.sauces")}
           chips={saucesLabels}
           emptyText={t("summary.noSauces")}
@@ -222,6 +249,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
         />
 
         <Section
+          icon="🌿"
           title={t("summary.toppings")}
           chips={toppingsLabels}
           emptyText={t("summary.noToppings")}
@@ -352,7 +380,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
 
               {order.isScheduled && (
                 <label className={styles.field}>
-                  <span>Hora de recogida (horario: 10:00 – 21:00)</span>
+                  <span>Hora de recogida (horario: 11:00 – 21:00)</span>
                   <input
                     type="datetime-local"
                     value={order.scheduledPickupTime || ""}
@@ -366,7 +394,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
           )}
 
           <label className={styles.field}>
-            <span>{t("summary.notes")}</span>
+            <span>{t("summary.notes")} <em className={styles.optionalTag}>({language === "es" ? "opcional" : "optional"})</em></span>
             <textarea
               name="notes"
               value={order.notes || ""}

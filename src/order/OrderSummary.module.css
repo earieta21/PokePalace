@@ -67,12 +67,35 @@
 }
 
 .subTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 0 4px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--text-3);
+}
+
+.sectionIcon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.subTitleCount {
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.optionalTag {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--text-3);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .detail {
@@ -155,30 +178,6 @@
   color: var(--text-2);
   font-size: 12.5px;
   font-weight: 600;
-}
-
-.priceSummary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 10px;
-  padding: 14px 12px;
-  border-radius: var(--radius-md);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-}
-
-.priceSummary span {
-  color: var(--text-2);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.priceSummary strong {
-  color: var(--text);
-  font-size: 18px;
-  font-weight: 800;
 }
 
 .checkoutSection {
@@ -500,17 +499,32 @@
 
 .priceTotalRow {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--text);
-  padding: 10px 0 0;
-  margin-top: 6px;
-  border-top: 1px dashed var(--border-md);
+  padding: 14px 16px;
+  margin-top: 10px;
+  border-radius: var(--radius-md);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+}
+
+.priceTotalRow span:first-child {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.priceTotalRow span:last-child {
+  color: var(--accent);
 }
 
 .ivaNote {
-  margin: 6px 0 0;
+  margin: 6px 2px 0;
   font-size: 11px;
   color: var(--text-3);
   font-weight: 500;
