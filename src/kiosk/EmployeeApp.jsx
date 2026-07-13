@@ -139,11 +139,22 @@ export default function EmployeeApp() {
     const { token: t, user } = await r.json();
     setToken(t);
     setMe(user);
+    if (user.isManager) {
+      const managed = await fetch(
+        `${API_URL}/api/kiosk/employees/manage?locationId=${LOCATION_ID}`,
+        { headers: { Authorization: `Bearer ${t}` } }
+      );
+      if (managed.ok) {
+        const data = await managed.json();
+        setEmployees(data.employees || []);
+      }
+    }
     setTab("inicio");
   }
 
   function handleLogout() {
     setToken(null); setMe(null);
+    setEmployees((current) => current.map(({ _id, name, color }) => ({ _id, name, color })));
     setTime([]); setChecklist({}); setTemps([]); setSchedule({}); setAnnouncements([]);
   }
 
@@ -334,7 +345,7 @@ function KioskLogin({ employees, onLogin }) {
                   </div>
                   <div className="relative min-w-0">
                     <p className="font-semibold text-white truncate">{e.name}</p>
-                    <p className={`text-xs capitalize mt-0.5 ${col.text}`}>{e.role}</p>
+                    <p className={`text-xs mt-0.5 ${col.text}`}>Personal</p>
                   </div>
                 </button>
               );
@@ -353,7 +364,7 @@ function KioskLogin({ employees, onLogin }) {
             {initials(selected.name)}
           </div>
           <p className="font-bold text-lg text-white mb-0.5">{selected.name}</p>
-          <p className={`text-xs capitalize mb-5 ${getColor(selected.color).text}`}>{selected.role}</p>
+          <p className={`text-xs mb-5 ${getColor(selected.color).text}`}>Personal</p>
 
           {/* PIN dots */}
           <div className="flex gap-4 mb-8">

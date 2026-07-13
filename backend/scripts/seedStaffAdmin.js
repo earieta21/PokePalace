@@ -7,32 +7,32 @@ dotenv.config();
 
 const run = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("✅ MongoDB connected");
-
-    const existing = await StaffUser.findOne({
-      email: "admin@pokepalace.com",
-    });
-
-    if (existing) {
-      console.log("⚠️ Admin already exists");
-      process.exit(0);
+    const { MONGO_URI, STAFF_ADMIN_NAME, STAFF_ADMIN_EMAIL, STAFF_ADMIN_PASSWORD } = process.env;
+    if (!MONGO_URI || !STAFF_ADMIN_NAME || !STAFF_ADMIN_EMAIL || !STAFF_ADMIN_PASSWORD) {
+      throw new Error(
+        "MONGO_URI, STAFF_ADMIN_NAME, STAFF_ADMIN_EMAIL and STAFF_ADMIN_PASSWORD are required"
+      );
+    }
+    if (STAFF_ADMIN_PASSWORD.length < 12) {
+      throw new Error("STAFF_ADMIN_PASSWORD must contain at least 12 characters");
     }
 
-    const hashedPassword = await bcrypt.hash("admin123", 10);
+    await mongoose.connect(MONGO_URI);
+    const existing = await StaffUser.findOne({ email: STAFF_ADMIN_EMAIL });
+    if (existing) throw new Error("An account with STAFF_ADMIN_EMAIL already exists");
 
     await StaffUser.create({
-      name: "Admin",
-      email: "admin@pokepalace.com",
-      password: hashedPassword,
+      name: STAFF_ADMIN_NAME,
+      email: STAFF_ADMIN_EMAIL,
+      password: await bcrypt.hash(STAFF_ADMIN_PASSWORD, 12),
       role: "admin",
     });
-
-    console.log("✅ Staff admin created");
-    process.exit(0);
+    console.log("Staff admin created");
   } catch (err) {
-    console.error("❌ Error seeding staff:", err);
-    process.exit(1);
+    console.error("Error seeding staff admin:", err.message);
+    process.exitCode = 1;
+  } finally {
+    await mongoose.disconnect();
   }
 };
 

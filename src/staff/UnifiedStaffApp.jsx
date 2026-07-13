@@ -224,12 +224,23 @@ export default function UnifiedStaffApp() {
     const { token: t, user } = await r.json();
     setToken(t);
     setMe(user);
+    if (user.isManager) {
+      const managed = await fetch(
+        `${API_URL}/api/kiosk/employees/manage?locationId=${LOCATION_ID}`,
+        { headers: { Authorization: `Bearer ${t}` } }
+      );
+      if (managed.ok) {
+        const data = await managed.json();
+        setEmployees(data.employees || []);
+      }
+    }
     const tabs = TABS_BY_ROLE[user.role] || TABS_BY_ROLE.employee;
     setTab(tabs[0]);
   }
 
   function handleLogout() {
     setToken(null); setMe(null); setTab(null); setLowStockCount(0);
+    setEmployees((current) => current.map(({ _id, name, color }) => ({ _id, name, color })));
     setTime([]); setChecklist({}); setTemps([]); setSchedule({}); setAnnouncements([]);
   }
 
@@ -442,7 +453,7 @@ function PinLogin({ employees, onLogin }) {
                   </div>
                   <div className="relative min-w-0">
                     <p className="font-semibold text-white truncate">{e.name}</p>
-                    <p className={`text-xs mt-0.5 ${col.text}`}>{ROLE_LABEL[e.role] || e.role}</p>
+                    <p className={`text-xs mt-0.5 ${col.text}`}>Personal</p>
                   </div>
                 </button>
               );
@@ -459,7 +470,7 @@ function PinLogin({ employees, onLogin }) {
             {initials(selected.name)}
           </div>
           <p className="font-bold text-lg text-white mb-0.5">{selected.name}</p>
-          <p className={`text-xs mb-5 ${getColor(selected.color).text}`}>{ROLE_LABEL[selected.role] || selected.role}</p>
+          <p className={`text-xs mb-5 ${getColor(selected.color).text}`}>Personal</p>
           <div className="flex gap-4 mb-8">
             {[0,1,2,3].map((i) => (
               <div key={i} className={`w-5 h-5 rounded-full border-2 transition-all duration-150 ${

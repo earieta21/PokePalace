@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import TimeRecord from "../models/TimeRecord.js";
 import ChecklistRecord from "../models/ChecklistRecord.js";
@@ -5,6 +6,7 @@ import TempRecord from "../models/TempRecord.js";
 import Announcement from "../models/Announcement.js";
 import Schedule from "../models/Schedule.js";
 import StaffUser from "../models/StaffUser.js";
+import { comparePin, hashPin, isValidPin } from "../utils/staffPin.js";
 
 /* ── EMPLOYEES ──────────────────────────────────────────────────────────── */
 
@@ -13,7 +15,20 @@ export const getKioskEmployees = async (req, res) => {
   if (!locationId) return res.status(400).json({ message: "locationId requerido" });
   try {
     const employees = await StaffUser.find({ locationId, active: true })
-      .select("-password -pin")
+      .select("_id name color")
+      .sort({ name: 1 });
+    res.json({ employees });
+  } catch (err) {
+    res.status(500).json({ message: "Error", err: err.message });
+  }
+};
+
+export const getManagedKioskEmployees = async (req, res) => {
+  const { locationId } = req.query;
+  if (!locationId) return res.status(400).json({ message: "locationId requerido" });
+  try {
+    const employees = await StaffUser.find({ locationId, active: true })
+      .select("_id name role color locationId active hourlyRate")
       .sort({ name: 1 });
     res.json({ employees });
   } catch (err) {
@@ -23,21 +38,28 @@ export const getKioskEmployees = async (req, res) => {
 
 export const createKioskEmployee = async (req, res) => {
   const { name, role, pin, color, locationId, hourlyRate } = req.body;
-  if (!name?.trim() || !pin || String(pin).length !== 4) {
+  if (!name?.trim() || !isValidPin(pin) || !locationId) {
     return res.status(400).json({ message: "Nombre y PIN de 4 dígitos requeridos" });
   }
   try {
-    const pinConflict = await StaffUser.findOne({ pin: String(pin), locationId, active: true });
+    const candidates = await StaffUser.find({ locationId, active: true }).select("+pin");
+    let pinConflict = false;
+    for (const candidate of candidates) {
+      if (await comparePin(pin, candidate.pin)) {
+        pinConflict = true;
+        break;
+      }
+    }
     if (pinConflict) return res.status(409).json({ message: "Ese PIN ya está en uso por otro empleado" });
 
     const slug = name.trim().toLowerCase().replace(/\s+/g, ".").replace(/[^a-z0-9.]/g, "");
     const email = `${slug}.${Date.now()}@pokepalace.internal`;
-    const password = await bcrypt.hash(Math.random().toString(36) + Date.now(), 10);
+    const password = await bcrypt.hash(crypto.randomBytes(32).toString("base64url"), 12);
 
     const employee = await StaffUser.create({
       name: name.trim(),
       role: role || "employee",
-      pin: String(pin),
+      pin: await hashPin(pin),
       color: color || "emerald",
       email,
       password,
@@ -66,7 +88,7 @@ export const updateKioskEmployee = async (req, res) => {
     if (update.hourlyRate !== undefined) update.hourlyRate = parseFloat(update.hourlyRate) || 0;
 
     const employee = await StaffUser.findByIdAndUpdate(req.params.id, update, { new: true })
-      .select("-password -pin");
+      .select("_id name role color locationId active hourlyRate");
     if (!employee) return res.status(404).json({ message: "Empleado no encontrado" });
     res.json({ employee });
   } catch (err) {

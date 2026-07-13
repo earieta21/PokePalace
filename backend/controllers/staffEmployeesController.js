@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 export const getEmployees = async (req, res) => {
   try {
     const employees = await StaffUser.find()
-      .select("-password")
+      .select("_id name email role color locationId active hourlyRate createdAt updatedAt")
       .sort({ role: 1, name: 1 });
     res.json({ employees });
   } catch (err) {
@@ -31,8 +31,20 @@ export const createEmployee = async (req, res) => {
       name, email, password: hashed, role, active: true,
     });
 
-    const { password: _, ...safe } = employee.toObject();
-    res.status(201).json({ employee: safe });
+    res.status(201).json({
+      employee: {
+        _id: employee._id,
+        name: employee.name,
+        email: employee.email,
+        role: employee.role,
+        color: employee.color,
+        locationId: employee.locationId,
+        active: employee.active,
+        hourlyRate: employee.hourlyRate,
+        createdAt: employee.createdAt,
+        updatedAt: employee.updatedAt,
+      },
+    });
   } catch (err) {
     res.status(400).json({ message: "Error creating employee", err: err.message });
   }
@@ -46,7 +58,7 @@ export const updateEmployee = async (req, res) => {
       req.params.id,
       { name, role, active },
       { new: true }
-    ).select("-password");
+    ).select("_id name email role color locationId active hourlyRate createdAt updatedAt");
 
     if (!employee) return res.status(404).json({ message: "Employee not found" });
     res.json({ employee });
