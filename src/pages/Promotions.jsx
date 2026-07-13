@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { API_URL } from "../config";
-import { REWARDS } from "../../backend/config/rewardsCatalog.js";
+import { REWARDS } from "../data/rewardsCatalog.js";
 import styles from "./Promotions.module.css";
 
 const TIERS = [

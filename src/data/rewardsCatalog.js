@@ -1,9 +1,7 @@
-// Fuente de verdad — esta es la copia que de verdad cobra los puntos.
-// El frontend tiene su propia copia en src/data/rewardsCatalog.js, solo
-// para mostrar los premios. No importar este archivo desde src/ — mezclar
-// el árbol del frontend (Vite/Netlify) con el del backend (Render) es
-// frágil: un cambio aquí pensado solo para el backend podría tronar el
-// build del sitio sin aviso. Si cambias un premio, actualiza ambos archivos.
+// Copia local para mostrar los premios en el frontend. El backend
+// (backend/config/rewardsCatalog.js) tiene su propia copia — es la que
+// realmente se usa para cobrar puntos, nunca se confía en esta.
+// Si cambias un premio (costo, nombre, ícono), actualiza ambos archivos.
 export const REWARDS = [
   {
     id: 1,
@@ -34,6 +32,3 @@ export const REWARDS = [
     desc: { es: "Un bowl completo de tu elección", en: "A full bowl of your choice" },
   },
 ];
-
-export const getRewardById = (rewardId) =>
-  REWARDS.find((reward) => reward.id === Number(rewardId)) ?? null;
