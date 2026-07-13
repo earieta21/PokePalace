@@ -991,7 +991,7 @@ function RewardsRedeemTab({ token }) {
             disabled={issuingStory || !storyHandle.trim() || !confirmedTagged || !confirmedDisclosure}
             className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:hover:bg-violet-600 text-white font-semibold transition"
           >
-            {issuingStory ? "Generando…" : "Generar código de topping"}
+            {issuingStory ? "Generando…" : "Generar código de bebida"}
           </button>
         </form>
 
@@ -1006,7 +1006,7 @@ function RewardsRedeemTab({ token }) {
             <p className="text-violet-300 text-sm font-semibold">Código generado para {issuedStory.socialHandle}</p>
             <p className="my-2 text-3xl font-mono font-bold tracking-widest text-white">{issuedStory.code}</p>
             <p className="text-slate-400 text-xs">
-              Válido hasta el {new Date(issuedStory.expiresAt).toLocaleDateString("es-MX")} con la compra de un bowl.
+              Agua de coco o limonada de matcha. Válido hasta el {new Date(issuedStory.expiresAt).toLocaleDateString("es-MX")} con la compra de un bowl.
             </p>
           </div>
         )}

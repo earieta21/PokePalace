@@ -44,14 +44,14 @@ export const REWARDS = [
 export const STORY_REWARD = {
   id: 101,
   cost: 0,
-  icon: "📲",
-  name: { es: "Topping por historia", en: "Story topping" },
-  desc: { es: "Un topping básico en tu próxima visita", en: "One basic topping on your next visit" },
+  icon: "🥤",
+  name: { es: "Bebida por historia", en: "Story drink" },
+  desc: { es: "Agua de coco o limonada de matcha", en: "Coconut water or matcha lemonade" },
   terms: {
-    es: "Con la compra de un bowl. Válido por 7 días, una vez cada 30 días y no acumulable.",
-    en: "With a bowl purchase. Valid for 7 days, once every 30 days, and cannot be combined.",
+    es: "Con la compra de un bowl. Agrega la bebida a la orden. Válido por 7 días, una vez cada 30 días y no acumulable.",
+    en: "With a bowl purchase. Add the drink to the order. Valid for 7 days, once every 30 days, and cannot be combined.",
   },
-  type: "extra_topping",
+  type: "free_drink",
   source: "social_story",
 };
 
