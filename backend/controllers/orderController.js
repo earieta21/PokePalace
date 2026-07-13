@@ -16,6 +16,11 @@ const hasRequiredBowlFields = ({ base, proteins }) => {
 const OPEN_HOUR = 11;
 const CLOSE_HOUR = 21;
 
+const isWithinBusinessHours = (date) => {
+  const hour = date.getHours();
+  return hour >= OPEN_HOUR && hour < CLOSE_HOUR;
+};
+
 const validateScheduledTime = (scheduledPickupTime) => {
   const scheduled = new Date(scheduledPickupTime);
   if (isNaN(scheduled.getTime())) return "Hora programada inválida";
@@ -24,8 +29,7 @@ const validateScheduledTime = (scheduledPickupTime) => {
   const minTime = new Date(now.getTime() + 15 * 60 * 1000);
   if (scheduled < minTime) return "La hora debe ser al menos 15 minutos desde ahora";
 
-  const hour = scheduled.getHours();
-  if (hour < OPEN_HOUR || hour >= CLOSE_HOUR) {
+  if (!isWithinBusinessHours(scheduled)) {
     return `El restaurante acepta pedidos de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00`;
   }
 
@@ -71,7 +75,9 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({ msg: "Agrega tu nombre y teléfono para confirmar" });
     }
 
-    // Validate scheduled pickup time
+    // Validate scheduled pickup time — and for orders "for now" (no scheduled
+    // time), reject them outright if the restaurant is currently closed
+    // instead of silently accepting a pedido nobody will be there to make.
     let resolvedScheduledTime = null;
     let isScheduled = false;
     if (scheduledPickupTime) {
@@ -79,6 +85,10 @@ export const createOrder = async (req, res) => {
       if (timeError) return res.status(400).json({ msg: timeError });
       resolvedScheduledTime = new Date(scheduledPickupTime);
       isScheduled = true;
+    } else if (!isWithinBusinessHours(new Date())) {
+      return res.status(400).json({
+        msg: `El restaurante está cerrado ahora. Aceptamos pedidos de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00 — puedes programar tu pedido para más tarde.`,
+      });
     }
 
     // Validate promo code — read first for a specific error message, then
