@@ -16,6 +16,7 @@ import expenseRoutes     from "./routes/expenses.js";
 import settingsRoutes    from "./routes/settings.js";
 import rewardsRoutes     from "./routes/rewards.js";
 import staffRewardsRoutes from "./routes/staffRewards.js";
+import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
 
 dotenv.config();
 
@@ -50,6 +51,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(sanitizeMongo);
 
 app.use("/api/auth",            authRoutes);
 app.use("/api/users",          userRoutes);
