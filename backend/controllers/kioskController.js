@@ -82,10 +82,14 @@ export const createKioskEmployee = async (req, res) => {
 
 export const updateKioskEmployee = async (req, res) => {
   try {
-    const allowed = ["hourlyRate", "color", "role"];
+    const allowed = ["name", "hourlyRate", "color", "role"];
     const update  = {};
     allowed.forEach((k) => { if (req.body[k] !== undefined) update[k] = req.body[k]; });
     if (update.hourlyRate !== undefined) update.hourlyRate = parseFloat(update.hourlyRate) || 0;
+    if (update.name !== undefined) {
+      update.name = String(update.name).trim();
+      if (!update.name) delete update.name;
+    }
 
     const employee = await StaffUser.findByIdAndUpdate(req.params.id, update, { new: true })
       .select("_id name role color locationId active hourlyRate");
