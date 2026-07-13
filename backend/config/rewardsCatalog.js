@@ -43,5 +43,19 @@ export const REWARDS = [
   },
 ];
 
+export const STORY_REWARD = {
+  id: 101,
+  cost: 0,
+  icon: "📲",
+  name: { es: "Topping por historia", en: "Story topping" },
+  desc: { es: "Un topping básico en tu próxima visita", en: "One basic topping on your next visit" },
+  terms: {
+    es: "Con la compra de un bowl. Válido por 7 días, una vez cada 30 días y no acumulable.",
+    en: "With a bowl purchase. Valid for 7 days, once every 30 days, and cannot be combined.",
+  },
+  type: "extra_topping",
+  source: "social_story",
+};
+
 export const getRewardById = (rewardId) =>
-  REWARDS.find((reward) => reward.id === Number(rewardId)) ?? null;
+  [...REWARDS, STORY_REWARD].find((reward) => reward.id === Number(rewardId)) ?? null;

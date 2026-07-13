@@ -1,11 +1,13 @@
 import express from "express";
 import { requireStaffAuth } from "../middleware/requireStaffAuth.js";
-import { lookupRedemption } from "../controllers/staffRewardsController.js";
+import { createSocialStoryReward, lookupRedemption } from "../controllers/staffRewardsController.js";
 
 const router = express.Router();
 
 const anyStaff = requireStaffAuth([]);
+const campaignStaff = requireStaffAuth(["cashier", "manager", "admin", "owner"]);
 
-router.get  ("/:code",      anyStaff, lookupRedemption);
+router.post ("/social-story", campaignStaff, createSocialStoryReward);
+router.get  ("/:code",        anyStaff, lookupRedemption);
 
 export default router;

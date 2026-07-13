@@ -863,6 +863,51 @@ function RewardsRedeemTab({ token }) {
   const [redemption, setRedemption] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [storyPlatform, setStoryPlatform] = useState("instagram");
+  const [storyHandle, setStoryHandle] = useState("");
+  const [confirmedTagged, setConfirmedTagged] = useState(false);
+  const [confirmedDisclosure, setConfirmedDisclosure] = useState(false);
+  const [issuingStory, setIssuingStory] = useState(false);
+  const [storyError, setStoryError] = useState("");
+  const [issuedStory, setIssuedStory] = useState(null);
+
+  const issueStoryReward = async (e) => {
+    e.preventDefault();
+    if (!storyHandle.trim() || !confirmedTagged || !confirmedDisclosure || issuingStory) return;
+    setIssuingStory(true);
+    setStoryError("");
+    setIssuedStory(null);
+    try {
+      const r = await fetch(`${API_URL}/api/staff/rewards/social-story`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          platform: storyPlatform,
+          handle: storyHandle.trim(),
+          confirmedTagged,
+          confirmedDisclosure,
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const retryDate = data.nextEligibleAt
+          ? ` Podrá participar de nuevo el ${new Date(data.nextEligibleAt).toLocaleDateString("es-MX")}.`
+          : "";
+        throw new Error(`${data.msg || "No se pudo generar el premio"}${retryDate}`);
+      }
+      setIssuedStory(data.redemption);
+      setStoryHandle("");
+      setConfirmedTagged(false);
+      setConfirmedDisclosure(false);
+    } catch (err) {
+      setStoryError(err.message);
+    } finally {
+      setIssuingStory(false);
+    }
+  };
 
   const lookup = async (e) => {
     e.preventDefault();
@@ -889,6 +934,84 @@ function RewardsRedeemTab({ token }) {
 
   return (
     <div>
+      <div className="mb-8">
+        <h2 className="text-lg font-bold text-white">Premio por historia</h2>
+        <p className="text-slate-400 text-sm mt-1 mb-4">
+          Verifica la historia en el teléfono del cliente antes de emitir el código. No aceptes capturas antiguas.
+        </p>
+
+        <form onSubmit={issueStoryReward} className="bg-slate-900 rounded-2xl border border-white/5 p-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="text-sm text-slate-300">
+              Red social
+              <select
+                value={storyPlatform}
+                onChange={(e) => { setStoryPlatform(e.target.value); setStoryError(""); setIssuedStory(null); }}
+                className="mt-1.5 w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-3 text-white focus:outline-none focus:border-emerald-500/50"
+              >
+                <option value="instagram">Instagram</option>
+                <option value="facebook">Facebook</option>
+              </select>
+            </label>
+            <label className="text-sm text-slate-300">
+              Usuario del cliente
+              <input
+                value={storyHandle}
+                onChange={(e) => { setStoryHandle(e.target.value); setStoryError(""); setIssuedStory(null); }}
+                placeholder="@usuario"
+                maxLength={51}
+                autoComplete="off"
+                className="mt-1.5 w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50"
+              />
+            </label>
+          </div>
+
+          <label className="flex items-start gap-3 text-sm text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={confirmedTagged}
+              onChange={(e) => { setConfirmedTagged(e.target.checked); setStoryError(""); }}
+              className="mt-0.5 w-4 h-4 accent-emerald-500"
+            />
+            <span>La historia está activa, muestra el producto y etiqueta la cuenta oficial de Poke Palace.</span>
+          </label>
+          <label className="flex items-start gap-3 text-sm text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={confirmedDisclosure}
+              onChange={(e) => { setConfirmedDisclosure(e.target.checked); setStoryError(""); }}
+              className="mt-0.5 w-4 h-4 accent-emerald-500"
+            />
+            <span>La historia indica que es una promoción, por ejemplo con #PromocionPokePalace.</span>
+          </label>
+
+          <button
+            type="submit"
+            disabled={issuingStory || !storyHandle.trim() || !confirmedTagged || !confirmedDisclosure}
+            className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:hover:bg-violet-600 text-white font-semibold transition"
+          >
+            {issuingStory ? "Generando…" : "Generar código de topping"}
+          </button>
+        </form>
+
+        {storyError && (
+          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm rounded-xl px-4 py-3 mt-3">
+            {storyError}
+          </div>
+        )}
+
+        {issuedStory && (
+          <div className="mt-3 bg-violet-500/10 border border-violet-500/20 rounded-2xl p-5 text-center">
+            <p className="text-violet-300 text-sm font-semibold">Código generado para {issuedStory.socialHandle}</p>
+            <p className="my-2 text-3xl font-mono font-bold tracking-widest text-white">{issuedStory.code}</p>
+            <p className="text-slate-400 text-xs">
+              Válido hasta el {new Date(issuedStory.expiresAt).toLocaleDateString("es-MX")} con la compra de un bowl.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-white/10 pt-6">
       <div className="mb-5">
         <h2 className="text-lg font-bold text-white">Canjear premios</h2>
         <p className="text-slate-400 text-sm mt-1">
@@ -935,7 +1058,9 @@ function RewardsRedeemTab({ token }) {
           <div className="space-y-1.5 mb-5">
             <p className="text-white font-semibold">{redemption.rewardName}</p>
             <p className="text-slate-400 text-sm">
-              Cliente: {redemption.user?.name || "—"} · {redemption.pointsCost} pts
+              {redemption.source === "social_story"
+                ? `${redemption.socialPlatform === "facebook" ? "Facebook" : "Instagram"}: ${redemption.socialHandle}`
+                : `Cliente: ${redemption.user?.name || "—"} · ${redemption.pointsCost} pts`}
             </p>
             {redemption.status === "used" && (
               <p className="text-slate-500 text-xs">
@@ -968,6 +1093,7 @@ function RewardsRedeemTab({ token }) {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -1265,12 +1391,12 @@ function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
           );
         })}
       </div>
-      <p className="text-xs text-slate-500 text-center">Toca "Editar" en cada empleado para configurar su sueldo por hora (MXN).</p>
+      <p className="text-xs text-slate-500 text-center">Toca &quot;Editar&quot; en cada empleado para configurar su sueldo por hora (MXN).</p>
     </div>
   );
 }
 
-function TeamManager({ employees, onAdd, onRemove, onUpdate }) {
+function TeamManager({ employees, onAdd, onRemove }) {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: "", role: "employee", pin: "", color: "emerald", hourlyRate: "" });
   const [error, setError] = useState("");

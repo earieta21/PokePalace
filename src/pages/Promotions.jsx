@@ -137,6 +137,42 @@ export default function RewardsPage() {
         </div>
       )}
 
+      {/* ── Social story campaign ── */}
+      <section className={`${styles.section} ${styles.storyCampaign}`}>
+        <div className={styles.storyCampaignHeader}>
+          <span className={styles.storyCampaignIcon} aria-hidden="true">📲</span>
+          <div>
+            <p className={styles.storyCampaignEyebrow}>
+              {language === "es" ? "Comparte y vuelve" : "Share and come back"}
+            </p>
+            <h2 className={styles.storyCampaignTitle}>
+              {language === "es" ? "Sube una historia y recibe un topping" : "Post a story and get a topping"}
+            </h2>
+            <p className={styles.storyCampaignLead}>
+              {language === "es"
+                ? "Comparte tu bowl, etiqueta la cuenta oficial de Poke Palace y recibe un código para tu próxima visita."
+                : "Share your bowl, tag the official Poke Palace account, and get a code for your next visit."}
+            </p>
+          </div>
+        </div>
+
+        <ol className={styles.storySteps}>
+          <li><span>1</span>{language === "es" ? "Sube una historia pública mostrando tu producto." : "Post a public story showing your product."}</li>
+          <li><span>2</span>{language === "es" ? "Etiqueta la cuenta oficial de Poke Palace." : "Tag the official Poke Palace account."}</li>
+          <li><span>3</span>{language === "es" ? "Incluye #PromocionPokePalace para indicar que recibes un beneficio." : "Include #PokePalacePromotion to disclose the benefit."}</li>
+          <li><span>4</span>{language === "es" ? "Muéstrala al personal mientras siga activa y recibe tu código." : "Show it to staff while it is active and receive your code."}</li>
+        </ol>
+
+        <div className={styles.storyTerms}>
+          <strong>{language === "es" ? "Condiciones" : "Terms"}</strong>
+          <p>
+            {language === "es"
+              ? "Topping básico en la siguiente visita con la compra de un bowl · Código válido por 7 días · Una participación por cuenta cada 30 días · No acumulable · Sujeto a disponibilidad."
+              : "Basic topping on your next visit with a bowl purchase · Code valid for 7 days · One entry per account every 30 days · Cannot be combined · Subject to availability."}
+          </p>
+        </div>
+      </section>
+
       {/* ── Recompensas canjeables ── */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>{t("rewards.redeemTitle")}</h2>
