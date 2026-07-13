@@ -270,6 +270,16 @@ const OrderPage = () => {
       .catch(() => {});
   }, []);
 
+  // Si el cliente ya había llegado al resumen (draftStep=6) y vuelve a entrar
+  // a "Ordenar" desde el menú sin pedir un paso específico, regrésalo
+  // directo al resumen en vez de dejarlo en el último paso del armador.
+  useEffect(() => {
+    if (!searchParams.has("step") && Number(order.draftStep) === 6) {
+      navigate("/summary", { state: { guest: isGuest }, replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const setOrderStep = useCallback((nextStep) => {
     setStep(nextStep);
     updateOrder("draftStep", nextStep);
@@ -297,7 +307,10 @@ const OrderPage = () => {
   };
 
   const goToSummary = () => {
-    updateOrder("draftStep", 5);
+    // 6 es un valor centinela: significa "ya llegó al resumen", distinto
+    // de estar en el paso 5 (Toppings) del armador. Así, si vuelve a entrar
+    // a "Ordenar" más tarde, lo mandamos directo al resumen otra vez.
+    updateOrder("draftStep", 6);
     navigate("/summary", { state: { guest: isGuest } });
   };
 
