@@ -1,10 +1,11 @@
 import "./LocationPage.css";
 import { useLanguage } from "../i18n/LanguageContext";
+import { GOOGLE_MAPS_URL } from "../config";
 
 const LOCATION = {
   name: "Poke Palace",
   phone: "+52 663 108 6583",
-  mapsUrl: "https://maps.app.goo.gl/XY9uU2vr8MER54CG7?g_st=ic",
+  mapsUrl: GOOGLE_MAPS_URL,
 };
 
 const mapQuery = encodeURIComponent(LOCATION.mapsUrl);

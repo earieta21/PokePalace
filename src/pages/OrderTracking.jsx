@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, useContext } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
+import { GOOGLE_REVIEW_URL } from "../config";
 import { getItemLabel } from "../order/OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import { clearActiveOrder } from "../components/ActiveOrderBanner";
@@ -102,6 +103,10 @@ export default function OrderTracking() {
   const [cancelling, setCancelling]     = useState(false);
   const [cancelError, setCancelError]   = useState("");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [reviewDismissed, setReviewDismissed] = useState(() =>
+    window.localStorage.getItem(`pokePalaceReviewDismissed:${orderId}`) === "1"
+  );
+  const [reviewOpened, setReviewOpened] = useState(false);
 
   const prevStatusRef  = useRef(null);
   const notifAskedRef  = useRef(false);
@@ -190,6 +195,11 @@ export default function OrderTracking() {
     } finally {
       setCancelling(false);
     }
+  };
+
+  const dismissReview = () => {
+    window.localStorage.setItem(`pokePalaceReviewDismissed:${orderId}`, "1");
+    setReviewDismissed(true);
   };
 
   if (error) {
@@ -327,6 +337,40 @@ export default function OrderTracking() {
             );
           })}
         </div>
+      )}
+
+      {isDone && !reviewDismissed && (
+        <section className={styles.reviewCard} aria-labelledby="google-review-title">
+          <div className={styles.reviewStars} aria-hidden="true">★★★★★</div>
+          <p className={styles.reviewEyebrow}>{t("tracking.reviewEyebrow")}</p>
+          <h2 id="google-review-title" className={styles.reviewTitle}>
+            {t("tracking.reviewTitle")}
+          </h2>
+          <p className={styles.reviewBody}>{t("tracking.reviewBody")}</p>
+          <div className={styles.reviewActions}>
+            <a
+              className={styles.reviewPrimaryBtn}
+              href={GOOGLE_REVIEW_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setReviewOpened(true)}
+            >
+              {t("tracking.reviewButton")}
+            </a>
+            <button
+              type="button"
+              className={styles.reviewLaterBtn}
+              onClick={dismissReview}
+            >
+              {t("tracking.reviewLater")}
+            </button>
+          </div>
+          {reviewOpened && (
+            <p className={styles.reviewThanks} role="status">
+              {t("tracking.reviewThanks")}
+            </p>
+          )}
+        </section>
       )}
 
       {/* Cancel order block — only while pending and within 5-min window */}
