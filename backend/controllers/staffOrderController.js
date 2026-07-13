@@ -2,8 +2,11 @@ import Order from "../models/Order.js";
 import Inventory from "../models/Inventory.js";
 import User from "../models/User.js";
 import Expense from "../models/Expense.js";
+import Redemption from "../models/Redemption.js";
 import { sendSMS, sendWhatsApp } from "../utils/notify.js";
 import { GOLD_TIER_MIN_POINTS, GOLD_POINTS_MULTIPLIER } from "../utils/loyalty.js";
+import { getRewardById } from "../config/rewardsCatalog.js";
+import { computeBowlSubtotal } from "../pricing.js";
 
 /* ── inventory auto-deduction ── */
 async function deductInventory(order) {
@@ -183,7 +186,7 @@ export const getOrderStats = async (req, res) => {
 export const createPosOrder = async (req, res) => {
   try {
     const {
-      items, customer, phone, notes, fulfillment, paymentMethod, total,
+      items, customer, phone, notes, fulfillment, paymentMethod, rewardCode,
       base, proteins, bowlSize, marinades, complements, sauces, toppings,
     } = req.body;
 
@@ -194,9 +197,59 @@ export const createPosOrder = async (req, res) => {
       return res.status(400).json({ message: "items or a custom bowl are required" });
     }
 
+    const safeItems = hasItems
+      ? items.map((item) => ({
+          name: String(item.name || "").trim(),
+          price: Math.max(0, Number(item.price) || 0),
+          qty: Math.max(1, Math.floor(Number(item.qty) || 1)),
+        }))
+      : [];
+    const itemsSubtotal = safeItems.reduce((sum, item) => sum + item.price * item.qty, 0);
+    const customBowlPrice = hasBowl
+      ? computeBowlSubtotal(bowlSize || (proteins.length === 3 ? "large" : "normal"))
+      : 0;
+    const subtotal = itemsSubtotal + customBowlPrice;
+
+    let redemption = null;
+    let rewardDiscount = 0;
+    const cleanRewardCode = rewardCode?.trim().toUpperCase();
+    if (cleanRewardCode) {
+      redemption = await Redemption.findOne({ code: cleanRewardCode, status: "active" });
+      if (!redemption || (redemption.expiresAt && redemption.expiresAt <= new Date())) {
+        return res.status(400).json({ message: "Código de premio inválido o vencido" });
+      }
+      const reward = getRewardById(redemption.rewardId);
+      if (!reward) return res.status(400).json({ message: "Premio no disponible" });
+
+      const bowlItems = safeItems.filter((item) => /bowl|pollo teriyaki/i.test(item.name));
+      const orderHasBowl = hasBowl || bowlItems.length > 0;
+      if (!orderHasBowl) {
+        return res.status(400).json({ message: "Este premio requiere un bowl en la orden" });
+      }
+
+      if (reward.type === "free_drink") {
+        const drinks = safeItems.filter((item) => /agua de coco|limonada de matcha/i.test(item.name));
+        if (!drinks.length) {
+          return res.status(400).json({ message: "Agrega Agua de Coco o Limonada de Matcha a la orden" });
+        }
+        rewardDiscount = Math.min(...drinks.map((item) => item.price));
+      } else if (reward.type === "double_protein") {
+        if (!hasBowl || proteins.length < 3) {
+          return res.status(400).json({ message: "Proteína doble requiere un bowl personalizado grande" });
+        }
+        rewardDiscount = 40;
+      } else if (reward.type === "free_bowl") {
+        const eligibleBowlPrice = hasBowl ? customBowlPrice : Math.min(...bowlItems.map((item) => item.price));
+        rewardDiscount = Math.min(249, eligibleBowlPrice);
+      }
+      rewardDiscount = Math.min(rewardDiscount, subtotal);
+    }
+
+    const total = Math.max(0, subtotal - rewardDiscount);
+
     const order = await Order.create({
       staffId: req.staff.id,
-      items: hasItems ? items : [],
+      items: safeItems,
       customer: customer || "Walk-in",
       phone: phone || null,
       notes: notes || null,
@@ -204,7 +257,11 @@ export const createPosOrder = async (req, res) => {
       paymentMethod: paymentMethod || "card_terminal",
       paymentStatus: "paid",
       source: "pos",
-      total: total ?? null,
+      subtotal,
+      discountAmount: rewardDiscount,
+      total,
+      rewardRedemption: redemption?._id || null,
+      rewardCode: redemption?.code || null,
       status: "pending",
       ...(hasBowl && {
         base,
@@ -218,6 +275,18 @@ export const createPosOrder = async (req, res) => {
         toppings: Array.isArray(toppings) ? toppings : [],
       }),
     });
+
+    if (redemption) {
+      const consumed = await Redemption.findOneAndUpdate(
+        { _id: redemption._id, status: "active", order: null },
+        { status: "used", usedAt: new Date(), usedBy: req.staff.id, order: order._id },
+        { new: true }
+      );
+      if (!consumed) {
+        await Order.findByIdAndDelete(order._id);
+        return res.status(409).json({ message: "Este premio ya fue usado en otra orden" });
+      }
+    }
 
     // Deduct inventory for POS orders (already paid on creation)
     deductInventory(order);

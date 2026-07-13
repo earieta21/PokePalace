@@ -57,6 +57,8 @@ const orderSchema = new mongoose.Schema(
     // Loyalty
     loyaltyPointsEarned: { type: Number, default: 0 },
     pointsRedeemed:      { type: Number, default: 0 },
+    rewardRedemption: { type: mongoose.Schema.Types.ObjectId, ref: "Redemption", default: null },
+    rewardCode:       { type: String, default: null },
 
     // Inventory deduction
     ingredientsDeducted: { type: Boolean, default: false },

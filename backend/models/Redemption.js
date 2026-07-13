@@ -11,8 +11,11 @@ const redemptionSchema = new mongoose.Schema(
     expiresAt:   { type: Date, default: null },
     usedAt:      { type: Date, default: null },
     usedBy:      { type: mongoose.Schema.Types.ObjectId, ref: "StaffUser", default: null },
+    order:       { type: mongoose.Schema.Types.ObjectId, ref: "Order" },
   },
   { timestamps: true }
 );
+
+redemptionSchema.index({ order: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model("Redemption", redemptionSchema);

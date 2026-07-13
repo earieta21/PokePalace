@@ -3,6 +3,7 @@ import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { queueOrder, flushQueuedOrders, isNetworkError, getQueuedOrders } from "../offlineQueue";
 import CustomBowlBuilder from "../CustomBowlBuilder";
+import { getRewardById } from "../../../backend/config/rewardsCatalog.js";
 
 const CUSTOM_BOWL_ID = "custom-bowl";
 
@@ -38,6 +39,9 @@ export default function POSPage({ styles }) {
   const [error, setError]       = useState("");
   const [queuedCount, setQueuedCount] = useState(() => getQueuedOrders().length);
   const [mode, setMode] = useState("menu"); // "menu" | "bowl"
+  const [rewardCode, setRewardCode] = useState("");
+  const [reward, setReward] = useState(null);
+  const [rewardLoading, setRewardLoading] = useState(false);
 
   const tryFlushQueue = useCallback(async () => {
     if (getQueuedOrders().length === 0) return;
@@ -91,7 +95,35 @@ export default function POSPage({ styles }) {
 
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const iva      = subtotal * IVA;
-  const total    = subtotal + iva;
+  const customRewardBowl = cart.find((i) => i.id === CUSTOM_BOWL_ID);
+  const bowlLines = cart.filter((i) => /bowl|pollo teriyaki/i.test(i.name));
+  const drinkLines = cart.filter((i) => /agua de coco|limonada de matcha/i.test(i.name));
+  let rewardDiscount = 0;
+  if (reward?.type === "free_drink" && bowlLines.length && drinkLines.length) {
+    rewardDiscount = Math.min(...drinkLines.map((item) => item.price));
+  } else if (reward?.type === "double_protein" && customRewardBowl?.bowl?.proteins?.length >= 3) {
+    rewardDiscount = 40;
+  } else if (reward?.type === "free_bowl" && bowlLines.length) {
+    rewardDiscount = Math.min(249, Math.min(...bowlLines.map((item) => item.price)));
+  }
+  const total = Math.max(0, subtotal + iva - rewardDiscount);
+
+  const lookupReward = async () => {
+    const clean = rewardCode.trim().toUpperCase();
+    if (!clean || rewardLoading) return;
+    setRewardLoading(true); setError(""); setReward(null);
+    try {
+      const data = await api.get(`/api/staff/rewards/${clean}`);
+      if (data.redemption?.status !== "active") throw new Error("El código no está activo");
+      const catalogReward = getRewardById(data.redemption.rewardId);
+      if (!catalogReward) throw new Error("Premio no disponible");
+      setReward({ ...catalogReward, code: clean });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setRewardLoading(false);
+    }
+  };
 
   const handleCobrar = async () => {
     if (cart.length === 0 || saving) return;
@@ -107,7 +139,7 @@ export default function POSPage({ styles }) {
       notes: notes.trim(),
       fulfillment,
       paymentMethod,
-      total: parseFloat(total.toFixed(2)),
+      rewardCode: reward?.code || null,
       ...(customBowl && {
         base: customBowl.bowl.base,
         proteins: customBowl.bowl.proteins,
@@ -120,10 +152,10 @@ export default function POSPage({ styles }) {
     };
 
     try {
-      await api.post("/api/staff/orders", payload);
-      setSuccess(`Orden enviada — $${total.toLocaleString("es-MX")} MXN`);
+      const data = await api.post("/api/staff/orders", payload);
+      setSuccess(`Orden enviada — $${data.order.total.toLocaleString("es-MX")} MXN`);
     } catch (e) {
-      if (isNetworkError(e)) {
+      if (isNetworkError(e) && !reward) {
         queueOrder(payload);
         setQueuedCount(getQueuedOrders().length);
         setSuccess(`Sin conexión — orden guardada y se enviará sola ($${total.toLocaleString("es-MX")} MXN)`);
@@ -140,6 +172,8 @@ export default function POSPage({ styles }) {
     setNotes("");
     setFulfillment("pickup");
     setPaymentMethod("card_terminal");
+    setRewardCode("");
+    setReward(null);
     setTimeout(() => setSuccess(""), 4000);
     setSaving(false);
   };
@@ -306,6 +340,31 @@ export default function POSPage({ styles }) {
           {success && <p className={styles.posSuccess} role="status">✓ {success}</p>}
           {error   && <p style={{ color: "red", fontSize: 12, marginBottom: 8 }} role="alert">{error}</p>}
 
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <input
+              className={styles.input}
+              value={rewardCode}
+              onChange={(e) => { setRewardCode(e.target.value.toUpperCase()); setReward(null); }}
+              placeholder="Código de premio"
+              maxLength={6}
+              style={{ margin: 0, textTransform: "uppercase" }}
+            />
+            <button type="button" className={styles.btnGhost} onClick={lookupReward} disabled={!rewardCode.trim() || rewardLoading}>
+              {rewardLoading ? "Buscando…" : "Aplicar"}
+            </button>
+          </div>
+          {reward && (
+            <div style={{ marginBottom: 10, padding: 10, borderRadius: 8, background: "#ecfdf3", color: "#166534", fontSize: 12 }}>
+              <strong>{reward.name.es}</strong><br />{reward.terms.es}
+            </div>
+          )}
+
+          {rewardDiscount > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#166534", fontSize: 12, marginBottom: 8 }}>
+              <span>Descuento de premio</span><strong>−${rewardDiscount.toLocaleString("es-MX")}</strong>
+            </div>
+          )}
+
           <div className={styles.posTotalFinal}>
             <span>Total</span>
             <span>${total.toLocaleString("es-MX")} MXN</span>
@@ -322,7 +381,7 @@ export default function POSPage({ styles }) {
           </button>
 
           {cart.length > 0 && (
-            <button className={styles.btnGhost} style={{ width: "100%", marginTop: 8 }} onClick={() => setCart([])} type="button">
+            <button className={styles.btnGhost} style={{ width: "100%", marginTop: 8 }} onClick={() => { setCart([]); setReward(null); setRewardCode(""); }} type="button">
               Limpiar orden
             </button>
           )}

@@ -863,7 +863,6 @@ function RewardsRedeemTab({ token }) {
   const [redemption, setRedemption] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [confirming, setConfirming] = useState(false);
 
   const lookup = async (e) => {
     e.preventDefault();
@@ -883,24 +882,6 @@ function RewardsRedeemTab({ token }) {
       setError(err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const confirm = async () => {
-    setConfirming(true);
-    setError("");
-    try {
-      const r = await fetch(`${API_URL}/api/staff/rewards/${redemption.code}/use`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.msg || "No se pudo canjear");
-      setRedemption(data.redemption);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setConfirming(false);
     }
   };
 
@@ -974,13 +955,9 @@ function RewardsRedeemTab({ token }) {
           </div>
 
           {redemption.status === "active" ? (
-            <button
-              onClick={confirm}
-              disabled={confirming}
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold transition"
-            >
-              {confirming ? "Confirmando…" : "✓ Confirmar y entregar premio"}
-            </button>
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-amber-300 text-sm">
+              Aplica este código dentro de la orden en la pestaña POS. El sistema verificará las condiciones y calculará el descuento.
+            </div>
           ) : (
             <button
               onClick={reset}

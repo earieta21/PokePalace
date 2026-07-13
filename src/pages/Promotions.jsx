@@ -141,6 +141,9 @@ export default function RewardsPage() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>{t("rewards.redeemTitle")}</h2>
         <p className={styles.sectionSub}>{t("rewards.rate")}</p>
+        <p className={styles.sectionSub}>
+          {language === "es" ? "Un premio por orden · No acumulable con otras promociones" : "One reward per order · Cannot be combined with other promotions"}
+        </p>
         {redeemError && (
           <p className={styles.redeemErrorBanner} role="alert">{redeemError}</p>
         )}
@@ -154,6 +157,7 @@ export default function RewardsPage() {
                 <div className={styles.rewardIcon}>{r.icon}</div>
                 <p className={styles.rewardName}>{r.name[language]}</p>
                 <p className={styles.rewardDesc}>{r.desc[language]}</p>
+                <p className={styles.rewardTerms}>{r.terms[language]}</p>
 
                 <div className={styles.rewardProgress}>
                   <div className={styles.rewardBar}>
