@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
+import { downloadCSV } from "../../utils/csv";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
   COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS,
@@ -218,6 +219,15 @@ export default function InventoryPage({ styles }) {
   const totalValue = items.reduce((s, i) => s + i.qty * i.cost, 0);
   const lowCount   = items.filter((i) => statusOf(i) !== "ok").length;
 
+  function exportCSV() {
+    const rows = [["Artículo", "Categoría", "Cantidad", "Unidad", "Mínimo", "Costo unitario", "Valor total", "Proveedor", "Estado"]];
+    visible.forEach((i) => {
+      const statusLabel = STATUS_CFG[statusOf(i)].label;
+      rows.push([i.item, i.category, i.qty, i.unit, i.minQty, i.cost, (i.qty * i.cost).toFixed(2), i.supplier || "", statusLabel]);
+    });
+    downloadCSV(`inventario_${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  }
+
   return (
     <div>
       <div className={styles.pageHeader}>
@@ -238,6 +248,9 @@ export default function InventoryPage({ styles }) {
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className={styles.btnGhost} onClick={load}>Actualizar</button>
+          <button className={styles.btnGhost} onClick={exportCSV} disabled={loading || visible.length === 0}>
+            ⬇ CSV
+          </button>
           <button
             className={receiving ? styles.btnGhost : styles.btnPrimary}
             style={{ background: receiving ? undefined : "#4A7A5A" }}

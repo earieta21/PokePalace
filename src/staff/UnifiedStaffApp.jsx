@@ -12,6 +12,7 @@ import {
 } from "../order/OrderLabels";
 import { StaffAuthContext } from "../context/StaffAuthContext";
 import { API_URL } from "../config";
+import { downloadCSV } from "../utils/csv";
 
 // POS pages — unchanged, work via StaffAuthContext.Provider
 import POSPage from "../pos/pages/POSPage";
@@ -107,7 +108,7 @@ const TAB_META = {
   ventas:  { label: "Ventas",   icon: Activity        },
   inv:     { label: "Inventario", icon: Package       },
   fin:     { label: "Finanzas", icon: BarChart3       },
-  disponibilidad: { label: "Disponibilidad", icon: ToggleRight },
+  disponibilidad: { label: "Tienda", icon: ToggleRight },
   panel:   { label: "Panel",    icon: TrendingUp      },
   inicio:  { label: "Inicio",   icon: Clock           },
   tareas:  { label: "Tareas",   icon: CheckSquare     },
@@ -1115,12 +1116,54 @@ function AvailabilityTab({ token }) {
   const [saving, setSaving]           = useState(false);
   const [saveError, setSaveError]     = useState("");
 
+  const [storeStatus, setStoreStatus] = useState(null); // { ordersPaused, pausedMessage }
+  const [pauseSaving, setPauseSaving] = useState(false);
+  const [pauseMsgDraft, setPauseMsgDraft] = useState("");
+
   useEffect(() => {
     fetch(`${API_URL}/api/settings/availability`)
       .then((r) => r.json())
       .then((d) => setUnavailable(d.unavailableItems ?? []))
       .catch(() => setUnavailable([]));
+
+    fetch(`${API_URL}/api/settings/store-status`)
+      .then((r) => r.json())
+      .then((d) => { setStoreStatus(d); setPauseMsgDraft(d.pausedMessage || ""); })
+      .catch(() => setStoreStatus({ ordersPaused: false, pausedMessage: "" }));
   }, []);
+
+  const togglePause = async () => {
+    const next = { ordersPaused: !storeStatus.ordersPaused, pausedMessage: pauseMsgDraft };
+    setStoreStatus(next);
+    setPauseSaving(true);
+    try {
+      await fetch(`${API_URL}/api/settings/store-status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(next),
+      });
+    } catch {
+      setSaveError("Error al guardar. Intenta de nuevo.");
+    } finally {
+      setPauseSaving(false);
+    }
+  };
+
+  const savePauseMessage = async () => {
+    setPauseSaving(true);
+    try {
+      await fetch(`${API_URL}/api/settings/store-status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ordersPaused: storeStatus.ordersPaused, pausedMessage: pauseMsgDraft }),
+      });
+      setStoreStatus((p) => ({ ...p, pausedMessage: pauseMsgDraft }));
+    } catch {
+      setSaveError("Error al guardar. Intenta de nuevo.");
+    } finally {
+      setPauseSaving(false);
+    }
+  };
 
   const toggle = async (id) => {
     const next = unavailable.includes(id)
@@ -1146,12 +1189,57 @@ function AvailabilityTab({ token }) {
 
   const unavailableCount = unavailable?.length ?? 0;
 
-  if (unavailable === null) {
+  if (unavailable === null || storeStatus === null) {
     return <p className="text-slate-400 text-sm mt-4">Cargando…</p>;
   }
 
   return (
     <div>
+      {/* Pausar pedidos en línea */}
+      <div className={`mb-6 rounded-2xl border p-4 ${storeStatus.ordersPaused ? "bg-rose-500/10 border-rose-500/30" : "bg-slate-900 border-white/5"}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-white">Pedidos en línea</h2>
+            <p className={`text-sm mt-1 ${storeStatus.ordersPaused ? "text-rose-400 font-semibold" : "text-slate-400"}`}>
+              {storeStatus.ordersPaused ? "⏸ Pausados — los clientes no pueden ordenar ahora" : "Activos — la tienda acepta pedidos normalmente"}
+            </p>
+          </div>
+          <button
+            onClick={togglePause}
+            disabled={pauseSaving}
+            className={`shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition ${
+              storeStatus.ordersPaused
+                ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                : "bg-rose-600 hover:bg-rose-500 text-white"
+            } disabled:opacity-50`}
+          >
+            {pauseSaving ? "Guardando…" : storeStatus.ordersPaused ? "Reanudar pedidos" : "Pausar pedidos"}
+          </button>
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-white/5">
+          <label className="text-xs text-slate-400 uppercase tracking-widest mb-1.5 block">
+            Mensaje para el cliente (opcional)
+          </label>
+          <div className="flex gap-2">
+            <input
+              value={pauseMsgDraft}
+              onChange={(e) => setPauseMsgDraft(e.target.value)}
+              placeholder="Ej. Cerrado temporalmente por alta demanda, regresamos en 30 min"
+              maxLength={200}
+              className="flex-1 bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50"
+            />
+            <button
+              onClick={savePauseMessage}
+              disabled={pauseSaving}
+              className="shrink-0 px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold transition disabled:opacity-50"
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="mb-5">
         <h2 className="text-lg font-bold text-white">Disponibilidad de ingredientes</h2>
         <p className="text-slate-400 text-sm mt-1">
@@ -1226,10 +1314,7 @@ function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee, onUpd
       rows.push([e?.name||"?", e?.role||"", t.date, fmtTime(t.clockIn), t.clockOut ? fmtTime(t.clockOut) : "en curso",
         t.clockOut ? Math.round((new Date(t.clockOut).getTime()-new Date(t.clockIn).getTime())/60000) : ""]);
     });
-    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-    a.download = `horas_${todayKey()}.csv`; a.click();
+    downloadCSV(`horas_${todayKey()}.csv`, rows);
   }
 
   return (
@@ -1325,12 +1410,34 @@ function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
     finally { setSaving(false); }
   };
 
+  function exportCSV() {
+    const rows = [["Empleado", "Rol", "Horas trabajadas", "Sueldo/hora", "Pago estimado"]];
+    hoursByEmp.forEach(({ emp, mins }) => {
+      const hours = mins / 60;
+      rows.push([
+        emp.name, ROLE_LABEL[emp.role] || emp.role,
+        hours.toFixed(2), emp.hourlyRate || 0,
+        (hours * (emp.hourlyRate || 0)).toFixed(2),
+      ]);
+    });
+    rows.push([]);
+    rows.push(["Total nómina", "", "", "", totalPayroll.toFixed(2)]);
+    downloadCSV(`nomina_${todayKey()}.csv`, rows);
+  }
+
   return (
     <div className="space-y-3">
       <div className="bg-slate-800 rounded-2xl border border-emerald-500/20 p-4">
-        <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Nómina estimada — últimos 7 días</p>
-        <p className="text-3xl font-black text-emerald-400">${totalPayroll.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MXN</p>
-        <p className="text-xs text-slate-500 mt-1">Basado en horas trabajadas × sueldo/hora configurado</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Nómina estimada — últimos 7 días</p>
+            <p className="text-3xl font-black text-emerald-400">${totalPayroll.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MXN</p>
+            <p className="text-xs text-slate-500 mt-1">Basado en horas trabajadas × sueldo/hora configurado</p>
+          </div>
+          <button onClick={exportCSV} className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold transition shrink-0">
+            <Download className="w-3.5 h-3.5" /> CSV
+          </button>
+        </div>
       </div>
 
       <div className="bg-slate-800 rounded-2xl border border-white/5 divide-y divide-white/5">

@@ -10,6 +10,7 @@ import ToppingsSelection from "./ToppingsSelection";
 import { useOrder } from "./OrderContext";
 import { BASE_LABELS, PROTEIN_LABELS } from "./OrderLabels";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "./pricing";
+import { API_URL } from "../config";
 
 const TOTAL_STEPS = 6;
 const STEP_NAMES = ["Base", "Proteínas", "Marinados", "Complementos", "Salsas", "Toppings"];
@@ -86,6 +87,30 @@ function StepProgress({ step }) {
           )}
         </React.Fragment>
       ))}
+    </div>
+  );
+}
+
+function PausedBanner({ message }) {
+  return (
+    <div style={{
+      maxWidth: 960, margin: "0 auto", padding: "0 20px 4px",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        background: "#fef2f2", border: "1px solid #fecaca",
+        borderRadius: 12, padding: "12px 16px", marginTop: 10,
+      }}>
+        <span style={{ fontSize: 20 }}>⏸</span>
+        <div>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: 13.5, color: "#991b1b" }}>
+            No estamos aceptando pedidos en línea ahora
+          </p>
+          <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "#b91c1c" }}>
+            {message || "Puedes seguir armando tu bowl, pero no podrás confirmarlo hasta que reabramos."}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -237,6 +262,14 @@ const OrderPage = () => {
   const isGuest = Boolean(location.state?.guest);
   const editMode = searchParams.get("edit") === "1";
 
+  const [storeStatus, setStoreStatus] = useState(null);
+  useEffect(() => {
+    fetch(`${API_URL}/api/settings/store-status`)
+      .then((r) => r.json())
+      .then(setStoreStatus)
+      .catch(() => {});
+  }, []);
+
   const setOrderStep = useCallback((nextStep) => {
     setStep(nextStep);
     updateOrder("draftStep", nextStep);
@@ -292,6 +325,7 @@ const OrderPage = () => {
 
   return (
     <div>
+      {storeStatus?.ordersPaused && <PausedBanner message={storeStatus.pausedMessage} />}
       <StepProgress step={step} />
       <PriceChip order={order} />
       <BowlMiniSummary order={order} step={step} />

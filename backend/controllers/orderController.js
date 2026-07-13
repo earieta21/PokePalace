@@ -1,6 +1,7 @@
 import Order from "../models/Order.js";
 import PromoCode from "../models/PromoCode.js";
 import User from "../models/User.js";
+import StoreSettings from "../models/StoreSettings.js";
 import { computePricing } from "../pricing.js";
 import { sendEmail, orderConfirmationEmail } from "../utils/notify.js";
 import { expireStalePoints } from "../utils/loyalty.js";
@@ -38,6 +39,13 @@ const validateScheduledTime = (scheduledPickupTime) => {
 
 export const createOrder = async (req, res) => {
   try {
+    const storeSettings = await StoreSettings.findOne({ key: "main" }).select("ordersPaused pausedMessage");
+    if (storeSettings?.ordersPaused) {
+      return res.status(503).json({
+        msg: storeSettings.pausedMessage?.trim() || "No estamos aceptando pedidos en línea en este momento. Intenta más tarde.",
+      });
+    }
+
     const {
       base,
       protein,

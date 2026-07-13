@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
+import { downloadCSV } from "../../utils/csv";
 
 const CATEGORIES = [
   "Ingredientes", "Renta", "Servicios", "Nómina",
@@ -101,6 +102,20 @@ export default function FinancePage({ styles }) {
     ? ((summary.profit / summary.revenue) * 100).toFixed(1)
     : null;
 
+  function exportCSV() {
+    const rows = [
+      ["Resumen", `${from} a ${to}`],
+      ["Ingresos", summary?.revenue ?? 0],
+      ["Gastos", summary?.expenses ?? 0],
+      ["Ganancia neta", summary?.profit ?? 0],
+      ["Órdenes pagadas", summary?.orderCount ?? 0],
+      [],
+      ["Fecha", "Categoría", "Descripción", "Monto"],
+      ...expenses.map((e) => [e.date, e.category, e.description, e.amount]),
+    ];
+    downloadCSV(`finanzas_${from}_a_${to}.csv`, rows);
+  }
+
   const maxCatAmt = summary?.byCategory
     ? Math.max(...Object.values(summary.byCategory), 1)
     : 1;
@@ -112,7 +127,10 @@ export default function FinancePage({ styles }) {
           <h1 className={styles.pageTitle}>Finanzas</h1>
           <p className={styles.pageSubtitle}>{from} → {to}</p>
         </div>
-        <button className={styles.btnGhost} onClick={load}>Actualizar</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className={styles.btnGhost} onClick={load}>Actualizar</button>
+          <button className={styles.btnGhost} onClick={exportCSV} disabled={loading}>⬇ CSV</button>
+        </div>
       </div>
 
       {/* Period tabs */}
