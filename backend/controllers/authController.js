@@ -10,7 +10,7 @@ export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
+    if (typeof name !== "string" || typeof email !== "string" || typeof password !== "string" || !name || !email || !password) {
       return res.status(400).json({ msg: "Todos los campos son obligatorios" });
     }
 
@@ -48,7 +48,7 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
       return res.status(400).json({ msg: "Email y password son obligatorios" });
     }
 

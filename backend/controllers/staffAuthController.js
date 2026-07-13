@@ -7,7 +7,7 @@ const MANAGER_ROLES = ["owner", "manager", "admin"];
 
 export const pinLogin = async (req, res) => {
   const { pin, locationId } = req.body;
-  if (!isValidPin(pin) || !locationId) {
+  if (!isValidPin(pin) || typeof locationId !== "string" || !locationId) {
     return res.status(400).json({ message: "pin y locationId requeridos" });
   }
   try {
@@ -48,6 +48,9 @@ export const pinLogin = async (req, res) => {
 
 export const staffLogin = async (req, res) => {
   const { email, password } = req.body;
+  if (typeof email !== "string" || typeof password !== "string") {
+    return res.status(400).json({ message: "Invalid credentials" });
+  }
 
   try {
     const user = await StaffUser.findOne({ email, active: true }).select("+password");

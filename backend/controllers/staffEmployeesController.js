@@ -17,7 +17,11 @@ export const getEmployees = async (req, res) => {
 export const createEmployee = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
-    if (!name || !email || !password || !role) {
+    if (
+      typeof name !== "string" || typeof email !== "string" ||
+      typeof password !== "string" || typeof role !== "string" ||
+      !name || !email || !password || !role
+    ) {
       return res.status(400).json({ message: "name, email, password, role required" });
     }
 
