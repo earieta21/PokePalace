@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true },
     password: { type: String, required: true },
+    phone: { type: String, default: "" }, // se guarda solo del ultimo pedido, para no volver a pedirlo
     points: { type: Number, default: 0 },          // saldo gastable — sube y baja al canjear
     lifetimePoints: { type: Number, default: 0 },   // nivel — solo sube, nunca baja al gastar
     pointsLastEarnedAt: { type: Date, default: null }, // para expirar saldo inactivo

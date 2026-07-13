@@ -196,6 +196,13 @@ export const createOrder = async (req, res) => {
 
     res.status(201).json({ order });
 
+    // Guarda el teléfono en el perfil del cliente logueado para no volver a
+    // pedírselo en su próximo pedido. Fire-and-forget, no bloquea la respuesta.
+    if (req.userId && phone?.trim()) {
+      User.findByIdAndUpdate(req.userId, { phone: phone.trim() })
+        .catch((err) => console.error("save phone error:", err.message));
+    }
+
     // Email de confirmación (solo usuarios logueados — los invitados no dan email).
     // Fire-and-forget después de responder: no retrasa ni rompe la creación.
     if (req.userId) {

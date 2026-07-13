@@ -18,6 +18,15 @@ export default function OrderSummaryPage() {
   const { order, resetOrder } = useOrder();
   const { t } = useLanguage();
 
+  // Cliente logueado: rellena nombre/teléfono desde su cuenta si el borrador
+  // llegó vacío — ya no debería tener que volver a escribirlos cada vez.
+  useEffect(() => {
+    if (!isLoggedIn || !user) return;
+    if (!order.customer?.trim() && user.name) order.updateCheckout("customer", user.name);
+    if (!order.phone?.trim() && user.phone) order.updateCheckout("phone", user.phone);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, user]);
+
   const isGuest = Boolean(location.state?.guest);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState("");
