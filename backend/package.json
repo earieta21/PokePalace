@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js",
+    "start": "node scripts/migrateStaffPins.js && node server.js",
     "migrate:staff-pins": "node scripts/migrateStaffPins.js"
   },
   "dependencies": {
