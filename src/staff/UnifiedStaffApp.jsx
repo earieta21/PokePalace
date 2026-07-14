@@ -1428,7 +1428,8 @@ function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee, onUpd
   });
 
   const activeNow = hoursByEmp.filter((h) => h.open);
-  const totalPayroll = hoursByEmp.reduce((s, { emp, mins }) => s + (mins / 60) * (emp.hourlyRate || 0), 0);
+  const payFor = (emp, mins) => emp.payType === "weekly" ? (emp.weeklySalary || 0) : (mins / 60) * (emp.hourlyRate || 0);
+  const totalPayroll = hoursByEmp.reduce((s, { emp, mins }) => s + payFor(emp, mins), 0);
 
   function exportCSV() {
     const rows = [["Empleado","Rol","Fecha","Entrada","Salida","Minutos lonche","Minutos netos"]];
@@ -1524,31 +1525,47 @@ function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee, onUpd
 }
 
 function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
-  const [editId, setEditId]   = useState(null);
+  const [editId, setEditId]     = useState(null);
+  const [editType, setEditType] = useState("hourly");
   const [editRate, setEditRate] = useState("");
-  const [saving, setSaving]   = useState(false);
+  const [editSalary, setEditSalary] = useState("");
+  const [saving, setSaving]     = useState(false);
+
+  const payFor = (emp, mins) => emp.payType === "weekly" ? (emp.weeklySalary || 0) : (mins / 60) * (emp.hourlyRate || 0);
+
+  const startEdit = (emp) => {
+    setEditId(emp._id);
+    setEditType(emp.payType === "weekly" ? "weekly" : "hourly");
+    setEditRate(String(emp.hourlyRate || ""));
+    setEditSalary(String(emp.weeklySalary || ""));
+  };
 
   const saveRate = async (emp) => {
     setSaving(true);
     try {
-      await onUpdate(emp._id, { hourlyRate: parseFloat(editRate) || 0 });
+      await onUpdate(emp._id, {
+        payType: editType,
+        hourlyRate: parseFloat(editRate) || 0,
+        weeklySalary: parseFloat(editSalary) || 0,
+      });
       setEditId(null);
     } catch { /* silently ignore */ }
     finally { setSaving(false); }
   };
 
   function exportCSV() {
-    const rows = [["Empleado", "Rol", "Horas trabajadas", "Sueldo/hora", "Pago estimado"]];
+    const rows = [["Empleado", "Rol", "Tipo de pago", "Horas trabajadas", "Sueldo/hora", "Sueldo semanal fijo", "Pago estimado"]];
     hoursByEmp.forEach(({ emp, mins }) => {
       const hours = mins / 60;
       rows.push([
         emp.name, ROLE_LABEL[emp.role] || emp.role,
-        hours.toFixed(2), emp.hourlyRate || 0,
-        (hours * (emp.hourlyRate || 0)).toFixed(2),
+        emp.payType === "weekly" ? "Semanal fijo" : "Por hora",
+        hours.toFixed(2), emp.hourlyRate || 0, emp.weeklySalary || 0,
+        payFor(emp, mins).toFixed(2),
       ]);
     });
     rows.push([]);
-    rows.push(["Total nómina", "", "", "", totalPayroll.toFixed(2)]);
+    rows.push(["Total nómina", "", "", "", "", "", totalPayroll.toFixed(2)]);
     downloadCSV(`nomina_${todayKey()}.csv`, rows);
   }
 
@@ -1559,7 +1576,7 @@ function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
           <div>
             <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Nómina estimada — últimos 7 días</p>
             <p className="text-3xl font-black text-emerald-400">${totalPayroll.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MXN</p>
-            <p className="text-xs text-slate-500 mt-1">Basado en horas trabajadas × sueldo/hora configurado</p>
+            <p className="text-xs text-slate-500 mt-1">Por hora según turnos, o sueldo semanal fijo si así está configurado</p>
           </div>
           <button onClick={exportCSV} className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold transition shrink-0">
             <Download className="w-3.5 h-3.5" /> CSV
@@ -1569,43 +1586,79 @@ function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
 
       <div className="bg-slate-800 rounded-2xl border border-white/5 divide-y divide-white/5">
         {hoursByEmp.map(({ emp, mins }) => {
-          const hours = mins / 60;
-          const pay   = hours * (emp.hourlyRate || 0);
+          const pay   = payFor(emp, mins);
           const col   = getColor(emp.color);
           const isEditing = editId === emp._id;
           return (
-            <div key={sid(emp._id)} className="flex items-center gap-3 p-4">
-              <span className={`w-9 h-9 rounded-xl ${col.bg} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
-                {initials(emp.name)}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{emp.name.split(" ")[0]}</p>
-                <p className="text-[11px] text-slate-500">{fmtHM(mins)} trabajadas</p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {isEditing ? (
-                  <>
+            <div key={sid(emp._id)} className={isEditing ? "p-4" : "flex items-center gap-3 p-4"}>
+              {isEditing ? (
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-9 h-9 rounded-xl ${col.bg} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
+                      {initials(emp.name)}
+                    </span>
+                    <p className="font-semibold text-sm truncate">{emp.name.split(" ")[0]}</p>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => setEditType("hourly")}
+                      className={`flex-1 text-xs font-semibold py-2 rounded-lg transition ${editType === "hourly" ? "bg-emerald-600 text-white" : "bg-slate-700 text-slate-400"}`}>
+                      Por hora
+                    </button>
+                    <button onClick={() => setEditType("weekly")}
+                      className={`flex-1 text-xs font-semibold py-2 rounded-lg transition ${editType === "weekly" ? "bg-emerald-600 text-white" : "bg-slate-700 text-slate-400"}`}>
+                      Semanal fijo
+                    </button>
+                  </div>
+                  {editType === "hourly" ? (
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-slate-400">$</span>
                       <input type="number" min="0" step="10" value={editRate}
                         onChange={(e) => setEditRate(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") saveRate(emp); if (e.key === "Escape") setEditId(null); }}
                         autoFocus
-                        className="w-20 bg-slate-700 border border-white/10 rounded-lg px-2 py-1 text-xs text-white text-right focus:outline-none focus:border-emerald-500 font-mono"
+                        className="flex-1 bg-slate-700 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white text-right focus:outline-none focus:border-emerald-500 font-mono"
                         placeholder="0"
                       />
-                      <span className="text-xs text-slate-400">/hr</span>
+                      <span className="text-xs text-slate-400">/hora</span>
                     </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-slate-400">$</span>
+                      <input type="number" min="0" step="50" value={editSalary}
+                        onChange={(e) => setEditSalary(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveRate(emp); if (e.key === "Escape") setEditId(null); }}
+                        autoFocus
+                        className="flex-1 bg-slate-700 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white text-right focus:outline-none focus:border-emerald-500 font-mono"
+                        placeholder="0"
+                      />
+                      <span className="text-xs text-slate-400">/semana</span>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditId(null)} className="flex-1 text-xs text-slate-300 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg transition">Cancelar</button>
                     <button onClick={() => saveRate(emp)} disabled={saving}
-                      className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded-lg transition">
-                      {saving ? "…" : "OK"}
+                      className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg transition">
+                      {saving ? "Guardando…" : "Guardar"}
                     </button>
-                    <button onClick={() => setEditId(null)} className="text-xs text-slate-400 hover:text-white transition">✕</button>
-                  </>
-                ) : (
-                  <>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <span className={`w-9 h-9 rounded-xl ${col.bg} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
+                    {initials(emp.name)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">{emp.name.split(" ")[0]}</p>
+                    <p className="text-[11px] text-slate-500">{fmtHM(mins)} trabajadas</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
                     <div className="text-right">
-                      {emp.hourlyRate > 0 ? (
+                      {emp.payType === "weekly" && emp.weeklySalary > 0 ? (
+                        <>
+                          <p className="text-sm font-bold">${pay.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
+                          <p className="text-[10px] text-slate-500">${emp.weeklySalary}/semana fijo</p>
+                        </>
+                      ) : emp.hourlyRate > 0 ? (
                         <>
                           <p className="text-sm font-bold">${pay.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
                           <p className="text-[10px] text-slate-500">${emp.hourlyRate}/hr</p>
@@ -1614,13 +1667,13 @@ function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
                         <p className="text-xs text-slate-500 italic">Sin tarifa</p>
                       )}
                     </div>
-                    <button onClick={() => { setEditId(emp._id); setEditRate(String(emp.hourlyRate || "")); }}
+                    <button onClick={() => startEdit(emp)}
                       className="text-[10px] text-slate-500 hover:text-emerald-400 bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg transition">
                       Editar
                     </button>
-                  </>
-                )}
-              </div>
+                  </div>
+                </>
+              )}
             </div>
           );
         })}

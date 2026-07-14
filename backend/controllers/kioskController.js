@@ -44,7 +44,7 @@ export const getManagedKioskEmployees = async (req, res) => {
   if (!locationId) return res.status(400).json({ message: "locationId requerido" });
   try {
     const employees = await StaffUser.find({ locationId, active: true })
-      .select("_id name role color locationId active hourlyRate")
+      .select("_id name role color locationId active hourlyRate payType weeklySalary")
       .sort({ name: 1 });
     res.json({ employees });
   } catch (err) {
@@ -53,7 +53,7 @@ export const getManagedKioskEmployees = async (req, res) => {
 };
 
 export const createKioskEmployee = async (req, res) => {
-  const { name, role, pin, color, locationId, hourlyRate } = req.body;
+  const { name, role, pin, color, locationId, hourlyRate, payType, weeklySalary } = req.body;
   if (!name?.trim() || !isValidPin(pin) || !locationId) {
     return res.status(400).json({ message: "Nombre y PIN de 4 dígitos requeridos" });
   }
@@ -82,6 +82,8 @@ export const createKioskEmployee = async (req, res) => {
       locationId,
       active: true,
       hourlyRate: hourlyRate ? parseFloat(hourlyRate) : 0,
+      payType: payType === "weekly" ? "weekly" : "hourly",
+      weeklySalary: weeklySalary ? parseFloat(weeklySalary) : 0,
     });
 
     res.status(201).json({
@@ -89,6 +91,7 @@ export const createKioskEmployee = async (req, res) => {
         _id: employee._id, name: employee.name,
         role: employee.role, color: employee.color,
         locationId: employee.locationId, hourlyRate: employee.hourlyRate,
+        payType: employee.payType, weeklySalary: employee.weeklySalary,
       },
     });
   } catch (err) {
@@ -98,17 +101,19 @@ export const createKioskEmployee = async (req, res) => {
 
 export const updateKioskEmployee = async (req, res) => {
   try {
-    const allowed = ["name", "hourlyRate", "color", "role"];
+    const allowed = ["name", "hourlyRate", "color", "role", "payType", "weeklySalary"];
     const update  = {};
     allowed.forEach((k) => { if (req.body[k] !== undefined) update[k] = req.body[k]; });
     if (update.hourlyRate !== undefined) update.hourlyRate = parseFloat(update.hourlyRate) || 0;
+    if (update.weeklySalary !== undefined) update.weeklySalary = parseFloat(update.weeklySalary) || 0;
+    if (update.payType !== undefined && update.payType !== "weekly") update.payType = "hourly";
     if (update.name !== undefined) {
       update.name = String(update.name).trim();
       if (!update.name) delete update.name;
     }
 
     const employee = await StaffUser.findByIdAndUpdate(req.params.id, update, { new: true })
-      .select("_id name role color locationId active hourlyRate");
+      .select("_id name role color locationId active hourlyRate payType weeklySalary");
     if (!employee) return res.status(404).json({ message: "Empleado no encontrado" });
     res.json({ employee });
   } catch (err) {
