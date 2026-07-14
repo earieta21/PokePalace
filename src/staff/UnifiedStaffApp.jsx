@@ -4,7 +4,7 @@ import {
   TrendingUp, ChevronLeft, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
-  ToggleRight, Gift,
+  ToggleRight, Gift, Coffee,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -28,6 +28,22 @@ import posStyles from "../pos/EmployeePortal.module.css";
    ========================================================================== */
 const LOCATION_ID = "tij-centro-01";
 const todayKey = () => new Date().toISOString().slice(0, 10);
+
+// Ubicación GPS del dispositivo — el backend valida que esté dentro del
+// radio del restaurante antes de dejar marcar entrada/salida/lonche.
+function getDeviceLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Este dispositivo no soporta ubicación GPS."));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => reject(new Error("Activa el permiso de ubicación para poder marcar tu entrada/salida.")),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  });
+}
 const fmtTime = (d) => new Date(d).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 const fmtHM = (mins) => `${Math.floor(mins / 60)}h ${String(Math.round(mins % 60)).padStart(2, "0")}m`;
 const initials = (name) => name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -138,6 +154,8 @@ export default function UnifiedStaffApp() {
   const [tab, setTab] = useState(null); // set after login based on role
   const [now, setNow] = useState(Date.now());
   const [lowStockCount, setLowStockCount] = useState(0);
+  const [clockError, setClockError] = useState("");
+  const [clockBusy, setClockBusy] = useState(false);
 
   // Load employee list for login screen
   useEffect(() => {
@@ -245,21 +263,61 @@ export default function UnifiedStaffApp() {
     setTime([]); setChecklist({}); setTemps([]); setSchedule({}); setAnnouncements([]);
   }
 
+  async function withDeviceLocation(fn) {
+    setClockError(""); setClockBusy(true);
+    try {
+      const { lat, lng } = await getDeviceLocation();
+      await fn({ lat, lng });
+    } catch (err) {
+      setClockError(err.message || "No se pudo completar la acción.");
+    } finally {
+      setClockBusy(false);
+    }
+  }
+
   async function clockIn() {
-    const r = await fetch(`${API_URL}/api/kiosk/time/clock-in`, {
-      method: "POST", headers: authHeaders,
-      body: JSON.stringify({ locationId: LOCATION_ID, date: todayKey() }),
+    await withDeviceLocation(async ({ lat, lng }) => {
+      const r = await fetch(`${API_URL}/api/kiosk/time/clock-in`, {
+        method: "POST", headers: authHeaders,
+        body: JSON.stringify({ locationId: LOCATION_ID, date: todayKey(), lat, lng }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || "No se pudo marcar tu entrada.");
+      if (data.record) setTime((p) => [data.record, ...p]);
     });
-    const { record } = await r.json();
-    if (record) setTime((p) => [record, ...p]);
   }
 
   async function clockOut() {
-    const r = await fetch(`${API_URL}/api/kiosk/time/clock-out`, {
-      method: "POST", headers: authHeaders, body: JSON.stringify({}),
+    await withDeviceLocation(async ({ lat, lng }) => {
+      const r = await fetch(`${API_URL}/api/kiosk/time/clock-out`, {
+        method: "POST", headers: authHeaders, body: JSON.stringify({ lat, lng }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || "No se pudo marcar tu salida.");
+      if (data.record) setTime((p) => p.map((t) => sid(t._id) === sid(data.record._id) ? data.record : t));
     });
-    const { record } = await r.json();
-    if (record) setTime((p) => p.map((t) => sid(t._id) === sid(record._id) ? record : t));
+  }
+
+  async function startBreak() {
+    await withDeviceLocation(async ({ lat, lng }) => {
+      const r = await fetch(`${API_URL}/api/kiosk/time/break-start`, {
+        method: "POST", headers: authHeaders, body: JSON.stringify({ lat, lng }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || "No se pudo iniciar tu lonche.");
+      if (data.record) setTime((p) => p.map((t) => sid(t._id) === sid(data.record._id) ? data.record : t));
+    });
+  }
+
+  async function endBreak() {
+    await withDeviceLocation(async ({ lat, lng }) => {
+      const r = await fetch(`${API_URL}/api/kiosk/time/break-end`, {
+        method: "POST", headers: authHeaders, body: JSON.stringify({ lat, lng }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || "No se pudo terminar tu lonche.");
+      if (data.record) setTime((p) => p.map((t) => sid(t._id) === sid(data.record._id) ? data.record : t));
+    });
   }
 
   async function toggleTask(listId, idx) {
@@ -382,7 +440,7 @@ export default function UnifiedStaffApp() {
 
         {/* Main content */}
         <main className={`flex-1 w-full mx-auto ${isPOSTab ? "max-w-5xl" : "max-w-3xl"} px-4 py-5 pb-28`}>
-          {tab === "inicio"  && <HomeTab me={me} now={now} openEntry={openEntry} time={time} schedule={schedule} checklist={checklist} onClockIn={clockIn} onClockOut={clockOut} />}
+          {tab === "inicio"  && <HomeTab me={me} now={now} openEntry={openEntry} time={time} schedule={schedule} checklist={checklist} onClockIn={clockIn} onClockOut={clockOut} onBreakStart={startBreak} onBreakEnd={endBreak} clockError={clockError} clockBusy={clockBusy} />}
           {tab === "tareas"  && <TasksTab employees={employees} checklist={checklist} onToggle={toggleTask} />}
           {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
           {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
@@ -511,14 +569,30 @@ function PinKey({ children, onClick, subtle }) {
 /* ============================================================================
    HOME — CLOCK IN/OUT
    ========================================================================== */
-function HomeTab({ me, now, openEntry, time, schedule, checklist, onClockIn, onClockOut }) {
+const FORGOT_CLOCKOUT_HOURS = 13;
+
+function HomeTab({ me, now, openEntry, time, schedule, checklist, onClockIn, onClockOut, onBreakStart, onBreakEnd, clockError, clockBusy }) {
   const [confirmOut, setConfirmOut] = useState(false);
   const todayEntries = time.filter((t) => sid(t.employeeId) === sid(me.id) && t.date === todayKey());
+
+  const breakMinsOf = (t) => (t.breaks || []).reduce((bAcc, b) => {
+    const bStart = new Date(b.start).getTime();
+    const bEnd = b.end ? new Date(b.end).getTime() : now;
+    return bAcc + (bEnd - bStart) / 60000;
+  }, 0);
+
   const workedMins = todayEntries.reduce((acc, t) => {
     const start = new Date(t.clockIn).getTime();
     const end = t.clockOut ? new Date(t.clockOut).getTime() : (sid(t._id) === sid(openEntry?._id) ? now : start);
-    return acc + (end - start) / 60000;
+    const grossMins = (end - start) / 60000;
+    return acc + Math.max(0, grossMins - breakMinsOf(t));
   }, 0);
+
+  const openBreak = openEntry?.breaks?.find((b) => !b.end);
+  const breakMins = openBreak ? (now - new Date(openBreak.start).getTime()) / 60000 : 0;
+  const forgotToClockOut = openEntry && !openBreak &&
+    (now - new Date(openEntry.clockIn).getTime()) > FORGOT_CLOCKOUT_HOURS * 3600 * 1000;
+
   const myShift = schedule?.[sid(me.id)]?.[(new Date().getDay() + 6) % 7];
   const totalTasks = Object.values(CHECKLISTS).reduce((a, l) => a + l.items.length, 0);
   const doneTasks = CHECK_IDS.reduce((a, lid) => a + Object.keys(checklist?.[lid] || {}).length, 0);
@@ -532,40 +606,70 @@ function HomeTab({ me, now, openEntry, time, schedule, checklist, onClockIn, onC
         <h2 className="text-2xl font-black tracking-tight">¡Hola, {me.name.split(" ")[0]}!</h2>
       </div>
 
-      <div className={`relative overflow-hidden rounded-3xl p-6 ${openEntry ? "bg-emerald-600" : "bg-slate-800"} transition-colors duration-500`}>
+      {forgotToClockOut && (
+        <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-300">
+            Tu turno lleva abierto más de {FORGOT_CLOCKOUT_HOURS}h desde las {fmtTime(openEntry.clockIn)} — si ya te fuiste, no olvides marcar salida.
+          </p>
+        </div>
+      )}
+
+      {clockError && (
+        <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl p-3.5">
+          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-rose-300">{clockError}</p>
+        </div>
+      )}
+
+      <div className={`relative overflow-hidden rounded-3xl p-6 ${openBreak ? "bg-amber-600" : openEntry ? "bg-emerald-600" : "bg-slate-800"} transition-colors duration-500`}>
         <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-black/10 translate-y-1/2 -translate-x-1/2" />
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-4">
-            <span className={`text-xs uppercase tracking-widest font-semibold ${openEntry ? "text-emerald-100" : "text-slate-400"}`}>
-              {openEntry ? "Turno activo" : "Sin turno activo"}
+            <span className={`text-xs uppercase tracking-widest font-semibold ${openEntry ? "text-white/90" : "text-slate-400"}`}>
+              {openBreak ? "En lonche" : openEntry ? "Turno activo" : "Sin turno activo"}
             </span>
             {openEntry && (
-              <span className="flex items-center gap-1.5 text-[11px] text-emerald-200 bg-black/20 px-2.5 py-1 rounded-full">
+              <span className="flex items-center gap-1.5 text-[11px] text-white/90 bg-black/20 px-2.5 py-1 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-lime-300 animate-pulse" />
-                desde {fmtTime(openEntry.clockIn)}
+                {openBreak ? `desde ${fmtTime(openBreak.start)}` : `desde ${fmtTime(openEntry.clockIn)}`}
               </span>
             )}
           </div>
-          <p className={`text-xs mb-1 ${openEntry ? "text-emerald-200" : "text-slate-500"}`}>Trabajado hoy</p>
-          <p className="text-5xl font-black tabular-nums mb-6">{fmtHM(workedMins)}</p>
-          {openEntry ? (
+          <p className={`text-xs mb-1 ${openEntry ? "text-white/80" : "text-slate-500"}`}>
+            {openBreak ? "Tiempo de lonche" : "Trabajado hoy"}
+          </p>
+          <p className="text-5xl font-black tabular-nums mb-6">{fmtHM(openBreak ? breakMins : workedMins)}</p>
+
+          {openBreak ? (
+            <button onClick={onBreakEnd} disabled={clockBusy} className="w-full flex items-center justify-center gap-2 bg-black/20 hover:bg-black/30 disabled:opacity-60 text-white font-bold py-4 rounded-2xl text-base transition active:scale-[0.98]">
+              <Coffee className="w-5 h-5" /> {clockBusy ? "Verificando ubicación…" : "Terminar lonche"}
+            </button>
+          ) : openEntry ? (
             confirmOut ? (
               <div className="space-y-2">
                 <p className="text-sm text-center text-emerald-100 mb-3">¿Confirmas tu salida?</p>
                 <div className="flex gap-2">
                   <button onClick={() => setConfirmOut(false)} className="flex-1 bg-black/20 hover:bg-black/30 text-white font-semibold py-3.5 rounded-2xl text-sm transition">Cancelar</button>
-                  <button onClick={() => { setConfirmOut(false); onClockOut(); }} className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold py-3.5 rounded-2xl text-sm transition">Sí, marcar salida</button>
+                  <button onClick={() => { setConfirmOut(false); onClockOut(); }} disabled={clockBusy} className="flex-1 bg-rose-500 hover:bg-rose-600 disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl text-sm transition">
+                    {clockBusy ? "Verificando…" : "Sí, marcar salida"}
+                  </button>
                 </div>
               </div>
             ) : (
-              <button onClick={() => setConfirmOut(true)} className="w-full flex items-center justify-center gap-2 bg-black/20 hover:bg-black/30 text-white font-bold py-4 rounded-2xl text-base transition active:scale-[0.98]">
-                <LogOut className="w-5 h-5" /> Marcar salida
-              </button>
+              <div className="space-y-2">
+                <button onClick={() => setConfirmOut(true)} disabled={clockBusy} className="w-full flex items-center justify-center gap-2 bg-black/20 hover:bg-black/30 disabled:opacity-60 text-white font-bold py-4 rounded-2xl text-base transition active:scale-[0.98]">
+                  <LogOut className="w-5 h-5" /> {clockBusy ? "Verificando ubicación…" : "Marcar salida"}
+                </button>
+                <button onClick={onBreakStart} disabled={clockBusy} className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 disabled:opacity-60 text-white font-semibold py-3 rounded-2xl text-sm transition active:scale-[0.98]">
+                  <Coffee className="w-4 h-4" /> Iniciar lonche
+                </button>
+              </div>
             )
           ) : (
-            <button onClick={onClockIn} className="w-full flex items-center justify-center gap-2 bg-lime-400 hover:bg-lime-300 text-slate-900 font-bold py-4 rounded-2xl text-base transition active:scale-[0.98]">
-              <LogIn className="w-5 h-5" /> Marcar entrada
+            <button onClick={onClockIn} disabled={clockBusy} className="w-full flex items-center justify-center gap-2 bg-lime-400 hover:bg-lime-300 disabled:opacity-60 text-slate-900 font-bold py-4 rounded-2xl text-base transition active:scale-[0.98]">
+              <LogIn className="w-5 h-5" /> {clockBusy ? "Verificando ubicación…" : "Marcar entrada"}
             </button>
           )}
         </div>
@@ -592,11 +696,23 @@ function HomeTab({ me, now, openEntry, time, schedule, checklist, onClockIn, onC
           </div>
           <ul className="divide-y divide-white/5">
             {todayEntries.map((t) => (
-              <li key={sid(t._id)} className="flex items-center justify-between px-4 py-3 text-sm">
-                <span className="flex items-center gap-2 text-emerald-400"><LogIn className="w-4 h-4" />{fmtTime(t.clockIn)}</span>
-                <span className="flex items-center gap-2 text-slate-400">
-                  {t.clockOut ? <><LogOut className="w-4 h-4 text-rose-400" />{fmtTime(t.clockOut)}</> : <span className="text-emerald-400 animate-pulse">en curso…</span>}
-                </span>
+              <li key={sid(t._id)} className="px-4 py-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-emerald-400"><LogIn className="w-4 h-4" />{fmtTime(t.clockIn)}</span>
+                  <span className="flex items-center gap-2 text-slate-400">
+                    {t.clockOut ? <><LogOut className="w-4 h-4 text-rose-400" />{fmtTime(t.clockOut)}</> : <span className="text-emerald-400 animate-pulse">en curso…</span>}
+                  </span>
+                </div>
+                {(t.breaks || []).length > 0 && (
+                  <div className="mt-1.5 pl-6 space-y-0.5">
+                    {t.breaks.map((b, i) => (
+                      <p key={i} className="text-[11px] text-amber-400/80 flex items-center gap-1.5">
+                        <Coffee className="w-3 h-3" />
+                        lonche {fmtTime(b.start)} – {b.end ? fmtTime(b.end) : "en curso…"}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -1295,11 +1411,18 @@ function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee, onUpd
   const weekAgo = Date.now() - 7 * 86400000;
   const weekEntries = time.filter((t) => new Date(t.clockIn).getTime() >= weekAgo);
 
+  const breakMinsOf = (t) => (t.breaks || []).reduce((bAcc, b) => {
+    const bStart = new Date(b.start).getTime();
+    const bEnd = b.end ? new Date(b.end).getTime() : now;
+    return bAcc + (bEnd - bStart) / 60000;
+  }, 0);
+
   const hoursByEmp = employees.map((e) => {
     const entries = weekEntries.filter((t) => sid(t.employeeId) === sid(e._id));
     const mins = entries.reduce((acc, t) => {
       const start = new Date(t.clockIn).getTime();
-      return acc + ((t.clockOut ? new Date(t.clockOut).getTime() : now) - start) / 60000;
+      const grossMins = ((t.clockOut ? new Date(t.clockOut).getTime() : now) - start) / 60000;
+      return acc + Math.max(0, grossMins - breakMinsOf(t));
     }, 0);
     return { emp: e, mins, open: entries.some((t) => !t.clockOut) };
   });
@@ -1308,11 +1431,15 @@ function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee, onUpd
   const totalPayroll = hoursByEmp.reduce((s, { emp, mins }) => s + (mins / 60) * (emp.hourlyRate || 0), 0);
 
   function exportCSV() {
-    const rows = [["Empleado","Rol","Fecha","Entrada","Salida","Minutos"]];
+    const rows = [["Empleado","Rol","Fecha","Entrada","Salida","Minutos lonche","Minutos netos"]];
     time.forEach((t) => {
       const e = empById(t.employeeId);
+      const breakMins = Math.round(breakMinsOf(t));
+      const netMins = t.clockOut
+        ? Math.round(Math.max(0, (new Date(t.clockOut).getTime() - new Date(t.clockIn).getTime()) / 60000 - breakMins))
+        : "";
       rows.push([e?.name||"?", e?.role||"", t.date, fmtTime(t.clockIn), t.clockOut ? fmtTime(t.clockOut) : "en curso",
-        t.clockOut ? Math.round((new Date(t.clockOut).getTime()-new Date(t.clockIn).getTime())/60000) : ""]);
+        breakMins || 0, netMins]);
     });
     downloadCSV(`horas_${todayKey()}.csv`, rows);
   }

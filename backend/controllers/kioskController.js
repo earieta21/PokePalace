@@ -7,6 +7,22 @@ import Announcement from "../models/Announcement.js";
 import Schedule from "../models/Schedule.js";
 import StaffUser from "../models/StaffUser.js";
 import { comparePin, hashPin, isValidPin } from "../utils/staffPin.js";
+import { isWithinRestaurant, MAX_DISTANCE_METERS } from "../utils/geo.js";
+
+const LOCATION_ERROR_MSG = `Debes estar en el restaurante para marcar tu entrada/salida (dentro de ${MAX_DISTANCE_METERS}m).`;
+
+// Valida que el body traiga coordenadas y que estén dentro del radio del
+// local. Devuelve un mensaje de error si algo falla, o null si está bien.
+function checkStaffLocation(req) {
+  const { lat, lng } = req.body || {};
+  if (typeof lat !== "number" || typeof lng !== "number") {
+    return "No se pudo obtener tu ubicación. Activa el permiso de ubicación e intenta de nuevo.";
+  }
+  if (!isWithinRestaurant(lat, lng)) {
+    return LOCATION_ERROR_MSG;
+  }
+  return null;
+}
 
 /* ── EMPLOYEES ──────────────────────────────────────────────────────────── */
 
@@ -114,6 +130,8 @@ export const removeKioskEmployee = async (req, res) => {
 export const clockIn = async (req, res) => {
   const { locationId, date } = req.body;
   const employeeId = req.staff.id;
+  const locationError = checkStaffLocation(req);
+  if (locationError) return res.status(403).json({ message: locationError });
   try {
     const existing = await TimeRecord.findOne({ employeeId, clockOut: null, locationId });
     if (existing) return res.status(409).json({ message: "Ya tienes turno activo" });
@@ -126,14 +144,55 @@ export const clockIn = async (req, res) => {
 
 export const clockOut = async (req, res) => {
   const employeeId = req.staff.id;
+  const locationError = checkStaffLocation(req);
+  if (locationError) return res.status(403).json({ message: locationError });
   try {
-    const record = await TimeRecord.findOneAndUpdate(
-      { employeeId, clockOut: null },
-      { clockOut: new Date() },
-      { new: true }
-    );
-    if (!record) return res.status(404).json({ message: "No hay turno activo" });
-    res.json({ record });
+    const open = await TimeRecord.findOne({ employeeId, clockOut: null });
+    if (!open) return res.status(404).json({ message: "No hay turno activo" });
+    const openBreak = open.breaks.find((b) => !b.end);
+    if (openBreak) {
+      return res.status(400).json({ message: "Termina tu lonche antes de marcar salida" });
+    }
+    open.clockOut = new Date();
+    await open.save();
+    res.json({ record: open });
+  } catch (err) {
+    res.status(500).json({ message: "Error", err: err.message });
+  }
+};
+
+/* ── LONCHE (break) ─────────────────────────────────────────────────────── */
+
+export const startBreak = async (req, res) => {
+  const employeeId = req.staff.id;
+  const locationError = checkStaffLocation(req);
+  if (locationError) return res.status(403).json({ message: locationError });
+  try {
+    const open = await TimeRecord.findOne({ employeeId, clockOut: null });
+    if (!open) return res.status(404).json({ message: "No tienes turno activo" });
+    if (open.breaks.some((b) => !b.end)) {
+      return res.status(409).json({ message: "Ya tienes un lonche en curso" });
+    }
+    open.breaks.push({ start: new Date() });
+    await open.save();
+    res.status(201).json({ record: open });
+  } catch (err) {
+    res.status(500).json({ message: "Error", err: err.message });
+  }
+};
+
+export const endBreak = async (req, res) => {
+  const employeeId = req.staff.id;
+  const locationError = checkStaffLocation(req);
+  if (locationError) return res.status(403).json({ message: locationError });
+  try {
+    const open = await TimeRecord.findOne({ employeeId, clockOut: null });
+    if (!open) return res.status(404).json({ message: "No tienes turno activo" });
+    const openBreak = open.breaks.find((b) => !b.end);
+    if (!openBreak) return res.status(404).json({ message: "No tienes un lonche en curso" });
+    openBreak.end = new Date();
+    await open.save();
+    res.json({ record: open });
   } catch (err) {
     res.status(500).json({ message: "Error", err: err.message });
   }

@@ -3,7 +3,7 @@ import { requireStaffAuth } from "../middleware/requireStaffAuth.js";
 import {
   getKioskEmployees, getManagedKioskEmployees,
   createKioskEmployee, updateKioskEmployee, removeKioskEmployee,
-  clockIn, clockOut, getTimeRecords,
+  clockIn, clockOut, getTimeRecords, startBreak, endBreak,
   getChecklist, toggleChecklistItem,
   addTempRecord, getTempRecords,
   getAnnouncements, createAnnouncement, deleteAnnouncement,
@@ -25,6 +25,8 @@ router.delete("/employees/:id",  managerOnly, removeKioskEmployee);
 // Time
 router.post("/time/clock-in",  anyStaff, clockIn);
 router.post("/time/clock-out", anyStaff, clockOut);
+router.post("/time/break-start", anyStaff, startBreak);
+router.post("/time/break-end",   anyStaff, endBreak);
 router.get ("/time",           anyStaff, getTimeRecords);
 
 // Checklist
