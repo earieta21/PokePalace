@@ -107,13 +107,18 @@ const TEMP_STATIONS = [
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 // Which tabs each role sees
+// Orden pensado por frecuencia de uso en un turno normal: primero lo
+// operativo (pos/cocina/premios), luego lo personal/diario (inicio, tareas,
+// temp), luego consulta frecuente (disponibilidad, hist, inv), luego lo
+// periódico (horario, avisos), y al final lo administrativo/menos frecuente
+// (ventas, fin, panel).
 const TABS_BY_ROLE = {
   employee: ["inicio", "tareas", "temp", "horario", "avisos"],
-  cashier:  ["pos", "premios", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
-  kitchen:  ["cocina", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
-  manager:  ["pos", "cocina", "premios", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  admin:    ["pos", "cocina", "premios", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  owner:    ["pos", "cocina", "premios", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  cashier:  ["pos", "premios", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
+  kitchen:  ["cocina", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
+  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "ventas", "fin", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "ventas", "fin", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "ventas", "fin", "panel"],
 };
 
 const TAB_META = {
