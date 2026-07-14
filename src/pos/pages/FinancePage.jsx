@@ -143,7 +143,7 @@ export default function FinancePage({ styles }) {
               color: period === p.id ? "var(--p-ink)" : "var(--p-muted)",
               fontSize: 12.5, fontWeight: 600, cursor: "pointer",
               boxShadow: period === p.id ? "var(--p-shadow)" : "none",
-              fontFamily: "Syne, sans-serif", transition: "background 130ms",
+              fontFamily: "Inter, sans-serif", transition: "background 130ms",
             }}
           >{p.label}</button>
         ))}
@@ -273,11 +273,11 @@ export default function FinancePage({ styles }) {
                   {confirmDel === e._id ? (
                     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                       <button onClick={() => handleDelete(e._id)}
-                        style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 5, background: "#c0392b", color: "#fff", border: "none", cursor: "pointer", fontFamily: "Syne, sans-serif" }}>
+                        style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 5, background: "#c0392b", color: "#fff", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
                         Sí
                       </button>
                       <button onClick={() => setConfirmDel(null)}
-                        style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 5, background: "transparent", color: "var(--p-muted)", border: "1px solid var(--p-border)", cursor: "pointer", fontFamily: "Syne, sans-serif" }}>
+                        style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 5, background: "transparent", color: "var(--p-muted)", border: "1px solid var(--p-border)", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
                         No
                       </button>
                     </div>

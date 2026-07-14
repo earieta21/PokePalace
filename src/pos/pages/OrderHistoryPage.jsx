@@ -95,7 +95,7 @@ export default function OrderHistoryPage({ styles }) {
                 fontWeight: 600,
                 cursor: "pointer",
                 boxShadow: range === r.id ? "var(--p-shadow)" : "none",
-                fontFamily: "Syne, sans-serif",
+                fontFamily: "Inter, sans-serif",
                 transition: "background 130ms",
               }}
             >

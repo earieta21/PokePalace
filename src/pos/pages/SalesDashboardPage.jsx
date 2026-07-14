@@ -97,7 +97,7 @@ export default function SalesDashboardPage({ styles }) {
                     background: "linear-gradient(180deg,#4A7A5A,#6aab82)",
                     transition: "height 400ms",
                   }} />
-                  <span style={{ fontSize: 10, color: "var(--p-muted)", fontFamily: "Syne,sans-serif", fontWeight: 600 }}>
+                  <span style={{ fontSize: 10, color: "var(--p-muted)", fontFamily: "Inter, sans-serif", fontWeight: 600 }}>
                     {d.day}
                   </span>
                   <span style={{ fontSize: 9, color: "var(--p-muted)" }}>{d.orders}p</span>

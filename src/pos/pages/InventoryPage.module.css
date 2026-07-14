@@ -20,7 +20,7 @@
   background: var(--p-cream);
   color: var(--p-ink);
   color-scheme: light;
-  font-family: "Syne", system-ui, sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
 }
 
 .pageHeader {
