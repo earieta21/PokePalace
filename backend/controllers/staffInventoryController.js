@@ -1,4 +1,33 @@
 import Inventory from "../models/Inventory.js";
+import Expense from "../models/Expense.js";
+
+// Cada sección del inventario tiene su categoría contable en Finanzas.
+const EXPENSE_CATEGORY_BY_SECTION = {
+  Comida:   "Ingredientes",
+  Limpieza: "Limpieza",
+  Empaque:  "Empaque",
+  Otros:    "Otros",
+};
+
+/* Registra la compra como gasto en Finanzas (costo unitario × cantidad).
+   Devuelve null si el artículo no tiene costo registrado; un fallo aquí
+   no debe tumbar la operación de inventario. */
+async function recordPurchaseExpense({ item, qty, staff }) {
+  const cost = Number(item.cost) || 0;
+  if (cost <= 0 || !(qty > 0)) return null;
+  try {
+    return await Expense.create({
+      category:    EXPENSE_CATEGORY_BY_SECTION[item.section] || "Otros",
+      description: `Compra de inventario: ${item.item} (${qty} ${item.unit})`,
+      amount:      parseFloat((qty * cost).toFixed(2)),
+      date:        new Date().toISOString().slice(0, 10),
+      source:      "inventario",
+      createdBy:   staff?.name || staff?.email || "staff",
+    });
+  } catch {
+    return null;
+  }
+}
 
 /* GET /api/staff/inventory */
 export const getInventory = async (req, res) => {
@@ -10,11 +39,16 @@ export const getInventory = async (req, res) => {
   }
 };
 
-/* POST /api/staff/inventory */
+/* POST /api/staff/inventory — body opcional: { registerExpense: true }
+   registra la existencia inicial como gasto en Finanzas si tiene costo. */
 export const createItem = async (req, res) => {
   try {
-    const item = await Inventory.create(req.body);
-    res.status(201).json({ item });
+    const { registerExpense, ...data } = req.body;
+    const item = await Inventory.create(data);
+    const expense = registerExpense
+      ? await recordPurchaseExpense({ item, qty: item.qty, staff: req.staff })
+      : null;
+    res.status(201).json({ item, expense });
   } catch (err) {
     res.status(400).json({ message: "Error creating item", err: err.message });
   }
@@ -51,7 +85,13 @@ export const restockItem = async (req, res) => {
     existing.lastRestockAt = new Date();
     await existing.save();
 
-    res.json({ item: existing });
+    // Recibir mercancía es una compra: se anota sola en Finanzas
+    // (salvo que el cliente lo desactive con registerExpense: false).
+    const expense = req.body.registerExpense === false
+      ? null
+      : await recordPurchaseExpense({ item: existing, qty: amount, staff: req.staff });
+
+    res.json({ item: existing, expense });
   } catch (err) {
     res.status(400).json({ message: "Error actualizando existencia", err: err.message });
   }

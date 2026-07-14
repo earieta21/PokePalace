@@ -2,16 +2,25 @@ import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { downloadCSV } from "../../utils/csv";
+import ui from "./FinancePage.module.css";
 
 const CATEGORIES = [
-  "Ingredientes", "Renta", "Servicios", "Nómina",
-  "Empaque", "Marketing", "Mantenimiento", "Otros",
+  { name: "Ingredientes",  icon: "🥑" },
+  { name: "Limpieza",      icon: "🧼" },
+  { name: "Empaque",       icon: "🥡" },
+  { name: "Renta",         icon: "🏠" },
+  { name: "Servicios",     icon: "💡" },
+  { name: "Nómina",        icon: "👥" },
+  { name: "Marketing",     icon: "📣" },
+  { name: "Mantenimiento", icon: "🔧" },
+  { name: "Otros",         icon: "📦" },
 ];
+const categoryIcon = (name) => CATEGORIES.find((c) => c.name === name)?.icon || "📦";
 
 const PERIODS = [
-  { id: "semana",   label: "Esta semana" },
-  { id: "mes",      label: "Este mes" },
-  { id: "anterior", label: "Mes anterior" },
+  { id: "semana",   label: "Esta semana",  icon: "📅", hint: "De lunes a hoy" },
+  { id: "mes",      label: "Este mes",     icon: "🗓️", hint: "Del día 1 a hoy" },
+  { id: "anterior", label: "Mes anterior", icon: "⏮",  hint: "El mes completo" },
 ];
 
 function getRange(period) {
@@ -33,7 +42,7 @@ function getRange(period) {
   return { from: fmt(start), to: fmt(now) };
 }
 
-const fmtMXN = (n) => `$${(n ?? 0).toLocaleString("es-MX")} MXN`;
+const fmtMXN = (n) => `$${(n ?? 0).toLocaleString("es-MX")}`;
 const today  = () => new Date().toISOString().slice(0, 10);
 
 export default function FinancePage({ styles }) {
@@ -45,7 +54,10 @@ export default function FinancePage({ styles }) {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
+  const [notice, setNotice]   = useState("");
+  const [showGuide, setShowGuide] = useState(true);
 
+  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     category: "Ingredientes", description: "", amount: "", date: today(),
   });
@@ -68,6 +80,18 @@ export default function FinancePage({ styles }) {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timeout = window.setTimeout(() => setNotice(""), 3500);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+
+  const closeForm = () => {
+    setShowForm(false);
+    setForm({ category: "Ingredientes", description: "", amount: "", date: today() });
+    setFormError("");
+  };
+
   const handleAdd = async () => {
     if (!form.description.trim()) return setFormError("Escribe una descripción.");
     const amt = parseFloat(form.amount);
@@ -80,7 +104,8 @@ export default function FinancePage({ styles }) {
         ? { ...prev, expenses: prev.expenses + amt, profit: prev.profit - amt }
         : prev
       );
-      setForm((f) => ({ ...f, description: "", amount: "" }));
+      setNotice(`Gasto de ${fmtMXN(amt)} registrado en ${form.category}.`);
+      closeForm();
     } catch (e) { setFormError(e.message); }
     finally { setSaving(false); }
   };
@@ -91,10 +116,13 @@ export default function FinancePage({ styles }) {
     try {
       await api.delete(`/api/staff/expenses/${id}`);
       setExpenses((prev) => prev.filter((e) => e._id !== id));
-      if (exp) setSummary((prev) => prev
-        ? { ...prev, expenses: prev.expenses - exp.amount, profit: prev.profit + exp.amount }
-        : prev
-      );
+      if (exp) {
+        setSummary((prev) => prev
+          ? { ...prev, expenses: prev.expenses - exp.amount, profit: prev.profit + exp.amount }
+          : prev
+        );
+        setNotice(`Se eliminó el gasto "${exp.description}".`);
+      }
     } catch (e) { setError(e.message); }
   };
 
@@ -110,8 +138,8 @@ export default function FinancePage({ styles }) {
       ["Ganancia neta", summary?.profit ?? 0],
       ["Órdenes pagadas", summary?.orderCount ?? 0],
       [],
-      ["Fecha", "Categoría", "Descripción", "Monto"],
-      ...expenses.map((e) => [e.date, e.category, e.description, e.amount]),
+      ["Fecha", "Categoría", "Descripción", "Monto", "Origen"],
+      ...expenses.map((e) => [e.date, e.category, e.description, e.amount, e.source === "inventario" ? "Inventario" : "Manual"]),
     ];
     downloadCSV(`finanzas_${from}_a_${to}.csv`, rows);
   }
@@ -120,135 +148,212 @@ export default function FinancePage({ styles }) {
     ? Math.max(...Object.values(summary.byCategory), 1)
     : 1;
 
+  const isLoss = !loading && (summary?.profit ?? 0) < 0;
+
   return (
-    <div>
-      <div className={styles.pageHeader}>
+    <div className={ui.financeRoot}>
+      <div className={`${styles.pageHeader} ${ui.pageHeader}`}>
         <div>
           <h1 className={styles.pageTitle}>Finanzas</h1>
-          <p className={styles.pageSubtitle}>{from} → {to}</p>
+          <p className={styles.pageSubtitle}>Revisa ingresos, gastos y ganancia — las compras de inventario se anotan solas.</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className={styles.btnGhost} onClick={load}>Actualizar</button>
-          <button className={styles.btnGhost} onClick={exportCSV} disabled={loading}>⬇ CSV</button>
+        <div className={ui.headerActions}>
+          <button className={styles.btnGhost} onClick={() => setShowGuide((visible) => !visible)}>
+            ? Cómo funciona
+          </button>
+          <button className={styles.btnGhost} onClick={load} title="Volver a cargar los datos">↻ Actualizar</button>
+          <button className={styles.btnGhost} onClick={exportCSV} disabled={loading} title="Descargar el período actual">
+            ↓ Exportar
+          </button>
+          <button
+            className={styles.btnPrimary}
+            onClick={() => (showForm ? closeForm() : setShowForm(true))}
+          >
+            {showForm ? "Cerrar formulario" : "+ Registrar gasto"}
+          </button>
         </div>
       </div>
 
-      {/* Period tabs */}
-      <div style={{ display: "flex", gap: 3, background: "rgba(0,0,0,0.04)", borderRadius: 8, padding: 3, marginBottom: 22, width: "fit-content" }}>
-        {PERIODS.map((p) => (
-          <button key={p.id} type="button" onClick={() => setPeriod(p.id)}
-            style={{
-              padding: "6px 16px", borderRadius: 6, border: "none",
-              background: period === p.id ? "var(--p-surface)" : "transparent",
-              color: period === p.id ? "var(--p-ink)" : "var(--p-muted)",
-              fontSize: 12.5, fontWeight: 600, cursor: "pointer",
-              boxShadow: period === p.id ? "var(--p-shadow)" : "none",
-              fontFamily: "Inter, sans-serif", transition: "background 130ms",
-            }}
-          >{p.label}</button>
-        ))}
-      </div>
+      {showGuide && (
+        <section className={ui.guide} aria-label="Guía rápida de finanzas">
+          <div className={ui.guideIntro}>
+            <span className={ui.guideEyebrow}>Guía rápida</span>
+            <strong>Tus finanzas en tres pasos</strong>
+            <button type="button" onClick={() => setShowGuide(false)} aria-label="Ocultar guía">×</button>
+          </div>
+          <div className={ui.guideSteps}>
+            <div className={ui.guideStep}><span>1</span><p><strong>Elige el período</strong>Semana o mes que quieres revisar.</p></div>
+            <div className={ui.guideStep}><span>2</span><p><strong>Lee tus números</strong>Ingresos, gastos y ganancia neta.</p></div>
+            <div className={ui.guideStep}><span>3</span><p><strong>Registra gastos manuales</strong>Renta, luz, gas… lo del inventario se anota solo.</p></div>
+          </div>
+        </section>
+      )}
+
+      {notice && (
+        <div className={ui.successNotice} role="status">
+          <span>✓</span>{notice}
+          <button type="button" onClick={() => setNotice("")} aria-label="Cerrar notificación">×</button>
+        </div>
+      )}
 
       {error && <p style={{ color: "red", fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
-      {/* KPI cards */}
-      <div className={styles.statsRow} style={{ marginBottom: 24 }}>
-        {[
-          { label: "Ingresos",     value: loading ? "—" : fmtMXN(summary?.revenue),  sub: `${summary?.orderCount ?? 0} órdenes pagadas`, accent: false },
-          { label: "Gastos",       value: loading ? "—" : fmtMXN(summary?.expenses), sub: "Registrados",          accent: false },
-          { label: "Ganancia Neta",value: loading ? "—" : fmtMXN(summary?.profit),   sub: summary?.profit < 0 ? "⚠ Pérdida" : "Antes de impuestos", accent: true },
-          { label: "Margen",       value: loading ? "—" : (margin != null ? `${margin}%` : "—"), sub: "Sobre ingresos", accent: false },
-        ].map(({ label, value, sub, accent }) => (
-          <div key={label} className={styles.statCard}>
-            <p className={styles.statLabel}>{label}</p>
-            <p className={`${styles.statValue} ${accent ? styles.statAccent : ""}`} style={{ fontSize: 16, lineHeight: 1.3, wordBreak: "break-word" }}>
-              {value}
-            </p>
-            <p className={styles.statSub}>{sub}</p>
-          </div>
-        ))}
-      </div>
+      {/* ── Add expense form ── */}
+      {showForm && (
+        <div className={`${styles.card} ${ui.actionPanel}`}>
+          <p className={styles.cardTitle}>Registrar gasto manual</p>
 
-      <div className={styles.grid2} style={{ alignItems: "start", gap: 20, marginBottom: 24 }}>
+          {formError && (
+            <p style={{ color: "red", fontSize: 12, marginBottom: 12 }}>{formError}</p>
+          )}
 
-        {/* ── Add expense form ── */}
-        <div className={styles.card}>
-          <p className={styles.cardTitle}>Registrar Gasto</p>
-
-          <div className={styles.formGroup}>
-            <label className={styles.label}>Categoría</label>
-            <select className={styles.select} value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+          <div className={ui.formStep}>
+            <div className={ui.stepHeading}>
+              <span>1</span>
+              <div><strong>Elige la categoría</strong><small>¿De qué tipo es este gasto?</small></div>
+            </div>
+            <div className={ui.categoryPicker}>
+              {CATEGORIES.map((category) => (
+                <button
+                  key={category.name}
+                  type="button"
+                  aria-pressed={form.category === category.name}
+                  onClick={() => setForm((previous) => ({ ...previous, category: category.name }))}
+                >
+                  <span>{category.icon}</span>{category.name}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className={styles.formGroup}>
-            <label className={styles.label}>Descripción</label>
-            <input className={styles.input}
-              placeholder="Ej: Salmón 2 kg, CFE agosto, Gas…"
-              value={form.description}
-              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            />
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup} style={{ marginBottom: 0 }}>
-              <label className={styles.label}>Monto (MXN)</label>
-              <input className={styles.input} type="number" min="0" step="0.01" placeholder="0.00"
-                value={form.amount}
-                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+          <div className={ui.formStep}>
+            <div className={ui.stepHeading}>
+              <span>2</span>
+              <div><strong>Captura los datos</strong><small>Qué se pagó, cuánto y cuándo.</small></div>
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Descripción *</label>
+              <input className={styles.input}
+                placeholder="Ej: CFE agosto, Gas, Renta del local…"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 onKeyDown={(e) => e.key === "Enter" && handleAdd()}
               />
             </div>
-            <div className={styles.formGroup} style={{ marginBottom: 0 }}>
-              <label className={styles.label}>Fecha</label>
-              <input className={styles.input} type="date"
-                value={form.date}
-                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-              />
+            <div className={styles.formRow}>
+              <div className={styles.formGroup} style={{ marginBottom: 0 }}>
+                <label className={styles.label}>Monto (MXN) *</label>
+                <input className={styles.input} type="number" min="0" step="0.01" placeholder="0.00"
+                  value={form.amount}
+                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                />
+              </div>
+              <div className={styles.formGroup} style={{ marginBottom: 0 }}>
+                <label className={styles.label}>Fecha</label>
+                <input className={styles.input} type="date"
+                  value={form.date}
+                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                />
+              </div>
             </div>
           </div>
 
-          {formError && <p style={{ color: "red", fontSize: 12, margin: "8px 0 0" }}>{formError}</p>}
-
-          <button className={styles.btnPrimary} style={{ width: "100%", marginTop: 16 }}
-            onClick={handleAdd} disabled={saving} type="button">
-            {saving ? "Guardando…" : "+ Agregar gasto"}
-          </button>
+          <div className={ui.formActions}>
+            <button className={styles.btnPrimary} onClick={handleAdd} disabled={saving} type="button">
+              {saving ? "Guardando…" : "Agregar gasto"}
+            </button>
+            <button className={styles.btnGhost} type="button" onClick={closeForm}>
+              Cancelar
+            </button>
+          </div>
         </div>
+      )}
 
-        {/* ── Category breakdown ── */}
-        <div className={styles.card}>
-          <p className={styles.cardTitle}>Gastos por categoría</p>
-          {loading ? (
-            <p style={{ color: "var(--p-muted)", fontSize: 13 }}>Cargando…</p>
-          ) : !summary?.byCategory || Object.keys(summary.byCategory).length === 0 ? (
-            <p style={{ color: "var(--p-muted)", fontSize: 13, paddingTop: 8 }}>Sin gastos en este período.</p>
-          ) : (
-            <div className={styles.barChart} style={{ marginTop: 10 }}>
-              {Object.entries(summary.byCategory)
-                .sort(([, a], [, b]) => b - a)
-                .map(([cat, amt]) => (
-                  <div key={cat} className={styles.barRow}>
-                    <span className={styles.barLabel}>{cat}</span>
-                    <div className={styles.barTrack}>
-                      <div className={styles.barFill} style={{ width: `${(amt / maxCatAmt) * 100}%` }} />
-                    </div>
-                    <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10.5, color: "var(--p-muted)", width: 110, textAlign: "right", whiteSpace: "nowrap", flexShrink: 0 }}>
-                      ${amt.toLocaleString("es-MX")}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          )}
+      {/* ── Period picker ── */}
+      <section className={ui.sectionsBlock}>
+        <div className={ui.sectionTitle}>
+          <div><span>Paso 1</span><strong>¿Qué período quieres ver?</strong></div>
+          <small>{from} → {to}</small>
+        </div>
+        <div className={ui.periodGrid}>
+          {PERIODS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              aria-pressed={period === p.id}
+              className={period === p.id ? ui.periodActive : ""}
+              onClick={() => setPeriod(p.id)}
+            >
+              <span className={ui.periodIcon}>{p.icon}</span>
+              <span className={ui.periodText}>
+                <strong>{p.label}</strong>
+                <small>{p.hint}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* ── KPI cards ── */}
+      <div className={ui.summaryGrid}>
+        <div>
+          <span className={ui.summaryIcon}>$</span>
+          <span><small>Ingresos</small><strong>{loading ? "—" : fmtMXN(summary?.revenue)}</strong><em>{summary?.orderCount ?? 0} órdenes pagadas</em></span>
+        </div>
+        <div>
+          <span className={ui.summaryIcon}>−</span>
+          <span><small>Gastos</small><strong>{loading ? "—" : fmtMXN(summary?.expenses)}</strong><em>{expenses.length} movimiento{expenses.length !== 1 ? "s" : ""}</em></span>
+        </div>
+        <div className={isLoss ? ui.warningSummary : ""}>
+          <span className={ui.summaryIcon}>{isLoss ? "!" : "="}</span>
+          <span><small>Ganancia neta</small><strong>{loading ? "—" : fmtMXN(summary?.profit)}</strong><em>{isLoss ? "⚠ Pérdida en el período" : "Antes de impuestos"}</em></span>
+        </div>
+        <div>
+          <span className={ui.summaryIcon}>%</span>
+          <span><small>Margen</small><strong>{loading ? "—" : (margin != null ? `${margin}%` : "—")}</strong><em>Sobre ingresos</em></span>
         </div>
       </div>
 
+      {/* ── Category breakdown ── */}
+      <div className={`${styles.card} ${ui.breakdownCard}`}>
+        <p className={styles.cardTitle}>Gastos por categoría</p>
+        {loading ? (
+          <p style={{ color: "var(--p-muted)", fontSize: 13 }}>Cargando…</p>
+        ) : !summary?.byCategory || Object.keys(summary.byCategory).length === 0 ? (
+          <p style={{ color: "var(--p-muted)", fontSize: 13, paddingTop: 8 }}>Sin gastos en este período.</p>
+        ) : (
+          <div className={styles.barChart} style={{ marginTop: 10 }}>
+            {Object.entries(summary.byCategory)
+              .sort(([, a], [, b]) => b - a)
+              .map(([cat, amt]) => (
+                <div key={cat} className={styles.barRow}>
+                  <span className={styles.barLabel}>{categoryIcon(cat)} {cat}</span>
+                  <div className={styles.barTrack}>
+                    <div className={styles.barFill} style={{ width: `${(amt / maxCatAmt) * 100}%` }} />
+                  </div>
+                  <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10.5, color: "var(--p-muted)", width: 110, textAlign: "right", whiteSpace: "nowrap", flexShrink: 0 }}>
+                    ${amt.toLocaleString("es-MX")}
+                  </span>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+
       {/* ── Expense list ── */}
+      <section className={ui.filterPanel}>
+        <div className={ui.listHeading}>
+          <div>
+            <span>Paso 2</span>
+            <h2>Movimientos del período</h2>
+            <p>{expenses.length} gasto{expenses.length !== 1 ? "s" : ""} registrado{expenses.length !== 1 ? "s" : ""} · los marcados con 📦 vienen del inventario</p>
+          </div>
+        </div>
+      </section>
+
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
+        <table className={`${styles.table} ${ui.financeTable}`}>
           <thead>
             <tr>
               <th>Fecha</th>
@@ -260,33 +365,37 @@ export default function FinancePage({ styles }) {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>Cargando…</td></tr>
+              <tr><td colSpan={5} className={ui.loadingCell}>Cargando movimientos…</td></tr>
             ) : expenses.length === 0 ? (
-              <tr><td colSpan={5} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>Sin gastos registrados en este período</td></tr>
+              <tr>
+                <td colSpan={5}>
+                  <div className={ui.emptyState}>
+                    <span>$</span>
+                    <strong>Sin gastos en este período</strong>
+                    <p>Registra un gasto manual o recibe mercancía en Inventario.</p>
+                    <button type="button" className={styles.btnPrimary} onClick={() => setShowForm(true)}>
+                      + Registrar gasto
+                    </button>
+                  </div>
+                </td>
+              </tr>
             ) : expenses.map((e) => (
               <tr key={e._id}>
                 <td className={styles.tdMuted}>{e.date}</td>
-                <td><span className={`${styles.badge} ${styles.badgeGray}`}>{e.category}</span></td>
+                <td>
+                  <span className={`${styles.badge} ${styles.badgeGray}`}>{categoryIcon(e.category)} {e.category}</span>
+                  {e.source === "inventario" && <span className={ui.sourceBadge}>📦 Inventario</span>}
+                </td>
                 <td style={{ fontWeight: 500 }}>{e.description}</td>
                 <td className={styles.tdMono}>${e.amount.toLocaleString("es-MX")} MXN</td>
                 <td>
                   {confirmDel === e._id ? (
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      <button onClick={() => handleDelete(e._id)}
-                        style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 5, background: "#c0392b", color: "#fff", border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
-                        Sí
-                      </button>
-                      <button onClick={() => setConfirmDel(null)}
-                        style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 5, background: "transparent", color: "var(--p-muted)", border: "1px solid var(--p-border)", cursor: "pointer", fontFamily: "Inter, sans-serif" }}>
-                        No
-                      </button>
+                    <div className={ui.confirmDelete}>
+                      <button onClick={() => handleDelete(e._id)}>Sí</button>
+                      <button onClick={() => setConfirmDel(null)}>No</button>
                     </div>
                   ) : (
-                    <button onClick={() => setConfirmDel(e._id)}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--p-muted)", fontSize: 18, padding: "0 4px", lineHeight: 1, transition: "color 120ms" }}
-                      onMouseEnter={(ev) => (ev.currentTarget.style.color = "#c0392b")}
-                      onMouseLeave={(ev) => (ev.currentTarget.style.color = "var(--p-muted)")}
-                      aria-label="Eliminar gasto">×</button>
+                    <button className={ui.deleteButton} onClick={() => setConfirmDel(e._id)} aria-label="Eliminar gasto" title="Eliminar gasto">×</button>
                   )}
                 </td>
               </tr>

@@ -41,6 +41,7 @@ const CLEANING_PRODUCTS = [
 const EMPTY_FORM = {
   item: "", section: "Comida", category: "Proteínas", unit: "kg",
   qty: "", minQty: "", cost: "", supplier: "", menuKeys: [],
+  registerExpense: true,
 };
 
 // Ingredientes reales del builder — se usan para autocompletar nombre/categoría/unidad
@@ -230,7 +231,7 @@ export default function InventoryPage({ styles }) {
     if (!form.item || !form.qty) return;
     setSaving(true); setFormError("");
     try {
-      const { item: created } = await api.post("/api/staff/inventory", {
+      const { item: created, expense } = await api.post("/api/staff/inventory", {
         item:     form.item,
         section:  form.section,
         category: form.category,
@@ -240,13 +241,18 @@ export default function InventoryPage({ styles }) {
         cost:     form.cost   ? parseFloat(form.cost)   : 0,
         supplier: form.supplier,
         menuKeys: form.menuKeys,
+        registerExpense: form.registerExpense,
       });
       setItems((prev) => [...prev, created]);
       setSectionFilter(form.section);
       setFilter("Todos");
       setStockFilter("Todos");
       setSearch("");
-      setNotice(`${created.item} se agregó al inventario.`);
+      setNotice(
+        expense
+          ? `${created.item} se agregó al inventario y se registró el gasto de $${expense.amount.toLocaleString("es-MX")} en Finanzas.`
+          : `${created.item} se agregó al inventario.`
+      );
       setForm(EMPTY_FORM);
       setMenuSearch("");
       setShowAdvanced(false);
@@ -338,10 +344,14 @@ export default function InventoryPage({ styles }) {
         results.forEach(({ item }) => map.set(item._id, item));
         return [...map.values()];
       });
+      const spent = results.reduce((sum, r) => sum + (r.expense?.amount || 0), 0);
       setReceiveQty({});
       setReceiveSearch("");
       setReceiving(false);
-      setNotice(`Recepción guardada: ${results.length} artículo${results.length !== 1 ? "s" : ""} actualizado${results.length !== 1 ? "s" : ""}.`);
+      setNotice(
+        `Recepción guardada: ${results.length} artículo${results.length !== 1 ? "s" : ""} actualizado${results.length !== 1 ? "s" : ""}.` +
+        (spent > 0 ? ` Se registraron $${spent.toLocaleString("es-MX")} de gastos en Finanzas.` : "")
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -497,7 +507,7 @@ export default function InventoryPage({ styles }) {
           )}
 
           <div className={ui.receiveFooter}>
-            <span>2. Revisa las cantidades y guarda la recepción.</span>
+            <span>2. Revisa las cantidades y guarda la recepción. Si el artículo tiene costo por unidad, el gasto se anota solo en Finanzas.</span>
             <button className={styles.btnPrimary} disabled={pendingReceiveCount === 0 || receiveSaving} onClick={submitReceiving}>
               {receiveSaving ? "Guardando…" : `Guardar recepción${pendingReceiveCount > 0 ? ` (${pendingReceiveCount})` : ""}`}
             </button>
@@ -662,6 +672,18 @@ export default function InventoryPage({ styles }) {
                   <label className={styles.label}>Proveedor</label>
                   <input className={styles.input} placeholder="ej. Ocean Fresh" value={form.supplier} onChange={f("supplier")} />
                 </div>
+                {parseFloat(form.cost) > 0 && parseFloat(form.qty) > 0 && (
+                  <label className={ui.expenseToggle}>
+                    <input
+                      type="checkbox"
+                      checked={form.registerExpense}
+                      onChange={(e) => setForm((previous) => ({ ...previous, registerExpense: e.target.checked }))}
+                    />
+                    <span>
+                      Registrar la compra en <strong>Finanzas</strong> — ${(parseFloat(form.qty) * parseFloat(form.cost)).toLocaleString("es-MX", { maximumFractionDigits: 2 })}
+                    </span>
+                  </label>
+                )}
               </>
             )}
 
