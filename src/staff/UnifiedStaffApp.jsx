@@ -1657,6 +1657,9 @@ function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
                         <>
                           <p className="text-sm font-bold">${pay.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
                           <p className="text-[10px] text-slate-500">${emp.weeklySalary}/semana fijo</p>
+                          {emp.hourlyRate > 0 && (
+                            <p className="text-[10px] text-emerald-400/80">≈${emp.hourlyRate}/hora efectivo</p>
+                          )}
                         </>
                       ) : emp.hourlyRate > 0 ? (
                         <>
