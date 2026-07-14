@@ -1,4 +1,4 @@
-const CACHE = "pokepalace-v2";
+const CACHE = "pokepalace-v3";
 const SHELL = ["/", "/index.html", "/manifest.json", "/icon.svg"];
 
 // ── Install: pre-cache app shell ──────────────────────────────────────────────

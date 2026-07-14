@@ -2,17 +2,44 @@ import { useState, useEffect, useContext } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { downloadCSV } from "../../utils/csv";
+import ui from "./InventoryPage.module.css";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
   COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS,
 } from "../../order/OrderLabels";
 
-const ITEM_CATEGORIES = ["Proteínas", "Granos", "Verduras", "Salsas", "Extras", "Otro"];
-const FILTER_CATEGORIES = ["Todos", ...ITEM_CATEGORIES];
-const UNITS = ["kg", "pz", "L", "paq", "botellas", "manojos", "bolsas", "latas"];
+const INVENTORY_SECTIONS = [
+  { name: "Comida", icon: "🍣", categories: ["Proteínas", "Granos", "Verduras", "Salsas", "Extras", "Otro"] },
+  { name: "Limpieza", icon: "🧼", categories: ["Químicos", "Higiene", "Utensilios", "Desechables", "Otro"] },
+  { name: "Empaque", icon: "🥡", categories: ["Contenedores", "Cubiertos", "Bolsas", "Servilletas", "Otro"] },
+  { name: "Otros", icon: "📦", categories: ["Equipo", "Oficina", "Otro"] },
+];
+const SECTION_NAMES = INVENTORY_SECTIONS.map((section) => section.name);
+const UNITS = ["kg", "pz", "L", "paq", "botellas", "manojos", "bolsas", "latas", "cajas", "rollos", "gal"];
+const LEGACY_CATEGORY_LABELS = {
+  Grains: "Granos",
+  Proteins: "Proteínas",
+  Veggies: "Verduras",
+  Sauces: "Salsas",
+  Extras: "Extras",
+  Other: "Otro",
+};
+
+const CLEANING_PRODUCTS = [
+  { name: "Detergente lavatrastes", category: "Químicos", unit: "L" },
+  { name: "Desengrasante", category: "Químicos", unit: "L" },
+  { name: "Sanitizante", category: "Químicos", unit: "L" },
+  { name: "Cloro", category: "Químicos", unit: "L" },
+  { name: "Limpiavidrios", category: "Químicos", unit: "botellas" },
+  { name: "Jabón para manos", category: "Higiene", unit: "L" },
+  { name: "Guantes desechables", category: "Desechables", unit: "cajas" },
+  { name: "Bolsas para basura", category: "Desechables", unit: "bolsas" },
+  { name: "Toallas de papel", category: "Desechables", unit: "rollos" },
+  { name: "Esponjas o fibras", category: "Utensilios", unit: "pz" },
+];
 
 const EMPTY_FORM = {
-  item: "", category: "Proteínas", unit: "kg",
+  item: "", section: "Comida", category: "Proteínas", unit: "kg",
   qty: "", minQty: "", cost: "", supplier: "", menuKeys: [],
 };
 
@@ -33,14 +60,20 @@ const MENU_ITEMS = MENU_GROUPS.flatMap(({ labels, group, category, unit }) =>
 
 function statusOf(item) {
   if (item.qty <= 0)           return "critical";
-  if (item.qty < item.minQty)  return "low";
+  if (item.qty <= item.minQty) return "low";
   return "ok";
 }
 
+// Los registros creados antes de agregar secciones pertenecen a Comida.
+const sectionOf = (item) => item.section || "Comida";
+const categoryOf = (item) => LEGACY_CATEGORY_LABELS[item.category] || item.category || "Otro";
+const categoriesFor = (sectionName) =>
+  INVENTORY_SECTIONS.find((section) => section.name === sectionName)?.categories || ["Otro"];
+
 const STATUS_CFG = {
-  ok:       { cls: "badgeGreen",  label: "OK" },
+  ok:       { cls: "badgeGreen",  label: "Disponible" },
   low:      { cls: "badgeYellow", label: "Bajo" },
-  critical: { cls: "badgeRed",    label: "Crítico" },
+  critical: { cls: "badgeRed",    label: "Agotado" },
 };
 
 const parseKeys = (str) =>
@@ -53,8 +86,12 @@ export default function InventoryPage({ styles }) {
   const [items, setItems]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
+  const [notice, setNotice]   = useState("");
   const [filter, setFilter]   = useState("Todos");
+  const [sectionFilter, setSectionFilter] = useState("Todos");
+  const [stockFilter, setStockFilter] = useState("Todos");
   const [search, setSearch]   = useState("");
+  const [showGuide, setShowGuide] = useState(true);
 
   // Add-item form
   const [showForm, setShowForm] = useState(false);
@@ -64,7 +101,10 @@ export default function InventoryPage({ styles }) {
 
   // Inline edit: qty + menuKeys together
   const [editing, setEditing]   = useState(null); // item._id
-  const [editForm, setEditForm] = useState({ qty: "", menuKeys: "" });
+  const [editForm, setEditForm] = useState({
+    qty: "", section: "Comida", category: "Proteínas", unit: "kg",
+    minQty: "", cost: "", supplier: "", menuKeys: "",
+  });
   const [editSaving, setEditSaving] = useState(false);
 
   // Advanced (optional) fields collapsed by default to keep the fast-add flow short
@@ -89,11 +129,71 @@ export default function InventoryPage({ styles }) {
 
   useEffect(() => { load(); }, [staffToken]);
 
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timeout = window.setTimeout(() => setNotice(""), 3500);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+
   const visible = items.filter((row) => {
-    const matchCat    = filter === "Todos" || row.category === filter;
+    const matchSection = sectionFilter === "Todos" || sectionOf(row) === sectionFilter;
+    const matchCat    = filter === "Todos" || categoryOf(row) === filter;
+    const matchStock  = stockFilter === "Todos" || statusOf(row) !== "ok";
     const matchSearch = row.item.toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch;
+    return matchSection && matchCat && matchStock && matchSearch;
   });
+
+  const activeCategories = sectionFilter === "Todos"
+    ? [...new Set(items.map(categoryOf).filter(Boolean))]
+    : [...new Set([
+        ...categoriesFor(sectionFilter),
+        ...items.filter((item) => sectionOf(item) === sectionFilter).map(categoryOf).filter(Boolean),
+      ])];
+  const filterCategories = ["Todos", ...activeCategories];
+  const editCategoryOptions = [...new Set([editForm.category, ...categoriesFor(editForm.section)].filter(Boolean))];
+  const hasActiveFilters = sectionFilter !== "Todos" || filter !== "Todos" || stockFilter !== "Todos" || search.trim();
+
+  const clearFilters = () => {
+    setSectionFilter("Todos");
+    setFilter("Todos");
+    setStockFilter("Todos");
+    setSearch("");
+  };
+
+  const chooseFormSection = (section) => {
+    setForm((previous) => ({
+      ...previous,
+      section,
+      category: categoriesFor(section)[0],
+      menuKeys: section === "Comida" ? previous.menuKeys : [],
+    }));
+    if (section !== "Comida") setMenuSearch("");
+  };
+
+  const pickCleaningProduct = (product) => {
+    setForm((previous) => ({
+      ...previous,
+      item: product.name,
+      section: "Limpieza",
+      category: product.category,
+      unit: product.unit,
+      menuKeys: [],
+    }));
+  };
+
+  const closeAddForm = () => {
+    setShowForm(false);
+    setForm(EMPTY_FORM);
+    setMenuSearch("");
+    setShowAdvanced(false);
+    setFormError("");
+  };
+
+  const closeReceiving = () => {
+    setReceiving(false);
+    setReceiveQty({});
+    setReceiveSearch("");
+  };
 
   /* ── Add new item ── */
   const f = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
@@ -114,6 +214,7 @@ export default function InventoryPage({ styles }) {
         ...p,
         menuKeys: [...p.menuKeys, m.key],
         item:     isFirstPick ? m.label    : p.item,
+        section:  isFirstPick ? "Comida"  : p.section,
         category: isFirstPick ? m.category : p.category,
         unit:     isFirstPick ? m.unit     : p.unit,
       };
@@ -131,6 +232,7 @@ export default function InventoryPage({ styles }) {
     try {
       const { item: created } = await api.post("/api/staff/inventory", {
         item:     form.item,
+        section:  form.section,
         category: form.category,
         unit:     form.unit,
         qty:      parseFloat(form.qty),
@@ -140,6 +242,11 @@ export default function InventoryPage({ styles }) {
         menuKeys: form.menuKeys,
       });
       setItems((prev) => [...prev, created]);
+      setSectionFilter(form.section);
+      setFilter("Todos");
+      setStockFilter("Todos");
+      setSearch("");
+      setNotice(`${created.item} se agregó al inventario.`);
       setForm(EMPTY_FORM);
       setMenuSearch("");
       setShowAdvanced(false);
@@ -156,6 +263,12 @@ export default function InventoryPage({ styles }) {
     setEditing(row._id);
     setEditForm({
       qty:      String(row.qty),
+      section:  sectionOf(row),
+      category: categoryOf(row),
+      unit:     row.unit,
+      minQty:   String(row.minQty ?? 0),
+      cost:     String(row.cost ?? 0),
+      supplier: row.supplier || "",
       menuKeys: (row.menuKeys || []).join(", "),
     });
   };
@@ -165,10 +278,17 @@ export default function InventoryPage({ styles }) {
     try {
       const { item: updated } = await api.patch(`/api/staff/inventory/${row._id}`, {
         qty:      parseFloat(editForm.qty) || 0,
+        section:  editForm.section,
+        category: editForm.category,
+        unit:     editForm.unit,
+        minQty:   parseFloat(editForm.minQty) || 0,
+        cost:     parseFloat(editForm.cost) || 0,
+        supplier: editForm.supplier.trim(),
         menuKeys: parseKeys(editForm.menuKeys),
       });
       setItems((prev) => prev.map((i) => (i._id === updated._id ? updated : i)));
       setEditing(null);
+      setNotice(`Se guardaron los cambios de ${updated.item}.`);
     } catch (err) { setError(err.message); }
     finally { setEditSaving(false); }
   };
@@ -179,11 +299,22 @@ export default function InventoryPage({ styles }) {
     try {
       await api.delete(`/api/staff/inventory/${row._id}`);
       setItems((prev) => prev.filter((i) => i._id !== row._id));
+      setNotice(`${row.item} se eliminó del inventario.`);
     } catch (err) { setError(err.message); }
   };
 
   /* ── Receive shipment ── */
   const pendingReceiveCount = Object.values(receiveQty).filter((v) => parseFloat(v) > 0).length;
+  const receiveGroups = Object.values(
+    items
+      .filter((item) => item.item.toLowerCase().includes(receiveSearch.toLowerCase()))
+      .reduce((groups, item) => {
+        const key = `${sectionOf(item)}::${categoryOf(item)}`;
+        if (!groups[key]) groups[key] = { section: sectionOf(item), category: categoryOf(item), items: [] };
+        groups[key].items.push(item);
+        return groups;
+      }, {})
+  );
 
   const bumpReceive = (id, delta) =>
     setReceiveQty((p) => ({
@@ -208,7 +339,9 @@ export default function InventoryPage({ styles }) {
         return [...map.values()];
       });
       setReceiveQty({});
+      setReceiveSearch("");
       setReceiving(false);
+      setNotice(`Recepción guardada: ${results.length} artículo${results.length !== 1 ? "s" : ""} actualizado${results.length !== 1 ? "s" : ""}.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -216,64 +349,81 @@ export default function InventoryPage({ styles }) {
     }
   };
 
-  const totalValue = items.reduce((s, i) => s + i.qty * i.cost, 0);
+  const totalValue = items.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.cost) || 0), 0);
   const lowCount   = items.filter((i) => statusOf(i) !== "ok").length;
 
   function exportCSV() {
-    const rows = [["Artículo", "Categoría", "Cantidad", "Unidad", "Mínimo", "Costo unitario", "Valor total", "Proveedor", "Estado"]];
+    const rows = [["Artículo", "Sección", "Categoría", "Cantidad", "Unidad", "Mínimo", "Costo unitario", "Valor total", "Proveedor", "Estado"]];
     visible.forEach((i) => {
       const statusLabel = STATUS_CFG[statusOf(i)].label;
-      rows.push([i.item, i.category, i.qty, i.unit, i.minQty, i.cost, (i.qty * i.cost).toFixed(2), i.supplier || "", statusLabel]);
+      rows.push([i.item, sectionOf(i), categoryOf(i), i.qty, i.unit, i.minQty ?? 0, i.cost ?? 0, ((Number(i.qty) || 0) * (Number(i.cost) || 0)).toFixed(2), i.supplier || "", statusLabel]);
     });
     downloadCSV(`inventario_${new Date().toISOString().slice(0, 10)}.csv`, rows);
   }
 
   return (
-    <div>
-      <div className={styles.pageHeader}>
+    <div className={ui.inventoryRoot}>
+      <div className={`${styles.pageHeader} ${ui.pageHeader}`}>
         <div>
           <h1 className={styles.pageTitle}>Inventario</h1>
-          <p className={styles.pageSubtitle}>
-            {loading ? "Cargando…" : `${items.length} artículos · $${totalValue.toFixed(0)} valor total`}
-            {lowCount > 0 && !loading && (
-              <span style={{
-                marginLeft: 10, background: "#e74c3c", color: "#fff",
-                fontSize: 11, fontWeight: 700, borderRadius: 10,
-                padding: "1px 7px",
-              }}>
-                {lowCount} bajo stock
-              </span>
-            )}
-          </p>
+          <p className={styles.pageSubtitle}>Consulta existencias, recibe mercancía y detecta lo que hace falta.</p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className={styles.btnGhost} onClick={load}>Actualizar</button>
-          <button className={styles.btnGhost} onClick={exportCSV} disabled={loading || visible.length === 0}>
-            ⬇ CSV
+        <div className={ui.headerActions}>
+          <button className={styles.btnGhost} onClick={() => setShowGuide((visible) => !visible)}>
+            ? Cómo funciona
+          </button>
+          <button className={styles.btnGhost} onClick={load} title="Volver a cargar los datos">↻ Actualizar</button>
+          <button className={styles.btnGhost} onClick={exportCSV} disabled={loading || visible.length === 0} title="Descargar la vista actual">
+            ↓ Exportar
           </button>
           <button
-            className={receiving ? styles.btnGhost : styles.btnPrimary}
-            style={{ background: receiving ? undefined : "#4A7A5A" }}
+            className={receiving ? styles.btnGhost : `${styles.btnPrimary} ${ui.receiveButton}`}
             onClick={() => {
-              setReceiving((v) => !v);
-              setShowForm(false);
-              if (receiving) setReceiveQty({});
+              if (receiving) closeReceiving();
+              else setReceiving(true);
+              if (showForm) closeAddForm();
             }}
           >
-            {receiving ? "Cancelar" : "📦 Recibir mercancía"}
+            {receiving ? "Cerrar recepción" : "▣ Recibir mercancía"}
           </button>
           <button
             className={styles.btnPrimary}
-            onClick={() => { setShowForm((v) => !v); setFormError(""); setReceiving(false); }}
+            onClick={() => {
+              if (showForm) closeAddForm();
+              else setShowForm(true);
+              closeReceiving();
+            }}
           >
-            {showForm ? "Cancelar" : "+ Agregar artículo"}
+            {showForm ? "Cerrar formulario" : "+ Nuevo artículo"}
           </button>
         </div>
       </div>
 
+      {showGuide && (
+        <section className={ui.guide} aria-label="Guía rápida del inventario">
+          <div className={ui.guideIntro}>
+            <span className={ui.guideEyebrow}>Guía rápida</span>
+            <strong>Tu inventario en tres pasos</strong>
+            <button type="button" onClick={() => setShowGuide(false)} aria-label="Ocultar guía">×</button>
+          </div>
+          <div className={ui.guideSteps}>
+            <div className={ui.guideStep}><span>1</span><p><strong>Elige una sección</strong>Separa comida, limpieza y empaques.</p></div>
+            <div className={ui.guideStep}><span>2</span><p><strong>Busca o filtra</strong>Encuentra rápido el artículo que necesitas.</p></div>
+            <div className={ui.guideStep}><span>3</span><p><strong>Actualiza existencias</strong>Edita una cantidad o registra una entrega.</p></div>
+          </div>
+        </section>
+      )}
+
+      {notice && (
+        <div className={ui.successNotice} role="status">
+          <span>✓</span>{notice}
+          <button type="button" onClick={() => setNotice("")} aria-label="Cerrar notificación">×</button>
+        </div>
+      )}
+
       {/* ── Receive shipment ── */}
       {receiving && (
-        <div className={styles.card} style={{ marginBottom: 20 }}>
+        <div className={`${styles.card} ${ui.actionPanel}`}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
             <div>
               <p className={styles.cardTitle}>Recibir mercancía</p>
@@ -288,58 +438,52 @@ export default function InventoryPage({ styles }) {
             )}
           </div>
 
-          <input
-            className={styles.input}
-            placeholder="Buscar artículo…"
-            value={receiveSearch}
-            onChange={(e) => setReceiveSearch(e.target.value)}
-            style={{ marginBottom: 16, maxWidth: 280 }}
-          />
+          <label className={ui.receiveSearch}>
+            <span>1. Busca el artículo que llegó</span>
+            <input className={styles.input} placeholder="Escribe el nombre…" value={receiveSearch} onChange={(e) => setReceiveSearch(e.target.value)} />
+          </label>
 
           {items.length === 0 ? (
             <p style={{ fontSize: 13, color: "var(--p-muted)" }}>Agrega artículos al inventario primero.</p>
+          ) : receiveGroups.length === 0 ? (
+            <div className={ui.emptyState}>
+              <span>⌕</span>
+              <strong>No encontramos ese artículo</strong>
+              <p>Prueba con otro nombre.</p>
+              <button type="button" className={styles.btnGhost} onClick={() => setReceiveSearch("")}>Limpiar búsqueda</button>
+            </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16, maxHeight: 480, overflowY: "auto" }}>
-              {ITEM_CATEGORIES.map((cat) => {
-                const catItems = items.filter(
-                  (i) => i.category === cat && i.item.toLowerCase().includes(receiveSearch.toLowerCase())
-                );
-                if (catItems.length === 0) return null;
+            <div className={ui.receiveList}>
+              {receiveGroups.map((group) => {
                 return (
-                  <div key={cat}>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: "var(--p-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
-                      {cat}
+                  <div key={`${group.section}-${group.category}`}>
+                    <p className={ui.receiveGroupTitle}>
+                      {group.section} · {group.category}
                     </p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {catItems.map((row) => {
+                      {group.items.map((row) => {
                         const val = receiveQty[row._id] ?? "";
                         const hasValue = parseFloat(val) > 0;
                         return (
-                          <div key={row._id} style={{
-                            display: "flex", alignItems: "center", gap: 8,
-                            padding: "8px 10px", borderRadius: 8,
-                            background: hasValue ? "rgba(74,122,90,0.08)" : "var(--p-bg)",
-                            border: hasValue ? "1px solid rgba(74,122,90,0.3)" : "1px solid transparent",
-                          }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
+                          <div key={row._id} className={`${ui.receiveRow} ${hasValue ? ui.receiveRowActive : ""}`}>
+                            <div className={ui.receiveInfo}>
                               <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>{row.item}</p>
                               <p style={{ margin: 0, fontSize: 11, color: "var(--p-muted)" }}>
                                 Actual: {row.qty} {row.unit}
                               </p>
                             </div>
-                            <button type="button" onClick={() => bumpReceive(row._id, 1)}
-                              style={{ padding: "5px 9px", fontSize: 12, fontWeight: 700, border: "1px solid var(--p-border)", borderRadius: 6, background: "var(--p-surface)", cursor: "pointer", color: "var(--p-ink)" }}>
+                            <button type="button" className={ui.receiveQuickButton} onClick={() => bumpReceive(row._id, 1)}>
                               +1
                             </button>
-                            <button type="button" onClick={() => bumpReceive(row._id, 5)}
-                              style={{ padding: "5px 9px", fontSize: 12, fontWeight: 700, border: "1px solid var(--p-border)", borderRadius: 6, background: "var(--p-surface)", cursor: "pointer", color: "var(--p-ink)" }}>
+                            <button type="button" className={ui.receiveQuickButton} onClick={() => bumpReceive(row._id, 5)}>
                               +5
                             </button>
                             <input
                               type="number" min="0" step="0.01" placeholder="0"
                               value={val}
                               onChange={(e) => setReceiveQty((p) => ({ ...p, [row._id]: e.target.value }))}
-                              style={{ width: 62, padding: "6px 6px", fontFamily: "DM Mono,monospace", fontSize: 13, border: "1px solid var(--p-g3)", borderRadius: 6, outline: "none", textAlign: "center" }}
+                              className={ui.receiveInput}
+                              aria-label={`Cantidad recibida de ${row.item}`}
                             />
                             <span style={{ fontSize: 11, color: "var(--p-muted)", width: 34 }}>{row.unit}</span>
                           </div>
@@ -352,11 +496,12 @@ export default function InventoryPage({ styles }) {
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+          <div className={ui.receiveFooter}>
+            <span>2. Revisa las cantidades y guarda la recepción.</span>
             <button className={styles.btnPrimary} disabled={pendingReceiveCount === 0 || receiveSaving} onClick={submitReceiving}>
               {receiveSaving ? "Guardando…" : `Guardar recepción${pendingReceiveCount > 0 ? ` (${pendingReceiveCount})` : ""}`}
             </button>
-            <button className={styles.btnGhost} onClick={() => { setReceiving(false); setReceiveQty({}); }}>
+            <button className={styles.btnGhost} onClick={closeReceiving}>
               Cancelar
             </button>
           </div>
@@ -372,98 +517,133 @@ export default function InventoryPage({ styles }) {
               <p style={{ color: "red", fontSize: 12, marginBottom: 12 }}>{formError}</p>
             )}
 
-            {/* Step 1 — search the real menu ingredients to auto-fill everything */}
-            <div className={styles.formGroup} style={{ position: "relative" }}>
-              <label className={styles.label}>¿Es un ingrediente del menú? Búscalo aquí</label>
-              <input
-                className={styles.input}
-                placeholder="ej. salmón, aguacate, arroz…"
-                value={menuSearch}
-                onChange={(e) => setMenuSearch(e.target.value)}
-              />
-              <p style={{ fontSize: 11, color: "var(--p-muted)", margin: "4px 0 0" }}>
-                Selecciónalo y el nombre, la categoría y la unidad se llenan solas. Si no aparece, no importa — sigue abajo y captúralo a mano.
-              </p>
+            <div className={ui.formStep}>
+              <div className={ui.stepHeading}>
+                <span>1</span>
+                <div><strong>Elige la sección</strong><small>¿En qué parte del inventario debe aparecer?</small></div>
+              </div>
+              <div className={ui.formSectionPicker}>
+                {INVENTORY_SECTIONS.map((section) => (
+                  <button
+                    key={section.name}
+                    type="button"
+                    aria-pressed={form.section === section.name}
+                    className={form.section === section.name ? ui.formSectionActive : ""}
+                    onClick={() => chooseFormSection(section.name)}
+                  >
+                    <span>{section.icon}</span>{section.name}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-              {menuMatches.length > 0 && (
-                <div style={{
-                  border: "1px solid var(--p-border)", borderRadius: 8, marginTop: 6,
-                  overflow: "hidden", background: "var(--p-surface)",
-                }}>
-                  {menuMatches.map((m) => (
+            {form.section === "Limpieza" && (
+              <div className={ui.cleaningQuickPick}>
+                <div>
+                  <span>Productos comunes</span>
+                  <strong>Selecciona uno para llenar los datos automáticamente</strong>
+                </div>
+                <div className={ui.cleaningProductGrid}>
+                  {CLEANING_PRODUCTS.map((product) => (
                     <button
-                      key={m.key}
+                      key={product.name}
                       type="button"
-                      onClick={() => pickMenuItem(m)}
-                      style={{
-                        display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between",
-                        padding: "9px 12px", background: "none", border: "none", borderBottom: "1px solid var(--p-border)",
-                        cursor: "pointer", textAlign: "left", fontFamily: "Syne, sans-serif",
-                      }}
+                      className={form.item === product.name ? ui.cleaningProductActive : ""}
+                      onClick={() => pickCleaningProduct(product)}
                     >
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--p-ink)" }}>{m.label}</span>
-                      <span style={{ fontSize: 10, color: "var(--p-muted)", background: "var(--p-bg)", padding: "2px 8px", borderRadius: 999 }}>{m.group}</span>
+                      <span>🧽</span>
+                      <span><strong>{product.name}</strong><small>{product.category} · {product.unit}</small></span>
                     </button>
                   ))}
                 </div>
-              )}
+              </div>
+            )}
 
-              {form.menuKeys.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                  {form.menuKeys.map((key) => {
-                    const meta = MENU_ITEMS.find((m) => m.key === key);
-                    return (
-                      <span key={key} style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        fontSize: 12, fontWeight: 600, color: "#fff", background: "#4A7A5A",
-                        borderRadius: 999, padding: "4px 6px 4px 12px",
-                      }}>
-                        {meta?.label || key}
-                        <button type="button" onClick={() => removeMenuKey(key)}
-                          style={{ background: "rgba(255,255,255,0.25)", border: "none", borderRadius: "50%", width: 18, height: 18, color: "#fff", cursor: "pointer", lineHeight: 1, fontSize: 12 }}>
-                          ×
-                        </button>
-                      </span>
-                    );
-                  })}
+            <div className={ui.formStep}>
+              <div className={ui.stepHeading}>
+                <span>2</span>
+                <div><strong>Captura lo esencial</strong><small>Nombre, tipo de artículo y existencia actual.</small></div>
+              </div>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Nombre del artículo *</label>
+                  <input className={styles.input} placeholder={form.section === "Limpieza" ? "ej. Detergente" : "ej. Salmón"} value={form.item} onChange={f("item")} required />
                 </div>
-              )}
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Categoría</label>
+                  <div className={ui.categoryPicker}>
+                    {categoriesFor(form.section).map((category) => (
+                      <button
+                        key={category}
+                        type="button"
+                        aria-pressed={form.category === category}
+                        onClick={() => setForm((previous) => ({ ...previous, category }))}
+                      >
+                        {category}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Cantidad actual *</label>
+                  <input className={styles.input} type="number" min="0" step="0.01" placeholder="0" value={form.qty} onChange={f("qty")} required />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Unidad de medida</label>
+                  <select className={styles.select} value={form.unit} onChange={f("unit")}>
+                    {UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                  </select>
+                </div>
+              </div>
             </div>
 
-            {/* Step 2 — the essentials */}
-            <div className={styles.formRow}>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Nombre *</label>
-                <input className={styles.input} placeholder="ej. Salmón" value={form.item} onChange={f("item")} required />
+            {form.section === "Comida" && (
+              <div className={ui.formStep}>
+                <div className={ui.stepHeading}>
+                  <span>3</span>
+                  <div><strong>Vincula con el menú</strong><small>Opcional: permite descontar ingredientes al vender.</small></div>
+                </div>
+                <div className={styles.formGroup} style={{ position: "relative", marginBottom: 0 }}>
+                  <label className={styles.label}>Buscar ingrediente del menú</label>
+                  <input
+                    className={styles.input}
+                    placeholder="ej. salmón, aguacate, arroz…"
+                    value={menuSearch}
+                    onChange={(e) => setMenuSearch(e.target.value)}
+                  />
+                  {menuMatches.length > 0 && (
+                    <div className={ui.menuSuggestions}>
+                      {menuMatches.map((m) => (
+                        <button key={m.key} type="button" onClick={() => pickMenuItem(m)}>
+                          <span>{m.label}</span><small>{m.group}</small>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {form.menuKeys.length > 0 && (
+                    <div className={ui.menuLinks}>
+                      {form.menuKeys.map((key) => {
+                        const meta = MENU_ITEMS.find((m) => m.key === key);
+                        return (
+                          <span key={key}>{meta?.label || key}<button type="button" onClick={() => removeMenuKey(key)} aria-label={`Quitar ${meta?.label || key}`}>×</button></span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Categoría</label>
-                <select className={styles.select} value={form.category} onChange={f("category")}>
-                  {ITEM_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
+            )}
 
-            <div className={styles.formRow}>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Cantidad *</label>
-                <input className={styles.input} type="number" min="0" step="0.01" placeholder="0" value={form.qty} onChange={f("qty")} required />
-              </div>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Unidad</label>
-                <select className={styles.select} value={form.unit} onChange={f("unit")}>
-                  {UNITS.map((u) => <option key={u}>{u}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Step 3 — optional details, collapsed by default */}
+            {/* Optional details, collapsed by default */}
             <button
               type="button"
+              aria-expanded={showAdvanced}
               onClick={() => setShowAdvanced((v) => !v)}
-              style={{ fontSize: 12, color: "var(--p-muted)", background: "none", border: "none", cursor: "pointer", padding: "4px 0 10px", fontWeight: 600 }}
+              className={ui.advancedToggle}
             >
-              {showAdvanced ? "− Ocultar detalles opcionales" : "+ Más detalles (mínimo, costo, proveedor)"}
+              {showAdvanced ? "− Ocultar alerta, costo y proveedor" : "+ Configurar alerta, costo y proveedor"}
             </button>
 
             {showAdvanced && (
@@ -485,11 +665,11 @@ export default function InventoryPage({ styles }) {
               </>
             )}
 
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <div className={ui.formActions}>
               <button className={styles.btnPrimary} type="submit" disabled={saving}>
-                {saving ? "Guardando…" : "Agregar"}
+                {saving ? "Guardando…" : "Agregar al inventario"}
               </button>
-              <button className={styles.btnGhost} type="button" onClick={() => { setShowForm(false); setMenuSearch(""); }}>
+              <button className={styles.btnGhost} type="button" onClick={closeAddForm}>
                 Cancelar
               </button>
             </div>
@@ -497,152 +677,198 @@ export default function InventoryPage({ styles }) {
         </div>
       )}
 
-      {/* ── Stats ── */}
       {!loading && (
-        <div className={styles.statsRow} style={{ marginBottom: 20 }}>
-          <div className={styles.statCard}>
-            <p className={styles.statLabel}>Total artículos</p>
-            <p className={styles.statValue}>{items.length}</p>
-          </div>
-          <div className={styles.statCard}>
-            <p className={styles.statLabel}>Bajo stock</p>
-            <p className={`${styles.statValue} ${lowCount > 0 ? styles.statAccent : ""}`}>{lowCount}</p>
-            <p className={styles.statSub}>Bajo o crítico</p>
-          </div>
-          <div className={styles.statCard}>
-            <p className={styles.statLabel}>Valor total</p>
-            <p className={styles.statValue}>${totalValue.toFixed(0)}</p>
+        <div className={ui.summaryGrid}>
+          <button type="button" className={!hasActiveFilters ? ui.summaryActive : ""} onClick={clearFilters}>
+            <span className={ui.summaryIcon}>▦</span>
+            <span><small>Total de artículos</small><strong>{items.length}</strong><em>Ver inventario completo</em></span>
+          </button>
+          <button
+            type="button"
+            className={`${ui.warningSummary} ${stockFilter === "Bajo" && sectionFilter === "Todos" && filter === "Todos" && !search.trim() ? ui.summaryActive : ""}`}
+            onClick={() => { setSectionFilter("Todos"); setFilter("Todos"); setStockFilter("Bajo"); setSearch(""); }}
+          >
+            <span className={ui.summaryIcon}>!</span>
+            <span><small>Necesitan atención</small><strong>{lowCount}</strong><em>{lowCount ? "Ver faltantes" : "Todo está abastecido"}</em></span>
+          </button>
+          <div className={ui.summaryValue}>
+            <span className={ui.summaryIcon}>$</span>
+            <span><small>Valor del inventario</small><strong>${totalValue.toFixed(0)}</strong><em>Según costos registrados</em></span>
           </div>
         </div>
       )}
 
       {error && <p style={{ color: "red", fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
-      {/* ── Filters ── */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-        <input
-          className={styles.input}
-          style={{ maxWidth: 200 }}
-          placeholder="Buscar…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {FILTER_CATEGORIES.map((cat) => (
-            <button key={cat} onClick={() => setFilter(cat)}
-              style={{
-                padding: "6px 13px", borderRadius: "var(--p-radius-sm)",
-                border: "1px solid var(--p-border)",
-                background: filter === cat ? "var(--p-g2)" : "var(--p-surface)",
-                color: filter === cat ? "#fff" : "var(--p-ink)",
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
-                fontFamily: "Syne, sans-serif", transition: "background 120ms",
-              }}
-            >{cat}</button>
-          ))}
+      {!loading && (
+        <section className={ui.sectionsBlock}>
+          <div className={ui.sectionTitle}>
+            <div><span>Paso 1</span><strong>¿Qué quieres consultar?</strong></div>
+            <small>Selecciona una sección para ver sus categorías.</small>
+          </div>
+          <div className={ui.sectionGrid}>
+            {[{ name: "Todos", icon: "▦" }, ...INVENTORY_SECTIONS].map((section) => {
+              const sectionItems = section.name === "Todos"
+                ? items
+                : items.filter((item) => sectionOf(item) === section.name);
+              const sectionLow = sectionItems.filter((item) => statusOf(item) !== "ok").length;
+              const selected = sectionFilter === section.name;
+              return (
+                <button
+                  key={section.name}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => { setSectionFilter(section.name); setFilter("Todos"); }}
+                  className={selected ? ui.sectionCardActive : ""}
+                >
+                  <span className={ui.sectionIcon}>{section.icon}</span>
+                  <span className={ui.sectionCardText}>
+                    <strong>{section.name === "Todos" ? "Todo" : section.name}</strong>
+                    <small>{sectionItems.length} artículo{sectionItems.length !== 1 ? "s" : ""}</small>
+                  </span>
+                  {sectionLow > 0 && <span className={ui.sectionAlert} title={`${sectionLow} con bajo stock`}>{sectionLow}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <section className={ui.filterPanel}>
+        <div className={ui.listHeading}>
+          <div>
+            <span>Paso 2</span>
+            <h2>{sectionFilter === "Todos" ? "Todos los artículos" : sectionFilter}</h2>
+            <p>{visible.length} resultado{visible.length !== 1 ? "s" : ""}{stockFilter === "Bajo" ? " que necesitan atención" : ""}</p>
+          </div>
+          <label className={ui.searchBox}>
+            <span>⌕</span>
+            <input placeholder="Buscar por nombre…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </label>
         </div>
-      </div>
+
+        <div className={ui.filterRow}>
+          {sectionFilter !== "Todos" && (
+            <div className={ui.categoryChips} aria-label="Filtrar por categoría">
+              {filterCategories.map((cat) => (
+                <button key={cat} type="button" aria-pressed={filter === cat} onClick={() => setFilter(cat)}>{cat}</button>
+              ))}
+            </div>
+          )}
+          <button type="button" className={`${ui.attentionFilter} ${stockFilter === "Bajo" ? ui.attentionFilterActive : ""}`} onClick={() => setStockFilter((current) => current === "Bajo" ? "Todos" : "Bajo")}>
+            <span>!</span> Solo bajo stock
+          </button>
+          {hasActiveFilters && <button type="button" className={ui.clearFilters} onClick={clearFilters}>Limpiar filtros</button>}
+        </div>
+      </section>
 
       {/* ── Table ── */}
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
+        <table className={`${styles.table} ${ui.inventoryTable}`}>
           <thead>
             <tr>
               <th>Artículo</th>
-              <th>Cat.</th>
-              <th>Cant.</th>
-              <th>U.</th>
-              <th>Mín.</th>
+              <th>Existencia</th>
+              <th>Mínimo</th>
+              <th>Costo</th>
               <th>Estado</th>
-              <th>Claves de menú</th>
-              <th></th>
+              <th>Proveedor</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>Cargando inventario…</td></tr>
+              <tr><td colSpan={7} className={ui.loadingCell}>Cargando inventario…</td></tr>
             ) : visible.length === 0 ? (
-              <tr><td colSpan={8} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>Sin artículos que coincidan</td></tr>
+              <tr>
+                <td colSpan={7}>
+                  <div className={ui.emptyState}>
+                    <span>{items.length === 0 ? "▣" : "⌕"}</span>
+                    <strong>{items.length === 0 ? "Tu inventario está vacío" : "No encontramos artículos"}</strong>
+                    <p>{items.length === 0 ? "Registra el primer artículo para comenzar." : "Prueba con otro nombre o quita los filtros activos."}</p>
+                    <button
+                      type="button"
+                      className={styles.btnPrimary}
+                      onClick={() => items.length === 0 ? setShowForm(true) : clearFilters()}
+                    >
+                      {items.length === 0 ? "+ Agregar primer artículo" : "Mostrar todo"}
+                    </button>
+                  </div>
+                </td>
+              </tr>
             ) : visible.map((row) => {
               const status    = statusOf(row);
               const { cls, label } = STATUS_CFG[status];
               const isEditing = editing === row._id;
 
               return (
-                <tr key={row._id} style={{ background: status === "critical" ? "rgba(231,76,60,0.04)" : status === "low" ? "rgba(241,196,15,0.04)" : undefined }}>
-                  <td style={{ fontWeight: 600 }}>{row.item}</td>
-                  <td><span className={`${styles.badge} ${styles.badgeGray}`}>{row.category}</span></td>
-
-                  {/* Qty — editable */}
-                  <td className={styles.tdMono}>
+                <tr key={row._id} className={status === "critical" ? ui.criticalRow : status === "low" ? ui.lowRow : ""}>
+                  <td className={ui.itemCell}>
+                    <strong>{row.item}</strong>
                     {isEditing ? (
-                      <input type="number" min="0" step="0.01"
-                        value={editForm.qty}
-                        onChange={(e) => setEditForm((p) => ({ ...p, qty: e.target.value }))}
-                        onKeyDown={(e) => e.key === "Escape" && setEditing(null)}
-                        autoFocus
-                        style={{ width: 60, padding: "3px 6px", fontFamily: "DM Mono,monospace", fontSize: 12, border: "1px solid var(--p-g3)", borderRadius: 4, outline: "none" }}
-                      />
-                    ) : row.qty}
-                  </td>
-
-                  <td className={styles.tdMuted}>{row.unit}</td>
-                  <td className={styles.tdMono}>{row.minQty}</td>
-                  <td><span className={`${styles.badge} ${styles[cls]}`}>{label}</span></td>
-
-                  {/* menuKeys — editable */}
-                  <td>
-                    {isEditing ? (
-                      <input
-                        value={editForm.menuKeys}
-                        onChange={(e) => setEditForm((p) => ({ ...p, menuKeys: e.target.value }))}
-                        onKeyDown={(e) => e.key === "Escape" && setEditing(null)}
-                        placeholder="salmon, white_rice, avocado…"
-                        style={{ width: "100%", minWidth: 160, padding: "3px 7px", fontSize: 11, border: "1px solid var(--p-g3)", borderRadius: 4, outline: "none", fontFamily: "DM Mono,monospace" }}
-                      />
-                    ) : (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-                        {(row.menuKeys || []).length === 0 ? (
-                          <span style={{ fontSize: 11, color: "var(--p-muted)", fontStyle: "italic" }}>Sin vincular</span>
-                        ) : (row.menuKeys).map((k) => (
-                          <span key={k} style={{
-                            fontSize: 10, fontFamily: "DM Mono,monospace",
-                            background: "var(--p-bg)", border: "1px solid var(--p-border)",
-                            borderRadius: 4, padding: "1px 5px", color: "var(--p-ink)",
-                          }}>{k}</span>
-                        ))}
+                      <div className={ui.itemEditMeta}>
+                        <select
+                          value={editForm.section}
+                          aria-label="Sección"
+                          onChange={(e) => {
+                            const section = e.target.value;
+                            setEditForm((previous) => ({
+                              ...previous,
+                              section,
+                              category: categoriesFor(section)[0],
+                              menuKeys: section === "Comida" ? previous.menuKeys : "",
+                            }));
+                          }}
+                        >
+                          {SECTION_NAMES.map((section) => <option key={section} value={section}>{section}</option>)}
+                        </select>
+                        <select value={editForm.category} aria-label="Categoría" onChange={(e) => setEditForm((previous) => ({ ...previous, category: e.target.value }))}>
+                          {editCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+                        </select>
                       </div>
+                    ) : (
+                      <small>{sectionOf(row)} · {categoryOf(row)}{(row.menuKeys || []).length > 0 ? " · Vinculado al menú" : ""}</small>
                     )}
                   </td>
-
-                  {/* Actions */}
                   <td>
-                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    {isEditing ? (
+                      <div className={ui.quantityEdit}>
+                        <input type="number" min="0" step="0.01" aria-label="Cantidad" value={editForm.qty} onChange={(e) => setEditForm((p) => ({ ...p, qty: e.target.value }))} onKeyDown={(e) => e.key === "Escape" && setEditing(null)} autoFocus />
+                        <select value={editForm.unit} aria-label="Unidad" onChange={(e) => setEditForm((p) => ({ ...p, unit: e.target.value }))}>
+                          {UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                        </select>
+                      </div>
+                    ) : <span className={ui.quantity}><strong>{row.qty}</strong> {row.unit}</span>}
+                  </td>
+                  <td>
+                    {isEditing ? (
+                      <input className={ui.compactInput} type="number" min="0" step="0.01" aria-label="Cantidad mínima" value={editForm.minQty} onChange={(e) => setEditForm((p) => ({ ...p, minQty: e.target.value }))} />
+                    ) : <span className={styles.tdMono}>{row.minQty ?? 0} {row.unit}</span>}
+                  </td>
+                  <td>
+                    {isEditing ? (
+                      <div className={ui.moneyEdit}><span>$</span><input type="number" min="0" step="0.01" aria-label="Costo por unidad" value={editForm.cost} onChange={(e) => setEditForm((p) => ({ ...p, cost: e.target.value }))} /></div>
+                    ) : row.cost > 0 ? `$${Number(row.cost).toFixed(2)}` : <span className={ui.mutedValue}>—</span>}
+                  </td>
+                  <td><span className={`${styles.badge} ${styles[cls]}`}>{label}</span></td>
+                  <td>
+                    {isEditing ? (
+                      <input className={ui.supplierInput} aria-label="Proveedor" placeholder="Sin proveedor" value={editForm.supplier} onChange={(e) => setEditForm((p) => ({ ...p, supplier: e.target.value }))} />
+                    ) : row.supplier || <span className={ui.mutedValue}>Sin proveedor</span>}
+                  </td>
+                  <td>
+                    <div className={ui.rowActions}>
                       {isEditing ? (
                         <>
-                          <button className={styles.btnPrimary}
-                            style={{ padding: "4px 10px", fontSize: 11 }}
-                            onClick={() => saveEdit(row)} disabled={editSaving}>
+                          <button className={styles.btnPrimary} onClick={() => saveEdit(row)} disabled={editSaving}>
                             {editSaving ? "…" : "Guardar"}
                           </button>
-                          <button className={styles.btnGhost}
-                            style={{ padding: "4px 8px", fontSize: 11 }}
-                            onClick={() => setEditing(null)}>
-                            ✕
-                          </button>
+                          <button className={styles.btnGhost} onClick={() => setEditing(null)}>Cancelar</button>
                         </>
                       ) : (
                         <>
-                          <button className={styles.btnGhost}
-                            style={{ padding: "4px 10px", fontSize: 11 }}
-                            onClick={() => startEdit(row)}>
-                            Editar
-                          </button>
-                          <button onClick={() => handleDelete(row)}
-                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--p-muted)", fontSize: 16, padding: "0 2px", lineHeight: 1, transition: "color 120ms" }}
-                            onMouseEnter={(ev) => (ev.currentTarget.style.color = "#c0392b")}
-                            onMouseLeave={(ev) => (ev.currentTarget.style.color = "var(--p-muted)")}
-                            title="Eliminar">×</button>
+                          <button className={styles.btnGhost} onClick={() => startEdit(row)}>Editar</button>
+                          <button className={ui.deleteButton} onClick={() => handleDelete(row)} aria-label={`Eliminar ${row.item}`} title="Eliminar artículo">×</button>
                         </>
                       )}
                     </div>

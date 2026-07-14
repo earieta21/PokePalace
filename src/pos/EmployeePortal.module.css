@@ -575,6 +575,17 @@
   box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.1);
 }
 
+/* Windows usa un menú nativo claro para los <option>; fijar ambos colores
+   evita texto blanco sobre fondo blanco en los selectores del portal. */
+.select {
+  color-scheme: light;
+}
+
+.select option {
+  color: #13261a;
+  background-color: #ffffff;
+}
+
 .label {
   display: block;
   font-size: 11px;

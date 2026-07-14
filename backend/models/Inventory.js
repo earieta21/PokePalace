@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const inventorySchema = new mongoose.Schema(
   {
     item:     { type: String, required: true },
+    section:  { type: String, default: "Comida" },
     category: { type: String, default: "Other" },
     unit:     { type: String, required: true },
     qty:      { type: Number, required: true, min: 0 },
