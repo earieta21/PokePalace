@@ -452,7 +452,7 @@ export default function UnifiedStaffApp() {
           {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
           {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
           {tab === "premios" && <RewardsRedeemTab token={token} />}
-          {tab === "disponibilidad" && <AvailabilityTab token={token} />}
+          {tab === "disponibilidad" && <AvailabilityTab token={token} role={me?.role} />}
           {tab === "panel"   && <PanelTab employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} />}
           {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "cocina"  && <KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
@@ -1292,7 +1292,7 @@ const AVAIL_CATEGORIES = [
   { label: "Toppings",     items: Object.entries(TOPPING_LABELS).map(([id, label]) => ({ id, label })) },
 ];
 
-function AvailabilityTab({ token }) {
+function AvailabilityTab({ token, role }) {
   const [unavailable, setUnavailable] = useState(null); // null = loading
   const [saving, setSaving]           = useState(false);
   const [saveError, setSaveError]     = useState("");
@@ -1300,6 +1300,12 @@ function AvailabilityTab({ token }) {
   const [storeStatus, setStoreStatus] = useState(null); // { ordersPaused, pausedMessage }
   const [pauseSaving, setPauseSaving] = useState(false);
   const [pauseMsgDraft, setPauseMsgDraft] = useState("");
+
+  // Respaldo de datos — solo dueño/admin
+  const canBackup = role === "owner" || role === "admin";
+  const [backupInfo, setBackupInfo]   = useState(null); // { lastBackupAt }
+  const [backupBusy, setBackupBusy]   = useState(false);
+  const [backupError, setBackupError] = useState("");
 
   useEffect(() => {
     fetch(`${API_URL}/api/settings/availability`)
@@ -1312,6 +1318,43 @@ function AvailabilityTab({ token }) {
       .then((d) => { setStoreStatus(d); setPauseMsgDraft(d.pausedMessage || ""); })
       .catch(() => setStoreStatus({ ordersPaused: false, pausedMessage: "" }));
   }, []);
+
+  useEffect(() => {
+    if (!canBackup) return;
+    fetch(`${API_URL}/api/staff/backup/status`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => setBackupInfo({ lastBackupAt: d.lastBackupAt || null }))
+      .catch(() => setBackupInfo({ lastBackupAt: null }));
+  }, [canBackup, token]);
+
+  const downloadBackup = async () => {
+    setBackupBusy(true);
+    setBackupError("");
+    try {
+      const r = await fetch(`${API_URL}/api/staff/backup`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) throw new Error("No se pudo generar el respaldo. Intenta de nuevo.");
+      const data = await r.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pokepalace_respaldo_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setBackupInfo({ lastBackupAt: data.exportedAt });
+    } catch (e) {
+      setBackupError(e.message);
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const daysSinceBackup = backupInfo?.lastBackupAt
+    ? Math.floor((Date.now() - new Date(backupInfo.lastBackupAt).getTime()) / 86400000)
+    : null;
+  const backupOverdue = canBackup && backupInfo && (daysSinceBackup === null || daysSinceBackup >= 7);
 
   const togglePause = async () => {
     const next = { ordersPaused: !storeStatus.ordersPaused, pausedMessage: pauseMsgDraft };
@@ -1420,6 +1463,42 @@ function AvailabilityTab({ token }) {
           </div>
         </div>
       </div>
+
+      {/* Respaldo de datos — solo dueño/admin */}
+      {canBackup && (
+        <div className={`mb-6 rounded-2xl border p-4 ${backupOverdue ? "bg-amber-500/10 border-amber-500/30" : "bg-slate-900 border-white/5"}`}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-bold text-white">💾 Respaldo de datos</h2>
+              <p className={`text-sm mt-1 ${backupOverdue ? "text-amber-400 font-semibold" : "text-slate-400"}`}>
+                {backupInfo === null
+                  ? "Consultando…"
+                  : daysSinceBackup === null
+                  ? "⚠ Nunca se ha descargado un respaldo"
+                  : daysSinceBackup === 0
+                  ? "Último respaldo: hoy"
+                  : daysSinceBackup >= 7
+                  ? `⚠ Último respaldo hace ${daysSinceBackup} días — descarga uno nuevo`
+                  : `Último respaldo hace ${daysSinceBackup} día${daysSinceBackup > 1 ? "s" : ""}`}
+              </p>
+            </div>
+            <button
+              onClick={downloadBackup}
+              disabled={backupBusy}
+              className={`shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition text-white disabled:opacity-50 ${
+                backupOverdue ? "bg-amber-600 hover:bg-amber-500" : "bg-slate-700 hover:bg-slate-600"
+              }`}
+            >
+              {backupBusy ? "Generando…" : "⬇ Descargar respaldo"}
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 mt-3 pt-3 border-t border-white/5">
+            Descarga un archivo con toda la información del negocio (órdenes, clientes, inventario, checadas, gastos…).
+            Guárdalo en un lugar seguro — por ejemplo tu Google Drive — al menos una vez por semana.
+          </p>
+          {backupError && <p className="text-rose-400 text-xs mt-2">{backupError}</p>}
+        </div>
+      )}
 
       <div className="mb-5">
         <h2 className="text-lg font-bold text-white">Disponibilidad de ingredientes</h2>

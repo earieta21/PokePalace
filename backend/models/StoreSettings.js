@@ -5,6 +5,7 @@ const schema = new mongoose.Schema({
   unavailableItems: { type: [String], default: [] },
   ordersPaused:     { type: Boolean, default: false },
   pausedMessage:    { type: String, default: "" },
+  lastBackupAt:     { type: Date, default: null },
 });
 schema.index({ key: 1 }, { unique: true });
 
