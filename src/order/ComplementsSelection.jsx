@@ -83,15 +83,21 @@ const ComplementsSelection = ({ onNext, onBack }) => {
       <div className={styles.grid}>
         {complements.map((complement) => {
           const name = getItemLabel("complement", complement.id, language);
+          const isSelected = selectedComplements.includes(complement.id);
+          const isUnavailable = unavailableItems.includes(complement.id);
+          const isSelectionBlocked = isUnavailable && !isSelected;
           return (
           <button
             key={complement.id}
             type="button"
             style={{ position: "relative" }}
             className={`${styles.card} ${
-              selectedComplements.includes(complement.id) ? styles.selected : ""
+              isSelected ? styles.selected : ""
             }`}
-            onClick={() => !unavailableItems.includes(complement.id) && toggleComplement(complement.id)}
+            onClick={() => !isSelectionBlocked && toggleComplement(complement.id)}
+            aria-pressed={isSelected}
+            aria-disabled={isSelectionBlocked}
+            disabled={isSelectionBlocked}
           >
             <div className={styles.imageWrap}>
               <img
@@ -103,13 +109,13 @@ const ComplementsSelection = ({ onNext, onBack }) => {
               <div className={styles.imageOverlay} />
             </div>
             <p className={styles.name}>{name}</p>
-            {unavailableItems.includes(complement.id) && (
+            {isUnavailable && (
               <div style={{
                 position: "absolute", inset: 0, display: "flex",
                 alignItems: "center", justifyContent: "center",
                 background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
               }}>
-                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>{t("order.soldOut")}</span>
               </div>
             )}
           </button>
@@ -125,12 +131,12 @@ const ComplementsSelection = ({ onNext, onBack }) => {
 
       <div className={styles.actions}>
         <button className={styles.backButton} type="button" onClick={onBack}>
-          ← Atrás
+          ← {t("order.back")}
         </button>
         <div className={styles.rightActions}>
           {selectedComplements.length === 0 && (
             <button className={styles.skipBtn} type="button" onClick={onNext}>
-              Omitir
+              {t("order.skip")}
             </button>
           )}
           <button className={styles.nextButton} onClick={handleNext}>

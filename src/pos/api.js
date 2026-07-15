@@ -14,7 +14,13 @@ export function createStaffApi(token) {
 
   const handleRes = async (res) => {
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.msg || data?.message || `HTTP ${res.status}`);
+    if (!res.ok) {
+      const error = new Error(data?.msg || data?.message || `HTTP ${res.status}`);
+      error.status = res.status;
+      error.retryable = Boolean(data?.retryable || res.status >= 500);
+      error.orderId = data?.orderId || data?.order?._id || null;
+      throw error;
+    }
     return data;
   };
 

@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useOrder } from "./OrderContext";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
@@ -10,7 +10,14 @@ import {
   ITEM_LABELS,
 } from "./OrderLabels";
 
-const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" }) => {
+const OrderSummary = ({
+  onEditStep,
+  onConfirm,
+  onPromoChange,
+  pointsDiscount = 0,
+  saving = false,
+  submitError = "",
+}) => {
   const { order } = useOrder();
   const { isLoggedIn, token } = useContext(AuthContext);
   const { language, t } = useLanguage();
@@ -20,11 +27,12 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
     base = "",
     protein = "",
     proteins = [],
-    bowlSize = "normal",
     marinades = [],
     sauces = [],
     complements = [],
     toppings = [],
+    fulfillment = "pickup",
+    updateCheckout,
   } = order || {};
 
   // Promo code state
@@ -38,6 +46,15 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
   const [favoriteName, setFavoriteName] = useState("");
   const [savingFavorite, setSavingFavorite] = useState(false);
   const [favoriteMsg, setFavoriteMsg] = useState("");
+  const [favoriteSuccess, setFavoriteSuccess] = useState(false);
+
+  // Delivery is temporarily unavailable until the checkout can collect an address.
+  // Normalize old saved drafts so they cannot silently submit as delivery orders.
+  useEffect(() => {
+    if (fulfillment === "delivery") {
+      updateCheckout("fulfillment", "pickup");
+    }
+  }, [fulfillment, updateCheckout]);
 
   const finalMarinades = marinades;
 
@@ -65,7 +82,10 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
   const saucesLabels = getListLabels(labels.sauce, sauces);
   const toppingsLabels = getListLabels(labels.topping, toppings);
 
-  const pricing = computePricing(bowlSize, promoApplied);
+  const pricedBowlSize = proteinLabels.length === 3 ? "large" : "normal";
+  const pricing = computePricing(pricedBowlSize, promoApplied);
+  const appliedPointsDiscount = Math.min(Math.max(0, pointsDiscount), pricing.total);
+  const finalTotal = Math.max(0, pricing.total - appliedPointsDiscount);
 
   // Time picker helpers — mantiene el rango en línea con lo que de verdad
   // acepta el backend (11:00–21:00), para no dejar elegir una hora que
@@ -110,8 +130,9 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
         body: JSON.stringify({ code: promoInput.trim() }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.msg || "Código inválido");
+      if (!res.ok) throw new Error(data?.msg || t("summary.promoInvalid"));
       setPromoApplied(data);
+      onPromoChange?.(data);
       order.updateCheckout("promoCode", data.code);
     } catch (e) {
       setPromoError(e.message);
@@ -124,6 +145,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
     setPromoApplied(null);
     setPromoInput("");
     setPromoError("");
+    onPromoChange?.(null);
     order.updateCheckout("promoCode", "");
   };
 
@@ -131,6 +153,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
     if (!favoriteName.trim()) return;
     setSavingFavorite(true);
     setFavoriteMsg("");
+    setFavoriteSuccess(false);
     try {
       const res = await fetch(`${API_URL}/api/users/me/favorites`, {
         method: "POST",
@@ -142,7 +165,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
           name: favoriteName.trim(),
           base,
           proteins: Array.isArray(proteins) && proteins.length > 0 ? proteins : protein ? [protein] : [],
-          bowlSize,
+          bowlSize: pricedBowlSize,
           marinades,
           complements,
           sauces,
@@ -150,12 +173,14 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.msg || "Error guardando favorito");
-      setFavoriteMsg("Bowl guardado en tus favoritos");
+      if (!res.ok) throw new Error(data?.msg || t("summary.favoriteSaveError"));
+      setFavoriteMsg(t("summary.favoriteSaved"));
+      setFavoriteSuccess(true);
       setFavoriteName("");
       setShowSaveFavorite(false);
     } catch (e) {
       setFavoriteMsg(e.message);
+      setFavoriteSuccess(false);
     } finally {
       setSavingFavorite(false);
     }
@@ -172,7 +197,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
           </h3>
           {value ? <p className={styles.detail}>{value}</p> : null}
         </div>
-        <button className={styles.editButton} onClick={onEdit} type="button">
+        <button className={styles.editButton} onClick={onEdit} type="button" aria-label={`${t("summary.edit")}: ${title}`}>
           {t("summary.edit")}
         </button>
       </div>
@@ -216,9 +241,9 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
         />
 
         <div className={styles.sizeNotice}>
-          <span>{bowlSize === "large" ? t("summary.large") : t("summary.normal")}</span>
+          <span>{pricedBowlSize === "large" ? t("summary.large") : t("summary.normal")}</span>
           <p>
-            {bowlSize === "large"
+            {pricedBowlSize === "large"
               ? t("summary.largeDesc")
               : t("summary.normalDesc")}
           </p>
@@ -263,15 +288,16 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
               <button
                 className={styles.favBtn}
                 type="button"
-                onClick={() => { setShowSaveFavorite(true); setFavoriteMsg(""); }}
+                onClick={() => { setShowSaveFavorite(true); setFavoriteMsg(""); setFavoriteSuccess(false); }}
               >
-                Guardar como favorito
+                {t("summary.saveFavorite")}
               </button>
             ) : (
               <div className={styles.favoriteRow}>
                 <input
                   className={styles.favoriteInput}
-                  placeholder="Nombre de tu bowl (ej: Mi Poke Favorito)"
+                  placeholder={t("summary.favoritePlaceholder")}
+                  aria-label={t("summary.favoritePlaceholder")}
                   value={favoriteName}
                   onChange={(e) => setFavoriteName(e.target.value)}
                   maxLength={40}
@@ -282,19 +308,19 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
                   onClick={handleSaveFavorite}
                   disabled={savingFavorite || !favoriteName.trim()}
                 >
-                  {savingFavorite ? "Guardando…" : "Guardar"}
+                  {savingFavorite ? t("summary.savingFavorite") : t("summary.save")}
                 </button>
                 <button
                   className={styles.favCancelBtn}
                   type="button"
-                  onClick={() => { setShowSaveFavorite(false); setFavoriteName(""); setFavoriteMsg(""); }}
+                  onClick={() => { setShowSaveFavorite(false); setFavoriteName(""); setFavoriteMsg(""); setFavoriteSuccess(false); }}
                 >
-                  Cancelar
+                  {t("summary.cancel")}
                 </button>
               </div>
             )}
             {favoriteMsg && (
-              <p className={favoriteMsg.startsWith("Bowl guardado") ? styles.promoSuccess : styles.promoError}>
+              <p className={favoriteSuccess ? styles.promoSuccess : styles.promoError} role="status" aria-live="polite">
                 {favoriteMsg}
               </p>
             )}
@@ -340,12 +366,11 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
               <span>{t("summary.fulfillment")}</span>
               <select
                 name="fulfillment"
-                value={order.fulfillment || "pickup"}
+                value={order.fulfillment === "dine_in" ? "dine_in" : "pickup"}
                 onChange={(e) => order.updateCheckout("fulfillment", e.target.value)}
               >
                 <option value="pickup">{t("summary.pickup")}</option>
                 <option value="dine_in">{t("summary.dineIn")}</option>
-                <option value="delivery">{t("summary.delivery")}</option>
               </select>
             </label>
 
@@ -375,12 +400,12 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
                     if (!e.target.checked) order.updateCheckout("scheduledPickupTime", "");
                   }}
                 />
-                <span>Programar hora de recogida</span>
+                <span>{t("summary.schedulePickup")}</span>
               </label>
 
               {order.isScheduled && (
                 <label className={styles.field}>
-                  <span>Hora de recogida (horario: 11:00 – 21:00)</span>
+                  <span>{t("summary.pickupTime")}</span>
                   <input
                     type="datetime-local"
                     value={order.scheduledPickupTime || ""}
@@ -394,7 +419,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
           )}
 
           <label className={styles.field}>
-            <span>{t("summary.notes")} <em className={styles.optionalTag}>({language === "es" ? "opcional" : "optional"})</em></span>
+            <span>{t("summary.notes")} <em className={styles.optionalTag}>({t("summary.optional")})</em></span>
             <textarea
               name="notes"
               value={order.notes || ""}
@@ -407,12 +432,13 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
 
         {/* Promo code */}
         <div className={styles.promoSection}>
-          <p className={styles.promoLabel}>Código promocional</p>
+          <p className={styles.promoLabel}>{t("summary.promoLabel")}</p>
           {!promoApplied ? (
             <div className={styles.promoRow}>
               <input
                 className={styles.promoInput}
-                placeholder="Ingresa tu código"
+                placeholder={t("summary.promoPlaceholder")}
+                aria-label={t("summary.promoLabel")}
                 value={promoInput}
                 onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoError(""); }}
                 maxLength={20}
@@ -424,23 +450,23 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
                 onClick={handleApplyPromo}
                 disabled={promoLoading || !promoInput.trim()}
               >
-                {promoLoading ? "Verificando…" : "Aplicar"}
+                {promoLoading ? t("summary.promoChecking") : t("summary.promoApply")}
               </button>
             </div>
           ) : (
             <div className={styles.promoApplied}>
               <span className={styles.promoSuccess}>
                 {promoApplied.code} — {promoApplied.discountType === "percent"
-                  ? `${promoApplied.discountValue}% de descuento`
-                  : `$${promoApplied.discountValue} de descuento`}
+                  ? t("summary.promoPercent", { value: promoApplied.discountValue })
+                  : t("summary.promoAmount", { value: promoApplied.discountValue })}
                 {promoApplied.description ? ` · ${promoApplied.description}` : ""}
               </span>
               <button className={styles.promoRemoveBtn} type="button" onClick={handleRemovePromo}>
-                Quitar
+                {t("summary.promoRemove")}
               </button>
             </div>
           )}
-          {promoError && <p className={styles.promoError}>{promoError}</p>}
+          {promoError && <p className={styles.promoError} role="alert">{promoError}</p>}
         </div>
 
         {/* Price breakdown */}
@@ -448,26 +474,32 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
           {pricing.discount > 0 && (
             <>
               <div className={styles.priceRow}>
-                <span>Subtotal</span>
+                <span>{t("summary.subtotal")}</span>
                 <span>${pricing.subtotal.toFixed(2)}</span>
               </div>
               <div className={`${styles.priceRow} ${styles.priceDiscountRow}`}>
-                <span>Descuento</span>
+                <span>{t("summary.discount")}</span>
                 <span>-${pricing.discount.toFixed(2)}</span>
               </div>
             </>
           )}
           {pricing.tax > 0 && (
             <div className={styles.priceRow}>
-              <span>IVA (16%)</span>
+              <span>{t("summary.tax")}</span>
               <span>${pricing.tax.toFixed(2)}</span>
             </div>
           )}
+          {appliedPointsDiscount > 0 && (
+            <div className={`${styles.priceRow} ${styles.priceDiscountRow}`}>
+              <span>{t("summary.pointsApplied")}</span>
+              <span>-${appliedPointsDiscount.toFixed(2)}</span>
+            </div>
+          )}
           <div className={styles.priceTotalRow}>
-            <span>Total</span>
-            <span>${pricing.total.toFixed(2)} MXN</span>
+            <span>{t("summary.total")}</span>
+            <span>${finalTotal.toFixed(2)} MXN</span>
           </div>
-          <p className={styles.ivaNote}>Precio con IVA incluido</p>
+          <p className={styles.ivaNote}>{t("summary.taxIncluded")}</p>
         </div>
 
         <div className={styles.actions}>
@@ -481,7 +513,7 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
             disabled={saving}
             aria-busy={saving}
           >
-            {saving ? t("summary.sending") : `${t("summary.confirm")} — $${pricing.total.toFixed(2)}`}
+            {saving ? t("summary.sending") : `${t("summary.confirm")} — $${finalTotal.toFixed(2)}`}
           </button>
         </div>
       </div>

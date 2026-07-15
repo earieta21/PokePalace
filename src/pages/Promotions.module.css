@@ -620,6 +620,41 @@
   font-weight: 600;
 }
 
+.pendingRecovery {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--accent-bg);
+  color: var(--text);
+}
+
+.pendingRecovery div {
+  display: grid;
+  gap: 3px;
+}
+
+.pendingRecovery span {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.pendingRecovery button {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+@media (max-width: 520px) {
+  .pendingRecovery {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 /* ── Won-code modal ── */
 .codeOverlay {
   position: fixed;

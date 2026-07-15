@@ -33,6 +33,61 @@ const TIERS = [
   },
 ];
 
+const PENDING_REDEMPTION_KEY = "pokePalace.pendingRewardRedemption.v1";
+const CLIENT_REDEMPTION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,99}$/;
+
+function createClientRedemptionId() {
+  if (globalThis.crypto?.randomUUID) return `reward:${globalThis.crypto.randomUUID()}`;
+  if (globalThis.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    return `reward:${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+  }
+  return `reward:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}:${Math.random().toString(36).slice(2)}`;
+}
+
+function pendingRedemptionKey(userId, rewardId) {
+  return `${userId}:${rewardId}`;
+}
+
+function loadPendingRedemptions() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PENDING_REDEMPTION_KEY) || "{}");
+    if (!stored || typeof stored !== "object" || Array.isArray(stored)) return {};
+    const valid = {};
+    for (const [key, pending] of Object.entries(stored)) {
+      if (
+        pending &&
+        key === pendingRedemptionKey(pending.userId, pending.rewardId) &&
+        CLIENT_REDEMPTION_ID_RE.test(pending.clientRedemptionId || "")
+      ) {
+        valid[key] = pending;
+      }
+    }
+    return valid;
+  } catch {
+    return {};
+  }
+}
+
+function savePendingRedemptions(pendingRedemptions) {
+  localStorage.setItem(PENDING_REDEMPTION_KEY, JSON.stringify(pendingRedemptions));
+}
+
+function savePendingRedemption(key, pending) {
+  const latest = loadPendingRedemptions();
+  const next = { ...latest, [key]: pending };
+  savePendingRedemptions(next);
+  return next;
+}
+
+function clearPendingRedemption(key) {
+  const next = loadPendingRedemptions();
+  delete next[key];
+  savePendingRedemptions(next);
+  return next;
+}
+
 function getCurrentTier(points) {
   return [...TIERS].reverse().find((t) => points >= t.min) ?? TIERS[0];
 }
@@ -49,6 +104,17 @@ export default function RewardsPage() {
   const [redeemError, setRedeemError] = useState("");
   const [wonCode, setWonCode] = useState(null);        // { code, rewardName, expiresAt }
   const [completedOrderCount, setCompletedOrderCount] = useState(null);
+  const [pendingRedemptions, setPendingRedemptions] = useState(loadPendingRedemptions);
+
+  useEffect(() => {
+    const syncPending = (event) => {
+      if (event.key === PENDING_REDEMPTION_KEY) {
+        setPendingRedemptions(loadPendingRedemptions());
+      }
+    };
+    window.addEventListener("storage", syncPending);
+    return () => window.removeEventListener("storage", syncPending);
+  }, []);
 
   // Reconcile recent paid/completed purchases that may have missed the old
   // "Cobrado" step, then refresh the visible balance. The backend guards each
@@ -120,9 +186,30 @@ export default function RewardsPage() {
     : 0;
   const favoriteName = user?.favoriteBowls?.[0]?.name || null;
   const firstName = user?.name?.trim().split(/\s+/)[0] || "";
+  const accountUserId = String(user?.id || user?._id || "");
+  const catalogRewardIds = new Set(REWARDS.map((reward) => reward.id));
+  const orphanedPendingRedemptions = Object.values(pendingRedemptions).filter(
+    (pending) => pending.userId === accountUserId && !catalogRewardIds.has(pending.rewardId)
+  );
 
   const handleRedeem = async (reward) => {
-    if (points < reward.cost || redeeming) return;
+    const userId = accountUserId;
+    if (!userId || redeeming) return;
+    const pendingKey = pendingRedemptionKey(userId, reward.id);
+    let pending = loadPendingRedemptions()[pendingKey] || pendingRedemptions[pendingKey];
+    if (!pending && points < reward.cost) return;
+
+    if (!pending) {
+      pending = {
+        userId,
+        rewardId: reward.id,
+        clientRedemptionId: createClientRedemptionId(),
+        createdAt: new Date().toISOString(),
+      };
+      const nextPending = savePendingRedemption(pendingKey, pending);
+      setPendingRedemptions(nextPending);
+    }
+
     setRedeeming(reward.id);
     setRedeemError("");
     try {
@@ -132,18 +219,32 @@ export default function RewardsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ rewardId: reward.id }),
+        body: JSON.stringify({
+          rewardId: reward.id,
+          clientRedemptionId: pending.clientRedemptionId,
+        }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.msg || t("rewards.redeemError"));
+      if (!res.ok) {
+        const error = new Error(data?.msg || t("rewards.redeemError"));
+        error.status = res.status;
+        error.retryable = Boolean(data?.retryable || res.status >= 500);
+        throw error;
+      }
 
       setWonCode({
         code: data.redemption.code,
-        rewardName: reward.name[language],
+        rewardName: data.redemption.rewardName || reward.name[language],
         expiresAt: data.redemption.expiresAt,
       });
+      const nextPending = clearPendingRedemption(pendingKey);
+      setPendingRedemptions(nextPending);
       await refreshUser();
     } catch (e) {
+      if ([400, 409, 422].includes(e.status) && !e.retryable) {
+        const nextPending = clearPendingRedemption(pendingKey);
+        setPendingRedemptions(nextPending);
+      }
       setRedeemError(e.message);
     } finally {
       setRedeeming(null);
@@ -306,9 +407,30 @@ export default function RewardsPage() {
         {redeemError && (
           <p className={styles.redeemErrorBanner} role="alert">{redeemError}</p>
         )}
+        {orphanedPendingRedemptions.map((pending) => (
+          <div className={styles.pendingRecovery} key={pendingRedemptionKey(pending.userId, pending.rewardId)}>
+            <div>
+              <strong>{language === "es" ? "Tienes un canje pendiente" : "You have a pending redemption"}</strong>
+              <span>{language === "es" ? "Termínalo sin volver a descontar puntos." : "Finish it without deducting points again."}</span>
+            </div>
+            <button
+              type="button"
+              className={`${styles.redeemBtn} ${styles.redeemActive}`}
+              disabled={redeeming === pending.rewardId}
+              onClick={() => handleRedeem({ id: pending.rewardId, cost: Infinity, name: {} })}
+            >
+              {redeeming === pending.rewardId
+                ? t("rewards.redeeming")
+                : (language === "es" ? "Recuperar mi código" : "Recover my code")}
+            </button>
+          </div>
+        ))}
         <div className={styles.rewardsGrid}>
           {REWARDS.map((r) => {
-            const canRedeem = isLoggedIn && points >= r.cost;
+            const hasPendingRedemption = Boolean(
+              accountUserId && pendingRedemptions[pendingRedemptionKey(accountUserId, r.id)]
+            );
+            const canRedeem = isLoggedIn && (points >= r.cost || hasPendingRedemption);
             const pct = isLoggedIn ? Math.min(100, Math.round((points / r.cost) * 100)) : 0;
             const isBusy = redeeming === r.id;
             return (
@@ -332,6 +454,8 @@ export default function RewardsPage() {
                 >
                   {isBusy
                     ? t("rewards.redeeming")
+                    : hasPendingRedemption
+                      ? (language === "es" ? "Reintentar canje" : "Retry redemption")
                     : canRedeem
                       ? t("rewards.redeem")
                       : t("rewards.missing", { points: r.cost - points })}

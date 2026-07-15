@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
-import { getItemLabel } from "./OrderLabels";
+import { getItemDescription, getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./MarinadeSelection.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
@@ -22,14 +22,14 @@ const MarinadeSelection = ({ onNext, onBack }) => {
   const { unavailableItems } = useAvailability();
 
   const marinades = [
-    { id: "citrus_marinade",        image: citrico,      desc: "Naranja, limón y aceite de sésamo" },
-    { id: "shoyu_marinade",         image: shoyu,        desc: "Salsa de soya japonesa clásica" },
-    { id: "ponzu_marinade",         image: punzu,        desc: "Cítrico con soya y dashi" },
-    { id: "spicy_marinade",         image: spicy,        desc: "Chile fresco y jengibre picante" },
-    { id: "sesame_marinade",        image: sesame,       desc: "Sésamo tostado y aceite de girasol" },
-    { id: "wasabi_marinade",        image: wassabi,      desc: "Toque picante suave con jengibre" },
-    { id: "miso_marinade",          image: miso,         desc: "Pasta de soya fermentada, umami" },
-    { id: "garlic_ginger_marinade", image: garlicGinger, desc: "Ajo fresco y jengibre picado" },
+    { id: "citrus_marinade",        image: citrico },
+    { id: "shoyu_marinade",         image: shoyu },
+    { id: "ponzu_marinade",         image: punzu },
+    { id: "spicy_marinade",         image: spicy },
+    { id: "sesame_marinade",        image: sesame },
+    { id: "wasabi_marinade",        image: wassabi },
+    { id: "miso_marinade",          image: miso },
+    { id: "garlic_ginger_marinade", image: garlicGinger },
   ];
 
   const [selectedMarinades, setSelectedMarinades] = useState(
@@ -75,15 +75,22 @@ const MarinadeSelection = ({ onNext, onBack }) => {
       <div className={styles.grid}>
         {marinades.map((marinade) => {
           const name = getItemLabel("marinade", marinade.id, language);
+          const description = getItemDescription("marinade", marinade.id, language);
+          const isSelected = selectedMarinades.includes(marinade.id);
+          const isUnavailable = unavailableItems.includes(marinade.id);
+          const isSelectionBlocked = isUnavailable && !isSelected;
           return (
           <button
             key={marinade.id}
             type="button"
             style={{ position: "relative" }}
             className={`${styles.card} ${
-              selectedMarinades.includes(marinade.id) ? styles.selected : ""
+              isSelected ? styles.selected : ""
             }`}
-            onClick={() => !unavailableItems.includes(marinade.id) && toggleMarinade(marinade.id)}
+            onClick={() => !isSelectionBlocked && toggleMarinade(marinade.id)}
+            aria-pressed={isSelected}
+            aria-disabled={isSelectionBlocked}
+            disabled={isSelectionBlocked}
           >
             <div className={styles.imageWrap}>
               <img
@@ -96,14 +103,14 @@ const MarinadeSelection = ({ onNext, onBack }) => {
             </div>
 
             <p className={styles.name}>{name}</p>
-            {marinade.desc && <p className={styles.itemDesc}>{marinade.desc}</p>}
-            {unavailableItems.includes(marinade.id) && (
+            {description && <p className={styles.itemDesc}>{description}</p>}
+            {isUnavailable && (
               <div style={{
                 position: "absolute", inset: 0, display: "flex",
                 alignItems: "center", justifyContent: "center",
                 background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
               }}>
-                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>{t("order.soldOut")}</span>
               </div>
             )}
           </button>
@@ -119,12 +126,12 @@ const MarinadeSelection = ({ onNext, onBack }) => {
 
       <div className={styles.actions}>
         <button className={styles.backButton} type="button" onClick={onBack}>
-          ← Atrás
+          ← {t("order.back")}
         </button>
         <div className={styles.rightActions}>
           {selectedMarinades.length === 0 && (
             <button className={styles.skipBtn} type="button" onClick={onNext}>
-              Omitir
+              {t("order.skip")}
             </button>
           )}
           <button className={styles.nextButton} onClick={handleNext}>

@@ -15,13 +15,25 @@ const writeQueue = (queue) => {
 
 export const getQueuedOrders = () => readQueue();
 
+export const createClientOrderId = () => {
+  const randomPart = globalThis.crypto?.randomUUID?.()
+    || `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  return `pos-${randomPart}`;
+};
+
 export const queueOrder = (orderPayload) => {
   const queue = readQueue();
-  const entry = {
-    localId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    queuedAt: new Date().toISOString(),
-    payload: orderPayload,
+  const payload = {
+    ...orderPayload,
+    clientOrderId: orderPayload.clientOrderId || createClientOrderId(),
   };
+  const entry = {
+    localId: payload.clientOrderId,
+    queuedAt: new Date().toISOString(),
+    payload,
+  };
+  const existing = queue.find((queued) => queued.payload?.clientOrderId === payload.clientOrderId);
+  if (existing) return existing;
   queue.push(entry);
   writeQueue(queue);
   return entry;
@@ -32,15 +44,27 @@ const removeFromQueue = (localId) => {
 };
 
 // Network-level failures (offline, DNS, server unreachable) throw a TypeError
-// in fetch; HTTP error responses (4xx/5xx) reject with a normal Error from
-// the API client and should NOT be queued for retry — they need a human.
+// in fetch; HTTP error responses reject with a normal Error from the API
+// client and remain visible in the queue until they can be reconciled.
 export const isNetworkError = (err) =>
   err instanceof TypeError || err?.message === "Failed to fetch";
 
 // Sends every queued order in order, stopping at the first failure so we
 // don't reorder or skip pending tickets. Returns how many were flushed.
-export const flushQueuedOrders = async (api, { onSuccess } = {}) => {
-  const queue = readQueue();
+export const flushQueuedOrders = async (api, { onSuccess, onError } = {}) => {
+  let queue = readQueue();
+  let migrated = false;
+  queue = queue.map((entry) => {
+    if (entry.payload?.clientOrderId) return entry;
+    migrated = true;
+    const clientOrderId = entry.localId ? `pos-${entry.localId}` : createClientOrderId();
+    return {
+      ...entry,
+      localId: clientOrderId,
+      payload: { ...entry.payload, clientOrderId },
+    };
+  });
+  if (migrated) writeQueue(queue);
   let sent = 0;
 
   for (const entry of queue) {
@@ -51,7 +75,10 @@ export const flushQueuedOrders = async (api, { onSuccess } = {}) => {
       onSuccess?.(entry);
     } catch (err) {
       if (isNetworkError(err)) break; // still offline — stop and retry later
-      removeFromQueue(entry.localId); // bad request — drop it, it'll never succeed
+      // Never discard a sale automatically. The stable clientOrderId makes
+      // later retries safe after a cashier or server-side correction.
+      onError?.(entry, err);
+      break;
     }
   }
 

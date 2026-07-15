@@ -823,6 +823,21 @@
   font-size: 9px;
 }
 
+.rewardArea label {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  color: var(--p-ink);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.rewardArea select {
+  width: 100%;
+  padding: 8px !important;
+  text-transform: none;
+}
+
 .totalBreakdown {
   padding: 8px 0 10px;
   border-top: 1px solid #e8ede9;

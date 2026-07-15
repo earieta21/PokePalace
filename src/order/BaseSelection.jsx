@@ -30,8 +30,9 @@ const BaseSelection = ({ onNext, onBack }) => {
   const [error, setError] = useState("");
 
   const handleSelection = (baseId) => {
-    setSelectedBase(baseId);
-    updateOrder("base", baseId);
+    const nextBase = selectedBase === baseId ? null : baseId;
+    setSelectedBase(nextBase);
+    updateOrder("base", nextBase);
     setError("");
   };
 
@@ -56,14 +57,20 @@ const BaseSelection = ({ onNext, onBack }) => {
         <div className={styles.grid}>
           {bases.map((base) => {
             const name = getItemLabel("base", base.id, language);
+            const isSelected = selectedBase === base.id;
+            const isUnavailable = unavailableItems.includes(base.id);
+            const isSelectionBlocked = isUnavailable && !isSelected;
             return (
             <button
               key={base.id}
               type="button"
               className={`${styles.card} ${
-                selectedBase === base.id ? styles.selected : ""
+                isSelected ? styles.selected : ""
               }`}
-              onClick={() => !unavailableItems.includes(base.id) && handleSelection(base.id)}
+              onClick={() => !isSelectionBlocked && handleSelection(base.id)}
+              aria-pressed={isSelected}
+              aria-disabled={isSelectionBlocked}
+              disabled={isSelectionBlocked}
               style={{ position: "relative" }}
             >
               <div className={styles.imageWrap}>
@@ -79,13 +86,13 @@ const BaseSelection = ({ onNext, onBack }) => {
               {base.description && (
                 <p className={styles.description}>{base.description}</p>
               )}
-              {unavailableItems.includes(base.id) && (
+              {isUnavailable && (
                 <div style={{
                   position: "absolute", inset: 0, display: "flex",
                   alignItems: "center", justifyContent: "center",
                   background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
                 }}>
-                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>{t("order.soldOut")}</span>
                 </div>
               )}
             </button>
@@ -101,7 +108,7 @@ const BaseSelection = ({ onNext, onBack }) => {
 
         <div className={styles.actions}>
           <button className={styles.backButton} type="button" onClick={onBack}>
-            ← Atrás
+            ← {t("order.back")}
           </button>
           <button className={styles.nextButton} onClick={handleNext}>
             {t("order.next")}

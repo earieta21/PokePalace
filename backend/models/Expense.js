@@ -12,6 +12,9 @@ const expenseSchema = new mongoose.Schema(
     locationId:  { type: String, default: "tij-centro-01" },
     createdBy:   { type: String, default: "staff" },
     source:      { type: String, enum: ["manual", "inventario"], default: "manual" },
+    // Sparse so existing/manual expenses remain unchanged; inventory
+    // receptions use it to avoid creating the same expense twice on retry.
+    sourceRef:   { type: String, unique: true, sparse: true, trim: true },
   },
   { timestamps: true }
 );

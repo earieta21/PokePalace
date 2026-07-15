@@ -5,7 +5,7 @@ import { API_URL } from "../config";
 import { GOOGLE_REVIEW_URL } from "../config";
 import { getItemLabel } from "../order/OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
-import { clearActiveOrder } from "../components/ActiveOrderBanner";
+import { clearActiveOrder, getOrderAccessToken } from "../utils/orderAccess";
 import styles from "./OrderTracking.module.css";
 
 const STEP_CONFIG = [
@@ -114,6 +114,8 @@ export default function OrderTracking() {
   const fetchOrder = useCallback(async () => {
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const orderToken = getOrderAccessToken(orderId);
+      if (orderToken) headers["X-Order-Token"] = orderToken;
       const res = await fetch(`${API_URL}/api/orders/${orderId}`, { headers });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.msg || t("tracking.loadError"));
@@ -184,6 +186,8 @@ export default function OrderTracking() {
     try {
       const headers = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
+      const orderToken = getOrderAccessToken(orderId);
+      if (orderToken) headers["X-Order-Token"] = orderToken;
       const res  = await fetch(`${API_URL}/api/orders/${orderId}/cancel`, { method: "PATCH", headers });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.msg || "Error al cancelar");

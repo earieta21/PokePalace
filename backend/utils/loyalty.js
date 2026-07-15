@@ -35,7 +35,10 @@ export async function expireStalePoints(userId) {
    harmless. If the user update fails, the order is rolled back for retry. */
 export async function awardLoyaltyPoints(order) {
   const userId = order.user?._id || order.user;
-  if (!userId || !order.total || order.total <= 0 || order.paymentStatus !== "paid") return null;
+  if (
+    !userId || !order.total || order.total <= 0 ||
+    order.paymentStatus !== "paid" || order.status === "cancelled"
+  ) return null;
 
   const basePoints = Math.floor(order.total / 10);
   if (basePoints <= 0) return null;
@@ -44,37 +47,97 @@ export async function awardLoyaltyPoints(order) {
   if (!userDoc) return null;
 
   const isGold = (userDoc.lifetimePoints ?? 0) >= GOLD_TIER_MIN_POINTS;
-  const earned = basePoints * (isGold ? GOLD_POINTS_MULTIPLIER : 1);
+  const calculatedEarned = basePoints * (isGold ? GOLD_POINTS_MULTIPLIER : 1);
   const claimed = await Order.findOneAndUpdate(
-    { _id: order._id, loyaltyPointsEarned: 0 },
-    { $set: { loyaltyPointsEarned: earned } },
+    { _id: order._id, loyaltyPointsEarned: 0, status: { $ne: "cancelled" } },
+    {
+      $set: {
+        loyaltyPointsEarned: calculatedEarned,
+        loyaltyCreditLedgerVersion: 1,
+      },
+    },
     { new: true }
   );
-  if (!claimed) return null;
+  let earned = calculatedEarned;
+  if (!claimed) {
+    const persisted = await Order.findById(order._id)
+      .select("status loyaltyPointsEarned loyaltyCreditLedgerVersion loyaltyCreditAppliedAt");
+    if (!persisted || persisted.status === "cancelled" || !(persisted.loyaltyPointsEarned > 0)) {
+      return null;
+    }
+    earned = persisted.loyaltyPointsEarned;
+
+    // Orders credited before the durable User ledger existed are treated as
+    // already applied, then backfilled without changing the balance.
+    if ((persisted.loyaltyCreditLedgerVersion || 0) < 1) {
+      const legacyUser = await User.findByIdAndUpdate(
+        userId,
+        { $addToSet: { loyaltyCreditedOrderIds: order._id } },
+        { new: true }
+      ).select("name email phone points lifetimePoints");
+      if (!legacyUser) return null;
+      await Order.updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            loyaltyCreditLedgerVersion: 1,
+            loyaltyCreditAppliedAt: persisted.loyaltyCreditAppliedAt || new Date(),
+          },
+        }
+      );
+      return {
+        earned,
+        balance: legacyUser.points,
+        lifetimePoints: legacyUser.lifetimePoints,
+        customer: legacyUser.name,
+        alreadyCredited: true,
+      };
+    }
+  }
 
   try {
-    const updatedUser = await User.findByIdAndUpdate(userId, {
-      $inc: { points: earned, lifetimePoints: earned },
-      $set: { pointsLastEarnedAt: new Date() },
-    }, { new: true }).select("name email phone points lifetimePoints");
+    let updatedUser = await User.findOneAndUpdate(
+      {
+        _id: userId,
+        loyaltyCreditedOrderIds: { $ne: order._id },
+        cancelledPosCreditsReversed: { $ne: order._id },
+      },
+      {
+        $inc: { points: earned, lifetimePoints: earned },
+        $set: { pointsLastEarnedAt: new Date() },
+        $addToSet: { loyaltyCreditedOrderIds: order._id },
+      },
+      { new: true }
+    ).select("name email phone points lifetimePoints");
 
-    if (!updatedUser) throw new Error("Rewards account not found while crediting points");
+    if (!updatedUser) {
+      const currentUser = await User.findById(userId)
+        .select("name email phone points lifetimePoints +loyaltyCreditedOrderIds +cancelledPosCreditsReversed");
+      if (!currentUser) throw new Error("Rewards account not found while crediting points");
+      if (currentUser.cancelledPosCreditsReversed?.some((id) => String(id) === String(order._id))) {
+        return null;
+      }
+      if (!currentUser.loyaltyCreditedOrderIds?.some((id) => String(id) === String(order._id))) {
+        throw new Error("Rewards credit could not be reconciled");
+      }
+      updatedUser = currentUser;
+    }
+
+    await Order.updateOne(
+      { _id: order._id, loyaltyCreditAppliedAt: null },
+      { $set: { loyaltyCreditAppliedAt: new Date() } }
+    );
 
     return {
       earned,
       balance: updatedUser.points,
       lifetimePoints: updatedUser.lifetimePoints,
       customer: updatedUser.name,
+      alreadyCredited: !claimed,
     };
   } catch (error) {
-    try {
-      await Order.updateOne(
-        { _id: order._id, loyaltyPointsEarned: earned },
-        { $set: { loyaltyPointsEarned: 0 } }
-      );
-    } catch (rollbackError) {
-      console.error("CRITICAL: loyalty rollback failed", rollbackError.message);
-    }
+    // Do not roll back the order claim: the User update may have succeeded
+    // despite an ambiguous driver error. The per-user ledger makes retry safe.
     console.error("awardLoyaltyPoints error:", error.message);
     return null;
   }
@@ -100,7 +163,14 @@ export async function reconcileRecentLoyaltyPoints(userId, days = 30) {
     user: userId,
     status: { $ne: "cancelled" },
     paymentStatus: "paid",
-    loyaltyPointsEarned: 0,
+    $or: [
+      { loyaltyPointsEarned: 0 },
+      {
+        loyaltyPointsEarned: { $gt: 0 },
+        loyaltyCreditLedgerVersion: { $gte: 1 },
+        loyaltyCreditAppliedAt: null,
+      },
+    ],
     total: { $gt: 0 },
     createdAt: { $gte: cutoff },
   }).sort({ createdAt: 1 }).limit(50);

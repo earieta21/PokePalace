@@ -2,8 +2,13 @@ import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
+import {
+  ACTIVE_ORDER_STORAGE_KEY,
+  clearActiveOrder,
+  getActiveOrderId,
+  getOrderAccessToken,
+} from "../utils/orderAccess";
 
-const ACTIVE_ORDER_KEY = "pokeActiveOrderId";
 const POLL_MS = 8000;
 
 const STATUS_CONFIG = {
@@ -12,41 +17,35 @@ const STATUS_CONFIG = {
   ready:     { label: "¡Tu bowl está listo! 🔔", sub: "Pasa a recogerlo",       color: "#166534", bg: "#dcfce7", pulse: true  },
 };
 
-export function saveActiveOrder(orderId) {
-  localStorage.setItem(ACTIVE_ORDER_KEY, orderId);
-}
-
-export function clearActiveOrder() {
-  localStorage.removeItem(ACTIVE_ORDER_KEY);
-}
-
 export default function ActiveOrderBanner() {
   const location = useLocation();
   const { token } = useContext(AuthContext);
-  const [orderId, setOrderId]   = useState(() => localStorage.getItem(ACTIVE_ORDER_KEY));
+  const [orderId, setOrderId]   = useState(getActiveOrderId);
   const [order, setOrder]       = useState(null);
   const [loaded, setLoaded]     = useState(false);
   const prevReadyRef            = useRef(false);
 
   // Re-read orderId from localStorage on every route change (catches same-tab updates)
   useEffect(() => {
-    setOrderId(localStorage.getItem(ACTIVE_ORDER_KEY));
+    setOrderId(getActiveOrderId());
   }, [location.pathname]);
 
   // Also listen for cross-tab storage events
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === ACTIVE_ORDER_KEY) setOrderId(e.newValue);
+      if (e.key === ACTIVE_ORDER_STORAGE_KEY) setOrderId(e.newValue);
     };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
   }, []);
 
   const fetchOrder = useCallback(async () => {
-    const id = localStorage.getItem(ACTIVE_ORDER_KEY);
+    const id = getActiveOrderId();
     if (!id) { setOrder(null); setLoaded(true); return; }
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const orderToken = getOrderAccessToken(id);
+      if (orderToken) headers["X-Order-Token"] = orderToken;
       const res = await fetch(`${API_URL}/api/orders/${id}`, { headers });
       if (!res.ok) { clearActiveOrder(); setOrderId(null); setOrder(null); setLoaded(true); return; }
       const data = await res.json();

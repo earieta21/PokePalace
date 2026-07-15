@@ -92,7 +92,7 @@ export default function SalesDashboardPage({ styles }) {
                     ${d.revenue > 0 ? (d.revenue / 1000).toFixed(1) + "k" : "0"}
                   </span>
                   <div style={{
-                    width: "100%", background: "var(--p-border)", borderRadius: 4,
+                    width: "100%", borderRadius: 4,
                     height: `${Math.max(pct, 4)}%`, minHeight: 4,
                     background: "linear-gradient(180deg,#4A7A5A,#6aab82)",
                     transition: "height 400ms",

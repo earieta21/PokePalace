@@ -6,9 +6,10 @@ import {
   User, TrendingUp,
 } from "lucide-react";
 import { API_URL } from "../config";
+import { tijuanaDateKey } from "../utils/date";
 
 const LOCATION_ID = "tij-centro-01";
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = () => tijuanaDateKey();
 const fmtTime = (d) => new Date(d).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 const fmtHM = (mins) => `${Math.floor(mins / 60)}h ${String(Math.round(mins % 60)).padStart(2, "0")}m`;
 const initials = (name) => name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -385,7 +386,7 @@ function KioskLogin({ employees, onLogin }) {
             ))}
             <div />
             <PinKey onClick={() => press("0")}>0</PinKey>
-            <PinKey onClick={() => { setError(false); setPin((p) => p.slice(0, -1)); }} subtle>
+            <PinKey ariaLabel="Borrar último dígito" onClick={() => { setError(false); setPin((p) => p.slice(0, -1)); }} subtle>
               <Delete className="w-5 h-5 mx-auto" />
             </PinKey>
           </div>
@@ -395,9 +396,9 @@ function KioskLogin({ employees, onLogin }) {
   );
 }
 
-function PinKey({ children, onClick, subtle }) {
+function PinKey({ children, onClick, subtle, ariaLabel }) {
   return (
-    <button onClick={onClick}
+    <button type="button" onClick={onClick} aria-label={ariaLabel}
       className={`h-16 rounded-2xl text-xl font-semibold transition-all duration-100 active:scale-95 ${
         subtle
           ? "bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"

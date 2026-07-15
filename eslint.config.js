@@ -5,7 +5,9 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
-  { ignores: ['dist', 'node_modules'] },
+  // qrcode-generator.js is a vendored third-party distribution; lint the
+  // adapter/components that call it, not the upstream bundle itself.
+  { ignores: ['dist', 'node_modules', 'src/vendor/**'] },
   {
     files: ['src/**/*.{js,jsx}'],
     languageOptions: {
