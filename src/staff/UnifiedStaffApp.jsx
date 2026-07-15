@@ -1092,7 +1092,7 @@ function RewardsRedeemTab({ token }) {
       <div className="mb-8">
         <h2 className="text-lg font-bold text-white">Premio por historia</h2>
         <p className="text-slate-400 text-sm mt-1 mb-4">
-          Verifica la historia en el teléfono del cliente antes de emitir el código. No aceptes capturas antiguas.
+          Verifica la publicación en el teléfono del cliente. La cuenta social se registra sólo para respetar el límite de una promoción cada 30 días; no es su usuario de Poke Palace.
         </p>
 
         <form onSubmit={issueStoryReward} className="bg-slate-900 rounded-2xl border border-white/5 p-5 space-y-4">
@@ -1109,15 +1109,16 @@ function RewardsRedeemTab({ token }) {
               </select>
             </label>
             <label className="text-sm text-slate-300">
-              Usuario del cliente
+              Cuenta donde publicó la historia
               <input
                 value={storyHandle}
                 onChange={(e) => { setStoryHandle(e.target.value); setStoryError(""); setIssuedStory(null); }}
-                placeholder="@usuario"
+                placeholder={storyPlatform === "facebook" ? "Usuario de Facebook" : "@cuenta_de_instagram"}
                 maxLength={51}
                 autoComplete="off"
                 className="mt-1.5 w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50"
               />
+              <span className="block mt-1.5 text-xs text-slate-500">Debe ser la misma cuenta que aparece en la historia activa.</span>
             </label>
           </div>
 

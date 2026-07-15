@@ -50,8 +50,28 @@ export default function RewardsPage() {
   const [wonCode, setWonCode] = useState(null);        // { code, rewardName, expiresAt }
   const [completedOrderCount, setCompletedOrderCount] = useState(null);
 
-  // Refresh on mount so el nivel y el saldo estén al día (p. ej. justo tras login)
-  useEffect(() => { if (isLoggedIn) refreshUser?.(); }, [isLoggedIn]);
+  // Reconcile recent paid/completed purchases that may have missed the old
+  // "Cobrado" step, then refresh the visible balance. The backend guards each
+  // order so opening this page repeatedly can never duplicate points.
+  useEffect(() => {
+    if (!isLoggedIn || !token) return undefined;
+    const controller = new AbortController();
+
+    fetch(`${API_URL}/api/rewards/reconcile`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+      .then(() => refreshUser?.())
+      .catch((error) => {
+        if (error.name !== "AbortError") refreshUser?.();
+      });
+
+    return () => controller.abort();
+    // refreshUser is intentionally omitted: AuthContext recreates the function
+    // after each user update, which would otherwise start a reconciliation loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, token]);
 
   // Personalization uses existing account orders only. It creates no new
   // customer profile fields and never changes prices or awards extra benefits.

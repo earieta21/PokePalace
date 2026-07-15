@@ -49,6 +49,11 @@ export default function POSPage({ styles }) {
   const [menuSearch, setMenuSearch] = useState("");
   const [showCustomerDetails, setShowCustomerDetails] = useState(false);
   const [showReward, setShowReward] = useState(false);
+  const [rewardsCustomer, setRewardsCustomer] = useState(null);
+  const [customerLookup, setCustomerLookup] = useState("");
+  const [customerMatches, setCustomerMatches] = useState([]);
+  const [customerSearching, setCustomerSearching] = useState(false);
+  const [customerSearchDone, setCustomerSearchDone] = useState(false);
 
   const tryFlushQueue = useCallback(async () => {
     if (getQueuedOrders().length === 0) return;
@@ -101,6 +106,10 @@ export default function POSPage({ styles }) {
     setReward(null);
     setShowCustomerDetails(false);
     setShowReward(false);
+    setRewardsCustomer(null);
+    setCustomerLookup("");
+    setCustomerMatches([]);
+    setCustomerSearchDone(false);
     setSuccess("");
     setError("");
   };
@@ -143,6 +152,43 @@ export default function POSPage({ styles }) {
     rewardDiscount = Math.min(249, Math.min(...bowlLines.map((item) => item.price)));
   }
   const total = Math.max(0, subtotal + iva - rewardDiscount);
+  const rewardsMultiplier = (rewardsCustomer?.lifetimePoints ?? 0) >= 300 ? 2 : 1;
+  const rewardsPointsPreview = Math.floor(total / 10) * rewardsMultiplier;
+
+  const searchRewardsCustomers = async () => {
+    const query = customerLookup.trim();
+    if (query.length < 3 || customerSearching) return;
+    setCustomerSearching(true);
+    setCustomerMatches([]);
+    setCustomerSearchDone(false);
+    setError("");
+    try {
+      const data = await api.get(`/api/staff/orders/customers/search?q=${encodeURIComponent(query)}`);
+      setCustomerMatches(data.customers || []);
+      setCustomerSearchDone(true);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCustomerSearching(false);
+    }
+  };
+
+  const selectRewardsCustomer = (customer) => {
+    setRewardsCustomer(customer);
+    setCliente(customer.name || "");
+    if (customer.phone) setPhone(customer.phone);
+    setCustomerLookup("");
+    setCustomerMatches([]);
+    setCustomerSearchDone(false);
+    setError("");
+  };
+
+  const removeRewardsCustomer = () => {
+    setRewardsCustomer(null);
+    setCustomerLookup("");
+    setCustomerMatches([]);
+    setCustomerSearchDone(false);
+  };
 
   const lookupReward = async () => {
     const clean = rewardCode.trim().toUpperCase();
@@ -176,6 +222,7 @@ export default function POSPage({ styles }) {
       fulfillment,
       paymentMethod,
       rewardCode: reward?.code || null,
+      customerUserId: rewardsCustomer?._id || null,
       ...(customBowl && {
         base: customBowl.bowl.base,
         proteins: customBowl.bowl.proteins,
@@ -189,12 +236,18 @@ export default function POSPage({ styles }) {
 
     try {
       const data = await api.post("/api/staff/orders", payload);
-      setSuccess(`Orden enviada — $${data.order.total.toLocaleString("es-MX")} MXN`);
+      const pointsMessage = data.loyalty?.earned
+        ? ` · ${data.loyalty.customer} ganó ${data.loyalty.earned} puntos (saldo: ${data.loyalty.balance})`
+        : rewardsCustomer && paymentMethod === "pay_at_pickup"
+          ? " · Los puntos se acreditarán al registrar el pago"
+          : "";
+      setSuccess(`Orden enviada — $${data.order.total.toLocaleString("es-MX")} MXN${pointsMessage}`);
     } catch (e) {
       if (isNetworkError(e) && !reward) {
         queueOrder(payload);
         setQueuedCount(getQueuedOrders().length);
-        setSuccess(`Sin conexión — orden guardada y se enviará sola ($${total.toLocaleString("es-MX")} MXN)`);
+        const queuedRewards = rewardsCustomer ? " Los puntos se acreditarán cuando vuelva la conexión." : "";
+        setSuccess(`Sin conexión — orden guardada y se enviará sola ($${total.toLocaleString("es-MX")} MXN).${queuedRewards}`);
       } else {
         setError(e.message);
         setSaving(false);
@@ -212,6 +265,10 @@ export default function POSPage({ styles }) {
     setReward(null);
     setShowCustomerDetails(false);
     setShowReward(false);
+    setRewardsCustomer(null);
+    setCustomerLookup("");
+    setCustomerMatches([]);
+    setCustomerSearchDone(false);
     setTimeout(() => setSuccess(""), 4000);
     setSaving(false);
   };
@@ -351,6 +408,66 @@ export default function POSPage({ styles }) {
               ))}
             </div>
           </div>
+
+          <section className={ui.loyaltyPanel} aria-label="Cliente Rewards">
+            <div className={ui.loyaltyHeading}>
+              <span className={ui.loyaltyIcon}>★</span>
+              <div>
+                <strong>Cliente Rewards</strong>
+                <small>Opcional · vincula la compra para sumar puntos</small>
+              </div>
+            </div>
+
+            {rewardsCustomer ? (
+              <div className={ui.loyaltySelected}>
+                <div>
+                  <strong>{rewardsCustomer.name}</strong>
+                  <span>{rewardsCustomer.phone || rewardsCustomer.email}</span>
+                  <small>Saldo actual: {rewardsCustomer.points ?? 0} puntos</small>
+                </div>
+                <button type="button" onClick={removeRewardsCustomer}>Cambiar</button>
+                <p>
+                  {paymentMethod === "pay_at_pickup"
+                    ? `Ganará ${rewardsPointsPreview} puntos cuando se registre el pago.`
+                    : `Ganará ${rewardsPointsPreview} puntos con esta compra${rewardsMultiplier === 2 ? " · Nivel Oro 2×" : ""}.`}
+                </p>
+              </div>
+            ) : (
+              <>
+                <form
+                  className={ui.loyaltySearch}
+                  onSubmit={(event) => { event.preventDefault(); searchRewardsCustomers(); }}
+                >
+                  <input
+                    value={customerLookup}
+                    onChange={(event) => {
+                      setCustomerLookup(event.target.value);
+                      setCustomerMatches([]);
+                      setCustomerSearchDone(false);
+                    }}
+                    placeholder="Teléfono, correo o nombre"
+                    autoComplete="off"
+                  />
+                  <button type="submit" disabled={customerLookup.trim().length < 3 || customerSearching}>
+                    {customerSearching ? "Buscando…" : "Buscar"}
+                  </button>
+                </form>
+                {customerMatches.length > 0 && (
+                  <div className={ui.loyaltyResults}>
+                    {customerMatches.map((customer) => (
+                      <button key={customer._id} type="button" onClick={() => selectRewardsCustomer(customer)}>
+                        <span><strong>{customer.name}</strong><small>{customer.phone || customer.email}</small></span>
+                        <em>{customer.points ?? 0} pts</em>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {customerSearchDone && customerMatches.length === 0 && (
+                  <p className={ui.loyaltyEmpty}>No encontramos una cuenta. La venta puede continuar sin Rewards.</p>
+                )}
+              </>
+            )}
+          </section>
 
           <button type="button" className={ui.detailsToggle} aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails((visible) => !visible)}>
             <span>Cliente y notas <small>Opcional</small></span><span>{showCustomerDetails ? "−" : "+"}</span>
