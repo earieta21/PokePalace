@@ -45,8 +45,17 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - run: npm test
+      - run: npm test 2>&1 | tee test-output.txt
         env:
           MONGO_URI: mongodb://127.0.0.1:27017/pokepalace_ci
           JWT_SECRET: ci-test-secret
           PIN_PEPPER: ci-test-pepper
+      # Si las pruebas fallan, la salida se manda al monitor de errores de la
+      # app para poder diagnosticar sin acceso a los logs de Actions.
+      - name: Reportar fallo al monitor
+        if: failure()
+        run: |
+          tail -c 1800 test-output.txt > tail.txt
+          jq -n --rawfile s tail.txt '{message: "CI backend fallo", stack: $s, url: "ci://github-actions"}' \
+            | curl -s -X POST https://pokepalace.onrender.com/api/monitor/error \
+                -H 'Content-Type: application/json' --data @- || true
