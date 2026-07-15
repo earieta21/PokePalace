@@ -3,11 +3,11 @@
   left: 50%;
   bottom: 16px;
   transform: translateX(-50%);
-  width: min(780px, calc(100% - 24px));
+  width: min(680px, calc(100% - 24px));
   height: 64px;
 
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   align-items: center;
 
   border-radius: var(--radius-lg);
@@ -49,8 +49,8 @@
 }
 
 .iconWrap {
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
   border-radius: 10px;
   display: grid;
   place-items: center;
@@ -78,9 +78,10 @@
 }
 
 .themeButton {
-  position: static;
-  justify-self: center;
-  width: 34px;
+  position: absolute;
+  left: 10px;
+  top: -54px;
+  width: 44px;
   height: 44px;
   border-radius: 999px;
   border: 1px solid var(--border-md);
@@ -99,10 +100,11 @@
 }
 
 .languageButton {
-  position: static;
-  justify-self: center;
-  min-width: 44px;
-  height: 34px;
+  position: absolute;
+  right: 10px;
+  top: -54px;
+  min-width: 48px;
+  height: 44px;
   border-radius: 999px;
   border: 1px solid var(--border-md);
   background: var(--bg-card);
@@ -130,18 +132,5 @@
 
   .link {
     font-size: 10px;
-  }
-}
-
-/* On larger screens the navigation participates in the page layout and stays
-   at the top, so it never covers menu cards or checkout totals. */
-@media (min-width: 760px) {
-  .navbar {
-    position: sticky;
-    left: auto;
-    top: 12px;
-    bottom: auto;
-    transform: none;
-    margin: 12px auto 8px;
   }
 }
