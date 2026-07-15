@@ -78,6 +78,19 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 5001;
 
+// El plan gratis de Render apaga el servidor tras ~15 min sin tráfico y el
+// siguiente cliente espera 30-60 s a que despierte. Este auto-ping lo mantiene
+// activo. Solo corre en Render (la variable RENDER la pone la plataforma);
+// un servicio despierto 24/7 usa ~720 de las 750 h gratis del mes.
+const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL || "https://pokepalace.onrender.com/";
+function startKeepAlive() {
+  if (!process.env.RENDER) return;
+  setInterval(() => {
+    fetch(KEEP_ALIVE_URL).catch(() => {});
+  }, 10 * 60 * 1000);
+  console.log("⏰ Keep-alive activo cada 10 min");
+}
+
 const start = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
@@ -85,6 +98,7 @@ const start = async () => {
 
     app.listen(PORT, () => {
       console.log(`✅ Server running on ${PORT}`);
+      startKeepAlive();
     });
   } catch (err) {
     console.error("❌ Error conectando a MongoDB:", err.message);
