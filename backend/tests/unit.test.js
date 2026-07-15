@@ -21,8 +21,9 @@ test("bowl grande suma el cargo extra", () => {
 
 test("promo de porcentaje descuenta sobre el subtotal", () => {
   const { discount, total } = computePricing("normal", { discountType: "percent", discountValue: 10 });
-  assert.equal(discount, Math.round(BOWL_BASE_PRICE * 10) / 100);
-  assert.equal(total, BOWL_BASE_PRICE - discount);
+  const round2 = (n) => Math.round(n * 100) / 100;
+  assert.equal(discount, round2(BOWL_BASE_PRICE * 0.10));
+  assert.equal(total, round2(BOWL_BASE_PRICE - discount)); // evita 224.10000000000002
 });
 
 test("promo fija nunca descuenta mas que el subtotal", () => {

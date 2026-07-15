@@ -13,6 +13,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 let server;
+let serverOutput = "";
 
 before(async () => {
   server = spawn(process.execPath, ["server.js"], {
@@ -24,8 +25,12 @@ before(async () => {
       JWT_SECRET: process.env.JWT_SECRET || "ci-test-secret",
       PIN_PEPPER: process.env.PIN_PEPPER || "ci-test-pepper",
     },
-    stdio: ["ignore", "inherit", "inherit"],
+    // stdout NO se hereda: el runner de node:test interpreta stdout como TAP
+    // y los logs del servidor lo contaminarían. Se capturan para diagnóstico.
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  server.stdout.on("data", (chunk) => { serverOutput += chunk; });
+  server.stderr.on("data", (chunk) => { serverOutput += chunk; });
 
   // Espera a que el servidor conteste (mongoose puede tardar en conectar)
   const deadline = Date.now() + 45000;
@@ -39,7 +44,9 @@ before(async () => {
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error(`El servidor no arrancó a tiempo: ${lastError?.message}`);
+  throw new Error(
+    `El servidor no arrancó a tiempo: ${lastError?.message}\n--- salida del servidor ---\n${serverOutput}`
+  );
 });
 
 after(() => {
