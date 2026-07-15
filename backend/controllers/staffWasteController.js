@@ -1,4 +1,5 @@
 import WasteLog from "../models/WasteLog.js";
+import { dayRangeInTimeZone } from "../utils/timeZone.js";
 
 /* GET /api/staff/waste?limit=50 */
 export const getWasteLogs = async (req, res) => {
@@ -40,12 +41,11 @@ export const createWasteLog = async (req, res) => {
 /* GET /api/staff/waste/stats */
 export const getWasteStats = async (req, res) => {
   try {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const { start, end } = dayRangeInTimeZone();
 
     const [allLogs, todayLogs] = await Promise.all([
       WasteLog.find(),
-      WasteLog.find({ createdAt: { $gte: todayStart } }),
+      WasteLog.find({ createdAt: { $gte: start, $lt: end } }),
     ]);
 
     const totalCost = allLogs.reduce((s, l) => s + l.cost, 0);

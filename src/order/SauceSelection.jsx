@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
-import { getItemLabel } from "./OrderLabels";
+import { getItemDescription, getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./SauceSelection.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
@@ -24,16 +24,16 @@ const SauceSelection = ({ onNext, onBack }) => {
   const { unavailableItems } = useAvailability();
 
   const sauces = [
-    { id: "spicy_mayo",         image: spicyMayo,    desc: "Mayonesa con sriracha y limón" },
-    { id: "soy_sauce",          image: soya,         desc: "Soya japonesa para mojar" },
-    { id: "ponzu_sauce",        image: punzu,        desc: "Agridulce con soya y cítrico" },
-    { id: "sesame_ginger",      image: sesameGinger, desc: "Jengibre, sésamo y miel" },
-    { id: "wasabi_vinaigrette", image: wasabi,       desc: "Toque picante suave y cítrico" },
-    { id: "sweet_chili",        image: sweetChili,   desc: "Dulce con jalapeño y ajo" },
-    { id: "garlic_sriracha",    image: garlicSiracha,desc: "Ajo asado con chile sriracha" },
-    { id: "avocado_lime",       image: avocadoLime,  desc: "Cremoso con aguacate y lima" },
-    { id: "miso_dressing",      image: miso,         desc: "Fermentado de soya, rico en umami" },
-    { id: "yuzu_kosho",         image: yuzuKosho,    desc: "Pasta japonesa de cítrico y chile" },
+    { id: "spicy_mayo",         image: spicyMayo },
+    { id: "soy_sauce",          image: soya },
+    { id: "ponzu_sauce",        image: punzu },
+    { id: "sesame_ginger",      image: sesameGinger },
+    { id: "wasabi_vinaigrette", image: wasabi },
+    { id: "sweet_chili",        image: sweetChili },
+    { id: "garlic_sriracha",    image: garlicSiracha },
+    { id: "avocado_lime",       image: avocadoLime },
+    { id: "miso_dressing",      image: miso },
+    { id: "yuzu_kosho",         image: yuzuKosho },
   ];
 
   const [selectedSauces, setSelectedSauces] = useState(order.sauces || []);
@@ -77,15 +77,22 @@ const SauceSelection = ({ onNext, onBack }) => {
       <div className={styles.grid}>
         {sauces.map((sauce) => {
           const name = getItemLabel("sauce", sauce.id, language);
+          const description = getItemDescription("sauce", sauce.id, language);
+          const isSelected = selectedSauces.includes(sauce.id);
+          const isUnavailable = unavailableItems.includes(sauce.id);
+          const isSelectionBlocked = isUnavailable && !isSelected;
           return (
           <button
             key={sauce.id}
             type="button"
             style={{ position: "relative" }}
             className={`${styles.card} ${
-              selectedSauces.includes(sauce.id) ? styles.selected : ""
+              isSelected ? styles.selected : ""
             }`}
-            onClick={() => !unavailableItems.includes(sauce.id) && toggleSauce(sauce.id)}
+            onClick={() => !isSelectionBlocked && toggleSauce(sauce.id)}
+            aria-pressed={isSelected}
+            aria-disabled={isSelectionBlocked}
+            disabled={isSelectionBlocked}
           >
             <div className={styles.imageWrap}>
               <img
@@ -98,14 +105,14 @@ const SauceSelection = ({ onNext, onBack }) => {
             </div>
 
             <p className={styles.name}>{name}</p>
-            {sauce.desc && <p className={styles.itemDesc}>{sauce.desc}</p>}
-            {unavailableItems.includes(sauce.id) && (
+            {description && <p className={styles.itemDesc}>{description}</p>}
+            {isUnavailable && (
               <div style={{
                 position: "absolute", inset: 0, display: "flex",
                 alignItems: "center", justifyContent: "center",
                 background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
               }}>
-                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>{t("order.soldOut")}</span>
               </div>
             )}
           </button>
@@ -121,12 +128,12 @@ const SauceSelection = ({ onNext, onBack }) => {
 
       <div className={styles.actions}>
         <button className={styles.backButton} type="button" onClick={onBack}>
-          ← Atrás
+          ← {t("order.back")}
         </button>
         <div className={styles.rightActions}>
           {selectedSauces.length === 0 && (
             <button className={styles.skipBtn} type="button" onClick={onNext}>
-              Omitir
+              {t("order.skip")}
             </button>
           )}
           <button className={styles.nextButton} onClick={handleNext}>

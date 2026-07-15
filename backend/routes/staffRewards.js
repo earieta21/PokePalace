@@ -4,10 +4,9 @@ import { createSocialStoryReward, lookupRedemption } from "../controllers/staffR
 
 const router = express.Router();
 
-const anyStaff = requireStaffAuth([]);
 const campaignStaff = requireStaffAuth(["cashier", "manager", "admin", "owner"]);
 
 router.post ("/social-story", campaignStaff, createSocialStoryReward);
-router.get  ("/:code",        anyStaff, lookupRedemption);
+router.get  ("/:code",        campaignStaff, lookupRedemption);
 
 export default router;

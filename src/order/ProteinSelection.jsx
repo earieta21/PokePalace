@@ -87,6 +87,8 @@ const ProteinSelection = ({ onNext, onBack }) => {
         {proteins.map((protein) => {
           const selectedIndex = selectedProteins.indexOf(protein.id);
           const isSelected = selectedIndex >= 0;
+          const isUnavailable = unavailableItems.includes(protein.id);
+          const isSelectionBlocked = isUnavailable && !isSelected;
           const name = getItemLabel("protein", protein.id, language);
           return (
           <button
@@ -95,7 +97,10 @@ const ProteinSelection = ({ onNext, onBack }) => {
             className={`${styles.card} ${
               isSelected ? styles.selected : ""
             }`}
-            onClick={() => !unavailableItems.includes(protein.id) && handleSelection(protein.id)}
+            onClick={() => !isSelectionBlocked && handleSelection(protein.id)}
+            aria-pressed={isSelected}
+            aria-disabled={isSelectionBlocked}
+            disabled={isSelectionBlocked}
             style={{ position: "relative" }}
           >
             <div className={styles.imageWrap}>
@@ -112,13 +117,13 @@ const ProteinSelection = ({ onNext, onBack }) => {
             </div>
 
             <p className={styles.name}>{name}</p>
-            {unavailableItems.includes(protein.id) && (
+            {isUnavailable && (
               <div style={{
                 position: "absolute", inset: 0, display: "flex",
                 alignItems: "center", justifyContent: "center",
                 background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
               }}>
-                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>{t("order.soldOut")}</span>
               </div>
             )}
           </button>
@@ -134,7 +139,7 @@ const ProteinSelection = ({ onNext, onBack }) => {
 
       <div className={styles.actions}>
         <button className={styles.backButton} type="button" onClick={onBack}>
-          ← Atrás
+          ← {t("order.back")}
         </button>
         <button className={styles.nextButton} onClick={handleNext}>
           {t("order.next")}

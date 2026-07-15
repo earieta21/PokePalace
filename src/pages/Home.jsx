@@ -6,11 +6,10 @@ import { computeBowlSubtotal } from "../order/pricing";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./Home.module.css";
 
-// Usa imágenes reales tuyas si las tienes
-import bowl1 from "../assets/poke.webp";
-import bowl2 from "../assets/poke.webp";
-import bowl3 from "../assets/poke.webp";
-import bowl4 from "../assets/poke.webp";
+import salmonBowl from "../assets/salmon.webp";
+import spicyTuna from "../assets/protein/tuna.webp";
+import tropicalShrimp from "../assets/protein/shrimp.webp";
+import citrusOctopus from "../assets/protein/octopus.webp";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -21,25 +20,29 @@ const Home = () => {
       id: "signature_emerald",
       name: t("menu.emeraldSalmon"),
       price: computeBowlSubtotal("normal"),
-      image: bowl1,
+      image: salmonBowl,
+      orderUrl: "/order?preset=classic_salmon",
     },
     {
       id: "spicy_tuna_crunch",
       name: t("menu.spicyTuna"),
       price: computeBowlSubtotal("normal"),
-      image: bowl2,
+      image: spicyTuna,
+      orderUrl: "/order?preset=spicy_tuna",
     },
     {
       id: "tropical_shrimp",
       name: t("menu.tropicalShrimp"),
-      price: computeBowlSubtotal("large"),
-      image: bowl3,
+      price: computeBowlSubtotal("normal"),
+      image: tropicalShrimp,
+      orderUrl: "/order?preset=tropical_shrimp",
     },
     {
-      id: "zen_greens",
-      name: t("menu.zenGreens"),
+      id: "citrus_octopus",
+      name: t("menu.citrusOctopus"),
       price: computeBowlSubtotal("normal"),
-      image: bowl4,
+      image: citrusOctopus,
+      orderUrl: "/order?preset=citrus_octopus",
     },
   ];
 
@@ -59,7 +62,7 @@ const Home = () => {
         <h2 className={styles.title}>{t("home.popularTitle")}</h2>
         <p className={styles.subtitle}>{t("home.popularSubtitle")}</p>
 
-        <Menu items={menuItems} />
+        <Menu items={menuItems} onSelect={(item) => navigate(item.orderUrl)} />
 
         <div className={styles.menuCtaRow}>
           <button
@@ -70,7 +73,7 @@ const Home = () => {
           </button>
           <button
             className={styles.secondaryBtn}
-            onClick={() => navigate("/order")}
+            onClick={() => navigate("/rewards-deals")}
           >
             {t("home.specialBowls")}
           </button>

@@ -7,6 +7,7 @@ import { getRewardById } from "../config/rewardsCatalog.js";
 
 // Unambiguous charset — no 0/O, 1/I/L — easier for staff to read back a code.
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const CLIENT_REDEMPTION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,99}$/;
 function generateCode() {
   let code = "";
   for (let i = 0; i < 6; i++) {
@@ -16,68 +17,148 @@ function generateCode() {
 }
 
 export const redeemReward = async (req, res) => {
-  let deductedReward = null;
   try {
     const rewardId = Number(req.body.rewardId);
-    const reward = getRewardById(rewardId);
-    if (!reward) return res.status(400).json({ msg: "Premio inválido" });
+    const clientRedemptionId = String(req.body.clientRedemptionId || "").trim();
+    if (!Number.isInteger(rewardId) || !CLIENT_REDEMPTION_ID_RE.test(clientRedemptionId)) {
+      return res.status(400).json({ msg: "Solicitud de canje inválida" });
+    }
 
-    // Saldo inactivo (12+ meses sin ganar puntos) se resetea antes de dejar gastarlo
-    await expireStalePoints(req.userId);
+    const sendExisting = async (redemption, status = 200) => {
+      if (redemption.rewardId !== rewardId) {
+        return res.status(409).json({ msg: "Este identificador de canje ya fue utilizado" });
+      }
+      const user = await User.findById(req.userId).select("points");
+      return res.status(status).json({
+        redemption,
+        points: user?.points ?? 0,
+        idempotent: status === 200,
+      });
+    };
 
-    // Atomic check-and-deduct — same pattern as points redemption at checkout,
-    // so firing this twice at once can't spend the same points balance twice.
-    const updatedUser = await User.findOneAndUpdate(
-      { _id: req.userId, points: { $gte: reward.cost } },
-      { $inc: { points: -reward.cost } },
-      { new: true }
+    const existing = await Redemption.findOne({ user: req.userId, clientRedemptionId });
+    if (existing) return sendExisting(existing);
+
+    const findReservation = (user) => user?.rewardRedemptionLedger?.find(
+      (entry) => entry.clientRedemptionId === clientRedemptionId
     );
-    if (!updatedUser) return res.status(400).json({ msg: "No tienes suficientes puntos" });
-    deductedReward = reward;
 
-    const expiresAt = new Date(Date.now() + REDEMPTION_CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+    // A durable snapshot lets a retry finish even after a reload or a future
+    // catalog change. Existing reservations never deduct the balance again.
+    let ledgerUser = await User.findById(req.userId).select("points +rewardRedemptionLedger");
+    let reservation = findReservation(ledgerUser);
+
+    if (reservation && reservation.rewardId !== rewardId) {
+      return res.status(409).json({ msg: "Este identificador de canje ya fue utilizado" });
+    }
+
+    if (!reservation) {
+      const reward = getRewardById(rewardId);
+      // Social-story rewards are issued only by the verified staff/claim flow;
+      // they are not zero-cost loyalty rewards available through this route.
+      if (!reward || reward.source === "social_story") {
+        return res.status(400).json({ msg: "Premio inválido" });
+      }
+
+      // Saldo inactivo (12+ meses sin ganar puntos) se resetea antes de dejar gastarlo.
+      await expireStalePoints(req.userId);
+
+      const requestedReservation = {
+        clientRedemptionId,
+        rewardId,
+        rewardName: reward.name.es,
+        pointsCost: reward.cost,
+        expiresAt: new Date(Date.now() + REDEMPTION_CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      };
+
+      try {
+        ledgerUser = await User.findOneAndUpdate(
+          {
+            _id: req.userId,
+            points: { $gte: reward.cost },
+            "rewardRedemptionLedger.clientRedemptionId": { $ne: clientRedemptionId },
+          },
+          {
+            $inc: { points: -reward.cost },
+            $push: { rewardRedemptionLedger: requestedReservation },
+          },
+          { new: true }
+        ).select("points +rewardRedemptionLedger");
+      } catch (error) {
+        // Mongo may commit an update even if its acknowledgement is lost. Read
+        // the atomic marker before deciding whether this request must be retried.
+        ledgerUser = await User.findOne({
+          _id: req.userId,
+          "rewardRedemptionLedger.clientRedemptionId": clientRedemptionId,
+        }).select("points +rewardRedemptionLedger");
+        if (!ledgerUser) throw error;
+      }
+
+      if (!ledgerUser) {
+        ledgerUser = await User.findById(req.userId).select("points +rewardRedemptionLedger");
+        reservation = findReservation(ledgerUser);
+        if (!reservation) {
+          return res.status(400).json({ msg: "No tienes suficientes puntos" });
+        }
+      } else {
+        reservation = findReservation(ledgerUser);
+      }
+
+      if (!reservation || reservation.rewardId !== rewardId) {
+        return res.status(409).json({ msg: "Este identificador de canje ya fue utilizado" });
+      }
+    }
 
     let redemption = null;
+    let createdRedemption = false;
     for (let attempt = 0; attempt < 5 && !redemption; attempt++) {
       try {
         redemption = await Redemption.create({
           user: req.userId,
-          rewardId,
-          rewardName: reward.name.es,
-          pointsCost: reward.cost,
+          clientRedemptionId,
+          rewardId: reservation.rewardId,
+          rewardName: reservation.rewardName,
+          pointsCost: reservation.pointsCost,
           code: generateCode(),
-          expiresAt,
+          expiresAt: reservation.expiresAt,
         });
+        createdRedemption = true;
       } catch (err) {
-        if (err.code !== 11000) throw err; // retry only on code collision
+        // A duplicate can be either the random display code or this same
+        // client request racing/retrying. Recover the latter as success.
+        const recovered = await Redemption.findOne({ user: req.userId, clientRedemptionId });
+        if (recovered) {
+          redemption = recovered;
+          break;
+        }
+        if (err.code !== 11000) throw err; // retry only on display-code collision
       }
     }
     if (!redemption) {
-      // Extremely unlikely, but refund the points rather than lose them
-      await User.findByIdAndUpdate(req.userId, { $inc: { points: reward.cost } });
-      deductedReward = null;
-      return res.status(500).json({ msg: "No se pudo generar el código, intenta de nuevo" });
+      return res.status(503).json({
+        msg: "No se pudo terminar el canje. Intenta de nuevo; tus puntos no se cobrarán dos veces.",
+        retryable: true,
+      });
     }
 
-    deductedReward = null;
-    res.status(201).json({ redemption, points: updatedUser.points });
+    // This marker is informational. The permanent request entry is retained so
+    // a later retry can always prove that the points were already deducted.
+    User.updateOne(
+      {
+        _id: req.userId,
+        "rewardRedemptionLedger.clientRedemptionId": clientRedemptionId,
+      },
+      { $set: { "rewardRedemptionLedger.$.completedAt": new Date() } }
+    ).catch((error) => console.error("reward ledger completion marker failed:", error.message));
+
+    return sendExisting(redemption, createdRedemption ? 201 : 200);
   } catch (err) {
-    // Once points have been deducted, every failure before a redemption is
-    // returned must compensate the balance. This avoids charging a customer
-    // for a database/validation failure while generating the code.
-    if (deductedReward) {
-      try {
-        await User.findByIdAndUpdate(req.userId, { $inc: { points: deductedReward.cost } });
-      } catch (refundError) {
-        console.error("CRITICAL: reward points refund failed", {
-          userId: req.userId,
-          rewardId: deductedReward.id,
-          error: refundError.message,
-        });
-      }
-    }
     console.error("redeemReward error:", err.message);
-    res.status(500).json({ msg: "Error canjeando el premio" });
+    res.status(503).json({
+      msg: "No se pudo terminar el canje. Intenta de nuevo con el mismo botón.",
+      retryable: true,
+    });
   }
 };
 

@@ -3,13 +3,33 @@ import Expense from "../models/Expense.js";
 import Inventory from "../models/Inventory.js";
 import WasteLog from "../models/WasteLog.js";
 import ErrorLog from "../models/ErrorLog.js";
+import {
+  dateKeyInTimeZone,
+  zonedDateTimeToUtc,
+  zonedParts,
+} from "../utils/timeZone.js";
 
-/* El negocio opera en Tijuana (UTC-7). Las fechas se guardan en UTC, así que
-   desplazamos antes de agrupar por día/hora para que "el martes" sea el
-   martes real del local y no el de Greenwich. */
-const TJ_OFFSET_MS = 7 * 60 * 60 * 1000;
-const toTijuana   = (date) => new Date(date.getTime() - TJ_OFFSET_MS);
-const fromTijuana = (date) => new Date(date.getTime() + TJ_OFFSET_MS);
+/* Las fechas se guardan en UTC y se agrupan con America/Tijuana para respetar
+   tanto el día local como los cambios estacionales de huso horario. */
+const toTijuana = (date) => {
+  const parts = zonedParts(date);
+  return new Date(Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  ));
+};
+const fromTijuana = (date) => zonedDateTimeToUtc({
+  year: date.getUTCFullYear(),
+  month: date.getUTCMonth() + 1,
+  day: date.getUTCDate(),
+  hour: date.getUTCHours(),
+  minute: date.getUTCMinutes(),
+  second: date.getUTCSeconds(),
+});
 
 const DAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -22,7 +42,7 @@ function mondayOf(date) {
   return fromTijuana(monday);
 }
 
-const dateStr = (d) => toTijuana(d).toISOString().slice(0, 10);
+const dateStr = (d) => dateKeyInTimeZone(d);
 
 function salesMetrics(orders) {
   const valid = orders.filter((o) => o.status !== "cancelled");
@@ -40,7 +60,7 @@ export const getWeeklySummary = async (req, res) => {
   try {
     const now      = new Date();
     const weekFrom = mondayOf(now);
-    const prevFrom = new Date(weekFrom.getTime() - 7 * 86400000);
+    const prevFrom = mondayOf(new Date(weekFrom.getTime() - 86400000));
 
     const [orders, expenses, inventory, waste, errorLogs] = await Promise.all([
       Order.find({ createdAt: { $gte: prevFrom } }).lean(),

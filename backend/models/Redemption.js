@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const redemptionSchema = new mongoose.Schema(
   {
     user:        { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    clientRedemptionId: { type: String, trim: true, maxlength: 100, default: null },
     rewardId:    { type: Number, required: true },
     rewardName:  { type: String, required: true }, // snapshot at redemption time
     pointsCost:  { type: Number, required: true },
@@ -30,5 +31,12 @@ const redemptionSchema = new mongoose.Schema(
 );
 
 redemptionSchema.index({ order: 1 }, { unique: true, sparse: true });
+redemptionSchema.index(
+  { user: 1, clientRedemptionId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clientRedemptionId: { $type: "string" } },
+  }
+);
 
 export default mongoose.model("Redemption", redemptionSchema);

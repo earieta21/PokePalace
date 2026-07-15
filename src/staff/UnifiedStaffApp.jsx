@@ -13,6 +13,7 @@ import {
 import { StaffAuthContext } from "../context/StaffAuthContext";
 import { API_URL } from "../config";
 import { downloadCSV } from "../utils/csv";
+import { tijuanaDateKey } from "../utils/date";
 import RewardQrCode from "../components/RewardQrCode";
 
 // POS pages — unchanged, work via StaffAuthContext.Provider
@@ -29,7 +30,7 @@ import posStyles from "../pos/EmployeePortal.module.css";
    CONSTANTS
    ========================================================================== */
 const LOCATION_ID = "tij-centro-01";
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = () => tijuanaDateKey();
 
 // Ubicación GPS del dispositivo — el backend valida que esté dentro del
 // radio del restaurante antes de dejar marcar entrada/salida/lonche.
@@ -63,6 +64,18 @@ const COLOR_KEYS = Object.keys(COLORS);
 const getColor = (c) => COLORS[c] || COLORS.emerald;
 
 const ROLE_LABEL = { owner: "Dueño/a", manager: "Gerente", admin: "Admin", cashier: "Cajero/a", kitchen: "Cocina", employee: "Empleado/a" };
+const MANAGEABLE_ROLES = {
+  manager: ["employee", "cashier", "kitchen"],
+  admin: ["employee", "cashier", "kitchen", "manager"],
+  owner: ["employee", "cashier", "kitchen", "manager", "admin", "owner"],
+};
+const ASSIGNABLE_ROLES = {
+  manager: ["employee"],
+  admin: ["employee", "cashier", "kitchen", "manager"],
+  owner: ["employee", "cashier", "kitchen", "manager", "admin", "owner"],
+};
+const canManageEmployee = (actor, employee) =>
+  sid(actor?.id) !== sid(employee?._id) && Boolean(MANAGEABLE_ROLES[actor?.role]?.includes(employee?.role));
 
 const CHECKLISTS = {
   apertura: { label: "Apertura",  icon: LogIn,      color: "text-emerald-400", items: [
@@ -437,7 +450,7 @@ export default function UnifiedStaffApp() {
           {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
           {tab === "premios" && <RewardsRedeemTab token={token} />}
           {tab === "disponibilidad" && <AvailabilityTab token={token} role={me?.role} />}
-          {tab === "panel"   && <PanelTab employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} />}
+          {tab === "panel"   && <PanelTab actor={me} employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} />}
           {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "cocina"  && <KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "hist"    && <OrderHistoryPage styles={posStyles} />}
@@ -508,7 +521,7 @@ function PinLogin({ onLogin }) {
             ))}
             <div />
             <PinKey onClick={() => press("0")}>0</PinKey>
-            <PinKey subtle onClick={() => { setError(false); setPin((p) => p.slice(0, -1)); }}>
+            <PinKey ariaLabel="Borrar último dígito" subtle onClick={() => { setError(false); setPin((p) => p.slice(0, -1)); }}>
               <Delete className="w-5 h-5 mx-auto" />
             </PinKey>
           </div>
@@ -517,9 +530,9 @@ function PinLogin({ onLogin }) {
   );
 }
 
-function PinKey({ children, onClick, subtle }) {
+function PinKey({ children, onClick, subtle, ariaLabel }) {
   return (
-    <button onClick={onClick}
+    <button type="button" onClick={onClick} aria-label={ariaLabel}
       className={`h-16 rounded-2xl text-xl font-semibold transition-all active:scale-95 ${
         subtle ? "bg-slate-800 hover:bg-slate-700 text-slate-400" : "bg-slate-800 hover:bg-slate-700 text-white border border-white/5"
       }`}>
@@ -1295,7 +1308,7 @@ function AvailabilityTab({ token, role }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `pokepalace_respaldo_${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `pokepalace_respaldo_${todayKey()}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1506,7 +1519,7 @@ function AvailabilityTab({ token, role }) {
 /* ============================================================================
    PANEL — ASISTENCIA + EQUIPO
    ========================================================================== */
-function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee, onUpdateEmployee }) {
+function PanelTab({ actor, employees, time, now, onAddEmployee, onRemoveEmployee, onUpdateEmployee }) {
   const [view, setView] = useState("hoy");
   const empById = (id) => employees.find((e) => sid(e._id) === sid(id));
   const weekAgo = Date.now() - 7 * 86400000;
@@ -1617,15 +1630,15 @@ function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee, onUpd
       )}
 
       {view === "nomina" && (
-        <PayrollView hoursByEmp={hoursByEmp} totalPayroll={totalPayroll} onUpdate={onUpdateEmployee} />
+        <PayrollView actor={actor} hoursByEmp={hoursByEmp} totalPayroll={totalPayroll} onUpdate={onUpdateEmployee} />
       )}
 
-      {view === "equipo" && <TeamManager employees={employees} onAdd={onAddEmployee} onRemove={onRemoveEmployee} onUpdate={onUpdateEmployee} />}
+      {view === "equipo" && <TeamManager actor={actor} employees={employees} onAdd={onAddEmployee} onRemove={onRemoveEmployee} />}
     </div>
   );
 }
 
-function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
+function PayrollView({ actor, hoursByEmp, totalPayroll, onUpdate }) {
   const [editId, setEditId]     = useState(null);
   const [editType, setEditType] = useState("hourly");
   const [editRate, setEditRate] = useState("");
@@ -1771,10 +1784,12 @@ function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
                         <p className="text-xs text-slate-500 italic">Sin tarifa</p>
                       )}
                     </div>
-                    <button onClick={() => startEdit(emp)}
-                      className="text-[10px] text-slate-500 hover:text-emerald-400 bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg transition">
-                      Editar
-                    </button>
+                    {canManageEmployee(actor, emp) && (
+                      <button onClick={() => startEdit(emp)}
+                        className="text-[10px] text-slate-500 hover:text-emerald-400 bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg transition">
+                        Editar
+                      </button>
+                    )}
                   </div>
                 </>
               )}
@@ -1787,7 +1802,7 @@ function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
   );
 }
 
-function TeamManager({ employees, onAdd, onRemove }) {
+function TeamManager({ actor, employees, onAdd, onRemove }) {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: "", role: "employee", pin: "", color: "emerald", hourlyRate: "" });
   const [error, setError] = useState("");
@@ -1832,13 +1847,14 @@ function TeamManager({ employees, onAdd, onRemove }) {
                 <p className={`text-xs ${col.text}`}>{ROLE_LABEL[e.role]||e.role}</p>
                 {e.hourlyRate > 0 && <p className="text-[10px] text-slate-500 mt-0.5">${e.hourlyRate}/hr</p>}
               </div>
-              {confirmId === sid(e._id)
-                ? <div className="flex gap-1 shrink-0">
-                    <button onClick={() => setConfirmId(null)} className="text-xs px-2 py-1.5 rounded-lg bg-slate-700 text-slate-300">No</button>
-                    <button onClick={() => { onRemove(e._id); setConfirmId(null); }} className="text-xs px-2 py-1.5 rounded-lg bg-rose-500 text-white font-semibold">Eliminar</button>
-                  </div>
-                : <button onClick={() => setConfirmId(sid(e._id))} className="text-slate-600 hover:text-rose-400 transition shrink-0"><Trash2 className="w-4 h-4" /></button>
-              }
+              {canManageEmployee(actor, e) && (
+                confirmId === sid(e._id)
+                  ? <div className="flex gap-1 shrink-0">
+                      <button onClick={() => setConfirmId(null)} className="text-xs px-2 py-1.5 rounded-lg bg-slate-700 text-slate-300">No</button>
+                      <button onClick={() => { onRemove(e._id); setConfirmId(null); }} className="text-xs px-2 py-1.5 rounded-lg bg-rose-500 text-white font-semibold">Eliminar</button>
+                    </div>
+                  : <button onClick={() => setConfirmId(sid(e._id))} className="text-slate-600 hover:text-rose-400 transition shrink-0"><Trash2 className="w-4 h-4" /></button>
+              )}
             </div>
           );
         })}
@@ -1852,11 +1868,9 @@ function TeamManager({ employees, onAdd, onRemove }) {
           <div className="grid grid-cols-2 gap-2">
             <select value={form.role} onChange={(e) => setForm({...form, role:e.target.value})}
               className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
-              <option value="employee">Empleado/a</option>
-              <option value="cashier">Cajero/a</option>
-              <option value="kitchen">Cocina</option>
-              <option value="manager">Gerente</option>
-              <option value="owner">Dueño/a · Socio</option>
+              {(ASSIGNABLE_ROLES[actor?.role] || []).map((role) => (
+                <option key={role} value={role}>{ROLE_LABEL[role] || role}</option>
+              ))}
             </select>
             <input value={form.pin} inputMode="numeric" placeholder="PIN (4 dígitos)"
               onChange={(e) => setForm({...form, pin:e.target.value.replace(/\D/g,"").slice(0,4)})}

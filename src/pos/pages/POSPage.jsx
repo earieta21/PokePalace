@@ -1,9 +1,16 @@
-import { useState, useContext, useEffect, useCallback } from "react";
+import { useState, useContext, useEffect, useCallback, useRef } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
-import { queueOrder, flushQueuedOrders, isNetworkError, getQueuedOrders } from "../offlineQueue";
+import {
+  createClientOrderId,
+  queueOrder,
+  flushQueuedOrders,
+  isNetworkError,
+  getQueuedOrders,
+} from "../offlineQueue";
 import CustomBowlBuilder from "../CustomBowlBuilder";
 import { getRewardById } from "../../data/rewardsCatalog.js";
+import { TOPPING_LABELS } from "../../order/OrderLabels.jsx";
 import ui from "./POSPage.module.css";
 
 const CUSTOM_BOWL_ID = "custom-bowl";
@@ -30,6 +37,7 @@ const IVA = 0; // IVA incluido en precio
 export default function POSPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
   const api = createStaffApi(staffToken);
+  const pendingSaleRef = useRef(null);
 
   const [cart, setCart]         = useState([]);
   const [cliente, setCliente]   = useState("");
@@ -44,6 +52,7 @@ export default function POSPage({ styles }) {
   const [mode, setMode] = useState("menu"); // "menu" | "bowl"
   const [rewardCode, setRewardCode] = useState("");
   const [reward, setReward] = useState(null);
+  const [rewardTopping, setRewardTopping] = useState("");
   const [rewardLoading, setRewardLoading] = useState(false);
   const [menuCategory, setMenuCategory] = useState("Todos");
   const [menuSearch, setMenuSearch] = useState("");
@@ -59,6 +68,7 @@ export default function POSPage({ styles }) {
     if (getQueuedOrders().length === 0) return;
     const sent = await flushQueuedOrders(api, {
       onSuccess: () => setQueuedCount(getQueuedOrders().length),
+      onError: (_entry, err) => setError(`No se pudo reenviar una orden pendiente: ${err.message}`),
     });
     if (sent > 0) setQueuedCount(getQueuedOrders().length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,6 +106,7 @@ export default function POSPage({ styles }) {
   };
 
   const clearOrder = () => {
+    pendingSaleRef.current = null;
     setCart([]);
     setCliente("");
     setPhone("");
@@ -104,6 +115,7 @@ export default function POSPage({ styles }) {
     setPaymentMethod("card_terminal");
     setRewardCode("");
     setReward(null);
+    setRewardTopping("");
     setShowCustomerDetails(false);
     setShowReward(false);
     setRewardsCustomer(null);
@@ -193,7 +205,7 @@ export default function POSPage({ styles }) {
   const lookupReward = async () => {
     const clean = rewardCode.trim().toUpperCase();
     if (!clean || rewardLoading) return;
-    setRewardLoading(true); setError(""); setReward(null);
+    setRewardLoading(true); setError(""); setReward(null); setRewardTopping("");
     try {
       const data = await api.get(`/api/staff/rewards/${clean}`);
       if (data.redemption?.status !== "active") throw new Error("El código no está activo");
@@ -209,19 +221,25 @@ export default function POSPage({ styles }) {
 
   const handleCobrar = async () => {
     if (cart.length === 0 || saving) return;
+    if (reward?.type === "extra_topping" && !rewardTopping) {
+      setError("Selecciona el topping extra elegido por el cliente.");
+      return;
+    }
     setSaving(true); setError("");
 
     const customBowl = cart.find((i) => i.id === CUSTOM_BOWL_ID);
     const regularItems = cart.filter((i) => i.id !== CUSTOM_BOWL_ID);
 
-    const payload = {
-      items: regularItems.map(({ name, price, qty }) => ({ name, price, qty })),
+    const nextPayload = {
+      clientOrderId: createClientOrderId(),
+      items: regularItems.map(({ id, qty }) => ({ id, qty })),
       customer: cliente.trim() || "Mostrador",
       phone: phone.trim(),
       notes: notes.trim(),
       fulfillment,
       paymentMethod,
       rewardCode: reward?.code || null,
+      rewardTopping: reward?.type === "extra_topping" ? rewardTopping : null,
       customerUserId: rewardsCustomer?._id || null,
       ...(customBowl && {
         base: customBowl.bowl.base,
@@ -233,6 +251,8 @@ export default function POSPage({ styles }) {
         toppings: customBowl.bowl.toppings,
       }),
     };
+    const payload = pendingSaleRef.current || nextPayload;
+    pendingSaleRef.current = payload;
 
     try {
       const data = await api.post("/api/staff/orders", payload);
@@ -242,13 +262,16 @@ export default function POSPage({ styles }) {
           ? " · Los puntos se acreditarán al registrar el pago"
           : "";
       setSuccess(`Orden enviada — $${data.order.total.toLocaleString("es-MX")} MXN${pointsMessage}`);
+      pendingSaleRef.current = null;
     } catch (e) {
-      if (isNetworkError(e) && !reward) {
+      if (isNetworkError(e)) {
         queueOrder(payload);
+        pendingSaleRef.current = null;
         setQueuedCount(getQueuedOrders().length);
         const queuedRewards = rewardsCustomer ? " Los puntos se acreditarán cuando vuelva la conexión." : "";
         setSuccess(`Sin conexión — orden guardada y se enviará sola ($${total.toLocaleString("es-MX")} MXN).${queuedRewards}`);
       } else {
+        if (!e.retryable && !e.orderId) pendingSaleRef.current = null;
         setError(e.message);
         setSaving(false);
         return;
@@ -263,6 +286,7 @@ export default function POSPage({ styles }) {
     setPaymentMethod("card_terminal");
     setRewardCode("");
     setReward(null);
+    setRewardTopping("");
     setShowCustomerDetails(false);
     setShowReward(false);
     setRewardsCustomer(null);
@@ -362,7 +386,7 @@ export default function POSPage({ styles }) {
         {queuedCount > 0 && (
           <div className={ui.offlineNotice}>
             <span>
-              ⚠ {queuedCount} orden{queuedCount !== 1 ? "es" : ""} sin enviar (sin conexión)
+              ⚠ {queuedCount} orden{queuedCount !== 1 ? "es" : ""} pendiente{queuedCount !== 1 ? "s" : ""} de enviar
             </span>
             <button type="button" onClick={tryFlushQueue}>
               Reintentar
@@ -488,10 +512,26 @@ export default function POSPage({ styles }) {
           {showReward && (
             <div className={ui.rewardArea}>
               <div>
-                <input className={styles.input} value={rewardCode} onChange={(e) => { setRewardCode(e.target.value.toUpperCase()); setReward(null); }} placeholder="Código" maxLength={6} />
+                <input className={styles.input} value={rewardCode} onChange={(e) => { setRewardCode(e.target.value.toUpperCase()); setReward(null); setRewardTopping(""); }} placeholder="Código" maxLength={6} />
                 <button type="button" className={styles.btnGhost} onClick={lookupReward} disabled={!rewardCode.trim() || rewardLoading}>{rewardLoading ? "Buscando…" : "Aplicar"}</button>
               </div>
               {reward && <div className={ui.rewardSuccess}><strong>{reward.name.es}</strong><span>{reward.terms.es}</span></div>}
+              {reward?.type === "extra_topping" && (
+                <label>
+                  <span>Elige el topping extra</span>
+                  <select
+                    className={styles.input}
+                    value={rewardTopping}
+                    onChange={(event) => { setRewardTopping(event.target.value); setError(""); }}
+                    required
+                  >
+                    <option value="">Seleccionar topping…</option>
+                    {Object.entries(TOPPING_LABELS).map(([id, label]) => (
+                      <option key={id} value={id}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
           )}
 
@@ -503,7 +543,7 @@ export default function POSPage({ styles }) {
           </div>
 
           <div className={ui.checkoutStep}><span>Paso 3</span><strong>Confirma y cobra</strong></div>
-          <button className={ui.chargeButton} onClick={handleCobrar} disabled={cart.length === 0 || saving} type="button">
+          <button className={ui.chargeButton} onClick={handleCobrar} disabled={cart.length === 0 || saving || (reward?.type === "extra_topping" && !rewardTopping)} type="button">
             {saving ? "Enviando orden…" : cart.length === 0 ? "Agrega productos para cobrar" : `Cobrar $${total.toLocaleString("es-MX")} MXN`}
           </button>
         </div>

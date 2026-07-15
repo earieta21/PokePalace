@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
-import { getItemLabel } from "./OrderLabels";
+import { getItemDescription, getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./ToppingsSelection.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
@@ -22,14 +22,14 @@ const ToppingsSelection = ({ onNext, onBack }) => {
   const { unavailableItems } = useAvailability();
 
   const toppings = [
-    { id: "sesame_seeds",      image: ajonjoli,      desc: "Ajonjolí tostado, crujiente" },
-    { id: "crispy_onions",     image: onions,        desc: "Cebolla frita en hojuelas" },
-    { id: "nori_strips",       image: algaNori,      desc: "Alga seca japonesa en tiras" },
-    { id: "red_pepper_flakes", image: pimientaRoja,  desc: "Pimiento rojo seco y picante" },
-    { id: "pickled_radish",    image: rabanos,       desc: "Rábano en vinagre, ligeramente ácido" },
-    { id: "toasted_coconut",   image: cocoTostado,   desc: "Coco tostado, toque dulce tropical" },
-    { id: "pumpkin_seeds",     image: pumpkingSeeds, desc: "Pepitas tostadas y saladas" },
-    { id: "furikake",          image: furikake,      desc: "Mezcla japonesa: alga, sésamo y umami" },
+    { id: "sesame_seeds",      image: ajonjoli },
+    { id: "crispy_onions",     image: onions },
+    { id: "nori_strips",       image: algaNori },
+    { id: "red_pepper_flakes", image: pimientaRoja },
+    { id: "pickled_radish",    image: rabanos },
+    { id: "toasted_coconut",   image: cocoTostado },
+    { id: "pumpkin_seeds",     image: pumpkingSeeds },
+    { id: "furikake",          image: furikake },
   ];
 
   const [selectedToppings, setSelectedToppings] = useState(
@@ -75,15 +75,22 @@ const ToppingsSelection = ({ onNext, onBack }) => {
       <div className={styles.grid}>
         {toppings.map((topping) => {
           const name = getItemLabel("topping", topping.id, language);
+          const description = getItemDescription("topping", topping.id, language);
+          const isSelected = selectedToppings.includes(topping.id);
+          const isUnavailable = unavailableItems.includes(topping.id);
+          const isSelectionBlocked = isUnavailable && !isSelected;
           return (
           <button
             key={topping.id}
             type="button"
             style={{ position: "relative" }}
             className={`${styles.card} ${
-              selectedToppings.includes(topping.id) ? styles.selected : ""
+              isSelected ? styles.selected : ""
             }`}
-            onClick={() => !unavailableItems.includes(topping.id) && toggleTopping(topping.id)}
+            onClick={() => !isSelectionBlocked && toggleTopping(topping.id)}
+            aria-pressed={isSelected}
+            aria-disabled={isSelectionBlocked}
+            disabled={isSelectionBlocked}
           >
             <div className={styles.imageWrap}>
               <img
@@ -96,14 +103,14 @@ const ToppingsSelection = ({ onNext, onBack }) => {
             </div>
 
             <p className={styles.name}>{name}</p>
-            {topping.desc && <p className={styles.itemDesc}>{topping.desc}</p>}
-            {unavailableItems.includes(topping.id) && (
+            {description && <p className={styles.itemDesc}>{description}</p>}
+            {isUnavailable && (
               <div style={{
                 position: "absolute", inset: 0, display: "flex",
                 alignItems: "center", justifyContent: "center",
                 background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
               }}>
-                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>Agotado</span>
+                <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>{t("order.soldOut")}</span>
               </div>
             )}
           </button>
@@ -119,12 +126,12 @@ const ToppingsSelection = ({ onNext, onBack }) => {
 
       <div className={styles.actions}>
         <button className={styles.backButton} type="button" onClick={onBack}>
-          ← Atrás
+          ← {t("order.back")}
         </button>
         <div className={styles.rightActions}>
           {selectedToppings.length === 0 && (
             <button className={styles.skipBtn} type="button" onClick={onNext}>
-              Omitir
+              {t("order.skip")}
             </button>
           )}
           <button className={styles.nextButton} onClick={handleNext}>

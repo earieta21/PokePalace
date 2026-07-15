@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { downloadCSV } from "../../utils/csv";
+import { tijuanaDateKey } from "../../utils/date";
 import ui from "./InventoryPage.module.css";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -119,6 +120,7 @@ export default function InventoryPage({ styles }) {
   const [receiveSearch, setReceiveSearch] = useState("");
   const [receiveQty, setReceiveQty]       = useState({}); // { itemId: "3.5" }
   const [receiveSaving, setReceiveSaving] = useState(false);
+  const [receiveRequestId, setReceiveRequestId] = useState("");
 
   const load = () => {
     setLoading(true);
@@ -194,6 +196,7 @@ export default function InventoryPage({ styles }) {
     setReceiving(false);
     setReceiveQty({});
     setReceiveSearch("");
+    setReceiveRequestId("");
   };
 
   /* ── Add new item ── */
@@ -322,11 +325,18 @@ export default function InventoryPage({ styles }) {
       }, {})
   );
 
-  const bumpReceive = (id, delta) =>
-    setReceiveQty((p) => ({
-      ...p,
-      [id]: String(Math.max(0, (parseFloat(p[id]) || 0) + delta)),
+  const updateReceiveQty = (id, value) => {
+    setReceiveRequestId("");
+    setReceiveQty((previous) => ({ ...previous, [id]: value }));
+  };
+
+  const bumpReceive = (id, delta) => {
+    setReceiveRequestId("");
+    setReceiveQty((previous) => ({
+      ...previous,
+      [id]: String(Math.max(0, (parseFloat(previous[id]) || 0) + delta)),
     }));
+  };
 
   const submitReceiving = async () => {
     const entries = Object.entries(receiveQty).filter(([, v]) => parseFloat(v) > 0);
@@ -334,22 +344,24 @@ export default function InventoryPage({ styles }) {
     setReceiveSaving(true);
     setError("");
     try {
-      const results = await Promise.all(
-        entries.map(([id, v]) =>
-          api.patch(`/api/staff/inventory/${id}/restock`, { amount: parseFloat(v) })
-        )
-      );
+      const requestId = receiveRequestId || `receipt-${Date.now()}-${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`;
+      if (!receiveRequestId) setReceiveRequestId(requestId);
+      const result = await api.post("/api/staff/inventory/restock-batch", {
+        requestId,
+        lines: entries.map(([itemId, value]) => ({ itemId, amount: parseFloat(value) })),
+      });
       setItems((prev) => {
         const map = new Map(prev.map((i) => [i._id, i]));
-        results.forEach(({ item }) => map.set(item._id, item));
+        result.items.forEach((item) => map.set(item._id, item));
         return [...map.values()];
       });
-      const spent = results.reduce((sum, r) => sum + (r.expense?.amount || 0), 0);
+      const spent = result.expenses.reduce((sum, expense) => sum + (expense?.amount || 0), 0);
       setReceiveQty({});
       setReceiveSearch("");
+      setReceiveRequestId("");
       setReceiving(false);
       setNotice(
-        `Recepción guardada: ${results.length} artículo${results.length !== 1 ? "s" : ""} actualizado${results.length !== 1 ? "s" : ""}.` +
+        `Recepción guardada: ${result.items.length} artículo${result.items.length !== 1 ? "s" : ""} actualizado${result.items.length !== 1 ? "s" : ""}.` +
         (spent > 0 ? ` Se registraron $${spent.toLocaleString("es-MX")} de gastos en Finanzas.` : "")
       );
     } catch (err) {
@@ -368,7 +380,7 @@ export default function InventoryPage({ styles }) {
       const statusLabel = STATUS_CFG[statusOf(i)].label;
       rows.push([i.item, sectionOf(i), categoryOf(i), i.qty, i.unit, i.minQty ?? 0, i.cost ?? 0, ((Number(i.qty) || 0) * (Number(i.cost) || 0)).toFixed(2), i.supplier || "", statusLabel]);
     });
-    downloadCSV(`inventario_${new Date().toISOString().slice(0, 10)}.csv`, rows);
+    downloadCSV(`inventario_${tijuanaDateKey()}.csv`, rows);
   }
 
   return (
@@ -491,7 +503,7 @@ export default function InventoryPage({ styles }) {
                             <input
                               type="number" min="0" step="0.01" placeholder="0"
                               value={val}
-                              onChange={(e) => setReceiveQty((p) => ({ ...p, [row._id]: e.target.value }))}
+                              onChange={(e) => updateReceiveQty(row._id, e.target.value)}
                               className={ui.receiveInput}
                               aria-label={`Cantidad recibida de ${row.item}`}
                             />

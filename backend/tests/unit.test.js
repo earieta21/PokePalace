@@ -23,11 +23,20 @@ test("promo de porcentaje descuenta sobre el subtotal", () => {
   const { discount, total } = computePricing("normal", { discountType: "percent", discountValue: 10 });
   const round2 = (n) => Math.round(n * 100) / 100;
   assert.equal(discount, round2(BOWL_BASE_PRICE * 0.10));
-  assert.equal(total, round2(BOWL_BASE_PRICE - discount)); // evita 224.10000000000002
+  assert.equal(total, round2(BOWL_BASE_PRICE - discount));
 });
 
 test("promo fija nunca descuenta mas que el subtotal", () => {
   const { discount, total } = computePricing("normal", { discountType: "fixed", discountValue: 99999 });
+  assert.equal(discount, BOWL_BASE_PRICE);
+  assert.equal(total, 0);
+});
+
+test("promo porcentual defensiva nunca supera el 100 por ciento", () => {
+  const { discount, total } = computePricing("normal", {
+    discountType: "percent",
+    discountValue: 250,
+  });
   assert.equal(discount, BOWL_BASE_PRICE);
   assert.equal(total, 0);
 });
@@ -52,7 +61,7 @@ test("la distancia Haversine es simetrica y positiva", () => {
   const d1 = distanceMeters(32.4558, -116.9193, 32.5327, -117.0182);
   const d2 = distanceMeters(32.5327, -117.0182, 32.4558, -116.9193);
   assert.ok(Math.abs(d1 - d2) < 0.001);
-  assert.ok(d1 > 5000 && d1 < 20000); // ~12-13 km reales
+  assert.ok(d1 > 5000 && d1 < 20000);
 });
 
 /* ── PINs del staff ── */
@@ -68,7 +77,7 @@ test("solo 4 digitos exactos son un PIN valido", () => {
 test("un PIN hasheado se verifica y uno incorrecto se rechaza", async () => {
   process.env.PIN_PEPPER = process.env.PIN_PEPPER || "pepper-de-prueba";
   const hash = await hashPin("4821");
-  assert.notEqual(hash, "4821"); // nunca en texto plano
+  assert.notEqual(hash, "4821");
   assert.equal(await comparePin("4821", hash), true);
   assert.equal(await comparePin("0000", hash), false);
 });

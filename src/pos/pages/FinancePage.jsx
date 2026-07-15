@@ -2,6 +2,7 @@ import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { downloadCSV } from "../../utils/csv";
+import { tijuanaDateKey } from "../../utils/date";
 import ui from "./FinancePage.module.css";
 
 const CATEGORIES = [
@@ -43,7 +44,7 @@ function getRange(period) {
 }
 
 const fmtMXN = (n) => `$${(n ?? 0).toLocaleString("es-MX")}`;
-const today  = () => new Date().toISOString().slice(0, 10);
+const today  = () => tijuanaDateKey();
 
 export default function FinancePage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
