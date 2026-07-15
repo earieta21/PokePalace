@@ -15,8 +15,8 @@ const router = express.Router();
 const anyStaff   = requireStaffAuth([]);
 const managerOnly = requireStaffAuth(["owner", "manager", "admin"]);
 
-// Employees
-router.get   ("/employees",      getKioskEmployees);
+// Employees — nunca exponer nombres antes de autenticar al personal.
+router.get   ("/employees",      anyStaff, getKioskEmployees);
 router.get   ("/employees/manage", managerOnly, getManagedKioskEmployees);
 router.post  ("/employees",      managerOnly, createKioskEmployee);
 router.patch ("/employees/:id",  managerOnly, updateKioskEmployee);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Clock, LogIn, LogOut, CheckSquare, Thermometer, Calendar, Megaphone,
-  TrendingUp, ChevronLeft, Delete, Plus, AlertTriangle, Snowflake,
+  TrendingUp, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
   ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard,
@@ -145,7 +145,6 @@ const TAB_META = {
    UNIFIED STAFF APP
    ========================================================================== */
 export default function UnifiedStaffApp() {
-  const [loadingEmps, setLoadingEmps] = useState(true);
   const [employees, setEmployees] = useState([]);
 
   // Auth state (token in memory only — shared tablet)
@@ -164,14 +163,6 @@ export default function UnifiedStaffApp() {
   const [lowStockCount, setLowStockCount] = useState(0);
   const [clockError, setClockError] = useState("");
   const [clockBusy, setClockBusy] = useState(false);
-
-  // Load employee list for login screen
-  useEffect(() => {
-    fetch(`${API_URL}/api/kiosk/employees?locationId=${LOCATION_ID}`)
-      .then((r) => r.json())
-      .then((d) => { setEmployees(d.employees || []); setLoadingEmps(false); })
-      .catch(() => setLoadingEmps(false));
-  }, []);
 
   // Load low-stock count after login (for badge on Inventario tab)
   useEffect(() => {
@@ -251,15 +242,17 @@ export default function UnifiedStaffApp() {
     const { token: t, user } = await r.json();
     setToken(t);
     setMe(user);
-    if (user.isManager) {
-      const managed = await fetch(
-        `${API_URL}/api/kiosk/employees/manage?locationId=${LOCATION_ID}`,
+    const employeePath = user.isManager ? "/api/kiosk/employees/manage" : "/api/kiosk/employees";
+    try {
+      const employeeResponse = await fetch(
+        `${API_URL}${employeePath}?locationId=${LOCATION_ID}`,
         { headers: { Authorization: `Bearer ${t}` } }
       );
-      if (managed.ok) {
-        const data = await managed.json();
-        setEmployees(data.employees || []);
-      }
+      if (!employeeResponse.ok) throw new Error("No se pudo cargar el personal");
+      const data = await employeeResponse.json();
+      setEmployees(data.employees || []);
+    } catch {
+      setEmployees([{ _id: user.id, name: user.name, role: user.role, color: user.color }]);
     }
     const tabs = TABS_BY_ROLE[user.role] || TABS_BY_ROLE.employee;
     setTab(tabs[0]);
@@ -267,7 +260,7 @@ export default function UnifiedStaffApp() {
 
   function handleLogout() {
     setToken(null); setMe(null); setTab(null); setLowStockCount(0);
-    setEmployees((current) => current.map(({ _id, name, color }) => ({ _id, name, color })));
+    setEmployees([]);
     setTime([]); setChecklist({}); setTemps([]); setSchedule({}); setAnnouncements([]);
   }
 
@@ -394,18 +387,7 @@ export default function UnifiedStaffApp() {
     setEmployees((p) => p.filter((e) => sid(e._id) !== sid(id)));
   }
 
-  if (loadingEmps) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950">
-      <div className="text-center">
-        <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4 animate-pulse">
-          <Leaf className="w-8 h-8 text-emerald-400" />
-        </div>
-        <p className="text-slate-400 text-sm tracking-widest uppercase">Cargando…</p>
-      </div>
-    </div>
-  );
-
-  if (!me) return <PinLogin employees={employees} onLogin={handleLogin} />;
+  if (!me) return <PinLogin onLogin={handleLogin} />;
 
   const isPOSTab = tab === "pos" || tab === "cocina";
 
@@ -475,8 +457,7 @@ export default function UnifiedStaffApp() {
 /* ============================================================================
    PIN LOGIN
    ========================================================================== */
-function PinLogin({ employees, onLogin }) {
-  const [selected, setSelected] = useState(null);
+function PinLogin({ onLogin }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -506,44 +487,17 @@ function PinLogin({ employees, onLogin }) {
         </div>
       </div>
 
-      {!selected ? (
-        <div className="flex-1 px-5 max-w-2xl mx-auto w-full">
-          <p className="text-slate-400 text-sm mb-5 text-center">Selecciona tu nombre para continuar</p>
-          <div className="grid grid-cols-2 gap-3">
-            {employees.map((e) => {
-              const col = getColor(e.color);
-              return (
-                <button key={sid(e._id)} onClick={() => { setSelected(e); setPin(""); setError(false); }}
-                  className="group relative overflow-hidden flex items-center gap-4 bg-slate-900 hover:bg-slate-800 border border-white/5 hover:border-white/10 rounded-2xl p-4 text-left transition-all hover:scale-[1.02] active:scale-[0.98]">
-                  <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity ${col.light}`} />
-                  <div className={`relative w-14 h-14 rounded-xl ${col.bg} flex items-center justify-center font-bold text-white text-lg shadow-lg shrink-0`}>
-                    {initials(e.name)}
-                  </div>
-                  <div className="relative min-w-0">
-                    <p className="font-semibold text-white truncate">{e.name}</p>
-                    <p className={`text-xs mt-0.5 ${col.text}`}>Personal</p>
-                  </div>
-                </button>
-              );
-            })}
+      <div className="flex-1 px-6 max-w-xs mx-auto w-full flex flex-col items-center">
+          <div className="w-20 h-20 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mb-4 shadow-xl shadow-emerald-950/30">
+            <ShieldCheck className="w-9 h-9 text-emerald-400" />
           </div>
-        </div>
-      ) : (
-        <div className="flex-1 px-6 max-w-xs mx-auto w-full flex flex-col items-center">
-          <button onClick={() => { setSelected(null); setPin(""); setError(false); setBusy(false); }}
-            className="self-start flex items-center gap-1 text-slate-400 hover:text-white text-sm mb-6 transition">
-            <ChevronLeft className="w-4 h-4" /> Volver
-          </button>
-          <div className={`w-20 h-20 rounded-2xl ${getColor(selected.color).bg} flex items-center justify-center font-bold text-white text-2xl mb-3 shadow-xl`}>
-            {initials(selected.name)}
-          </div>
-          <p className="font-bold text-lg text-white mb-0.5">{selected.name}</p>
-          <p className={`text-xs mb-5 ${getColor(selected.color).text}`}>Personal</p>
+          <p className="font-bold text-lg text-white mb-1">Acceso privado</p>
+          <p className="text-xs text-slate-400 mb-6 text-center">Ingresa tu PIN de 4 dígitos. Tu nombre aparecerá después de verificarlo.</p>
           <div className="flex gap-4 mb-8">
             {[0,1,2,3].map((i) => (
               <div key={i} className={`w-5 h-5 rounded-full border-2 transition-all duration-150 ${
                 error ? "bg-rose-500 border-rose-500 scale-110"
-                : pin.length > i ? `${getColor(selected.color).bg} border-transparent scale-110`
+                : pin.length > i ? "bg-emerald-500 border-transparent scale-110"
                 : "border-slate-600"}`} />
             ))}
           </div>
@@ -558,8 +512,7 @@ function PinLogin({ employees, onLogin }) {
               <Delete className="w-5 h-5 mx-auto" />
             </PinKey>
           </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
