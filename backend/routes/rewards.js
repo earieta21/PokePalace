@@ -1,7 +1,7 @@
 import express from "express";
 import { protect } from "../middleware/authMiddleware.js";
 import { rateLimit } from "../middleware/rateLimit.js";
-import { redeemReward, getMyRedemptions } from "../controllers/rewardsController.js";
+import { claimSocialStoryReward, redeemReward, getMyRedemptions } from "../controllers/rewardsController.js";
 
 const router = express.Router();
 
@@ -13,6 +13,8 @@ const redeemLimiter = rateLimit({
 });
 
 router.post("/redeem", protect, redeemLimiter, redeemReward);
+router.post("/claim", protect, redeemLimiter, claimSocialStoryReward);
 router.get("/mine", protect, getMyRedemptions);
 
 export default router;
+

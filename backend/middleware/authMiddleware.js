@@ -12,6 +12,9 @@ export const protect = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded?.id || decoded.type === "staff") {
+      return res.status(401).json({ msg: "Token de cliente inválido" });
+    }
     req.userId = decoded.id; // 👈 lo usamos para ligar órdenes al usuario
     next();
   } catch {
@@ -26,6 +29,9 @@ export const optionalAuth = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded?.id || decoded.type === "staff") {
+      return res.status(401).json({ msg: "Token de cliente inválido" });
+    }
     req.userId = decoded.id;
   } catch {
     return res.status(401).json({ msg: "Token inválido" });
@@ -33,3 +39,4 @@ export const optionalAuth = (req, res, next) => {
 
   return next();
 };
+

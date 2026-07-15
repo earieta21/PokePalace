@@ -4,7 +4,7 @@ import {
   TrendingUp, ChevronLeft, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
-  ToggleRight, Gift, Coffee,
+  ToggleRight, Gift, Coffee, Copy, QrCode, Share2,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -13,6 +13,7 @@ import {
 import { StaffAuthContext } from "../context/StaffAuthContext";
 import { API_URL } from "../config";
 import { downloadCSV } from "../utils/csv";
+import RewardQrCode from "../components/RewardQrCode";
 
 // POS pages — unchanged, work via StaffAuthContext.Provider
 import POSPage from "../pos/pages/POSPage";
@@ -992,6 +993,11 @@ function RewardsRedeemTab({ token }) {
   const [issuingStory, setIssuingStory] = useState(false);
   const [storyError, setStoryError] = useState("");
   const [issuedStory, setIssuedStory] = useState(null);
+  const [storyShareStatus, setStoryShareStatus] = useState("");
+
+  const claimUrl = issuedStory?.claimToken
+    ? `${window.location.origin}/claim-reward?token=${encodeURIComponent(issuedStory.claimToken)}`
+    : "";
 
   const issueStoryReward = async (e) => {
     e.preventDefault();
@@ -999,6 +1005,7 @@ function RewardsRedeemTab({ token }) {
     setIssuingStory(true);
     setStoryError("");
     setIssuedStory(null);
+    setStoryShareStatus("");
     try {
       const r = await fetch(`${API_URL}/api/staff/rewards/social-story`, {
         method: "POST",
@@ -1020,7 +1027,7 @@ function RewardsRedeemTab({ token }) {
           : "";
         throw new Error(`${data.msg || "No se pudo generar el premio"}${retryDate}`);
       }
-      setIssuedStory(data.redemption);
+      setIssuedStory({ ...data.redemption, claimToken: data.claimToken });
       setStoryHandle("");
       setConfirmedTagged(false);
       setConfirmedDisclosure(false);
@@ -1028,6 +1035,32 @@ function RewardsRedeemTab({ token }) {
       setStoryError(err.message);
     } finally {
       setIssuingStory(false);
+    }
+  };
+
+  const copyStoryCode = async () => {
+    if (!issuedStory?.code) return;
+    try {
+      await navigator.clipboard.writeText(issuedStory.code);
+      setStoryShareStatus("Código copiado");
+    } catch {
+      setStoryShareStatus("No se pudo copiar; anota el código manualmente");
+    }
+  };
+
+  const shareStoryReward = async () => {
+    if (!issuedStory || !claimUrl) return;
+    const text = `Tu bebida de Poke Palace ya está lista. Guarda el premio en tu cuenta: ${claimUrl} Código de respaldo: ${issuedStory.code}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Premio Poke Palace", text });
+      } else {
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+      }
+      setStoryShareStatus("Enlace listo para compartir");
+    } catch (err) {
+      if (err.name !== "AbortError") setStoryShareStatus("No se pudo compartir el enlace");
     }
   };
 
@@ -1123,12 +1156,39 @@ function RewardsRedeemTab({ token }) {
         )}
 
         {issuedStory && (
-          <div className="mt-3 bg-violet-500/10 border border-violet-500/20 rounded-2xl p-5 text-center">
-            <p className="text-violet-300 text-sm font-semibold">Código generado para {issuedStory.socialHandle}</p>
-            <p className="my-2 text-3xl font-mono font-bold tracking-widest text-white">{issuedStory.code}</p>
-            <p className="text-slate-400 text-xs">
-              Agua de coco o limonada de matcha. Válido hasta el {new Date(issuedStory.expiresAt).toLocaleDateString("es-MX")} con la compra de un bowl.
-            </p>
+          <div className="mt-3 bg-violet-500/10 border border-violet-500/20 rounded-2xl p-5">
+            <div className="text-center">
+              <p className="text-violet-300 text-sm font-semibold">Código generado para {issuedStory.socialHandle}</p>
+              <p className="my-2 text-3xl font-mono font-bold tracking-widest text-white">{issuedStory.code}</p>
+              <p className="text-slate-400 text-xs">
+                Agua de coco o limonada de matcha. Válido hasta el {new Date(issuedStory.expiresAt).toLocaleDateString("es-MX")} con la compra de un bowl.
+              </p>
+            </div>
+
+            {claimUrl && (
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-5 items-center bg-slate-950/60 rounded-2xl border border-white/10 p-4">
+                <div className="mx-auto rounded-xl overflow-hidden leading-none">
+                  <RewardQrCode value={claimUrl} size={180} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 text-white font-semibold">
+                    <QrCode size={19} aria-hidden="true" /> Guardar en la cuenta del cliente
+                  </div>
+                  <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+                    Pide al cliente escanear este QR. Si inicia sesión o crea una cuenta, el premio aparecerá automáticamente en “Mis premios”.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+                    <button type="button" onClick={copyStoryCode} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-2.5 text-sm font-semibold text-white transition">
+                      <Copy size={16} aria-hidden="true" /> Copiar código
+                    </button>
+                    <button type="button" onClick={shareStoryReward} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3 py-2.5 text-sm font-semibold text-white transition">
+                      <Share2 size={16} aria-hidden="true" /> Compartir enlace
+                    </button>
+                  </div>
+                  {storyShareStatus && <p className="text-emerald-300 text-xs mt-2" role="status">{storyShareStatus}</p>}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1827,3 +1887,4 @@ function BottomNav({ tab, setTab, tabs, openEntry, lowStockCount }) {
     </nav>
   );
 }
+

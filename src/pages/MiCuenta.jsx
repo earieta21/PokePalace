@@ -1,5 +1,5 @@
-import { useContext, useEffect, useState, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useContext, useEffect, useState } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useOrder } from "../order/OrderContext";
 import { API_URL } from "../config";
@@ -19,6 +19,7 @@ export default function MiCuenta() {
   const { loadFavorite, reorder } = useOrder();
   const { language, t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -27,7 +28,11 @@ export default function MiCuenta() {
   const [favorites, setFavorites] = useState([]);
   const [favLoading, setFavLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [activeTab, setActiveTab] = useState("orders");
+  const [activeTab, setActiveTab] = useState(
+    ["orders", "favorites", "rewards"].includes(searchParams.get("tab"))
+      ? searchParams.get("tab")
+      : "orders"
+  );
 
   const [redemptions, setRedemptions] = useState([]);
   const [redeemLoading, setRedeemLoading] = useState(false);
@@ -443,3 +448,4 @@ export default function MiCuenta() {
     </div>
   );
 }
+
