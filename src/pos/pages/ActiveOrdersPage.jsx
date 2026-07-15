@@ -78,9 +78,9 @@ export default function ActiveOrdersPage({ styles }) {
     } catch (e) { setError(e.message); }
   };
 
-  const markPaid = async (order) => {
+  const markPaid = async (order, method) => {
     try {
-      const { order: updated } = await api.patch(`/api/staff/orders/${order._id}/pay`, {});
+      const { order: updated } = await api.patch(`/api/staff/orders/${order._id}/pay`, { method });
       setOrders((prev) => prev.map((o) => (o._id === updated._id ? updated : o)));
     } catch (e) { setError(e.message); }
   };
@@ -150,11 +150,18 @@ export default function ActiveOrdersPage({ styles }) {
                 </div>
                 <div className={styles.orderCardFooter}>
                   {order.paymentStatus === "paid" ? (
-                    <span className={styles.paidBadge}>✓ Pagado</span>
+                    <span className={styles.paidBadge}>
+                      ✓ Pagado{order.paymentMethod === "cash" ? " · Efectivo" : order.paymentMethod === "card_terminal" ? " · Tarjeta" : ""}
+                    </span>
                   ) : (
-                    <button className={styles.btnPay} onClick={() => markPaid(order)}>
-                      Cobrado{order.total != null ? ` $${order.total.toLocaleString("es-MX")} MXN` : ""}
-                    </button>
+                    <>
+                      <button className={styles.btnPay} onClick={() => markPaid(order, "cash")} title={order.total != null ? `Cobrar $${order.total.toLocaleString("es-MX")} en efectivo` : "Cobrar en efectivo"}>
+                        💵 Efectivo
+                      </button>
+                      <button className={styles.btnPay} onClick={() => markPaid(order, "card_terminal")} title={order.total != null ? `Cobrar $${order.total.toLocaleString("es-MX")} con tarjeta` : "Cobrar con tarjeta"}>
+                        💳 Tarjeta
+                      </button>
+                    </>
                   )}
                   {order.status === "ready" ? (
                     <button className={styles.btnGhost} style={{ flex: 1 }} onClick={() => dismiss(order)}>

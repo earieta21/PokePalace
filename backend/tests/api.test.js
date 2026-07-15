@@ -1050,3 +1050,48 @@ test("el monitor de errores acepta reportes", async () => {
   const body = await r.json();
   assert.equal(body.ok, true);
 });
+
+
+test("cobrar registra el metodo de pago y rechaza metodos desconocidos", async () => {
+  const created = await postCustomerOrder({
+    base: "white_rice",
+    proteins: ["salmon"],
+    customer: "Cobro con metodo CI",
+    phone: "6630000042",
+    scheduledPickupTime: tomorrowAt15(),
+  }, "pay-method");
+  assert.equal(created.status, 201);
+  const orderId = (await created.json()).order._id;
+
+  const paid = await fetch(`${BASE}/api/staff/orders/${orderId}/pay`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${staffTokens.cashier}` },
+    body: JSON.stringify({ method: "cash" }),
+  });
+  assert.equal(paid.status, 200);
+  const paidBody = await paid.json();
+  assert.equal(paidBody.order.paymentStatus, "paid");
+  assert.equal(paidBody.order.paymentMethod, "cash");
+
+  // Un metodo desconocido no debe corromper el registro: se ignora y el
+  // metodo original de la orden se conserva.
+  const other = await postCustomerOrder({
+    base: "white_rice",
+    proteins: ["salmon"],
+    customer: "Cobro metodo invalido CI",
+    phone: "6630000043",
+    scheduledPickupTime: tomorrowAt15(),
+  }, "pay-method-invalid");
+  assert.equal(other.status, 201);
+  const otherId = (await other.json()).order._id;
+
+  const weird = await fetch(`${BASE}/api/staff/orders/${otherId}/pay`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${staffTokens.cashier}` },
+    body: JSON.stringify({ method: "bitcoin" }),
+  });
+  assert.equal(weird.status, 200);
+  const weirdBody = await weird.json();
+  assert.equal(weirdBody.order.paymentStatus, "paid");
+  assert.equal(weirdBody.order.paymentMethod, "pay_at_pickup");
+});
