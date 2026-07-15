@@ -6,9 +6,12 @@ const LOCATION = {
   name: "Poke Palace",
   phone: "+52 663 108 6583",
   mapsUrl: GOOGLE_MAPS_URL,
-  lat: 32.455826,
-  lng: -116.919307,
 };
+
+const MAP_EMBED_URL =
+  "https://www.openstreetmap.org/export/embed.html" +
+  "?bbox=-116.929307%2C32.445826%2C-116.909307%2C32.465826" +
+  "&layer=mapnik&marker=32.455826%2C-116.919307";
 
 export default function LocationPage() {
   const { t } = useLanguage();
@@ -29,10 +32,9 @@ export default function LocationPage() {
         <div className="mapPanel" aria-label={t("location.map")}>
           <iframe
             title={`${t("location.map")} ${LOCATION.name}`}
-            src={`https://www.google.com/maps?q=${LOCATION.lat},${LOCATION.lng}&z=17&output=embed`}
+            src={MAP_EMBED_URL}
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
-            allowFullScreen
           />
         </div>
 
