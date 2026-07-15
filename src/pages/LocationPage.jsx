@@ -6,9 +6,9 @@ const LOCATION = {
   name: "Poke Palace",
   phone: "+52 663 108 6583",
   mapsUrl: GOOGLE_MAPS_URL,
+  lat: 32.455826,
+  lng: -116.919307,
 };
-
-const mapQuery = encodeURIComponent(LOCATION.mapsUrl);
 
 export default function LocationPage() {
   const { t } = useLanguage();
@@ -29,9 +29,10 @@ export default function LocationPage() {
         <div className="mapPanel" aria-label={t("location.map")}>
           <iframe
             title={`${t("location.map")} ${LOCATION.name}`}
-            src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
+            src={`https://www.google.com/maps?q=${LOCATION.lat},${LOCATION.lng}&z=17&output=embed`}
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
+            allowFullScreen
           />
         </div>
 
