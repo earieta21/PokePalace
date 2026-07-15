@@ -18,6 +18,8 @@ import rewardsRoutes     from "./routes/rewards.js";
 import staffRewardsRoutes from "./routes/staffRewards.js";
 import staffBackupRoutes from "./routes/staffBackup.js";
 import staffSummaryRoutes from "./routes/staffSummary.js";
+import monitorRoutes from "./routes/monitor.js";
+import { logServerError } from "./controllers/monitorController.js";
 import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
 
 dotenv.config();
@@ -71,9 +73,27 @@ app.use("/api/rewards",        rewardsRoutes);
 app.use("/api/staff/rewards",  staffRewardsRoutes);
 app.use("/api/staff/backup",   staffBackupRoutes);
 app.use("/api/staff/summary",  staffSummaryRoutes);
+app.use("/api/monitor",        monitorRoutes);
 
 app.get("/", (req, res) => {
   res.send("API Poke Palace funcionando 🍣");
+});
+
+// Errores no manejados en rutas Express → quedan registrados en el monitor.
+app.use((err, req, res, next) => {
+  logServerError(err, `${req.method} ${req.originalUrl}`);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ message: "Error interno del servidor" });
+});
+
+// Fallos a nivel proceso: se registran antes de que el proceso muera/continúe.
+process.on("unhandledRejection", (reason) => {
+  logServerError(reason instanceof Error ? reason : new Error(String(reason)), "unhandledRejection");
+});
+process.on("uncaughtException", (err) => {
+  logServerError(err, "uncaughtException");
+  // Se le da un momento al registro y se termina: seguir con estado corrupto es peor.
+  setTimeout(() => process.exit(1), 1500);
 });
 
 const PORT = process.env.PORT || 5001;

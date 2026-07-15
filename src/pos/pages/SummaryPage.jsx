@@ -77,6 +77,9 @@ export default function SummaryPage({ styles }) {
     if (money.net < 0 && sales.orders > 0) {
       alerts.push({ tone: "bad", icon: "⚠️", text: `Vas en pérdida esta semana: gastos ${fmtMXN(money.expenses)} contra ${fmtMXN(sales.revenue)} de ventas.` });
     }
+    if (data.techErrors > 0) {
+      alerts.push({ tone: "warn", icon: "🐞", text: `${data.techErrors} error${data.techErrors > 1 ? "es" : ""} técnico${data.techErrors > 1 ? "s" : ""} registrado${data.techErrors > 1 ? "s" : ""} esta semana en la app — pídele el detalle a tu asistente.` });
+    }
     if (alerts.length === 0 && !noData) {
       alerts.push({ tone: "ok", icon: "✅", text: "Sin alertas — todo se ve en orden esta semana." });
     }

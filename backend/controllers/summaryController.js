@@ -2,6 +2,7 @@ import Order from "../models/Order.js";
 import Expense from "../models/Expense.js";
 import Inventory from "../models/Inventory.js";
 import WasteLog from "../models/WasteLog.js";
+import ErrorLog from "../models/ErrorLog.js";
 
 /* El negocio opera en Tijuana (UTC-7). Las fechas se guardan en UTC, así que
    desplazamos antes de agrupar por día/hora para que "el martes" sea el
@@ -41,11 +42,12 @@ export const getWeeklySummary = async (req, res) => {
     const weekFrom = mondayOf(now);
     const prevFrom = new Date(weekFrom.getTime() - 7 * 86400000);
 
-    const [orders, expenses, inventory, waste] = await Promise.all([
+    const [orders, expenses, inventory, waste, errorLogs] = await Promise.all([
       Order.find({ createdAt: { $gte: prevFrom } }).lean(),
       Expense.find({ date: { $gte: dateStr(prevFrom) } }).lean(),
       Inventory.find().lean(),
       WasteLog.find({ createdAt: { $gte: prevFrom } }).lean(),
+      ErrorLog.find({ lastSeenAt: { $gte: weekFrom } }).lean(),
     ]);
 
     const thisOrders = orders.filter((o) => o.createdAt >= weekFrom);
@@ -128,6 +130,7 @@ export const getWeeklySummary = async (req, res) => {
         cost:  wasteCost(wasteThis),
         prev:  { count: wastePrev.length, cost: wasteCost(wastePrev) },
       },
+      techErrors: errorLogs.reduce((s, e) => s + (e.count || 1), 0),
     });
   } catch (err) {
     res.status(500).json({ message: "Error al generar el resumen", err: err.message });
