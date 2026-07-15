@@ -33,7 +33,7 @@ export default function LocationPage() {
           <iframe
             title={`${t("location.map")} ${LOCATION.name}`}
             src={MAP_EMBED_URL}
-            loading="lazy"
+            loading="eager"
             referrerPolicy="no-referrer-when-downgrade"
           />
         </div>
