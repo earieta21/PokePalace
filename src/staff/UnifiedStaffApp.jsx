@@ -5,6 +5,7 @@ import {
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
   ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard,
+  Menu, X,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -15,6 +16,7 @@ import { API_URL } from "../config";
 import { downloadCSV } from "../utils/csv";
 import { tijuanaDateKey } from "../utils/date";
 import RewardQrCode from "../components/RewardQrCode";
+import shellStyles from "./UnifiedStaffApp.module.css";
 
 // POS pages — unchanged, work via StaffAuthContext.Provider
 import POSPage from "../pos/pages/POSPage";
@@ -137,22 +139,42 @@ const TABS_BY_ROLE = {
 };
 
 const TAB_META = {
-  pos:     { label: "POS",      icon: ShoppingCart   },
-  cocina:  { label: "Cocina",   icon: UtensilsCrossed },
-  premios: { label: "Premios",  icon: Gift            },
-  hist:    { label: "Historial", icon: ClipboardList  },
-  resumen: { label: "Resumen",  icon: LayoutDashboard },
-  ventas:  { label: "Ventas",   icon: Activity        },
-  inv:     { label: "Inventario", icon: Package       },
-  fin:     { label: "Finanzas", icon: BarChart3       },
-  disponibilidad: { label: "Tienda", icon: ToggleRight },
-  panel:   { label: "Panel",    icon: TrendingUp      },
-  inicio:  { label: "Inicio",   icon: Clock           },
-  tareas:  { label: "Tareas",   icon: CheckSquare     },
-  temp:    { label: "Temp",     icon: Thermometer     },
-  horario: { label: "Horario",  icon: Calendar        },
-  avisos:  { label: "Avisos",   icon: Megaphone       },
+  pos:     { label: "POS", title: "Punto de venta", icon: ShoppingCart },
+  cocina:  { label: "Cocina", title: "Pantalla de cocina", icon: UtensilsCrossed },
+  premios: { label: "Premios", title: "Premios y promociones", icon: Gift },
+  hist:    { label: "Historial", title: "Historial de órdenes", icon: ClipboardList },
+  resumen: { label: "Resumen", title: "Resumen semanal", icon: LayoutDashboard },
+  ventas:  { label: "Ventas", title: "Panel de ventas", icon: Activity },
+  inv:     { label: "Inventario", title: "Inventario", icon: Package },
+  fin:     { label: "Finanzas", title: "Finanzas", icon: BarChart3 },
+  disponibilidad: { label: "Tienda", title: "Disponibilidad de la tienda", icon: ToggleRight },
+  panel:   { label: "Equipo", title: "Administración del equipo", icon: TrendingUp },
+  inicio:  { label: "Inicio", title: "Mi turno", icon: Clock },
+  tareas:  { label: "Tareas", title: "Tareas del local", icon: CheckSquare },
+  temp:    { label: "Temperaturas", mobileLabel: "Temp.", title: "Control de temperaturas", icon: Thermometer },
+  horario: { label: "Horario", title: "Horario del equipo", icon: Calendar },
+  avisos:  { label: "Avisos", title: "Avisos del equipo", icon: Megaphone },
 };
+
+const TAB_GROUPS = [
+  { id: "operacion", label: "Operación", tabs: ["pos", "cocina", "premios"] },
+  { id: "turno", label: "Mi turno", tabs: ["inicio", "tareas", "temp"] },
+  { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv"] },
+  { id: "equipo", label: "Equipo", tabs: ["horario", "avisos"] },
+  { id: "gestion", label: "Administración", tabs: ["resumen", "ventas", "fin", "panel"] },
+];
+
+const MOBILE_PRIMARY_BY_ROLE = {
+  employee: ["inicio", "tareas", "temp", "horario"],
+  cashier: ["pos", "premios", "inicio", "tareas"],
+  kitchen: ["cocina", "inicio", "tareas", "temp"],
+  manager: ["pos", "cocina", "inicio", "inv"],
+  admin: ["pos", "cocina", "inicio", "inv"],
+  owner: ["pos", "cocina", "inicio", "inv"],
+};
+
+const tabGroupLabel = (tabId) =>
+  TAB_GROUPS.find((group) => group.tabs.includes(tabId))?.label || "Staff";
 
 /* ============================================================================
    UNIFIED STAFF APP
@@ -402,68 +424,152 @@ export default function UnifiedStaffApp() {
 
   if (!me) return <PinLogin onLogin={handleLogin} />;
 
-  const isPOSTab = tab === "pos" || tab === "cocina";
+  const isWideTab = ["pos", "cocina", "hist", "resumen", "ventas", "inv", "fin", "panel"].includes(tab);
 
   return (
     <StaffAuthContext.Provider value={staffContextValue}>
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
+      <div className={shellStyles.shell}>
+        <StaffSidebar
+          me={me}
+          tabs={myTabs}
+          tab={tab}
+          setTab={setTab}
+          openEntry={openEntry}
+          lowStockCount={lowStockCount}
+          onLogout={handleLogout}
+        />
 
-        {/* Header */}
-        <header className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-white/5 px-4 py-3 shrink-0">
-          <div className="max-w-5xl mx-auto flex items-center justify-between">
+        <div className={shellStyles.workspace}>
+          {/* Header */}
+          <header className={shellStyles.topbar}>
+            <div className={shellStyles.topbarInner}>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
                 <Leaf className="w-4 h-4 text-emerald-400" />
               </div>
               <div>
-                <p className="text-xs text-slate-400 leading-none">Poke Palace · Staff</p>
-                <p className="text-sm font-bold leading-tight">{me.name}
-                  <span className={`ml-2 text-[10px] font-normal px-1.5 py-0.5 rounded-full ${getColor(employees.find(e=>sid(e._id)===sid(me.id))?.color||"emerald").light} ${getColor(employees.find(e=>sid(e._id)===sid(me.id))?.color||"emerald").text}`}>
-                    {ROLE_LABEL[me.role] || me.role}
-                  </span>
-                </p>
+                <p className={shellStyles.topbarEyebrow}>{tabGroupLabel(tab)}</p>
+                <p className={shellStyles.topbarTitle}>{TAB_META[tab]?.title || TAB_META[tab]?.label}</p>
               </div>
               {openEntry && (
-                <span className="flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> En turno
+                <span className={shellStyles.shiftStatus}>
+                  <span /> En turno
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-mono font-semibold text-slate-300 tabular-nums hidden sm:block">
+            <div className={shellStyles.topbarActions}>
+              <div className={shellStyles.mobileIdentity}>
+                <span className={shellStyles.mobileAvatar}>{initials(me.name)}</span>
+                <span>
+                  <strong>{me.name}</strong>
+                  <small>{ROLE_LABEL[me.role] || me.role}</small>
+                </span>
+              </div>
+              <span className={shellStyles.clock}>
                 {new Date(now).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </span>
               <button onClick={handleLogout}
-                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition">
-                <LogOut className="w-3.5 h-3.5" /> Salir
+                className={shellStyles.mobileLogout} aria-label="Cerrar sesión">
+                <LogOut className="w-4 h-4" /> <span>Salir</span>
               </button>
             </div>
-          </div>
-        </header>
+            </div>
+          </header>
 
-        {/* Main content */}
-        <main className={`flex-1 w-full mx-auto ${isPOSTab ? "max-w-5xl" : "max-w-3xl"} px-4 py-5 pb-28`}>
-          {tab === "inicio"  && <HomeTab me={me} now={now} openEntry={openEntry} time={time} schedule={schedule} checklist={checklist} onClockIn={clockIn} onClockOut={clockOut} onBreakStart={startBreak} onBreakEnd={endBreak} clockError={clockError} clockBusy={clockBusy} />}
-          {tab === "tareas"  && <TasksTab employees={employees} checklist={checklist} onToggle={toggleTask} />}
-          {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
-          {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
-          {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
-          {tab === "premios" && <RewardsRedeemTab token={token} />}
-          {tab === "disponibilidad" && <AvailabilityTab token={token} role={me?.role} />}
-          {tab === "panel"   && <PanelTab actor={me} employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} />}
-          {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
-          {tab === "cocina"  && <KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
-          {tab === "hist"    && <OrderHistoryPage styles={posStyles} />}
-          {tab === "resumen" && <SummaryPage styles={posStyles} />}
-          {tab === "ventas"  && <SalesDashboardPage styles={posStyles} />}
-          {tab === "inv"     && <InventoryPage styles={posStyles} />}
-          {tab === "fin"     && <FinancePage styles={posStyles} />}
-        </main>
+          {/* Main content */}
+          <main className={`${shellStyles.main} ${isWideTab ? shellStyles.mainWide : shellStyles.mainStandard} ${posStyles.staffEmbed}`}>
+            {tab === "inicio"  && <HomeTab me={me} now={now} openEntry={openEntry} time={time} schedule={schedule} checklist={checklist} onClockIn={clockIn} onClockOut={clockOut} onBreakStart={startBreak} onBreakEnd={endBreak} clockError={clockError} clockBusy={clockBusy} />}
+            {tab === "tareas"  && <TasksTab employees={employees} checklist={checklist} onToggle={toggleTask} />}
+            {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
+            {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
+            {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
+            {tab === "premios" && <RewardsRedeemTab token={token} />}
+            {tab === "disponibilidad" && <AvailabilityTab token={token} role={me?.role} />}
+            {tab === "panel"   && <PanelTab actor={me} employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} />}
+            {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
+            {tab === "cocina"  && <section className={shellStyles.portalSurface}><KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} /></section>}
+            {tab === "hist"    && <section className={shellStyles.portalSurface}><OrderHistoryPage styles={posStyles} /></section>}
+            {tab === "resumen" && <SummaryPage styles={posStyles} />}
+            {tab === "ventas"  && <section className={shellStyles.portalSurface}><SalesDashboardPage styles={posStyles} /></section>}
+            {tab === "inv"     && <InventoryPage styles={posStyles} />}
+            {tab === "fin"     && <FinancePage styles={posStyles} />}
+          </main>
+        </div>
 
         {/* Bottom nav */}
-        <BottomNav tab={tab} setTab={setTab} tabs={myTabs} openEntry={openEntry} lowStockCount={lowStockCount} />
+        <BottomNav role={me.role} tab={tab} setTab={setTab} tabs={myTabs} openEntry={openEntry} lowStockCount={lowStockCount} />
       </div>
     </StaffAuthContext.Provider>
+  );
+}
+
+function NavIndicator({ id, openEntry, lowStockCount, compact = false }) {
+  if (id === "inicio" && openEntry) {
+    return <span className={compact ? shellStyles.compactStatusDot : shellStyles.statusDot} aria-label="Turno activo" />;
+  }
+  if (id === "inv" && lowStockCount > 0) {
+    return (
+      <span className={compact ? shellStyles.compactCountBadge : shellStyles.countBadge} aria-label={`${lowStockCount} alertas de inventario`}>
+        {lowStockCount > 9 ? "9+" : lowStockCount}
+      </span>
+    );
+  }
+  return null;
+}
+
+function StaffSidebar({ me, tabs, tab, setTab, openEntry, lowStockCount, onLogout }) {
+  return (
+    <aside className={shellStyles.sidebar} aria-label="Navegación de Staff">
+      <div className={shellStyles.brand}>
+        <span className={shellStyles.brandMark}><Leaf aria-hidden="true" /></span>
+        <span>
+          <strong>Poke Palace</strong>
+          <small>Centro de trabajo</small>
+        </span>
+      </div>
+
+      <nav className={shellStyles.sidebarNav}>
+        {TAB_GROUPS.map((group) => {
+          const visibleTabs = group.tabs.filter((id) => tabs.includes(id));
+          if (!visibleTabs.length) return null;
+          return (
+            <div className={shellStyles.navGroup} key={group.id}>
+              <p>{group.label}</p>
+              {visibleTabs.map((id) => {
+                const { label, icon: Icon } = TAB_META[id];
+                const isActive = tab === id;
+                return (
+                  <button
+                    type="button"
+                    key={id}
+                    onClick={() => setTab(id)}
+                    className={`${shellStyles.sidebarLink} ${isActive ? shellStyles.sidebarLinkActive : ""}`}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    <span className={shellStyles.sidebarIcon}><Icon aria-hidden="true" /></span>
+                    <span>{label}</span>
+                    <NavIndicator id={id} openEntry={openEntry} lowStockCount={lowStockCount} />
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </nav>
+
+      <div className={shellStyles.sidebarFooter}>
+        <div className={shellStyles.profile}>
+          <span className={shellStyles.profileAvatar}>{initials(me.name)}</span>
+          <span className={shellStyles.profileCopy}>
+            <strong>{me.name}</strong>
+            <small>{ROLE_LABEL[me.role] || me.role}</small>
+          </span>
+        </div>
+        <button type="button" onClick={onLogout} className={shellStyles.logoutButton}>
+          <LogOut aria-hidden="true" /> Cerrar sesión
+        </button>
+      </div>
+    </aside>
   );
 }
 
@@ -1910,31 +2016,122 @@ function TeamManager({ actor, employees, onAdd, onRemove }) {
 /* ============================================================================
    BOTTOM NAV
    ========================================================================== */
-function BottomNav({ tab, setTab, tabs, openEntry, lowStockCount }) {
+function BottomNav({ role, tab, setTab, tabs, openEntry, lowStockCount }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const preferredTabs = MOBILE_PRIMARY_BY_ROLE[role] || MOBILE_PRIMARY_BY_ROLE.employee;
+  const primaryTabs = [...preferredTabs, ...tabs.filter((id) => !preferredTabs.includes(id))]
+    .filter((id, index, list) => tabs.includes(id) && list.indexOf(id) === index)
+    .slice(0, 4);
+  const isMoreActive = !primaryTabs.includes(tab);
+
+  useEffect(() => {
+    if (!moreOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setMoreOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [moreOpen]);
+
+  const openTab = (id) => {
+    setTab(id);
+    setMoreOpen(false);
+  };
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-20 bg-slate-900/95 backdrop-blur border-t border-white/5">
-      <div className="max-w-5xl mx-auto flex justify-around px-2 py-2 overflow-x-auto">
-        {tabs.map((id) => {
-          const { label, icon: Icon } = TAB_META[id];
+    <>
+      {moreOpen && (
+        <div className={shellStyles.moreLayer}>
+          <button
+            type="button"
+            className={shellStyles.moreBackdrop}
+            onClick={() => setMoreOpen(false)}
+            aria-label="Cerrar menú"
+          />
+          <section className={shellStyles.moreSheet} role="dialog" aria-modal="true" aria-labelledby="staff-more-title">
+            <div className={shellStyles.moreHandle} />
+            <div className={shellStyles.moreHeader}>
+              <div>
+                <span>Centro de trabajo</span>
+                <h2 id="staff-more-title">Todas las secciones</h2>
+              </div>
+              <button type="button" onClick={() => setMoreOpen(false)} aria-label="Cerrar">
+                <X aria-hidden="true" />
+              </button>
+            </div>
+            <div className={shellStyles.moreContent}>
+              {TAB_GROUPS.map((group) => {
+                const visibleTabs = group.tabs.filter((id) => tabs.includes(id));
+                if (!visibleTabs.length) return null;
+                return (
+                  <div className={shellStyles.moreGroup} key={group.id}>
+                    <p>{group.label}</p>
+                    <div className={shellStyles.moreGrid}>
+                      {visibleTabs.map((id) => {
+                        const { label, icon: Icon } = TAB_META[id];
+                        const isActive = tab === id;
+                        return (
+                          <button
+                            type="button"
+                            key={id}
+                            onClick={() => openTab(id)}
+                            className={isActive ? shellStyles.moreItemActive : ""}
+                            aria-current={isActive ? "page" : undefined}
+                          >
+                            <span><Icon aria-hidden="true" /></span>
+                            <strong>{label}</strong>
+                            <NavIndicator id={id} openEntry={openEntry} lowStockCount={lowStockCount} compact />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      )}
+
+      <nav className={shellStyles.mobileNav} aria-label="Navegación principal de Staff">
+        <div className={shellStyles.mobileNavInner}>
+        {primaryTabs.map((id) => {
+          const { label, mobileLabel, icon: Icon } = TAB_META[id];
           const isActive = tab === id;
           return (
-            <button key={id} onClick={() => setTab(id)}
-              className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all relative shrink-0 ${isActive ? "text-emerald-400" : "text-slate-500 hover:text-slate-300"}`}>
-              {id === "inicio" && openEntry && (
-                <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              )}
-              {id === "inv" && lowStockCount > 0 && (
-                <span className="absolute -top-0.5 right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                  {lowStockCount > 9 ? "9+" : lowStockCount}
-                </span>
-              )}
-              <Icon className={`w-5 h-5 ${isActive ? "scale-110" : ""} transition-transform`} />
-              <span className={`text-[10px] font-medium whitespace-nowrap ${isActive ? "text-emerald-400" : ""}`}>{label}</span>
+            <button
+              type="button"
+              key={id}
+              onClick={() => openTab(id)}
+              className={isActive ? shellStyles.mobileNavActive : ""}
+              aria-current={isActive ? "page" : undefined}
+            >
+              <span className={shellStyles.mobileNavIcon}>
+                <Icon aria-hidden="true" />
+                <NavIndicator id={id} openEntry={openEntry} lowStockCount={lowStockCount} compact />
+              </span>
+              <span>{mobileLabel || label}</span>
             </button>
           );
         })}
-      </div>
-    </nav>
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className={isMoreActive || moreOpen ? shellStyles.mobileNavActive : ""}
+            aria-expanded={moreOpen}
+            aria-controls="staff-more-title"
+          >
+            <span className={shellStyles.mobileNavIcon}><Menu aria-hidden="true" /></span>
+            <span>Más</span>
+          </button>
+        </div>
+      </nav>
+    </>
   );
 }
 

@@ -34,6 +34,30 @@
   margin-top: 0;
 }
 
+/* Shared tokens for pages embedded in the unified Staff shell. Several
+   operational pages use these primitives without the legacy .portal wrapper. */
+.staffEmbed {
+  --p-g0: #0d1f14;
+  --p-g1: #1a3d2b;
+  --p-g2: #2d6a4f;
+  --p-g3: #52b788;
+  --p-g4: #b7e4c7;
+  --p-gold: #d4a017;
+  --p-cream: #faf7f0;
+  --p-surface: #ffffff;
+  --p-bg: #f5f3ee;
+  --p-ink: #0d1b0f;
+  --p-text: #0d1b0f;
+  --p-muted: #6b7b6e;
+  --p-border: rgba(45, 106, 79, 0.13);
+  --p-shadow: 0 2px 8px rgba(13, 27, 15, 0.06);
+  --p-shadow-md: 0 4px 16px rgba(13, 27, 15, 0.09);
+  --p-radius: 10px;
+  --p-radius-sm: 6px;
+  --p-topbar-h: 76px;
+  color-scheme: light;
+}
+
 /* ══════════════════════════════
    SIDEBAR
 ══════════════════════════════ */
