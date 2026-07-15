@@ -4,7 +4,7 @@ import User from "../models/User.js";
 import Expense from "../models/Expense.js";
 import Redemption from "../models/Redemption.js";
 import { sendSMS, sendWhatsApp } from "../utils/notify.js";
-import { GOLD_TIER_MIN_POINTS, GOLD_POINTS_MULTIPLIER } from "../utils/loyalty.js";
+import { awardLoyaltyPoints } from "../utils/loyalty.js";
 import { getRewardById } from "../config/rewardsCatalog.js";
 import { computeBowlSubtotal } from "../pricing.js";
 
@@ -35,38 +35,38 @@ async function deductInventory(order) {
   }
 }
 
-/* ── loyalty point award: 1 point per $10 MXN, 2x for customers already in
-   Oro (300+ lifetimePoints) at the time they placed the order. Tier is read
-   from lifetimePoints — an achievement that only goes up — never from the
-   spendable balance, so redeeming a reward can't knock someone out of Oro.
-   Guarded atomically on loyaltyPointsEarned so calling markAsPaid more than
-   once on the same order (double click, retry, repeated API call) can never
-   award points twice — the conditional update only succeeds the first time. ── */
-async function awardLoyaltyPoints(order) {
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/* GET /api/staff/orders/customers/search?q=...
+   Staff-only lookup used to attach an existing Rewards account to a POS sale. */
+export const searchRewardCustomers = async (req, res) => {
   try {
-    if (!order.user || !order.total || order.total <= 0) return;
-    const basePoints = Math.floor(order.total / 10);
-    if (basePoints <= 0) return;
+    const query = String(req.query.q || "").trim().slice(0, 80);
+    if (query.length < 3) {
+      return res.status(400).json({ message: "Escribe al menos 3 caracteres" });
+    }
 
-    const userDoc = await User.findById(order.user).select("lifetimePoints");
-    const isGold = (userDoc?.lifetimePoints ?? 0) >= GOLD_TIER_MIN_POINTS;
-    const earned = basePoints * (isGold ? GOLD_POINTS_MULTIPLIER : 1);
+    const safeQuery = escapeRegex(query);
+    const digits = query.replace(/\D/g, "");
+    const filters = [
+      { name: { $regex: safeQuery, $options: "i" } },
+      { email: { $regex: safeQuery, $options: "i" } },
+    ];
+    if (digits.length >= 3) {
+      filters.push({ phone: { $regex: digits.split("").join("\\D*"), $options: "i" } });
+    }
 
-    const claimed = await Order.findOneAndUpdate(
-      { _id: order._id, loyaltyPointsEarned: 0 },
-      { loyaltyPointsEarned: earned },
-      { new: true }
-    );
-    if (!claimed) return; // already awarded on a previous call — do nothing
+    const customers = await User.find({ $or: filters })
+      .select("name email phone points lifetimePoints")
+      .sort({ name: 1 })
+      .limit(8)
+      .lean();
 
-    await User.findByIdAndUpdate(order.user, {
-      $inc: { points: earned, lifetimePoints: earned },
-      $set: { pointsLastEarnedAt: new Date() },
-    });
+    return res.json({ customers });
   } catch (err) {
-    console.error("awardLoyaltyPoints error:", err.message);
+    return res.status(500).json({ message: "No se pudieron buscar clientes", err: err.message });
   }
-}
+};
 
 /* ── helpers ── */
 const todayStart = () => {
@@ -106,11 +106,12 @@ export const markAsPaid = async (req, res) => {
     ).populate("user", "name email");
     if (!order) return res.status(404).json({ message: "Orden no encontrada" });
 
-    // Fire-and-forget: deduct inventory + award loyalty points
+    // Inventory can run in the background; points are awaited so the POS can
+    // immediately show the customer the updated balance.
     if (!order.ingredientsDeducted) deductInventory(order);
-    if (order.source === "online") awardLoyaltyPoints(order);
+    const loyalty = await awardLoyaltyPoints(order);
 
-    res.json({ order });
+    res.json({ order, loyalty });
   } catch (err) {
     res.status(500).json({ message: "Error al marcar pago", err: err.message });
   }
@@ -130,11 +131,16 @@ export const updateOrderStatus = async (req, res) => {
 
     const order = await Order.findByIdAndUpdate(
       req.params.id,
-      { status },
+      {
+        status,
+        ...(status === "completed" ? { paymentStatus: "paid" } : {}),
+      },
       { new: true }
     ).populate("user", "name email");
 
-    res.json({ order });
+    const loyalty = status === "completed" ? await awardLoyaltyPoints(order) : null;
+
+    res.json({ order, loyalty });
 
     // Aviso al cliente cuando su pedido pasa a "listo" (una sola vez, solo pedidos online).
     // Intenta WhatsApp primero; si no está configurado o falla, cae a SMS.
@@ -186,7 +192,7 @@ export const getOrderStats = async (req, res) => {
 export const createPosOrder = async (req, res) => {
   try {
     const {
-      items, customer, phone, notes, fulfillment, paymentMethod, rewardCode,
+      items, customer, phone, notes, fulfillment, paymentMethod, rewardCode, customerUserId,
       base, proteins, bowlSize, marinades, complements, sauces, toppings,
     } = req.body;
 
@@ -247,15 +253,27 @@ export const createPosOrder = async (req, res) => {
 
     const total = Math.max(0, subtotal - rewardDiscount);
 
+    let linkedCustomer = null;
+    if (customerUserId) {
+      linkedCustomer = await User.findById(customerUserId).select("name email phone points lifetimePoints");
+      if (!linkedCustomer) {
+        return res.status(400).json({ message: "La cuenta Rewards seleccionada ya no existe" });
+      }
+    }
+
+    const resolvedPaymentMethod = paymentMethod || "card_terminal";
+    const paymentStatus = resolvedPaymentMethod === "pay_at_pickup" ? "pending" : "paid";
+
     const order = await Order.create({
       staffId: req.staff.id,
+      user: linkedCustomer?._id || null,
       items: safeItems,
-      customer: customer || "Walk-in",
-      phone: phone || null,
+      customer: customer || linkedCustomer?.name || "Walk-in",
+      phone: phone || linkedCustomer?.phone || null,
       notes: notes || null,
       fulfillment: fulfillment || "pickup",
-      paymentMethod: paymentMethod || "card_terminal",
-      paymentStatus: "paid",
+      paymentMethod: resolvedPaymentMethod,
+      paymentStatus,
       source: "pos",
       subtotal,
       discountAmount: rewardDiscount,
@@ -288,10 +306,12 @@ export const createPosOrder = async (req, res) => {
       }
     }
 
-    // Deduct inventory for POS orders (already paid on creation)
+    // Paid POS sales credit Rewards immediately. Pending sales do it later
+    // through /pay or when the order is completed.
     deductInventory(order);
+    const loyalty = await awardLoyaltyPoints(order);
 
-    res.status(201).json({ order });
+    res.status(201).json({ order, loyalty });
   } catch (err) {
     res.status(500).json({ message: "Error creating POS order", err: err.message });
   }

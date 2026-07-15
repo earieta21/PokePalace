@@ -2,7 +2,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import Redemption from "../models/Redemption.js";
-import { expireStalePoints, REDEMPTION_CODE_EXPIRY_DAYS } from "../utils/loyalty.js";
+import { expireStalePoints, reconcileRecentLoyaltyPoints, REDEMPTION_CODE_EXPIRY_DAYS } from "../utils/loyalty.js";
 import { getRewardById } from "../config/rewardsCatalog.js";
 
 // Unambiguous charset — no 0/O, 1/I/L — easier for staff to read back a code.
@@ -95,6 +95,17 @@ export const getMyRedemptions = async (req, res) => {
     res.json({ redemptions });
   } catch {
     res.status(500).json({ msg: "Error obteniendo tus premios" });
+  }
+};
+
+export const reconcileMyLoyaltyPoints = async (req, res) => {
+  try {
+    const result = await reconcileRecentLoyaltyPoints(req.userId, 30);
+    const user = await User.findById(req.userId).select("points lifetimePoints");
+    return res.json({ ...result, points: user?.points ?? 0, lifetimePoints: user?.lifetimePoints ?? 0 });
+  } catch (err) {
+    console.error("reconcileMyLoyaltyPoints error:", err.message);
+    return res.status(500).json({ msg: "No se pudieron revisar tus puntos" });
   }
 };
 
