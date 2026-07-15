@@ -4,7 +4,7 @@ import {
   TrendingUp, ChevronLeft, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
-  ToggleRight, Gift, Coffee, Copy, QrCode, Share2,
+  ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -21,6 +21,7 @@ import KDSPage from "../pos/pages/KDSPage";
 import OrderHistoryPage from "../pos/pages/OrderHistoryPage";
 import FinancePage from "../pos/pages/FinancePage";
 import SalesDashboardPage from "../pos/pages/SalesDashboardPage";
+import SummaryPage from "../pos/pages/SummaryPage";
 import InventoryPage from "../pos/pages/InventoryPage";
 import posStyles from "../pos/EmployeePortal.module.css";
 
@@ -117,9 +118,9 @@ const TABS_BY_ROLE = {
   employee: ["inicio", "tareas", "temp", "horario", "avisos"],
   cashier:  ["pos", "premios", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
   kitchen:  ["cocina", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
-  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "ventas", "fin", "panel"],
-  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "ventas", "fin", "panel"],
-  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "ventas", "fin", "panel"],
+  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
 };
 
 const TAB_META = {
@@ -127,6 +128,7 @@ const TAB_META = {
   cocina:  { label: "Cocina",   icon: UtensilsCrossed },
   premios: { label: "Premios",  icon: Gift            },
   hist:    { label: "Historial", icon: ClipboardList  },
+  resumen: { label: "Resumen",  icon: LayoutDashboard },
   ventas:  { label: "Ventas",   icon: Activity        },
   inv:     { label: "Inventario", icon: Package       },
   fin:     { label: "Finanzas", icon: BarChart3       },
@@ -457,6 +459,7 @@ export default function UnifiedStaffApp() {
           {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "cocina"  && <KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
           {tab === "hist"    && <OrderHistoryPage styles={posStyles} />}
+          {tab === "resumen" && <SummaryPage styles={posStyles} />}
           {tab === "ventas"  && <SalesDashboardPage styles={posStyles} />}
           {tab === "inv"     && <InventoryPage styles={posStyles} />}
           {tab === "fin"     && <FinancePage styles={posStyles} />}
