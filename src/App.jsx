@@ -22,6 +22,7 @@ const OrderSummaryPage = lazy(() => import("./pages/OrderSummaryPage"));
 const OrderTracking    = lazy(() => import("./pages/OrderTracking"));
 const LocationPage     = lazy(() => import("./pages/LocationPage"));
 const QrCodePage       = lazy(() => import("./pages/QrCodePage"));
+const ClaimRewardPage  = lazy(() => import("./pages/ClaimRewardPage"));
 
 // Kiosk & staff — lazy loaded (never used by regular customers)
 const KioskLayout      = lazy(() => import("./kiosk/KioskLayout"));
@@ -97,6 +98,14 @@ const App = () => {
                   </PrivateRoute>
                 }
               />
+              <Route
+                path="/claim-reward"
+                element={
+                  <PrivateRoute>
+                    <ClaimRewardPage />
+                  </PrivateRoute>
+                }
+              />
             </Route>
 
             {/* ✅ Self-service kiosk (counter tablet) */}
@@ -129,3 +138,4 @@ const App = () => {
 };
 
 export default App;
+

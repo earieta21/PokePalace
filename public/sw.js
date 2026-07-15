@@ -1,4 +1,4 @@
-const CACHE = "pokepalace-v3";
+const CACHE = "pokepalace-v4";
 const SHELL = ["/", "/index.html", "/manifest.json", "/icon.svg"];
 
 // ── Install: pre-cache app shell ──────────────────────────────────────────────
@@ -26,6 +26,8 @@ self.addEventListener("fetch", (e) => {
   const { request } = e;
   const url = new URL(request.url);
 
+  if (request.method !== "GET") return;
+
   // 1. Cross-origin (fonts, CDN) — network only, no caching
   if (url.origin !== self.location.origin) {
     e.respondWith(fetch(request));
@@ -41,10 +43,10 @@ self.addEventListener("fetch", (e) => {
   // 3. HTML navigation — network first, fall back to shell for offline SPA routing
   if (request.mode === "navigate") {
     e.respondWith(
-      fetch(request)
+      fetch(request, { cache: "no-store" })
         .then((res) => {
           const clone = res.clone();
-          caches.open(CACHE).then((c) => c.put(request, clone));
+          caches.open(CACHE).then((c) => c.put("/index.html", clone));
           return res;
         })
         .catch(() => caches.match("/index.html"))
@@ -52,17 +54,17 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // 4. Static assets (JS, CSS, images, fonts) — stale-while-revalidate
+  // 4. Static assets — network first so a newly deployed UI appears immediately.
+  // Cached assets remain available as an offline fallback.
   e.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(request);
-      const fetchPromise = fetch(request)
-        .then((res) => {
-          if (res.ok) cache.put(request, res.clone());
-          return res;
-        })
-        .catch(() => null);
-      return cached || fetchPromise;
+      try {
+        const response = await fetch(request, { cache: "no-store" });
+        if (response.ok) cache.put(request, response.clone());
+        return response;
+      } catch {
+        return cache.match(request);
+      }
     })
   );
 });
@@ -79,3 +81,4 @@ self.addEventListener("notificationclick", (e) => {
     })
   );
 });
+

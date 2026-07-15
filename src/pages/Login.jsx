@@ -109,7 +109,7 @@ export default function Login() {
             <div className={styles.secondaryRow}>
               <span>
                 {t("auth.noAccount")}{" "}
-                <Link className={styles.link} to="/register">
+                <Link className={styles.link} to="/register" state={{ from }}>
                   {t("auth.registerLink")}
                 </Link>
               </span>
@@ -133,3 +133,4 @@ export default function Login() {
     </div>
   );
 }
+

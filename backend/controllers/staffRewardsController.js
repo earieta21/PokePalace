@@ -2,6 +2,7 @@ import Redemption from "../models/Redemption.js";
 import SocialStoryParticipant from "../models/SocialStoryParticipant.js";
 import { STORY_REWARD } from "../config/rewardsCatalog.js";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const STORY_CODE_EXPIRY_DAYS = 7;
@@ -120,7 +121,20 @@ export const createSocialStoryReward = async (req, res) => {
     }
     if (!redemption) throw new Error("No se pudo generar un código único");
 
-    res.status(201).json({ redemption, nextEligibleAt });
+    // The QR contains a signed, single-purpose token instead of the reward code.
+    // It remains valid only while the reward is valid and can attach this
+    // social-story reward to a single customer account.
+    const claimExpiresInSeconds = Math.max(60, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
+    const claimToken = jwt.sign(
+      {
+        purpose: "reward_claim",
+        redemptionId: redemption._id.toString(),
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: claimExpiresInSeconds }
+    );
+
+    res.status(201).json({ redemption, nextEligibleAt, claimToken });
   } catch (err) {
     if (participantClaimed) {
       try {
@@ -184,3 +198,4 @@ export const useRedemption = async (req, res) => {
     res.status(500).json({ msg: "Error canjeando el código" });
   }
 };
+
