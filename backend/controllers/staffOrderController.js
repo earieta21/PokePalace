@@ -513,12 +513,16 @@ export const getAllOrders = async (req, res) => {
   }
 };
 
-/* PATCH /api/staff/orders/:id/pay */
+/* PATCH /api/staff/orders/:id/pay — body opcional: { method: "cash" | "card_terminal" }
+   Registrar CÓMO se pagó permite cuadrar caja (efectivo) contra terminal. */
 export const markAsPaid = async (req, res) => {
   try {
+    const PAY_METHODS = ["cash", "card_terminal"];
+    const method = PAY_METHODS.includes(req.body?.method) ? req.body.method : null;
+
     const order = await Order.findOneAndUpdate(
       { _id: req.params.id, status: { $ne: "cancelled" } },
-      { paymentStatus: "paid" },
+      { paymentStatus: "paid", ...(method ? { paymentMethod: method } : {}) },
       { new: true }
     ).populate("user", "name email");
     if (!order) {
