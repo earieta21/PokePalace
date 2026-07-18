@@ -33,8 +33,8 @@ export default function KioskSummaryPage() {
 
   const onConfirm = async () => {
     const selectedProteins = Array.isArray(order?.proteins) ? order.proteins : [];
-    if (!order?.base || selectedProteins.length < 2) {
-      setSubmitError("Completa la base y selecciona 2 proteínas para confirmar.");
+    if (!order?.base || selectedProteins.length < 1) {
+      setSubmitError("Completa la base y selecciona al menos 1 proteína para confirmar.");
       return;
     }
 

@@ -16,7 +16,7 @@ const ProteinSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
   const { unavailableItems } = useAvailability();
-  const MIN_PROTEINS = 2;
+  const MIN_PROTEINS = 1;
   const MAX_PROTEINS = 3;
 
   const proteins = [
