@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Clock, LogIn, LogOut, CheckSquare, Thermometer, Calendar, Megaphone,
-  TrendingUp, ChevronLeft, Delete, Plus, AlertTriangle, Snowflake,
+  TrendingUp, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
-  ToggleRight,
+  ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard,
+  Menu, X,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -12,6 +13,10 @@ import {
 } from "../order/OrderLabels";
 import { StaffAuthContext } from "../context/StaffAuthContext";
 import { API_URL } from "../config";
+import { downloadCSV } from "../utils/csv";
+import { tijuanaDateKey } from "../utils/date";
+import RewardQrCode from "../components/RewardQrCode";
+import shellStyles from "./UnifiedStaffApp.module.css";
 
 // POS pages — unchanged, work via StaffAuthContext.Provider
 import POSPage from "../pos/pages/POSPage";
@@ -19,6 +24,7 @@ import KDSPage from "../pos/pages/KDSPage";
 import OrderHistoryPage from "../pos/pages/OrderHistoryPage";
 import FinancePage from "../pos/pages/FinancePage";
 import SalesDashboardPage from "../pos/pages/SalesDashboardPage";
+import SummaryPage from "../pos/pages/SummaryPage";
 import InventoryPage from "../pos/pages/InventoryPage";
 import posStyles from "../pos/EmployeePortal.module.css";
 
@@ -26,7 +32,23 @@ import posStyles from "../pos/EmployeePortal.module.css";
    CONSTANTS
    ========================================================================== */
 const LOCATION_ID = "tij-centro-01";
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = () => tijuanaDateKey();
+
+// Ubicación GPS del dispositivo — el backend valida que esté dentro del
+// radio del restaurante antes de dejar marcar entrada/salida/lonche.
+function getDeviceLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Este dispositivo no soporta ubicación GPS."));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => reject(new Error("Activa el permiso de ubicación para poder marcar tu entrada/salida.")),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  });
+}
 const fmtTime = (d) => new Date(d).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 const fmtHM = (mins) => `${Math.floor(mins / 60)}h ${String(Math.round(mins % 60)).padStart(2, "0")}m`;
 const initials = (name) => name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -44,6 +66,18 @@ const COLOR_KEYS = Object.keys(COLORS);
 const getColor = (c) => COLORS[c] || COLORS.emerald;
 
 const ROLE_LABEL = { owner: "Dueño/a", manager: "Gerente", admin: "Admin", cashier: "Cajero/a", kitchen: "Cocina", employee: "Empleado/a" };
+const MANAGEABLE_ROLES = {
+  manager: ["employee", "cashier", "kitchen"],
+  admin: ["employee", "cashier", "kitchen", "manager"],
+  owner: ["employee", "cashier", "kitchen", "manager", "admin", "owner"],
+};
+const ASSIGNABLE_ROLES = {
+  manager: ["employee"],
+  admin: ["employee", "cashier", "kitchen", "manager"],
+  owner: ["employee", "cashier", "kitchen", "manager", "admin", "owner"],
+};
+const canManageEmployee = (actor, employee) =>
+  sid(actor?.id) !== sid(employee?._id) && Boolean(MANAGEABLE_ROLES[actor?.role]?.includes(employee?.role));
 
 const CHECKLISTS = {
   apertura: { label: "Apertura",  icon: LogIn,      color: "text-emerald-400", items: [
@@ -90,36 +124,62 @@ const TEMP_STATIONS = [
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
 // Which tabs each role sees
+// Orden pensado por frecuencia de uso en un turno normal: primero lo
+// operativo (pos/cocina/premios), luego lo personal/diario (inicio, tareas,
+// temp), luego consulta frecuente (disponibilidad, hist, inv), luego lo
+// periódico (horario, avisos), y al final lo administrativo/menos frecuente
+// (ventas, fin, panel).
 const TABS_BY_ROLE = {
   employee: ["inicio", "tareas", "temp", "horario", "avisos"],
-  cashier:  ["pos", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
-  kitchen:  ["cocina", "hist", "inicio", "tareas", "temp", "horario", "avisos"],
-  manager:  ["pos", "cocina", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  admin:    ["pos", "cocina", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
-  owner:    ["pos", "cocina", "hist", "ventas", "fin", "inv", "disponibilidad", "panel", "inicio", "tareas", "temp", "horario", "avisos"],
+  cashier:  ["pos", "premios", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
+  kitchen:  ["cocina", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
+  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
 };
 
 const TAB_META = {
-  pos:     { label: "POS",      icon: ShoppingCart   },
-  cocina:  { label: "Cocina",   icon: UtensilsCrossed },
-  hist:    { label: "Historial", icon: ClipboardList  },
-  ventas:  { label: "Ventas",   icon: Activity        },
-  inv:     { label: "Inventario", icon: Package       },
-  fin:     { label: "Finanzas", icon: BarChart3       },
-  disponibilidad: { label: "Disponibilidad", icon: ToggleRight },
-  panel:   { label: "Panel",    icon: TrendingUp      },
-  inicio:  { label: "Inicio",   icon: Clock           },
-  tareas:  { label: "Tareas",   icon: CheckSquare     },
-  temp:    { label: "Temp",     icon: Thermometer     },
-  horario: { label: "Horario",  icon: Calendar        },
-  avisos:  { label: "Avisos",   icon: Megaphone       },
+  pos:     { label: "POS", title: "Punto de venta", icon: ShoppingCart },
+  cocina:  { label: "Cocina", title: "Pantalla de cocina", icon: UtensilsCrossed },
+  premios: { label: "Premios", title: "Premios y promociones", icon: Gift },
+  hist:    { label: "Historial", title: "Historial de órdenes", icon: ClipboardList },
+  resumen: { label: "Resumen", title: "Resumen semanal", icon: LayoutDashboard },
+  ventas:  { label: "Ventas", title: "Panel de ventas", icon: Activity },
+  inv:     { label: "Inventario", title: "Inventario", icon: Package },
+  fin:     { label: "Finanzas", title: "Finanzas", icon: BarChart3 },
+  disponibilidad: { label: "Tienda", title: "Disponibilidad de la tienda", icon: ToggleRight },
+  panel:   { label: "Equipo", title: "Administración del equipo", icon: TrendingUp },
+  inicio:  { label: "Inicio", title: "Mi turno", icon: Clock },
+  tareas:  { label: "Tareas", title: "Tareas del local", icon: CheckSquare },
+  temp:    { label: "Temperaturas", mobileLabel: "Temp.", title: "Control de temperaturas", icon: Thermometer },
+  horario: { label: "Horario", title: "Horario del equipo", icon: Calendar },
+  avisos:  { label: "Avisos", title: "Avisos del equipo", icon: Megaphone },
 };
+
+const TAB_GROUPS = [
+  { id: "operacion", label: "Operación", tabs: ["pos", "cocina", "premios"] },
+  { id: "turno", label: "Mi turno", tabs: ["inicio", "tareas", "temp"] },
+  { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv"] },
+  { id: "equipo", label: "Equipo", tabs: ["horario", "avisos"] },
+  { id: "gestion", label: "Administración", tabs: ["resumen", "ventas", "fin", "panel"] },
+];
+
+const MOBILE_PRIMARY_BY_ROLE = {
+  employee: ["inicio", "tareas", "temp", "horario"],
+  cashier: ["pos", "premios", "inicio", "tareas"],
+  kitchen: ["cocina", "inicio", "tareas", "temp"],
+  manager: ["pos", "cocina", "inicio", "inv"],
+  admin: ["pos", "cocina", "inicio", "inv"],
+  owner: ["pos", "cocina", "inicio", "inv"],
+};
+
+const tabGroupLabel = (tabId) =>
+  TAB_GROUPS.find((group) => group.tabs.includes(tabId))?.label || "Staff";
 
 /* ============================================================================
    UNIFIED STAFF APP
    ========================================================================== */
 export default function UnifiedStaffApp() {
-  const [loadingEmps, setLoadingEmps] = useState(true);
   const [employees, setEmployees] = useState([]);
 
   // Auth state (token in memory only — shared tablet)
@@ -136,14 +196,8 @@ export default function UnifiedStaffApp() {
   const [tab, setTab] = useState(null); // set after login based on role
   const [now, setNow] = useState(Date.now());
   const [lowStockCount, setLowStockCount] = useState(0);
-
-  // Load employee list for login screen
-  useEffect(() => {
-    fetch(`${API_URL}/api/kiosk/employees?locationId=${LOCATION_ID}`)
-      .then((r) => r.json())
-      .then((d) => { setEmployees(d.employees || []); setLoadingEmps(false); })
-      .catch(() => setLoadingEmps(false));
-  }, []);
+  const [clockError, setClockError] = useState("");
+  const [clockBusy, setClockBusy] = useState(false);
 
   // Load low-stock count after login (for badge on Inventario tab)
   useEffect(() => {
@@ -223,30 +277,83 @@ export default function UnifiedStaffApp() {
     const { token: t, user } = await r.json();
     setToken(t);
     setMe(user);
+    const employeePath = user.isManager ? "/api/kiosk/employees/manage" : "/api/kiosk/employees";
+    try {
+      const employeeResponse = await fetch(
+        `${API_URL}${employeePath}?locationId=${LOCATION_ID}`,
+        { headers: { Authorization: `Bearer ${t}` } }
+      );
+      if (!employeeResponse.ok) throw new Error("No se pudo cargar el personal");
+      const data = await employeeResponse.json();
+      setEmployees(data.employees || []);
+    } catch {
+      setEmployees([{ _id: user.id, name: user.name, role: user.role, color: user.color }]);
+    }
     const tabs = TABS_BY_ROLE[user.role] || TABS_BY_ROLE.employee;
     setTab(tabs[0]);
   }
 
   function handleLogout() {
     setToken(null); setMe(null); setTab(null); setLowStockCount(0);
+    setEmployees([]);
     setTime([]); setChecklist({}); setTemps([]); setSchedule({}); setAnnouncements([]);
   }
 
+  async function withDeviceLocation(fn) {
+    setClockError(""); setClockBusy(true);
+    try {
+      const { lat, lng } = await getDeviceLocation();
+      await fn({ lat, lng });
+    } catch (err) {
+      setClockError(err.message || "No se pudo completar la acción.");
+    } finally {
+      setClockBusy(false);
+    }
+  }
+
   async function clockIn() {
-    const r = await fetch(`${API_URL}/api/kiosk/time/clock-in`, {
-      method: "POST", headers: authHeaders,
-      body: JSON.stringify({ locationId: LOCATION_ID, date: todayKey() }),
+    await withDeviceLocation(async ({ lat, lng }) => {
+      const r = await fetch(`${API_URL}/api/kiosk/time/clock-in`, {
+        method: "POST", headers: authHeaders,
+        body: JSON.stringify({ locationId: LOCATION_ID, date: todayKey(), lat, lng }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || "No se pudo marcar tu entrada.");
+      if (data.record) setTime((p) => [data.record, ...p]);
     });
-    const { record } = await r.json();
-    if (record) setTime((p) => [record, ...p]);
   }
 
   async function clockOut() {
-    const r = await fetch(`${API_URL}/api/kiosk/time/clock-out`, {
-      method: "POST", headers: authHeaders, body: JSON.stringify({}),
+    await withDeviceLocation(async ({ lat, lng }) => {
+      const r = await fetch(`${API_URL}/api/kiosk/time/clock-out`, {
+        method: "POST", headers: authHeaders, body: JSON.stringify({ lat, lng }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || "No se pudo marcar tu salida.");
+      if (data.record) setTime((p) => p.map((t) => sid(t._id) === sid(data.record._id) ? data.record : t));
     });
-    const { record } = await r.json();
-    if (record) setTime((p) => p.map((t) => sid(t._id) === sid(record._id) ? record : t));
+  }
+
+  async function startBreak() {
+    await withDeviceLocation(async ({ lat, lng }) => {
+      const r = await fetch(`${API_URL}/api/kiosk/time/break-start`, {
+        method: "POST", headers: authHeaders, body: JSON.stringify({ lat, lng }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || "No se pudo iniciar tu lonche.");
+      if (data.record) setTime((p) => p.map((t) => sid(t._id) === sid(data.record._id) ? data.record : t));
+    });
+  }
+
+  async function endBreak() {
+    await withDeviceLocation(async ({ lat, lng }) => {
+      const r = await fetch(`${API_URL}/api/kiosk/time/break-end`, {
+        method: "POST", headers: authHeaders, body: JSON.stringify({ lat, lng }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message || "No se pudo terminar tu lonche.");
+      if (data.record) setTime((p) => p.map((t) => sid(t._id) === sid(data.record._id) ? data.record : t));
+    });
   }
 
   async function toggleTask(listId, idx) {
@@ -315,87 +422,161 @@ export default function UnifiedStaffApp() {
     setEmployees((p) => p.filter((e) => sid(e._id) !== sid(id)));
   }
 
-  if (loadingEmps) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950">
-      <div className="text-center">
-        <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4 animate-pulse">
-          <Leaf className="w-8 h-8 text-emerald-400" />
-        </div>
-        <p className="text-slate-400 text-sm tracking-widest uppercase">Cargando…</p>
-      </div>
-    </div>
-  );
+  if (!me) return <PinLogin onLogin={handleLogin} />;
 
-  if (!me) return <PinLogin employees={employees} onLogin={handleLogin} />;
-
-  const isPOSTab = tab === "pos" || tab === "cocina";
+  const isWideTab = ["pos", "cocina", "hist", "resumen", "ventas", "inv", "fin", "panel"].includes(tab);
 
   return (
     <StaffAuthContext.Provider value={staffContextValue}>
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
+      <div className={shellStyles.shell}>
+        <StaffSidebar
+          me={me}
+          tabs={myTabs}
+          tab={tab}
+          setTab={setTab}
+          openEntry={openEntry}
+          lowStockCount={lowStockCount}
+          onLogout={handleLogout}
+        />
 
-        {/* Header */}
-        <header className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-white/5 px-4 py-3 shrink-0">
-          <div className="max-w-5xl mx-auto flex items-center justify-between">
+        <div className={shellStyles.workspace}>
+          {/* Header */}
+          <header className={shellStyles.topbar}>
+            <div className={shellStyles.topbarInner}>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
                 <Leaf className="w-4 h-4 text-emerald-400" />
               </div>
               <div>
-                <p className="text-xs text-slate-400 leading-none">Poke Palace · Staff</p>
-                <p className="text-sm font-bold leading-tight">{me.name}
-                  <span className={`ml-2 text-[10px] font-normal px-1.5 py-0.5 rounded-full ${getColor(employees.find(e=>sid(e._id)===sid(me.id))?.color||"emerald").light} ${getColor(employees.find(e=>sid(e._id)===sid(me.id))?.color||"emerald").text}`}>
-                    {ROLE_LABEL[me.role] || me.role}
-                  </span>
-                </p>
+                <p className={shellStyles.topbarEyebrow}>{tabGroupLabel(tab)}</p>
+                <p className={shellStyles.topbarTitle}>{TAB_META[tab]?.title || TAB_META[tab]?.label}</p>
               </div>
               {openEntry && (
-                <span className="flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> En turno
+                <span className={shellStyles.shiftStatus}>
+                  <span /> En turno
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-mono font-semibold text-slate-300 tabular-nums hidden sm:block">
+            <div className={shellStyles.topbarActions}>
+              <div className={shellStyles.mobileIdentity}>
+                <span className={shellStyles.mobileAvatar}>{initials(me.name)}</span>
+                <span>
+                  <strong>{me.name}</strong>
+                  <small>{ROLE_LABEL[me.role] || me.role}</small>
+                </span>
+              </div>
+              <span className={shellStyles.clock}>
                 {new Date(now).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </span>
               <button onClick={handleLogout}
-                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition">
-                <LogOut className="w-3.5 h-3.5" /> Salir
+                className={shellStyles.mobileLogout} aria-label="Cerrar sesión">
+                <LogOut className="w-4 h-4" /> <span>Salir</span>
               </button>
             </div>
-          </div>
-        </header>
+            </div>
+          </header>
 
-        {/* Main content */}
-        <main className={`flex-1 w-full mx-auto ${isPOSTab ? "max-w-5xl" : "max-w-3xl"} px-4 py-5 pb-28`}>
-          {tab === "inicio"  && <HomeTab me={me} now={now} openEntry={openEntry} time={time} schedule={schedule} checklist={checklist} onClockIn={clockIn} onClockOut={clockOut} />}
-          {tab === "tareas"  && <TasksTab employees={employees} checklist={checklist} onToggle={toggleTask} />}
-          {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
-          {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
-          {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
-          {tab === "disponibilidad" && <AvailabilityTab token={token} />}
-          {tab === "panel"   && <PanelTab employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} />}
-          {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
-          {tab === "cocina"  && <KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
-          {tab === "hist"    && <OrderHistoryPage styles={posStyles} />}
-          {tab === "ventas"  && <SalesDashboardPage styles={posStyles} />}
-          {tab === "inv"     && <InventoryPage styles={posStyles} />}
-          {tab === "fin"     && <FinancePage styles={posStyles} />}
-        </main>
+          {/* Main content */}
+          <main className={`${shellStyles.main} ${isWideTab ? shellStyles.mainWide : shellStyles.mainStandard} ${posStyles.staffEmbed}`}>
+            {tab === "inicio"  && <HomeTab me={me} now={now} openEntry={openEntry} time={time} schedule={schedule} checklist={checklist} onClockIn={clockIn} onClockOut={clockOut} onBreakStart={startBreak} onBreakEnd={endBreak} clockError={clockError} clockBusy={clockBusy} />}
+            {tab === "tareas"  && <TasksTab employees={employees} checklist={checklist} onToggle={toggleTask} />}
+            {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
+            {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
+            {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
+            {tab === "premios" && <RewardsRedeemTab token={token} />}
+            {tab === "disponibilidad" && <AvailabilityTab token={token} role={me?.role} />}
+            {tab === "panel"   && <PanelTab actor={me} employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} />}
+            {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
+            {tab === "cocina"  && <section className={shellStyles.portalSurface}><KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} /></section>}
+            {tab === "hist"    && <section className={shellStyles.portalSurface}><OrderHistoryPage styles={posStyles} /></section>}
+            {tab === "resumen" && <SummaryPage styles={posStyles} />}
+            {tab === "ventas"  && <section className={shellStyles.portalSurface}><SalesDashboardPage styles={posStyles} /></section>}
+            {tab === "inv"     && <InventoryPage styles={posStyles} />}
+            {tab === "fin"     && <FinancePage styles={posStyles} />}
+          </main>
+        </div>
 
         {/* Bottom nav */}
-        <BottomNav tab={tab} setTab={setTab} tabs={myTabs} openEntry={openEntry} lowStockCount={lowStockCount} />
+        <BottomNav role={me.role} tab={tab} setTab={setTab} tabs={myTabs} openEntry={openEntry} lowStockCount={lowStockCount} />
       </div>
     </StaffAuthContext.Provider>
+  );
+}
+
+function NavIndicator({ id, openEntry, lowStockCount, compact = false }) {
+  if (id === "inicio" && openEntry) {
+    return <span className={compact ? shellStyles.compactStatusDot : shellStyles.statusDot} aria-label="Turno activo" />;
+  }
+  if (id === "inv" && lowStockCount > 0) {
+    return (
+      <span className={compact ? shellStyles.compactCountBadge : shellStyles.countBadge} aria-label={`${lowStockCount} alertas de inventario`}>
+        {lowStockCount > 9 ? "9+" : lowStockCount}
+      </span>
+    );
+  }
+  return null;
+}
+
+function StaffSidebar({ me, tabs, tab, setTab, openEntry, lowStockCount, onLogout }) {
+  return (
+    <aside className={shellStyles.sidebar} aria-label="Navegación de Staff">
+      <div className={shellStyles.brand}>
+        <span className={shellStyles.brandMark}><Leaf aria-hidden="true" /></span>
+        <span>
+          <strong>Poke Palace</strong>
+          <small>Centro de trabajo</small>
+        </span>
+      </div>
+
+      <nav className={shellStyles.sidebarNav}>
+        {TAB_GROUPS.map((group) => {
+          const visibleTabs = group.tabs.filter((id) => tabs.includes(id));
+          if (!visibleTabs.length) return null;
+          return (
+            <div className={shellStyles.navGroup} key={group.id}>
+              <p>{group.label}</p>
+              {visibleTabs.map((id) => {
+                const { label, icon: Icon } = TAB_META[id];
+                const isActive = tab === id;
+                return (
+                  <button
+                    type="button"
+                    key={id}
+                    onClick={() => setTab(id)}
+                    className={`${shellStyles.sidebarLink} ${isActive ? shellStyles.sidebarLinkActive : ""}`}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    <span className={shellStyles.sidebarIcon}><Icon aria-hidden="true" /></span>
+                    <span>{label}</span>
+                    <NavIndicator id={id} openEntry={openEntry} lowStockCount={lowStockCount} />
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </nav>
+
+      <div className={shellStyles.sidebarFooter}>
+        <div className={shellStyles.profile}>
+          <span className={shellStyles.profileAvatar}>{initials(me.name)}</span>
+          <span className={shellStyles.profileCopy}>
+            <strong>{me.name}</strong>
+            <small>{ROLE_LABEL[me.role] || me.role}</small>
+          </span>
+        </div>
+        <button type="button" onClick={onLogout} className={shellStyles.logoutButton}>
+          <LogOut aria-hidden="true" /> Cerrar sesión
+        </button>
+      </div>
+    </aside>
   );
 }
 
 /* ============================================================================
    PIN LOGIN
    ========================================================================== */
-function PinLogin({ employees, onLogin }) {
-  const [selected, setSelected] = useState(null);
+function PinLogin({ onLogin }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -425,44 +606,17 @@ function PinLogin({ employees, onLogin }) {
         </div>
       </div>
 
-      {!selected ? (
-        <div className="flex-1 px-5 max-w-2xl mx-auto w-full">
-          <p className="text-slate-400 text-sm mb-5 text-center">Selecciona tu nombre para continuar</p>
-          <div className="grid grid-cols-2 gap-3">
-            {employees.map((e) => {
-              const col = getColor(e.color);
-              return (
-                <button key={sid(e._id)} onClick={() => { setSelected(e); setPin(""); setError(false); }}
-                  className="group relative overflow-hidden flex items-center gap-4 bg-slate-900 hover:bg-slate-800 border border-white/5 hover:border-white/10 rounded-2xl p-4 text-left transition-all hover:scale-[1.02] active:scale-[0.98]">
-                  <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity ${col.light}`} />
-                  <div className={`relative w-14 h-14 rounded-xl ${col.bg} flex items-center justify-center font-bold text-white text-lg shadow-lg shrink-0`}>
-                    {initials(e.name)}
-                  </div>
-                  <div className="relative min-w-0">
-                    <p className="font-semibold text-white truncate">{e.name}</p>
-                    <p className={`text-xs mt-0.5 ${col.text}`}>{ROLE_LABEL[e.role] || e.role}</p>
-                  </div>
-                </button>
-              );
-            })}
+      <div className="flex-1 px-6 max-w-xs mx-auto w-full flex flex-col items-center">
+          <div className="w-20 h-20 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mb-4 shadow-xl shadow-emerald-950/30">
+            <ShieldCheck className="w-9 h-9 text-emerald-400" />
           </div>
-        </div>
-      ) : (
-        <div className="flex-1 px-6 max-w-xs mx-auto w-full flex flex-col items-center">
-          <button onClick={() => { setSelected(null); setPin(""); setError(false); setBusy(false); }}
-            className="self-start flex items-center gap-1 text-slate-400 hover:text-white text-sm mb-6 transition">
-            <ChevronLeft className="w-4 h-4" /> Volver
-          </button>
-          <div className={`w-20 h-20 rounded-2xl ${getColor(selected.color).bg} flex items-center justify-center font-bold text-white text-2xl mb-3 shadow-xl`}>
-            {initials(selected.name)}
-          </div>
-          <p className="font-bold text-lg text-white mb-0.5">{selected.name}</p>
-          <p className={`text-xs mb-5 ${getColor(selected.color).text}`}>{ROLE_LABEL[selected.role] || selected.role}</p>
+          <p className="font-bold text-lg text-white mb-1">Acceso privado</p>
+          <p className="text-xs text-slate-400 mb-6 text-center">Ingresa tu PIN de 4 dígitos. Tu nombre aparecerá después de verificarlo.</p>
           <div className="flex gap-4 mb-8">
             {[0,1,2,3].map((i) => (
               <div key={i} className={`w-5 h-5 rounded-full border-2 transition-all duration-150 ${
                 error ? "bg-rose-500 border-rose-500 scale-110"
-                : pin.length > i ? `${getColor(selected.color).bg} border-transparent scale-110`
+                : pin.length > i ? "bg-emerald-500 border-transparent scale-110"
                 : "border-slate-600"}`} />
             ))}
           </div>
@@ -473,19 +627,18 @@ function PinLogin({ employees, onLogin }) {
             ))}
             <div />
             <PinKey onClick={() => press("0")}>0</PinKey>
-            <PinKey subtle onClick={() => { setError(false); setPin((p) => p.slice(0, -1)); }}>
+            <PinKey ariaLabel="Borrar último dígito" subtle onClick={() => { setError(false); setPin((p) => p.slice(0, -1)); }}>
               <Delete className="w-5 h-5 mx-auto" />
             </PinKey>
           </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
 
-function PinKey({ children, onClick, subtle }) {
+function PinKey({ children, onClick, subtle, ariaLabel }) {
   return (
-    <button onClick={onClick}
+    <button type="button" onClick={onClick} aria-label={ariaLabel}
       className={`h-16 rounded-2xl text-xl font-semibold transition-all active:scale-95 ${
         subtle ? "bg-slate-800 hover:bg-slate-700 text-slate-400" : "bg-slate-800 hover:bg-slate-700 text-white border border-white/5"
       }`}>
@@ -497,14 +650,30 @@ function PinKey({ children, onClick, subtle }) {
 /* ============================================================================
    HOME — CLOCK IN/OUT
    ========================================================================== */
-function HomeTab({ me, now, openEntry, time, schedule, checklist, onClockIn, onClockOut }) {
+const FORGOT_CLOCKOUT_HOURS = 13;
+
+function HomeTab({ me, now, openEntry, time, schedule, checklist, onClockIn, onClockOut, onBreakStart, onBreakEnd, clockError, clockBusy }) {
   const [confirmOut, setConfirmOut] = useState(false);
   const todayEntries = time.filter((t) => sid(t.employeeId) === sid(me.id) && t.date === todayKey());
+
+  const breakMinsOf = (t) => (t.breaks || []).reduce((bAcc, b) => {
+    const bStart = new Date(b.start).getTime();
+    const bEnd = b.end ? new Date(b.end).getTime() : now;
+    return bAcc + (bEnd - bStart) / 60000;
+  }, 0);
+
   const workedMins = todayEntries.reduce((acc, t) => {
     const start = new Date(t.clockIn).getTime();
     const end = t.clockOut ? new Date(t.clockOut).getTime() : (sid(t._id) === sid(openEntry?._id) ? now : start);
-    return acc + (end - start) / 60000;
+    const grossMins = (end - start) / 60000;
+    return acc + Math.max(0, grossMins - breakMinsOf(t));
   }, 0);
+
+  const openBreak = openEntry?.breaks?.find((b) => !b.end);
+  const breakMins = openBreak ? (now - new Date(openBreak.start).getTime()) / 60000 : 0;
+  const forgotToClockOut = openEntry && !openBreak &&
+    (now - new Date(openEntry.clockIn).getTime()) > FORGOT_CLOCKOUT_HOURS * 3600 * 1000;
+
   const myShift = schedule?.[sid(me.id)]?.[(new Date().getDay() + 6) % 7];
   const totalTasks = Object.values(CHECKLISTS).reduce((a, l) => a + l.items.length, 0);
   const doneTasks = CHECK_IDS.reduce((a, lid) => a + Object.keys(checklist?.[lid] || {}).length, 0);
@@ -518,40 +687,70 @@ function HomeTab({ me, now, openEntry, time, schedule, checklist, onClockIn, onC
         <h2 className="text-2xl font-black tracking-tight">¡Hola, {me.name.split(" ")[0]}!</h2>
       </div>
 
-      <div className={`relative overflow-hidden rounded-3xl p-6 ${openEntry ? "bg-emerald-600" : "bg-slate-800"} transition-colors duration-500`}>
+      {forgotToClockOut && (
+        <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-300">
+            Tu turno lleva abierto más de {FORGOT_CLOCKOUT_HOURS}h desde las {fmtTime(openEntry.clockIn)} — si ya te fuiste, no olvides marcar salida.
+          </p>
+        </div>
+      )}
+
+      {clockError && (
+        <div className="flex items-start gap-2.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl p-3.5">
+          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <p className="text-xs text-rose-300">{clockError}</p>
+        </div>
+      )}
+
+      <div className={`relative overflow-hidden rounded-3xl p-6 ${openBreak ? "bg-amber-600" : openEntry ? "bg-emerald-600" : "bg-slate-800"} transition-colors duration-500`}>
         <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-black/10 translate-y-1/2 -translate-x-1/2" />
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-4">
-            <span className={`text-xs uppercase tracking-widest font-semibold ${openEntry ? "text-emerald-100" : "text-slate-400"}`}>
-              {openEntry ? "Turno activo" : "Sin turno activo"}
+            <span className={`text-xs uppercase tracking-widest font-semibold ${openEntry ? "text-white/90" : "text-slate-400"}`}>
+              {openBreak ? "En lonche" : openEntry ? "Turno activo" : "Sin turno activo"}
             </span>
             {openEntry && (
-              <span className="flex items-center gap-1.5 text-[11px] text-emerald-200 bg-black/20 px-2.5 py-1 rounded-full">
+              <span className="flex items-center gap-1.5 text-[11px] text-white/90 bg-black/20 px-2.5 py-1 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-lime-300 animate-pulse" />
-                desde {fmtTime(openEntry.clockIn)}
+                {openBreak ? `desde ${fmtTime(openBreak.start)}` : `desde ${fmtTime(openEntry.clockIn)}`}
               </span>
             )}
           </div>
-          <p className={`text-xs mb-1 ${openEntry ? "text-emerald-200" : "text-slate-500"}`}>Trabajado hoy</p>
-          <p className="text-5xl font-black tabular-nums mb-6">{fmtHM(workedMins)}</p>
-          {openEntry ? (
+          <p className={`text-xs mb-1 ${openEntry ? "text-white/80" : "text-slate-500"}`}>
+            {openBreak ? "Tiempo de lonche" : "Trabajado hoy"}
+          </p>
+          <p className="text-5xl font-black tabular-nums mb-6">{fmtHM(openBreak ? breakMins : workedMins)}</p>
+
+          {openBreak ? (
+            <button onClick={onBreakEnd} disabled={clockBusy} className="w-full flex items-center justify-center gap-2 bg-black/20 hover:bg-black/30 disabled:opacity-60 text-white font-bold py-4 rounded-2xl text-base transition active:scale-[0.98]">
+              <Coffee className="w-5 h-5" /> {clockBusy ? "Verificando ubicación…" : "Terminar lonche"}
+            </button>
+          ) : openEntry ? (
             confirmOut ? (
               <div className="space-y-2">
                 <p className="text-sm text-center text-emerald-100 mb-3">¿Confirmas tu salida?</p>
                 <div className="flex gap-2">
                   <button onClick={() => setConfirmOut(false)} className="flex-1 bg-black/20 hover:bg-black/30 text-white font-semibold py-3.5 rounded-2xl text-sm transition">Cancelar</button>
-                  <button onClick={() => { setConfirmOut(false); onClockOut(); }} className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-bold py-3.5 rounded-2xl text-sm transition">Sí, marcar salida</button>
+                  <button onClick={() => { setConfirmOut(false); onClockOut(); }} disabled={clockBusy} className="flex-1 bg-rose-500 hover:bg-rose-600 disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl text-sm transition">
+                    {clockBusy ? "Verificando…" : "Sí, marcar salida"}
+                  </button>
                 </div>
               </div>
             ) : (
-              <button onClick={() => setConfirmOut(true)} className="w-full flex items-center justify-center gap-2 bg-black/20 hover:bg-black/30 text-white font-bold py-4 rounded-2xl text-base transition active:scale-[0.98]">
-                <LogOut className="w-5 h-5" /> Marcar salida
-              </button>
+              <div className="space-y-2">
+                <button onClick={() => setConfirmOut(true)} disabled={clockBusy} className="w-full flex items-center justify-center gap-2 bg-black/20 hover:bg-black/30 disabled:opacity-60 text-white font-bold py-4 rounded-2xl text-base transition active:scale-[0.98]">
+                  <LogOut className="w-5 h-5" /> {clockBusy ? "Verificando ubicación…" : "Marcar salida"}
+                </button>
+                <button onClick={onBreakStart} disabled={clockBusy} className="w-full flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 disabled:opacity-60 text-white font-semibold py-3 rounded-2xl text-sm transition active:scale-[0.98]">
+                  <Coffee className="w-4 h-4" /> Iniciar lonche
+                </button>
+              </div>
             )
           ) : (
-            <button onClick={onClockIn} className="w-full flex items-center justify-center gap-2 bg-lime-400 hover:bg-lime-300 text-slate-900 font-bold py-4 rounded-2xl text-base transition active:scale-[0.98]">
-              <LogIn className="w-5 h-5" /> Marcar entrada
+            <button onClick={onClockIn} disabled={clockBusy} className="w-full flex items-center justify-center gap-2 bg-lime-400 hover:bg-lime-300 disabled:opacity-60 text-slate-900 font-bold py-4 rounded-2xl text-base transition active:scale-[0.98]">
+              <LogIn className="w-5 h-5" /> {clockBusy ? "Verificando ubicación…" : "Marcar entrada"}
             </button>
           )}
         </div>
@@ -578,11 +777,23 @@ function HomeTab({ me, now, openEntry, time, schedule, checklist, onClockIn, onC
           </div>
           <ul className="divide-y divide-white/5">
             {todayEntries.map((t) => (
-              <li key={sid(t._id)} className="flex items-center justify-between px-4 py-3 text-sm">
-                <span className="flex items-center gap-2 text-emerald-400"><LogIn className="w-4 h-4" />{fmtTime(t.clockIn)}</span>
-                <span className="flex items-center gap-2 text-slate-400">
-                  {t.clockOut ? <><LogOut className="w-4 h-4 text-rose-400" />{fmtTime(t.clockOut)}</> : <span className="text-emerald-400 animate-pulse">en curso…</span>}
-                </span>
+              <li key={sid(t._id)} className="px-4 py-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-emerald-400"><LogIn className="w-4 h-4" />{fmtTime(t.clockIn)}</span>
+                  <span className="flex items-center gap-2 text-slate-400">
+                    {t.clockOut ? <><LogOut className="w-4 h-4 text-rose-400" />{fmtTime(t.clockOut)}</> : <span className="text-emerald-400 animate-pulse">en curso…</span>}
+                  </span>
+                </div>
+                {(t.breaks || []).length > 0 && (
+                  <div className="mt-1.5 pl-6 space-y-0.5">
+                    {t.breaks.map((b, i) => (
+                      <p key={i} className="text-[11px] text-amber-400/80 flex items-center gap-1.5">
+                        <Coffee className="w-3 h-3" />
+                        lonche {fmtTime(b.start)} – {b.end ? fmtTime(b.end) : "en curso…"}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -843,6 +1054,309 @@ function AnnouncementsTab({ employees, announcements, isManager, onAdd, onRemove
 }
 
 /* ============================================================================
+   CANJEAR PREMIOS — cliente muestra su código, staff lo busca y confirma
+   ========================================================================== */
+function RewardsRedeemTab({ token }) {
+  const [code, setCode] = useState("");
+  const [redemption, setRedemption] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [storyPlatform, setStoryPlatform] = useState("instagram");
+  const [storyHandle, setStoryHandle] = useState("");
+  const [confirmedTagged, setConfirmedTagged] = useState(false);
+  const [confirmedDisclosure, setConfirmedDisclosure] = useState(false);
+  const [issuingStory, setIssuingStory] = useState(false);
+  const [storyError, setStoryError] = useState("");
+  const [issuedStory, setIssuedStory] = useState(null);
+  const [storyShareStatus, setStoryShareStatus] = useState("");
+
+  const claimUrl = issuedStory?.claimToken
+    ? `${window.location.origin}/claim-reward?token=${encodeURIComponent(issuedStory.claimToken)}`
+    : "";
+
+  const issueStoryReward = async (e) => {
+    e.preventDefault();
+    if (!storyHandle.trim() || !confirmedTagged || !confirmedDisclosure || issuingStory) return;
+    setIssuingStory(true);
+    setStoryError("");
+    setIssuedStory(null);
+    setStoryShareStatus("");
+    try {
+      const r = await fetch(`${API_URL}/api/staff/rewards/social-story`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          platform: storyPlatform,
+          handle: storyHandle.trim(),
+          confirmedTagged,
+          confirmedDisclosure,
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        const retryDate = data.nextEligibleAt
+          ? ` Podrá participar de nuevo el ${new Date(data.nextEligibleAt).toLocaleDateString("es-MX")}.`
+          : "";
+        throw new Error(`${data.msg || "No se pudo generar el premio"}${retryDate}`);
+      }
+      setIssuedStory({ ...data.redemption, claimToken: data.claimToken });
+      setStoryHandle("");
+      setConfirmedTagged(false);
+      setConfirmedDisclosure(false);
+    } catch (err) {
+      setStoryError(err.message);
+    } finally {
+      setIssuingStory(false);
+    }
+  };
+
+  const copyStoryCode = async () => {
+    if (!issuedStory?.code) return;
+    try {
+      await navigator.clipboard.writeText(issuedStory.code);
+      setStoryShareStatus("Código copiado");
+    } catch {
+      setStoryShareStatus("No se pudo copiar; anota el código manualmente");
+    }
+  };
+
+  const shareStoryReward = async () => {
+    if (!issuedStory || !claimUrl) return;
+    const text = `Tu bebida de Poke Palace ya está lista. Guarda el premio en tu cuenta: ${claimUrl} Código de respaldo: ${issuedStory.code}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Premio Poke Palace", text });
+      } else {
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+      }
+      setStoryShareStatus("Enlace listo para compartir");
+    } catch (err) {
+      if (err.name !== "AbortError") setStoryShareStatus("No se pudo compartir el enlace");
+    }
+  };
+
+  const lookup = async (e) => {
+    e.preventDefault();
+    const clean = code.trim().toUpperCase();
+    if (!clean) return;
+    setLoading(true);
+    setError("");
+    setRedemption(null);
+    try {
+      const r = await fetch(`${API_URL}/api/staff/rewards/${clean}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.msg || "Código no encontrado");
+      setRedemption(data.redemption);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reset = () => { setCode(""); setRedemption(null); setError(""); };
+
+  return (
+    <div>
+      <div className="mb-8">
+        <h2 className="text-lg font-bold text-white">Premio por historia</h2>
+        <p className="text-slate-400 text-sm mt-1 mb-4">
+          Verifica la publicación en el teléfono del cliente. La cuenta social se registra sólo para respetar el límite de una promoción cada 30 días; no es su usuario de Poke Palace.
+        </p>
+
+        <form onSubmit={issueStoryReward} className="bg-slate-900 rounded-2xl border border-white/5 p-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="text-sm text-slate-300">
+              Red social
+              <select
+                value={storyPlatform}
+                onChange={(e) => { setStoryPlatform(e.target.value); setStoryError(""); setIssuedStory(null); }}
+                className="mt-1.5 w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-3 text-white focus:outline-none focus:border-emerald-500/50"
+              >
+                <option value="instagram">Instagram</option>
+                <option value="facebook">Facebook</option>
+              </select>
+            </label>
+            <label className="text-sm text-slate-300">
+              Cuenta donde publicó la historia
+              <input
+                value={storyHandle}
+                onChange={(e) => { setStoryHandle(e.target.value); setStoryError(""); setIssuedStory(null); }}
+                placeholder={storyPlatform === "facebook" ? "Usuario de Facebook" : "@cuenta_de_instagram"}
+                maxLength={51}
+                autoComplete="off"
+                className="mt-1.5 w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50"
+              />
+              <span className="block mt-1.5 text-xs text-slate-500">Debe ser la misma cuenta que aparece en la historia activa.</span>
+            </label>
+          </div>
+
+          <label className="flex items-start gap-3 text-sm text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={confirmedTagged}
+              onChange={(e) => { setConfirmedTagged(e.target.checked); setStoryError(""); }}
+              className="mt-0.5 w-4 h-4 accent-emerald-500"
+            />
+            <span>La historia está activa, muestra el producto y etiqueta la cuenta oficial de Poke Palace.</span>
+          </label>
+          <label className="flex items-start gap-3 text-sm text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={confirmedDisclosure}
+              onChange={(e) => { setConfirmedDisclosure(e.target.checked); setStoryError(""); }}
+              className="mt-0.5 w-4 h-4 accent-emerald-500"
+            />
+            <span>La historia indica que es una promoción, por ejemplo con #PromocionPokePalace.</span>
+          </label>
+
+          <button
+            type="submit"
+            disabled={issuingStory || !storyHandle.trim() || !confirmedTagged || !confirmedDisclosure}
+            className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:hover:bg-violet-600 text-white font-semibold transition"
+          >
+            {issuingStory ? "Generando…" : "Generar código de bebida"}
+          </button>
+        </form>
+
+        {storyError && (
+          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm rounded-xl px-4 py-3 mt-3">
+            {storyError}
+          </div>
+        )}
+
+        {issuedStory && (
+          <div className="mt-3 bg-violet-500/10 border border-violet-500/20 rounded-2xl p-5">
+            <div className="text-center">
+              <p className="text-violet-300 text-sm font-semibold">Código generado para {issuedStory.socialHandle}</p>
+              <p className="my-2 text-3xl font-mono font-bold tracking-widest text-white">{issuedStory.code}</p>
+              <p className="text-slate-400 text-xs">
+                Agua de coco o limonada de matcha. Válido hasta el {new Date(issuedStory.expiresAt).toLocaleDateString("es-MX")} con la compra de un bowl.
+              </p>
+            </div>
+
+            {claimUrl && (
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-5 items-center bg-slate-950/60 rounded-2xl border border-white/10 p-4">
+                <div className="mx-auto rounded-xl overflow-hidden leading-none">
+                  <RewardQrCode value={claimUrl} size={180} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 text-white font-semibold">
+                    <QrCode size={19} aria-hidden="true" /> Guardar en la cuenta del cliente
+                  </div>
+                  <p className="text-slate-400 text-sm mt-2 leading-relaxed">
+                    Pide al cliente escanear este QR. Si inicia sesión o crea una cuenta, el premio aparecerá automáticamente en “Mis premios”.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+                    <button type="button" onClick={copyStoryCode} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-2.5 text-sm font-semibold text-white transition">
+                      <Copy size={16} aria-hidden="true" /> Copiar código
+                    </button>
+                    <button type="button" onClick={shareStoryReward} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3 py-2.5 text-sm font-semibold text-white transition">
+                      <Share2 size={16} aria-hidden="true" /> Compartir enlace
+                    </button>
+                  </div>
+                  {storyShareStatus && <p className="text-emerald-300 text-xs mt-2" role="status">{storyShareStatus}</p>}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-white/10 pt-6">
+      <div className="mb-5">
+        <h2 className="text-lg font-bold text-white">Canjear premios</h2>
+        <p className="text-slate-400 text-sm mt-1">
+          Pide al cliente el código de 6 caracteres que le aparece en su cuenta y búscalo aquí.
+        </p>
+      </div>
+
+      <form onSubmit={lookup} className="flex gap-2 mb-4">
+        <input
+          value={code}
+          onChange={(e) => { setCode(e.target.value.toUpperCase()); setRedemption(null); setError(""); }}
+          placeholder="Ej. A3K9QZ"
+          maxLength={6}
+          className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-white text-lg font-mono tracking-widest text-center uppercase placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50"
+        />
+        <button
+          type="submit"
+          disabled={loading || !code.trim()}
+          className="px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white font-semibold transition"
+        >
+          {loading ? "Buscando…" : "Buscar"}
+        </button>
+      </form>
+
+      {error && (
+        <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm rounded-xl px-4 py-3 mb-4">
+          {error}
+        </div>
+      )}
+
+      {redemption && (
+        <div className="bg-slate-900 rounded-2xl border border-white/5 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-2xl font-mono font-bold tracking-widest text-white">{redemption.code}</span>
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+              redemption.status === "used"    ? "bg-slate-500/20 text-slate-400"
+              : redemption.status === "expired" ? "bg-rose-500/20 text-rose-400"
+              : "bg-emerald-500/20 text-emerald-400"
+            }`}>
+              {redemption.status === "used" ? "Ya usado" : redemption.status === "expired" ? "Vencido" : "Activo"}
+            </span>
+          </div>
+
+          <div className="space-y-1.5 mb-5">
+            <p className="text-white font-semibold">{redemption.rewardName}</p>
+            <p className="text-slate-400 text-sm">
+              {redemption.source === "social_story"
+                ? `${redemption.socialPlatform === "facebook" ? "Facebook" : "Instagram"}: ${redemption.socialHandle}`
+                : `Cliente: ${redemption.user?.name || "—"} · ${redemption.pointsCost} pts`}
+            </p>
+            {redemption.status === "used" && (
+              <p className="text-slate-500 text-xs">
+                Usado el {new Date(redemption.usedAt).toLocaleString("es-MX")}
+              </p>
+            )}
+            {redemption.status === "expired" && (
+              <p className="text-rose-400 text-xs">
+                Venció el {new Date(redemption.expiresAt).toLocaleDateString("es-MX")}
+              </p>
+            )}
+            {redemption.status === "active" && redemption.expiresAt && (
+              <p className="text-slate-500 text-xs">
+                Válido hasta el {new Date(redemption.expiresAt).toLocaleDateString("es-MX")}
+              </p>
+            )}
+          </div>
+
+          {redemption.status === "active" ? (
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-amber-300 text-sm">
+              Aplica este código dentro de la orden en la pestaña POS. El sistema verificará las condiciones y calculará el descuento.
+            </div>
+          ) : (
+            <button
+              onClick={reset}
+              className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold transition"
+            >
+              Buscar otro código
+            </button>
+          )}
+        </div>
+      )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
    DISPONIBILIDAD DE INGREDIENTES
    ========================================================================== */
 const AVAIL_CATEGORIES = [
@@ -854,17 +1368,102 @@ const AVAIL_CATEGORIES = [
   { label: "Toppings",     items: Object.entries(TOPPING_LABELS).map(([id, label]) => ({ id, label })) },
 ];
 
-function AvailabilityTab({ token }) {
+function AvailabilityTab({ token, role }) {
   const [unavailable, setUnavailable] = useState(null); // null = loading
   const [saving, setSaving]           = useState(false);
   const [saveError, setSaveError]     = useState("");
+
+  const [storeStatus, setStoreStatus] = useState(null); // { ordersPaused, pausedMessage }
+  const [pauseSaving, setPauseSaving] = useState(false);
+  const [pauseMsgDraft, setPauseMsgDraft] = useState("");
+
+  // Respaldo de datos — solo dueño/admin
+  const canBackup = role === "owner" || role === "admin";
+  const [backupInfo, setBackupInfo]   = useState(null); // { lastBackupAt }
+  const [backupBusy, setBackupBusy]   = useState(false);
+  const [backupError, setBackupError] = useState("");
 
   useEffect(() => {
     fetch(`${API_URL}/api/settings/availability`)
       .then((r) => r.json())
       .then((d) => setUnavailable(d.unavailableItems ?? []))
       .catch(() => setUnavailable([]));
+
+    fetch(`${API_URL}/api/settings/store-status`)
+      .then((r) => r.json())
+      .then((d) => { setStoreStatus(d); setPauseMsgDraft(d.pausedMessage || ""); })
+      .catch(() => setStoreStatus({ ordersPaused: false, pausedMessage: "" }));
   }, []);
+
+  useEffect(() => {
+    if (!canBackup) return;
+    fetch(`${API_URL}/api/staff/backup/status`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((d) => setBackupInfo({ lastBackupAt: d.lastBackupAt || null }))
+      .catch(() => setBackupInfo({ lastBackupAt: null }));
+  }, [canBackup, token]);
+
+  const downloadBackup = async () => {
+    setBackupBusy(true);
+    setBackupError("");
+    try {
+      const r = await fetch(`${API_URL}/api/staff/backup`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) throw new Error("No se pudo generar el respaldo. Intenta de nuevo.");
+      const data = await r.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `pokepalace_respaldo_${todayKey()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setBackupInfo({ lastBackupAt: data.exportedAt });
+    } catch (e) {
+      setBackupError(e.message);
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const daysSinceBackup = backupInfo?.lastBackupAt
+    ? Math.floor((Date.now() - new Date(backupInfo.lastBackupAt).getTime()) / 86400000)
+    : null;
+  const backupOverdue = canBackup && backupInfo && (daysSinceBackup === null || daysSinceBackup >= 7);
+
+  const togglePause = async () => {
+    const next = { ordersPaused: !storeStatus.ordersPaused, pausedMessage: pauseMsgDraft };
+    setStoreStatus(next);
+    setPauseSaving(true);
+    try {
+      await fetch(`${API_URL}/api/settings/store-status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(next),
+      });
+    } catch {
+      setSaveError("Error al guardar. Intenta de nuevo.");
+    } finally {
+      setPauseSaving(false);
+    }
+  };
+
+  const savePauseMessage = async () => {
+    setPauseSaving(true);
+    try {
+      await fetch(`${API_URL}/api/settings/store-status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ordersPaused: storeStatus.ordersPaused, pausedMessage: pauseMsgDraft }),
+      });
+      setStoreStatus((p) => ({ ...p, pausedMessage: pauseMsgDraft }));
+    } catch {
+      setSaveError("Error al guardar. Intenta de nuevo.");
+    } finally {
+      setPauseSaving(false);
+    }
+  };
 
   const toggle = async (id) => {
     const next = unavailable.includes(id)
@@ -890,12 +1489,93 @@ function AvailabilityTab({ token }) {
 
   const unavailableCount = unavailable?.length ?? 0;
 
-  if (unavailable === null) {
+  if (unavailable === null || storeStatus === null) {
     return <p className="text-slate-400 text-sm mt-4">Cargando…</p>;
   }
 
   return (
     <div>
+      {/* Pausar pedidos en línea */}
+      <div className={`mb-6 rounded-2xl border p-4 ${storeStatus.ordersPaused ? "bg-rose-500/10 border-rose-500/30" : "bg-slate-900 border-white/5"}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-white">Pedidos en línea</h2>
+            <p className={`text-sm mt-1 ${storeStatus.ordersPaused ? "text-rose-400 font-semibold" : "text-slate-400"}`}>
+              {storeStatus.ordersPaused ? "⏸ Pausados — los clientes no pueden ordenar ahora" : "Activos — la tienda acepta pedidos normalmente"}
+            </p>
+          </div>
+          <button
+            onClick={togglePause}
+            disabled={pauseSaving}
+            className={`shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition ${
+              storeStatus.ordersPaused
+                ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                : "bg-rose-600 hover:bg-rose-500 text-white"
+            } disabled:opacity-50`}
+          >
+            {pauseSaving ? "Guardando…" : storeStatus.ordersPaused ? "Reanudar pedidos" : "Pausar pedidos"}
+          </button>
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-white/5">
+          <label className="text-xs text-slate-400 uppercase tracking-widest mb-1.5 block">
+            Mensaje para el cliente (opcional)
+          </label>
+          <div className="flex gap-2">
+            <input
+              value={pauseMsgDraft}
+              onChange={(e) => setPauseMsgDraft(e.target.value)}
+              placeholder="Ej. Cerrado temporalmente por alta demanda, regresamos en 30 min"
+              maxLength={200}
+              className="flex-1 bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50"
+            />
+            <button
+              onClick={savePauseMessage}
+              disabled={pauseSaving}
+              className="shrink-0 px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold transition disabled:opacity-50"
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Respaldo de datos — solo dueño/admin */}
+      {canBackup && (
+        <div className={`mb-6 rounded-2xl border p-4 ${backupOverdue ? "bg-amber-500/10 border-amber-500/30" : "bg-slate-900 border-white/5"}`}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-bold text-white">💾 Respaldo de datos</h2>
+              <p className={`text-sm mt-1 ${backupOverdue ? "text-amber-400 font-semibold" : "text-slate-400"}`}>
+                {backupInfo === null
+                  ? "Consultando…"
+                  : daysSinceBackup === null
+                  ? "⚠ Nunca se ha descargado un respaldo"
+                  : daysSinceBackup === 0
+                  ? "Último respaldo: hoy"
+                  : daysSinceBackup >= 7
+                  ? `⚠ Último respaldo hace ${daysSinceBackup} días — descarga uno nuevo`
+                  : `Último respaldo hace ${daysSinceBackup} día${daysSinceBackup > 1 ? "s" : ""}`}
+              </p>
+            </div>
+            <button
+              onClick={downloadBackup}
+              disabled={backupBusy}
+              className={`shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition text-white disabled:opacity-50 ${
+                backupOverdue ? "bg-amber-600 hover:bg-amber-500" : "bg-slate-700 hover:bg-slate-600"
+              }`}
+            >
+              {backupBusy ? "Generando…" : "⬇ Descargar respaldo"}
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 mt-3 pt-3 border-t border-white/5">
+            Descarga un archivo con toda la información del negocio (órdenes, clientes, inventario, checadas, gastos…).
+            Guárdalo en un lugar seguro — por ejemplo tu Google Drive — al menos una vez por semana.
+          </p>
+          {backupError && <p className="text-rose-400 text-xs mt-2">{backupError}</p>}
+        </div>
+      )}
+
       <div className="mb-5">
         <h2 className="text-lg font-bold text-white">Disponibilidad de ingredientes</h2>
         <p className="text-slate-400 text-sm mt-1">
@@ -945,35 +1625,44 @@ function AvailabilityTab({ token }) {
 /* ============================================================================
    PANEL — ASISTENCIA + EQUIPO
    ========================================================================== */
-function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee, onUpdateEmployee }) {
+function PanelTab({ actor, employees, time, now, onAddEmployee, onRemoveEmployee, onUpdateEmployee }) {
   const [view, setView] = useState("hoy");
   const empById = (id) => employees.find((e) => sid(e._id) === sid(id));
   const weekAgo = Date.now() - 7 * 86400000;
   const weekEntries = time.filter((t) => new Date(t.clockIn).getTime() >= weekAgo);
 
+  const breakMinsOf = (t) => (t.breaks || []).reduce((bAcc, b) => {
+    const bStart = new Date(b.start).getTime();
+    const bEnd = b.end ? new Date(b.end).getTime() : now;
+    return bAcc + (bEnd - bStart) / 60000;
+  }, 0);
+
   const hoursByEmp = employees.map((e) => {
     const entries = weekEntries.filter((t) => sid(t.employeeId) === sid(e._id));
     const mins = entries.reduce((acc, t) => {
       const start = new Date(t.clockIn).getTime();
-      return acc + ((t.clockOut ? new Date(t.clockOut).getTime() : now) - start) / 60000;
+      const grossMins = ((t.clockOut ? new Date(t.clockOut).getTime() : now) - start) / 60000;
+      return acc + Math.max(0, grossMins - breakMinsOf(t));
     }, 0);
     return { emp: e, mins, open: entries.some((t) => !t.clockOut) };
   });
 
   const activeNow = hoursByEmp.filter((h) => h.open);
-  const totalPayroll = hoursByEmp.reduce((s, { emp, mins }) => s + (mins / 60) * (emp.hourlyRate || 0), 0);
+  const payFor = (emp, mins) => emp.payType === "weekly" ? (emp.weeklySalary || 0) : (mins / 60) * (emp.hourlyRate || 0);
+  const totalPayroll = hoursByEmp.reduce((s, { emp, mins }) => s + payFor(emp, mins), 0);
 
   function exportCSV() {
-    const rows = [["Empleado","Rol","Fecha","Entrada","Salida","Minutos"]];
+    const rows = [["Empleado","Rol","Fecha","Entrada","Salida","Minutos lonche","Minutos netos"]];
     time.forEach((t) => {
       const e = empById(t.employeeId);
+      const breakMins = Math.round(breakMinsOf(t));
+      const netMins = t.clockOut
+        ? Math.round(Math.max(0, (new Date(t.clockOut).getTime() - new Date(t.clockIn).getTime()) / 60000 - breakMins))
+        : "";
       rows.push([e?.name||"?", e?.role||"", t.date, fmtTime(t.clockIn), t.clockOut ? fmtTime(t.clockOut) : "en curso",
-        t.clockOut ? Math.round((new Date(t.clockOut).getTime()-new Date(t.clockIn).getTime())/60000) : ""]);
+        breakMins || 0, netMins]);
     });
-    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-    a.download = `horas_${todayKey()}.csv`; a.click();
+    downloadCSV(`horas_${todayKey()}.csv`, rows);
   }
 
   return (
@@ -1047,75 +1736,152 @@ function PanelTab({ employees, time, now, onAddEmployee, onRemoveEmployee, onUpd
       )}
 
       {view === "nomina" && (
-        <PayrollView hoursByEmp={hoursByEmp} totalPayroll={totalPayroll} onUpdate={onUpdateEmployee} />
+        <PayrollView actor={actor} hoursByEmp={hoursByEmp} totalPayroll={totalPayroll} onUpdate={onUpdateEmployee} />
       )}
 
-      {view === "equipo" && <TeamManager employees={employees} onAdd={onAddEmployee} onRemove={onRemoveEmployee} onUpdate={onUpdateEmployee} />}
+      {view === "equipo" && <TeamManager actor={actor} employees={employees} onAdd={onAddEmployee} onRemove={onRemoveEmployee} />}
     </div>
   );
 }
 
-function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
-  const [editId, setEditId]   = useState(null);
+function PayrollView({ actor, hoursByEmp, totalPayroll, onUpdate }) {
+  const [editId, setEditId]     = useState(null);
+  const [editType, setEditType] = useState("hourly");
   const [editRate, setEditRate] = useState("");
-  const [saving, setSaving]   = useState(false);
+  const [editSalary, setEditSalary] = useState("");
+  const [saving, setSaving]     = useState(false);
+
+  const payFor = (emp, mins) => emp.payType === "weekly" ? (emp.weeklySalary || 0) : (mins / 60) * (emp.hourlyRate || 0);
+
+  const startEdit = (emp) => {
+    setEditId(emp._id);
+    setEditType(emp.payType === "weekly" ? "weekly" : "hourly");
+    setEditRate(String(emp.hourlyRate || ""));
+    setEditSalary(String(emp.weeklySalary || ""));
+  };
 
   const saveRate = async (emp) => {
     setSaving(true);
     try {
-      await onUpdate(emp._id, { hourlyRate: parseFloat(editRate) || 0 });
+      await onUpdate(emp._id, {
+        payType: editType,
+        hourlyRate: parseFloat(editRate) || 0,
+        weeklySalary: parseFloat(editSalary) || 0,
+      });
       setEditId(null);
     } catch { /* silently ignore */ }
     finally { setSaving(false); }
   };
 
+  function exportCSV() {
+    const rows = [["Empleado", "Rol", "Tipo de pago", "Horas trabajadas", "Sueldo/hora", "Sueldo semanal fijo", "Pago estimado"]];
+    hoursByEmp.forEach(({ emp, mins }) => {
+      const hours = mins / 60;
+      rows.push([
+        emp.name, ROLE_LABEL[emp.role] || emp.role,
+        emp.payType === "weekly" ? "Semanal fijo" : "Por hora",
+        hours.toFixed(2), emp.hourlyRate || 0, emp.weeklySalary || 0,
+        payFor(emp, mins).toFixed(2),
+      ]);
+    });
+    rows.push([]);
+    rows.push(["Total nómina", "", "", "", "", "", totalPayroll.toFixed(2)]);
+    downloadCSV(`nomina_${todayKey()}.csv`, rows);
+  }
+
   return (
     <div className="space-y-3">
       <div className="bg-slate-800 rounded-2xl border border-emerald-500/20 p-4">
-        <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Nómina estimada — últimos 7 días</p>
-        <p className="text-3xl font-black text-emerald-400">${totalPayroll.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MXN</p>
-        <p className="text-xs text-slate-500 mt-1">Basado en horas trabajadas × sueldo/hora configurado</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-slate-400 uppercase tracking-widest mb-1">Nómina estimada — últimos 7 días</p>
+            <p className="text-3xl font-black text-emerald-400">${totalPayroll.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} MXN</p>
+            <p className="text-xs text-slate-500 mt-1">Por hora según turnos, o sueldo semanal fijo si así está configurado</p>
+          </div>
+          <button onClick={exportCSV} className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold transition shrink-0">
+            <Download className="w-3.5 h-3.5" /> CSV
+          </button>
+        </div>
       </div>
 
       <div className="bg-slate-800 rounded-2xl border border-white/5 divide-y divide-white/5">
         {hoursByEmp.map(({ emp, mins }) => {
-          const hours = mins / 60;
-          const pay   = hours * (emp.hourlyRate || 0);
+          const pay   = payFor(emp, mins);
           const col   = getColor(emp.color);
           const isEditing = editId === emp._id;
           return (
-            <div key={sid(emp._id)} className="flex items-center gap-3 p-4">
-              <span className={`w-9 h-9 rounded-xl ${col.bg} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
-                {initials(emp.name)}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{emp.name.split(" ")[0]}</p>
-                <p className="text-[11px] text-slate-500">{fmtHM(mins)} trabajadas</p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {isEditing ? (
-                  <>
+            <div key={sid(emp._id)} className={isEditing ? "p-4" : "flex items-center gap-3 p-4"}>
+              {isEditing ? (
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-9 h-9 rounded-xl ${col.bg} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
+                      {initials(emp.name)}
+                    </span>
+                    <p className="font-semibold text-sm truncate">{emp.name.split(" ")[0]}</p>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => setEditType("hourly")}
+                      className={`flex-1 text-xs font-semibold py-2 rounded-lg transition ${editType === "hourly" ? "bg-emerald-600 text-white" : "bg-slate-700 text-slate-400"}`}>
+                      Por hora
+                    </button>
+                    <button onClick={() => setEditType("weekly")}
+                      className={`flex-1 text-xs font-semibold py-2 rounded-lg transition ${editType === "weekly" ? "bg-emerald-600 text-white" : "bg-slate-700 text-slate-400"}`}>
+                      Semanal fijo
+                    </button>
+                  </div>
+                  {editType === "hourly" ? (
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-slate-400">$</span>
                       <input type="number" min="0" step="10" value={editRate}
                         onChange={(e) => setEditRate(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") saveRate(emp); if (e.key === "Escape") setEditId(null); }}
                         autoFocus
-                        className="w-20 bg-slate-700 border border-white/10 rounded-lg px-2 py-1 text-xs text-white text-right focus:outline-none focus:border-emerald-500 font-mono"
+                        className="flex-1 bg-slate-700 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white text-right focus:outline-none focus:border-emerald-500 font-mono"
                         placeholder="0"
                       />
-                      <span className="text-xs text-slate-400">/hr</span>
+                      <span className="text-xs text-slate-400">/hora</span>
                     </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-slate-400">$</span>
+                      <input type="number" min="0" step="50" value={editSalary}
+                        onChange={(e) => setEditSalary(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveRate(emp); if (e.key === "Escape") setEditId(null); }}
+                        autoFocus
+                        className="flex-1 bg-slate-700 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white text-right focus:outline-none focus:border-emerald-500 font-mono"
+                        placeholder="0"
+                      />
+                      <span className="text-xs text-slate-400">/semana</span>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditId(null)} className="flex-1 text-xs text-slate-300 bg-slate-700 hover:bg-slate-600 py-2 rounded-lg transition">Cancelar</button>
                     <button onClick={() => saveRate(emp)} disabled={saving}
-                      className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded-lg transition">
-                      {saving ? "…" : "OK"}
+                      className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg transition">
+                      {saving ? "Guardando…" : "Guardar"}
                     </button>
-                    <button onClick={() => setEditId(null)} className="text-xs text-slate-400 hover:text-white transition">✕</button>
-                  </>
-                ) : (
-                  <>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <span className={`w-9 h-9 rounded-xl ${col.bg} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
+                    {initials(emp.name)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">{emp.name.split(" ")[0]}</p>
+                    <p className="text-[11px] text-slate-500">{fmtHM(mins)} trabajadas</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
                     <div className="text-right">
-                      {emp.hourlyRate > 0 ? (
+                      {emp.payType === "weekly" && emp.weeklySalary > 0 ? (
+                        <>
+                          <p className="text-sm font-bold">${pay.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
+                          <p className="text-[10px] text-slate-500">${emp.weeklySalary}/semana fijo</p>
+                          {emp.hourlyRate > 0 && (
+                            <p className="text-[10px] text-emerald-400/80">≈${emp.hourlyRate}/hora efectivo</p>
+                          )}
+                        </>
+                      ) : emp.hourlyRate > 0 ? (
                         <>
                           <p className="text-sm font-bold">${pay.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</p>
                           <p className="text-[10px] text-slate-500">${emp.hourlyRate}/hr</p>
@@ -1124,23 +1890,25 @@ function PayrollView({ hoursByEmp, totalPayroll, onUpdate }) {
                         <p className="text-xs text-slate-500 italic">Sin tarifa</p>
                       )}
                     </div>
-                    <button onClick={() => { setEditId(emp._id); setEditRate(String(emp.hourlyRate || "")); }}
-                      className="text-[10px] text-slate-500 hover:text-emerald-400 bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg transition">
-                      Editar
-                    </button>
-                  </>
-                )}
-              </div>
+                    {canManageEmployee(actor, emp) && (
+                      <button onClick={() => startEdit(emp)}
+                        className="text-[10px] text-slate-500 hover:text-emerald-400 bg-white/5 hover:bg-white/10 px-2 py-1 rounded-lg transition">
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
       </div>
-      <p className="text-xs text-slate-500 text-center">Toca "Editar" en cada empleado para configurar su sueldo por hora (MXN).</p>
+      <p className="text-xs text-slate-500 text-center">Toca &quot;Editar&quot; en cada empleado para configurar su sueldo por hora (MXN).</p>
     </div>
   );
 }
 
-function TeamManager({ employees, onAdd, onRemove, onUpdate }) {
+function TeamManager({ actor, employees, onAdd, onRemove }) {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: "", role: "employee", pin: "", color: "emerald", hourlyRate: "" });
   const [error, setError] = useState("");
@@ -1185,13 +1953,14 @@ function TeamManager({ employees, onAdd, onRemove, onUpdate }) {
                 <p className={`text-xs ${col.text}`}>{ROLE_LABEL[e.role]||e.role}</p>
                 {e.hourlyRate > 0 && <p className="text-[10px] text-slate-500 mt-0.5">${e.hourlyRate}/hr</p>}
               </div>
-              {confirmId === sid(e._id)
-                ? <div className="flex gap-1 shrink-0">
-                    <button onClick={() => setConfirmId(null)} className="text-xs px-2 py-1.5 rounded-lg bg-slate-700 text-slate-300">No</button>
-                    <button onClick={() => { onRemove(e._id); setConfirmId(null); }} className="text-xs px-2 py-1.5 rounded-lg bg-rose-500 text-white font-semibold">Eliminar</button>
-                  </div>
-                : <button onClick={() => setConfirmId(sid(e._id))} className="text-slate-600 hover:text-rose-400 transition shrink-0"><Trash2 className="w-4 h-4" /></button>
-              }
+              {canManageEmployee(actor, e) && (
+                confirmId === sid(e._id)
+                  ? <div className="flex gap-1 shrink-0">
+                      <button onClick={() => setConfirmId(null)} className="text-xs px-2 py-1.5 rounded-lg bg-slate-700 text-slate-300">No</button>
+                      <button onClick={() => { onRemove(e._id); setConfirmId(null); }} className="text-xs px-2 py-1.5 rounded-lg bg-rose-500 text-white font-semibold">Eliminar</button>
+                    </div>
+                  : <button onClick={() => setConfirmId(sid(e._id))} className="text-slate-600 hover:text-rose-400 transition shrink-0"><Trash2 className="w-4 h-4" /></button>
+              )}
             </div>
           );
         })}
@@ -1205,11 +1974,9 @@ function TeamManager({ employees, onAdd, onRemove, onUpdate }) {
           <div className="grid grid-cols-2 gap-2">
             <select value={form.role} onChange={(e) => setForm({...form, role:e.target.value})}
               className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
-              <option value="employee">Empleado/a</option>
-              <option value="cashier">Cajero/a</option>
-              <option value="kitchen">Cocina</option>
-              <option value="manager">Gerente</option>
-              <option value="owner">Dueño/a · Socio</option>
+              {(ASSIGNABLE_ROLES[actor?.role] || []).map((role) => (
+                <option key={role} value={role}>{ROLE_LABEL[role] || role}</option>
+              ))}
             </select>
             <input value={form.pin} inputMode="numeric" placeholder="PIN (4 dígitos)"
               onChange={(e) => setForm({...form, pin:e.target.value.replace(/\D/g,"").slice(0,4)})}
@@ -1249,30 +2016,122 @@ function TeamManager({ employees, onAdd, onRemove, onUpdate }) {
 /* ============================================================================
    BOTTOM NAV
    ========================================================================== */
-function BottomNav({ tab, setTab, tabs, openEntry, lowStockCount }) {
+function BottomNav({ role, tab, setTab, tabs, openEntry, lowStockCount }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const preferredTabs = MOBILE_PRIMARY_BY_ROLE[role] || MOBILE_PRIMARY_BY_ROLE.employee;
+  const primaryTabs = [...preferredTabs, ...tabs.filter((id) => !preferredTabs.includes(id))]
+    .filter((id, index, list) => tabs.includes(id) && list.indexOf(id) === index)
+    .slice(0, 4);
+  const isMoreActive = !primaryTabs.includes(tab);
+
+  useEffect(() => {
+    if (!moreOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setMoreOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [moreOpen]);
+
+  const openTab = (id) => {
+    setTab(id);
+    setMoreOpen(false);
+  };
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-20 bg-slate-900/95 backdrop-blur border-t border-white/5">
-      <div className="max-w-5xl mx-auto flex justify-around px-2 py-2 overflow-x-auto">
-        {tabs.map((id) => {
-          const { label, icon: Icon } = TAB_META[id];
+    <>
+      {moreOpen && (
+        <div className={shellStyles.moreLayer}>
+          <button
+            type="button"
+            className={shellStyles.moreBackdrop}
+            onClick={() => setMoreOpen(false)}
+            aria-label="Cerrar menú"
+          />
+          <section className={shellStyles.moreSheet} role="dialog" aria-modal="true" aria-labelledby="staff-more-title">
+            <div className={shellStyles.moreHandle} />
+            <div className={shellStyles.moreHeader}>
+              <div>
+                <span>Centro de trabajo</span>
+                <h2 id="staff-more-title">Todas las secciones</h2>
+              </div>
+              <button type="button" onClick={() => setMoreOpen(false)} aria-label="Cerrar">
+                <X aria-hidden="true" />
+              </button>
+            </div>
+            <div className={shellStyles.moreContent}>
+              {TAB_GROUPS.map((group) => {
+                const visibleTabs = group.tabs.filter((id) => tabs.includes(id));
+                if (!visibleTabs.length) return null;
+                return (
+                  <div className={shellStyles.moreGroup} key={group.id}>
+                    <p>{group.label}</p>
+                    <div className={shellStyles.moreGrid}>
+                      {visibleTabs.map((id) => {
+                        const { label, icon: Icon } = TAB_META[id];
+                        const isActive = tab === id;
+                        return (
+                          <button
+                            type="button"
+                            key={id}
+                            onClick={() => openTab(id)}
+                            className={isActive ? shellStyles.moreItemActive : ""}
+                            aria-current={isActive ? "page" : undefined}
+                          >
+                            <span><Icon aria-hidden="true" /></span>
+                            <strong>{label}</strong>
+                            <NavIndicator id={id} openEntry={openEntry} lowStockCount={lowStockCount} compact />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      )}
+
+      <nav className={shellStyles.mobileNav} aria-label="Navegación principal de Staff">
+        <div className={shellStyles.mobileNavInner}>
+        {primaryTabs.map((id) => {
+          const { label, mobileLabel, icon: Icon } = TAB_META[id];
           const isActive = tab === id;
           return (
-            <button key={id} onClick={() => setTab(id)}
-              className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all relative shrink-0 ${isActive ? "text-emerald-400" : "text-slate-500 hover:text-slate-300"}`}>
-              {id === "inicio" && openEntry && (
-                <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              )}
-              {id === "inv" && lowStockCount > 0 && (
-                <span className="absolute -top-0.5 right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
-                  {lowStockCount > 9 ? "9+" : lowStockCount}
-                </span>
-              )}
-              <Icon className={`w-5 h-5 ${isActive ? "scale-110" : ""} transition-transform`} />
-              <span className={`text-[10px] font-medium whitespace-nowrap ${isActive ? "text-emerald-400" : ""}`}>{label}</span>
+            <button
+              type="button"
+              key={id}
+              onClick={() => openTab(id)}
+              className={isActive ? shellStyles.mobileNavActive : ""}
+              aria-current={isActive ? "page" : undefined}
+            >
+              <span className={shellStyles.mobileNavIcon}>
+                <Icon aria-hidden="true" />
+                <NavIndicator id={id} openEntry={openEntry} lowStockCount={lowStockCount} compact />
+              </span>
+              <span>{mobileLabel || label}</span>
             </button>
           );
         })}
-      </div>
-    </nav>
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className={isMoreActive || moreOpen ? shellStyles.mobileNavActive : ""}
+            aria-expanded={moreOpen}
+            aria-controls="staff-more-title"
+          >
+            <span className={shellStyles.mobileNavIcon}><Menu aria-hidden="true" /></span>
+            <span>Más</span>
+          </button>
+        </div>
+      </nav>
+    </>
   );
 }
+

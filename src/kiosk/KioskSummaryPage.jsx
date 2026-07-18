@@ -4,6 +4,11 @@ import OrderSummary from "../order/OrderSummary";
 import { useOrder } from "../order/OrderContext";
 import useIdleTimeout from "./useIdleTimeout";
 import { API_URL } from "../config";
+import {
+  clearOrderSubmission,
+  getOrCreateOrderSubmission,
+  keepOrderSubmissionPayload,
+} from "../utils/orderSubmission";
 
 const IDLE_TIMEOUT_MS = 60000;
 
@@ -15,6 +20,7 @@ export default function KioskSummaryPage() {
   const [submitError, setSubmitError] = useState("");
 
   const goToWelcome = useCallback(() => {
+    clearOrderSubmission("kiosk");
     resetOrder();
     navigate("/kiosk", { replace: true });
   }, [resetOrder, navigate]);
@@ -41,22 +47,35 @@ export default function KioskSummaryPage() {
       setSaving(true);
       setSubmitError("");
 
+      let submission = getOrCreateOrderSubmission("kiosk");
+      submission = keepOrderSubmissionPayload(submission, {
+        ...order,
+        updateCheckout: undefined,
+        scheduledPickupTime: order.isScheduled && order.scheduledPickupTime
+          ? new Date(order.scheduledPickupTime).toISOString()
+          : undefined,
+        clientOrderId: submission.clientOrderId,
+      });
+
       const res = await fetch(`${API_URL}/api/orders`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...order,
-          updateCheckout: undefined,
-          scheduledPickupTime: order.isScheduled && order.scheduledPickupTime
-            ? new Date(order.scheduledPickupTime).toISOString()
-            : undefined,
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          "X-Order-Token": submission.orderToken,
+        },
+        body: JSON.stringify(submission.payload),
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.msg || "No se pudo enviar tu pedido. Intenta de nuevo.");
+      if (!res.ok) {
+        if (res.status < 500 && !data?.retryable) {
+          clearOrderSubmission("kiosk", submission.clientOrderId);
+        }
+        throw new Error(data?.msg || "No se pudo enviar tu pedido. Intenta de nuevo.");
+      }
 
       const shortCode = data.order._id.slice(-6).toUpperCase();
+      clearOrderSubmission("kiosk", submission.clientOrderId);
       resetOrder();
       navigate("/kiosk/done", { replace: true, state: { shortCode, total: data.order.total } });
     } catch (e) {

@@ -1,18 +1,30 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import StaffUser from "../models/StaffUser.js";
+import { comparePin, hashPin, isHashedPin, isValidPin } from "../utils/staffPin.js";
 
 const MANAGER_ROLES = ["owner", "manager", "admin"];
 
 export const pinLogin = async (req, res) => {
   const { pin, locationId } = req.body;
-  if (!pin || !locationId) {
+  if (!isValidPin(pin) || typeof locationId !== "string" || !locationId) {
     return res.status(400).json({ message: "pin y locationId requeridos" });
   }
   try {
-    const user = await StaffUser.findOne({ pin, locationId, active: true });
+    const candidates = await StaffUser.find({ locationId, active: true }).select("+pin");
+    let user = null;
+    for (const candidate of candidates) {
+      if (await comparePin(pin, candidate.pin)) {
+        user = candidate;
+        break;
+      }
+    }
     if (!user) {
       return res.status(401).json({ message: "PIN incorrecto" });
+    }
+    if (!isHashedPin(user.pin)) {
+      user.pin = await hashPin(pin);
+      await user.save();
     }
     const token = jwt.sign(
       { id: user._id, role: user.role, type: "staff" },
@@ -36,9 +48,12 @@ export const pinLogin = async (req, res) => {
 
 export const staffLogin = async (req, res) => {
   const { email, password } = req.body;
+  if (typeof email !== "string" || typeof password !== "string") {
+    return res.status(400).json({ message: "Invalid credentials" });
+  }
 
   try {
-    const user = await StaffUser.findOne({ email, active: true });
+    const user = await StaffUser.findOne({ email, active: true }).select("+password");
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }

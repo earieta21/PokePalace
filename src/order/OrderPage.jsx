@@ -8,16 +8,26 @@ import ComplementsSelection from "./ComplementsSelection";
 import SauceSelection from "./SauceSelection";
 import ToppingsSelection from "./ToppingsSelection";
 import { useOrder } from "./OrderContext";
-import { BASE_LABELS, PROTEIN_LABELS } from "./OrderLabels";
+import { ITEM_LABELS } from "./OrderLabels";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "./pricing";
+import { API_URL } from "../config";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const TOTAL_STEPS = 6;
-const STEP_NAMES = ["Base", "Proteínas", "Marinados", "Complementos", "Salsas", "Toppings"];
+const STEP_NAME_KEYS = [
+  "summary.base",
+  "summary.protein",
+  "summary.marinades",
+  "summary.complements",
+  "summary.sauces",
+  "summary.toppings",
+];
 
 const PRESETS = [
   {
-    name: "Clásico Salmón",
-    tag: "El más pedido",
+    id: "classic_salmon",
+    nameKey: "order.presetClassicSalmon",
+    tagKey: "order.presetMostOrdered",
     base: "white_rice",
     proteins: ["salmon", "tuna"],
     bowlSize: "normal",
@@ -27,8 +37,9 @@ const PRESETS = [
     toppings: ["sesame_seeds", "nori_strips"],
   },
   {
-    name: "Tropical Camarón",
-    tag: "Fresco y ligero",
+    id: "tropical_shrimp",
+    nameKey: "order.presetTropicalShrimp",
+    tagKey: "order.presetFreshLight",
     base: "spring_mix",
     proteins: ["shrimp", "salmon"],
     bowlSize: "normal",
@@ -38,8 +49,9 @@ const PRESETS = [
     toppings: ["sesame_seeds", "crispy_onions"],
   },
   {
-    name: "Atún Picante",
-    tag: "Con mucho sabor",
+    id: "spicy_tuna",
+    nameKey: "order.presetSpicyTuna",
+    tagKey: "order.presetFlavorful",
     base: "brown_rice",
     proteins: ["tuna", "seared_tuna"],
     bowlSize: "normal",
@@ -48,21 +60,42 @@ const PRESETS = [
     sauces: ["garlic_sriracha", "spicy_mayo"],
     toppings: ["red_pepper_flakes", "furikake"],
   },
+  {
+    id: "citrus_octopus",
+    nameKey: "order.presetCitrusOctopus",
+    tagKey: "order.presetFreshLight",
+    base: "spring_mix",
+    proteins: ["octopus", "shrimp"],
+    bowlSize: "normal",
+    marinades: ["citrus_marinade"],
+    complements: ["cucumber", "mango", "avocado"],
+    sauces: ["avocado_lime", "soy_sauce"],
+    toppings: ["sesame_seeds", "nori_strips"],
+  },
 ];
 
-function StepProgress({ step }) {
+function StepProgress({ step, t }) {
+  const currentStepName = t(STEP_NAME_KEYS[step]);
   return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      padding: "14px 20px 4px",
-      maxWidth: 960,
-      margin: "0 auto",
-    }}>
+    <div
+      role="progressbar"
+      aria-valuemin={1}
+      aria-valuemax={TOTAL_STEPS}
+      aria-valuenow={step + 1}
+      aria-label={t("order.progressLabel", { step: step + 1, total: TOTAL_STEPS, name: currentStepName })}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        padding: "14px 20px 4px",
+        maxWidth: 960,
+        margin: "0 auto",
+      }}
+    >
       {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
         <React.Fragment key={i}>
           <div
-            title={STEP_NAMES[i]}
+            title={t(STEP_NAME_KEYS[i])}
+            aria-hidden="true"
             style={{
               width: 28, height: 28,
               borderRadius: "50%",
@@ -90,7 +123,31 @@ function StepProgress({ step }) {
   );
 }
 
-function PriceChip({ order }) {
+function PausedBanner({ message, t }) {
+  return (
+    <div style={{
+      maxWidth: 960, margin: "0 auto", padding: "0 20px 4px",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        background: "#fef2f2", border: "1px solid #fecaca",
+        borderRadius: 12, padding: "12px 16px", marginTop: 10,
+      }}>
+        <span aria-hidden="true" style={{ fontSize: 20 }}>⏸</span>
+        <div>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: 13.5, color: "#991b1b" }}>
+            {t("order.pausedTitle")}
+          </p>
+          <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "#b91c1c" }}>
+            {message || t("order.pausedFallback")}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PriceChip({ order, t }) {
   const isLarge = Array.isArray(order.proteins) && order.proteins.length >= 3;
   const price = isLarge ? BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE : BOWL_BASE_PRICE;
   return (
@@ -110,32 +167,43 @@ function PriceChip({ order }) {
         fontSize: 13,
         fontWeight: 700,
       }}>
-        ${price} MXN{isLarge ? " · Bowl grande" : ""}
+        ${price} MXN{isLarge ? ` · ${t("order.largeBowlSuffix")}` : ""}
       </span>
     </div>
   );
 }
 
-function BowlMiniSummary({ order, step }) {
+function BowlMiniSummary({ order, step, language, t }) {
   if (step === 0) return null;
 
   const parts = [];
+  const labels = ITEM_LABELS[language] || ITEM_LABELS.es;
+  const countLabel = (count, oneKey, manyKey) => t(count === 1 ? oneKey : manyKey, { count });
 
   if (order.base) {
-    parts.push({ icon: "🍚", text: BASE_LABELS[order.base] || order.base });
+    parts.push({ icon: "🍚", text: labels.base[order.base] || order.base });
   }
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
-    const names = order.proteins.map((id) => PROTEIN_LABELS[id] || id);
+    const names = order.proteins.map((id) => labels.protein[id] || id);
     parts.push({ icon: "🐟", text: names.join(", ") });
   }
   if (step >= 3 && Array.isArray(order.marinades) && order.marinades.length > 0) {
-    parts.push({ icon: "✨", text: `${order.marinades.length} marinado${order.marinades.length > 1 ? "s" : ""}` });
+    parts.push({
+      icon: "✨",
+      text: countLabel(order.marinades.length, "order.marinadeCountOne", "order.marinadeCountMany"),
+    });
   }
   if (step >= 4 && Array.isArray(order.complements) && order.complements.length > 0) {
-    parts.push({ icon: "🥗", text: `${order.complements.length} complemento${order.complements.length > 1 ? "s" : ""}` });
+    parts.push({
+      icon: "🥗",
+      text: countLabel(order.complements.length, "order.complementCountOne", "order.complementCountMany"),
+    });
   }
   if (step >= 5 && Array.isArray(order.sauces) && order.sauces.length > 0) {
-    parts.push({ icon: "🥣", text: `${order.sauces.length} salsa${order.sauces.length > 1 ? "s" : ""}` });
+    parts.push({
+      icon: "🥣",
+      text: countLabel(order.sauces.length, "order.sauceCountOne", "order.sauceCountMany"),
+    });
   }
 
   if (parts.length === 0) return null;
@@ -159,7 +227,7 @@ function BowlMiniSummary({ order, step }) {
             fontSize: "11.5px", fontWeight: 500, color: "var(--text-2)",
             whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 3,
           }}>
-            <span>{p.icon}</span>
+            <span aria-hidden="true">{p.icon}</span>
             <span>{p.text}</span>
           </span>
         </React.Fragment>
@@ -168,16 +236,16 @@ function BowlMiniSummary({ order, step }) {
   );
 }
 
-function PresetBowls({ onSelect }) {
+function PresetBowls({ onSelect, t }) {
   return (
     <div style={{ padding: "6px 20px 0", maxWidth: 960, margin: "0 auto" }}>
       <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 600, color: "var(--text-3)", letterSpacing: "0.3px", textTransform: "uppercase" }}>
-        Empezar desde un bowl de la casa
+        {t("order.presetStart")}
       </p>
       <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" }}>
         {PRESETS.map((preset) => (
           <button
-            key={preset.name}
+            key={preset.nameKey}
             type="button"
             onClick={() => onSelect(preset)}
             style={{
@@ -204,20 +272,20 @@ function PresetBowls({ onSelect }) {
               border: "1px solid var(--accent-border)", color: "var(--accent)",
               letterSpacing: "0.3px",
             }}>
-              {preset.tag}
+              {t(preset.tagKey)}
             </span>
             <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text)", lineHeight: 1.2 }}>
-              {preset.name}
+              {t(preset.nameKey)}
             </span>
             <span style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 500 }}>
-              {preset.proteins.length === 3 ? `$${BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE}` : `$${BOWL_BASE_PRICE}`} MXN · Personalizable
+              {preset.proteins.length === 3 ? `$${BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE}` : `$${BOWL_BASE_PRICE}`} MXN · {t("order.presetCustomizable")}
             </span>
           </button>
         ))}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 4px" }}>
         <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-        <span style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 500 }}>o arma el tuyo desde cero</span>
+        <span style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 500 }}>{t("order.presetFromScratch")}</span>
         <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
       </div>
     </div>
@@ -226,6 +294,7 @@ function PresetBowls({ onSelect }) {
 
 const OrderPage = () => {
   const { order, updateOrder, loadFavorite } = useOrder();
+  const { language, t } = useLanguage();
   const [step, setStep] = useState(() => {
     const savedStep = Number(order.draftStep);
     return Number.isInteger(savedStep) && savedStep >= 0 && savedStep <= 5 ? savedStep : 0;
@@ -236,6 +305,34 @@ const OrderPage = () => {
 
   const isGuest = Boolean(location.state?.guest);
   const editMode = searchParams.get("edit") === "1";
+  const requestedPreset = searchParams.get("preset");
+
+  const [storeStatus, setStoreStatus] = useState(null);
+  useEffect(() => {
+    fetch(`${API_URL}/api/settings/store-status`)
+      .then((r) => r.json())
+      .then(setStoreStatus)
+      .catch(() => {});
+  }, []);
+
+  // Si el cliente ya había llegado al resumen (draftStep=6) y vuelve a entrar
+  // a "Ordenar" desde el menú sin pedir un paso específico, regrésalo
+  // directo al resumen en vez de dejarlo en el último paso del armador.
+  useEffect(() => {
+    if (!searchParams.has("step") && !requestedPreset && Number(order.draftStep) === 6) {
+      navigate("/summary", { state: { guest: isGuest }, replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!requestedPreset) return;
+    const preset = PRESETS.find((candidate) => candidate.id === requestedPreset);
+    if (!preset) return;
+    loadFavorite(preset);
+    updateOrder("draftStep", 6);
+    navigate("/summary", { state: { guest: isGuest }, replace: true });
+  }, [isGuest, loadFavorite, navigate, requestedPreset, updateOrder]);
 
   const setOrderStep = useCallback((nextStep) => {
     setStep(nextStep);
@@ -264,7 +361,10 @@ const OrderPage = () => {
   };
 
   const goToSummary = () => {
-    updateOrder("draftStep", 5);
+    // 6 es un valor centinela: significa "ya llegó al resumen", distinto
+    // de estar en el paso 5 (Toppings) del armador. Así, si vuelve a entrar
+    // a "Ordenar" más tarde, lo mandamos directo al resumen otra vez.
+    updateOrder("draftStep", 6);
     navigate("/summary", { state: { guest: isGuest } });
   };
 
@@ -278,6 +378,7 @@ const OrderPage = () => {
 
   const handleSelectPreset = (preset) => {
     loadFavorite(preset);
+    updateOrder("draftStep", 6);
     navigate("/summary", { state: { guest: isGuest } });
   };
 
@@ -292,11 +393,12 @@ const OrderPage = () => {
 
   return (
     <div>
-      <StepProgress step={step} />
-      <PriceChip order={order} />
-      <BowlMiniSummary order={order} step={step} />
+      {storeStatus?.ordersPaused && <PausedBanner message={storeStatus.pausedMessage} t={t} />}
+      <StepProgress step={step} t={t} />
+      <PriceChip order={order} t={t} />
+      <BowlMiniSummary order={order} step={step} language={language} t={t} />
       {step === 0 && !order.base && (
-        <PresetBowls onSelect={handleSelectPreset} />
+        <PresetBowls onSelect={handleSelectPreset} t={t} />
       )}
       {steps[step]}
     </div>

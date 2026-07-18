@@ -71,6 +71,12 @@
   color: var(--text-2);
 }
 
+.pointsSubcaption {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
 .pointsRight {
   flex: 1;
   min-width: 180px;
@@ -153,6 +159,248 @@
   color: var(--text-2);
 }
 
+/* ── Personalized guidance ── */
+.personalCard {
+  padding: 24px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(145deg, var(--accent-bg), var(--bg-card) 70%);
+  box-shadow: var(--shadow-sm);
+}
+
+.personalTopRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.personalEyebrow {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.personalTitle {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+.personalLead {
+  max-width: 620px;
+  margin: 7px 0 0;
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.personalRewardIcon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  border: 1px solid var(--accent-border);
+  border-radius: 17px;
+  background: var(--bg-card);
+  font-size: 27px;
+}
+
+.personalProgress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 19px 0;
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.personalProgressTrack {
+  height: 9px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-muted);
+}
+
+.personalProgressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 500ms ease;
+}
+
+.personalFacts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.personalFacts > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.personalFacts strong,
+.personalFacts span {
+  display: block;
+}
+
+.personalFacts strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personalFacts span {
+  margin-top: 3px;
+  color: var(--text-2);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.personalActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.personalPrimary,
+.personalSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.personalPrimary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.personalSecondary {
+  border: 1px solid var(--border-md);
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+/* ── Social story campaign ── */
+.storyCampaign {
+  padding: 24px;
+  border: 1px solid rgba(124, 58, 237, 0.22);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(145deg, rgba(124, 58, 237, 0.09), var(--bg-card) 65%);
+  box-shadow: var(--shadow-sm);
+}
+
+.storyCampaignHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.storyCampaignIcon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #7c3aed, #db2777);
+  color: #fff;
+  font-size: 24px;
+}
+
+.storyCampaignEyebrow {
+  margin: 0 0 3px;
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.storyCampaignTitle {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.storyCampaignLead {
+  max-width: 650px;
+  margin: 7px 0 0;
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.storySteps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 20px 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.storySteps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.storySteps span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  background: rgba(124, 58, 237, 0.12);
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.storyTerms {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.storyTerms strong { color: var(--text); }
+.storyTerms p { margin: 3px 0 0; }
+
 /* ── Rewards grid ── */
 .rewardsGrid {
   display: grid;
@@ -195,6 +443,13 @@
   margin: 0;
   font-size: 12px;
   color: var(--text-2);
+  line-height: 1.4;
+}
+
+.rewardTerms {
+  margin: 6px 0 12px;
+  color: #6b7280;
+  font-size: 12px;
   line-height: 1.4;
 }
 
@@ -354,6 +609,157 @@
   line-height: 1.5;
 }
 
+.redeemErrorBanner {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pendingRecovery {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--accent-bg);
+  color: var(--text);
+}
+
+.pendingRecovery div {
+  display: grid;
+  gap: 3px;
+}
+
+.pendingRecovery span {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.pendingRecovery button {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+@media (max-width: 520px) {
+  .pendingRecovery {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+/* ── Won-code modal ── */
+.codeOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: rgba(20, 16, 12, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 180ms ease;
+}
+
+.codeModal {
+  width: min(340px, 100%);
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  padding: 32px 26px 26px;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+  animation: popIn 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.codeCheckmark {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.codeTitle {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.codeRewardName {
+  margin: 0 0 18px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.codeValue {
+  margin: 0 0 10px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  border: 1.5px dashed var(--border-md);
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--accent);
+}
+
+.codeHint {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.codeExpiry {
+  margin: 0 0 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.codeCloseBtn {
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.codeCloseBtn:hover { opacity: 0.9; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 /* ── Responsive ── */
 @media (max-width: 600px) {
   .tiersGrid, .howGrid {
@@ -366,4 +772,9 @@
     flex-direction: column;
     align-items: flex-start;
   }
+  .storyCampaign { padding: 20px 16px; }
+  .storySteps { grid-template-columns: 1fr; }
+  .personalFacts { grid-template-columns: 1fr; }
+  .personalActions { flex-direction: column; }
+  .personalPrimary, .personalSecondary { width: 100%; }
 }

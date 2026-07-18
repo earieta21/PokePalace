@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useCallback, useRef } from "react";
+import { useState, useEffect, useContext, useCallback, useMemo, useRef } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import {
@@ -85,12 +85,14 @@ function playNewOrderBeep() {
       osc.start(t);
       osc.stop(t + 0.18);
     });
-  } catch {}
+  } catch {
+    // Audio is an optional alert; unsupported browsers still show the ticket.
+  }
 }
 
-export default function KDSPage({ styles }) {
+export default function KDSPage({ styles, role }) {
   const { staffToken } = useContext(StaffAuthContext);
-  const api = createStaffApi(staffToken);
+  const api = useMemo(() => createStaffApi(staffToken), [staffToken]);
 
   const [orders, setOrders]       = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -132,7 +134,7 @@ export default function KDSPage({ styles }) {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [staffToken]);
+  }, [api]);
 
   useEffect(() => {
     load();
@@ -168,6 +170,7 @@ export default function KDSPage({ styles }) {
   };
 
   const [confirming, setConfirming] = useState(null);
+  const isKitchenOnly = role === "kitchen";
 
   const pending = orders.filter((o) => o.status !== "ready").length;
 
@@ -267,24 +270,32 @@ export default function KDSPage({ styles }) {
                 </div>
                 <div className={styles.kdsFooter}>
                   {isReady ? (
-                    <button className={`${styles.kdsBtnReady} ${styles.kdsBtnDismiss}`} onClick={() => dismiss(order)}>
-                      Marcar Completado
-                    </button>
+                    isKitchenOnly ? (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--p-muted)" }}>
+                        Esperando entrega en caja
+                      </span>
+                    ) : (
+                      <button className={`${styles.kdsBtnReady} ${styles.kdsBtnDismiss}`} onClick={() => dismiss(order)}>
+                        Marcar Completado
+                      </button>
+                    )
                   ) : (
                     <button className={styles.kdsBtnReady} onClick={() => advance(order)}>
                       {order.status === "pending" ? "Iniciar Preparación" : "Marcar Listo"}
                     </button>
                   )}
-                  {confirming === order._id ? (
-                    <div className={styles.kdsCancelConfirm}>
-                      <span>¿Cancelar orden?</span>
-                      <button className={styles.kdsCancelYes} onClick={() => { cancel(order); setConfirming(null); }}>Sí</button>
-                      <button className={styles.kdsCancelNo}  onClick={() => setConfirming(null)}>No</button>
-                    </div>
-                  ) : (
-                    <button className={styles.kdsBtnCancel} onClick={() => setConfirming(order._id)}>
-                      Cancelar orden
-                    </button>
+                  {!isKitchenOnly && (
+                    confirming === order._id ? (
+                      <div className={styles.kdsCancelConfirm}>
+                        <span>¿Cancelar orden?</span>
+                        <button className={styles.kdsCancelYes} onClick={() => { cancel(order); setConfirming(null); }}>Sí</button>
+                        <button className={styles.kdsCancelNo}  onClick={() => setConfirming(null)}>No</button>
+                      </div>
+                    ) : (
+                      <button className={styles.kdsBtnCancel} onClick={() => setConfirming(order._id)}>
+                        Cancelar orden
+                      </button>
+                    )
                   )}
                 </div>
               </div>

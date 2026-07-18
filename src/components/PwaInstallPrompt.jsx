@@ -1,6 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const DISMISSED_KEY = "pwaDismissed";
+const VISIT_COUNT_KEY = "pwaVisitCount";
+const SESSION_VISIT_KEY = "pwaVisitRegistered";
+const PROMPT_DELAY_MS = 10000;
 
 function isIos() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
@@ -11,42 +16,72 @@ function isInStandalone() {
     || window.navigator.standalone === true;
 }
 
+function wasDismissed() {
+  try {
+    return localStorage.getItem(DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function registerVisit() {
+  try {
+    let visitCount = Number(localStorage.getItem(VISIT_COUNT_KEY)) || 0;
+    if (!sessionStorage.getItem(SESSION_VISIT_KEY)) {
+      visitCount += 1;
+      localStorage.setItem(VISIT_COUNT_KEY, String(visitCount));
+      sessionStorage.setItem(SESSION_VISIT_KEY, "1");
+    }
+    return visitCount >= 2;
+  } catch {
+    // If storage is unavailable, avoid interrupting a first-time visitor.
+    return false;
+  }
+}
+
 export default function PwaInstallPrompt() {
+  const { pathname } = useLocation();
+  const { t } = useLanguage();
   const [promptEvent, setPromptEvent] = useState(null);
-  const [showIos, setShowIos]         = useState(false);
-  const [visible, setVisible]         = useState(false);
-  const [installing, setInstalling]   = useState(false);
-  const [iosStep2, setIosStep2]       = useState(false);
-  const dismissed                     = useRef(localStorage.getItem(DISMISSED_KEY) === "1");
+  const [showIos] = useState(() => isIos());
+  const [isReturnVisit, setIsReturnVisit] = useState(false);
+  const [delayReady, setDelayReady] = useState(false);
+  const [dismissed, setDismissed] = useState(wasDismissed);
+  const [installing, setInstalling] = useState(false);
+  const [iosStep2, setIosStep2] = useState(false);
+  const isHome = pathname === "/";
 
   useEffect(() => {
-    if (dismissed.current || isInStandalone()) return;
-
-    const handler = (e) => {
-      e.preventDefault();
-      setPromptEvent(e);
-      setVisible(true);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
-
-    if (isIos()) {
-      const timer = setTimeout(() => {
-        setShowIos(true);
-        setVisible(true);
-      }, 4000);
-      return () => {
-        window.removeEventListener("beforeinstallprompt", handler);
-        clearTimeout(timer);
-      };
-    }
-
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    setIsReturnVisit(registerVisit());
   }, []);
 
+  useEffect(() => {
+    if (dismissed || isInStandalone()) return undefined;
+
+    const handler = (event) => {
+      event.preventDefault();
+      setPromptEvent(event);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, [dismissed]);
+
+  useEffect(() => {
+    setDelayReady(false);
+    setIosStep2(false);
+    if (!isHome || !isReturnVisit || dismissed || isInStandalone()) return undefined;
+
+    const timer = window.setTimeout(() => setDelayReady(true), PROMPT_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [dismissed, isHome, isReturnVisit]);
+
   const dismiss = () => {
-    setVisible(false);
-    dismissed.current = true;
-    localStorage.setItem(DISMISSED_KEY, "1");
+    setDismissed(true);
+    try {
+      localStorage.setItem(DISMISSED_KEY, "1");
+    } catch {
+      // State still prevents the prompt from returning in this session.
+    }
   };
 
   const install = async () => {
@@ -55,76 +90,78 @@ export default function PwaInstallPrompt() {
     promptEvent.prompt();
     const { outcome } = await promptEvent.userChoice;
     setInstalling(false);
-    if (outcome === "accepted") setVisible(false);
+    setPromptEvent(null);
+    if (outcome === "accepted") dismiss();
   };
 
-  // Opens the native iOS share sheet — user selects "Agregar a inicio" inside it
   const openIosShare = async () => {
     try {
       await navigator.share({
         title: "Poke Palace",
-        text: "Pide tu bowl de poke",
+        text: t("pwa.shareText"),
         url: window.location.origin,
       });
     } catch {
-      // User cancelled or share not supported — show manual fallback
+      // If sharing is cancelled or unavailable, keep the manual instructions visible.
     }
     setIosStep2(true);
   };
 
+  const visible = isHome
+    && isReturnVisit
+    && delayReady
+    && !dismissed
+    && (showIos || Boolean(promptEvent));
+
   if (!visible) return null;
 
   return (
-    <div style={{
-      position: "fixed",
-      bottom: 80,
-      left: "50%",
-      transform: "translateX(-50%)",
-      zIndex: 8500,
-      width: "min(360px, calc(100vw - 32px))",
-      background: "#fff",
-      borderRadius: 18,
-      boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
-      border: "1.5px solid #e5e7eb",
-      padding: "16px 18px",
-      display: "flex",
-      gap: 12,
-      alignItems: "flex-start",
-      animation: "promptIn 0.35s cubic-bezier(0.34,1.56,0.64,1)",
-    }}>
+    <div
+      role="dialog"
+      aria-labelledby="pwa-install-title"
+      aria-describedby="pwa-install-description"
+      style={{
+        position: "fixed",
+        bottom: "calc(136px + env(safe-area-inset-bottom, 0px))",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 950,
+        width: "min(360px, calc(100vw - 32px))",
+        maxHeight: "calc(100dvh - 160px)",
+        overflowY: "auto",
+        background: "var(--bg-card)",
+        borderRadius: 18,
+        boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
+        border: "1.5px solid var(--border-md)",
+        padding: "16px 18px",
+        display: "flex",
+        gap: 12,
+        alignItems: "flex-start",
+        animation: "promptIn 0.35s cubic-bezier(0.34,1.56,0.64,1)",
+      }}
+    >
       <img
         src="/icon.svg"
-        alt="Poke Palace"
+        alt=""
+        aria-hidden="true"
         style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0 }}
       />
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: "#111" }}>
-          Instala Poke Palace
+        <p id="pwa-install-title" style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: "var(--text)" }}>
+          {t("pwa.title")}
         </p>
 
-        {showIos ? (
-          iosStep2 ? (
-            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#555", lineHeight: 1.6 }}>
-              En el menú que se abrió, busca{" "}
-              <strong style={{ color: "#111" }}>"Agregar a inicio"</strong>{" "}
-              (puede que tengas que deslizar hacia abajo dentro del menú).
-            </p>
-          ) : (
-            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#555", lineHeight: 1.6 }}>
-              Toca el botón de abajo para abrir el menú de compartir de Safari,
-              luego elige <strong style={{ color: "#111" }}>"Agregar a inicio"</strong>.
-            </p>
-          )
-        ) : (
-          <p style={{ margin: "0 0 10px", fontSize: 12, color: "#555", lineHeight: 1.6 }}>
-            Accede rápido desde tu pantalla de inicio, sin abrir el navegador.
-          </p>
-        )}
+        <p id="pwa-install-description" style={{ margin: "0 0 10px", fontSize: 12, color: "var(--text-2)", lineHeight: 1.6 }}>
+          {showIos
+            ? t(iosStep2 ? "pwa.iosStep2" : "pwa.iosInstructions")
+            : t("pwa.description")}
+        </p>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {showIos && !iosStep2 && (
             <button
+              type="button"
               onClick={openIosShare}
               style={{
                 background: "#0a7aff", color: "#fff", border: "none",
@@ -133,12 +170,13 @@ export default function PwaInstallPrompt() {
                 display: "flex", alignItems: "center", gap: 5,
               }}
             >
-              <span style={{ fontSize: 16 }}>⬆</span> Compartir
+              <span aria-hidden="true" style={{ fontSize: 16 }}>⬆</span> {t("pwa.share")}
             </button>
           )}
 
           {!showIos && (
             <button
+              type="button"
               onClick={install}
               disabled={installing}
               style={{
@@ -147,19 +185,20 @@ export default function PwaInstallPrompt() {
                 fontWeight: 700, cursor: "pointer", flexShrink: 0,
               }}
             >
-              {installing ? "Instalando…" : "Instalar"}
+              {installing ? t("pwa.installing") : t("pwa.install")}
             </button>
           )}
 
           <button
+            type="button"
             onClick={dismiss}
             style={{
-              background: "transparent", color: "#888", border: "1px solid #e5e7eb",
+              background: "transparent", color: "var(--text-2)", border: "1px solid var(--border-md)",
               borderRadius: 8, padding: "7px 14px", fontSize: 13,
               cursor: "pointer", flexShrink: 0,
             }}
           >
-            {iosStep2 ? "Listo" : "Ahora no"}
+            {iosStep2 ? t("pwa.done") : t("pwa.notNow")}
           </button>
         </div>
       </div>
@@ -167,7 +206,7 @@ export default function PwaInstallPrompt() {
       <style>{`
         @keyframes promptIn {
           from { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.96); }
-          to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
         }
       `}</style>
     </div>

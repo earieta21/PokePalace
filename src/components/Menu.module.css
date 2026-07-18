@@ -7,6 +7,13 @@
 
 /* Card: glass / modern */
 .menuCard {
+  display: block;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   border-radius: 22px;
   overflow: hidden;
 
@@ -16,6 +23,11 @@
 
   transition: transform 160ms ease, box-shadow 160ms ease,
     border-color 160ms ease;
+}
+
+.menuCard:focus-visible {
+  outline: 3px solid var(--accent-border);
+  outline-offset: 3px;
 }
 
 .menuCard:hover {

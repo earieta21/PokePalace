@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import TimeRecord from "../models/TimeRecord.js";
 import ChecklistRecord from "../models/ChecklistRecord.js";
@@ -5,15 +6,86 @@ import TempRecord from "../models/TempRecord.js";
 import Announcement from "../models/Announcement.js";
 import Schedule from "../models/Schedule.js";
 import StaffUser from "../models/StaffUser.js";
+import { comparePin, hashPin, isValidPin } from "../utils/staffPin.js";
+import { isWithinRestaurant, MAX_DISTANCE_METERS } from "../utils/geo.js";
+import {
+  canAssignStaffRole,
+  canManageStaffRole,
+  isStaffRole,
+  manageableRolesFor,
+} from "../utils/staffRoles.js";
+import { dateKeyInTimeZone } from "../utils/timeZone.js";
+
+const LOCATION_ERROR_MSG = `Debes estar en el restaurante para marcar tu entrada/salida (dentro de ${MAX_DISTANCE_METERS}m).`;
+
+// Valida que el body traiga coordenadas y que estén dentro del radio del
+// local. Devuelve un mensaje de error si algo falla, o null si está bien.
+function checkStaffLocation(req) {
+  const { lat, lng } = req.body || {};
+  if (typeof lat !== "number" || typeof lng !== "number") {
+    return "No se pudo obtener tu ubicación. Activa el permiso de ubicación e intenta de nuevo.";
+  }
+  if (!isWithinRestaurant(lat, lng)) {
+    return LOCATION_ERROR_MSG;
+  }
+  return null;
+}
+
+const sameId = (left, right) => String(left) === String(right);
+
+const requestedLocationIsAllowed = (req, locationId) =>
+  !req.staff.locationId || req.staff.locationId === locationId;
+
+const safeMoney = (value) => {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? amount : 0;
+};
+
+async function wouldRemoveLastOwner(employee, update = {}) {
+  const removesOwner = employee.role === "owner" && (
+    update.active === false || (update.role !== undefined && update.role !== "owner")
+  );
+  if (!removesOwner) return false;
+  const otherOwners = await StaffUser.countDocuments({
+    _id: { $ne: employee._id },
+    role: "owner",
+    active: true,
+  });
+  return otherOwners === 0;
+}
 
 /* ── EMPLOYEES ──────────────────────────────────────────────────────────── */
 
 export const getKioskEmployees = async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.status(400).json({ message: "locationId requerido" });
+  if (!requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "No puedes consultar otra sucursal" });
+  }
   try {
     const employees = await StaffUser.find({ locationId, active: true })
-      .select("-password -pin")
+      .select("_id name color")
+      .sort({ name: 1 });
+    res.json({ employees });
+  } catch (err) {
+    res.status(500).json({ message: "Error", err: err.message });
+  }
+};
+
+export const getManagedKioskEmployees = async (req, res) => {
+  const { locationId } = req.query;
+  if (!locationId) return res.status(400).json({ message: "locationId requerido" });
+  if (!requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "No puedes administrar otra sucursal" });
+  }
+  try {
+    const manageableRoles = manageableRolesFor(req.staff.role);
+    const employees = await StaffUser.find({
+      locationId,
+      active: true,
+      $or: [{ role: { $in: manageableRoles } }, { _id: req.staff.id }],
+    })
+      .select("_id name role color locationId active hourlyRate payType weeklySalary")
       .sort({ name: 1 });
     res.json({ employees });
   } catch (err) {
@@ -22,28 +94,44 @@ export const getKioskEmployees = async (req, res) => {
 };
 
 export const createKioskEmployee = async (req, res) => {
-  const { name, role, pin, color, locationId, hourlyRate } = req.body;
-  if (!name?.trim() || !pin || String(pin).length !== 4) {
+  const { name, role, pin, color, locationId, hourlyRate, payType, weeklySalary } = req.body;
+  const requestedRole = role || "employee";
+  if (!name?.trim() || !isValidPin(pin) || !locationId) {
     return res.status(400).json({ message: "Nombre y PIN de 4 dígitos requeridos" });
   }
+  if (!requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "No puedes crear personal en otra sucursal" });
+  }
+  if (!isStaffRole(requestedRole) || !canAssignStaffRole(req.staff.role, requestedRole)) {
+    return res.status(403).json({ message: "No tienes permiso para asignar ese rol" });
+  }
   try {
-    const pinConflict = await StaffUser.findOne({ pin: String(pin), locationId, active: true });
+    const candidates = await StaffUser.find({ locationId, active: true }).select("+pin");
+    let pinConflict = false;
+    for (const candidate of candidates) {
+      if (await comparePin(pin, candidate.pin)) {
+        pinConflict = true;
+        break;
+      }
+    }
     if (pinConflict) return res.status(409).json({ message: "Ese PIN ya está en uso por otro empleado" });
 
     const slug = name.trim().toLowerCase().replace(/\s+/g, ".").replace(/[^a-z0-9.]/g, "");
     const email = `${slug}.${Date.now()}@pokepalace.internal`;
-    const password = await bcrypt.hash(Math.random().toString(36) + Date.now(), 10);
+    const password = await bcrypt.hash(crypto.randomBytes(32).toString("base64url"), 12);
 
     const employee = await StaffUser.create({
       name: name.trim(),
-      role: role || "employee",
-      pin: String(pin),
+      role: requestedRole,
+      pin: await hashPin(pin),
       color: color || "emerald",
       email,
       password,
       locationId,
       active: true,
-      hourlyRate: hourlyRate ? parseFloat(hourlyRate) : 0,
+      hourlyRate: safeMoney(hourlyRate),
+      payType: payType === "weekly" ? "weekly" : "hourly",
+      weeklySalary: safeMoney(weeklySalary),
     });
 
     res.status(201).json({
@@ -51,6 +139,7 @@ export const createKioskEmployee = async (req, res) => {
         _id: employee._id, name: employee.name,
         role: employee.role, color: employee.color,
         locationId: employee.locationId, hourlyRate: employee.hourlyRate,
+        payType: employee.payType, weeklySalary: employee.weeklySalary,
       },
     });
   } catch (err) {
@@ -60,13 +149,41 @@ export const createKioskEmployee = async (req, res) => {
 
 export const updateKioskEmployee = async (req, res) => {
   try {
-    const allowed = ["hourlyRate", "color", "role"];
+    const target = await StaffUser.findById(req.params.id)
+      .select("_id name role locationId active");
+    if (!target) return res.status(404).json({ message: "Empleado no encontrado" });
+    if (sameId(target._id, req.staff.id)) {
+      return res.status(403).json({ message: "No puedes modificar tu propia cuenta desde el panel" });
+    }
+    if (!requestedLocationIsAllowed(req, target.locationId)) {
+      return res.status(403).json({ message: "No puedes administrar otra sucursal" });
+    }
+    if (!canManageStaffRole(req.staff.role, target.role)) {
+      return res.status(403).json({ message: "No tienes permiso para modificar a este integrante" });
+    }
+
+    const allowed = ["name", "hourlyRate", "color", "role", "payType", "weeklySalary"];
     const update  = {};
     allowed.forEach((k) => { if (req.body[k] !== undefined) update[k] = req.body[k]; });
-    if (update.hourlyRate !== undefined) update.hourlyRate = parseFloat(update.hourlyRate) || 0;
+    if (update.role !== undefined && (
+      !isStaffRole(update.role) || !canAssignStaffRole(req.staff.role, update.role)
+    )) {
+      return res.status(403).json({ message: "No tienes permiso para asignar ese rol" });
+    }
+    if (update.hourlyRate !== undefined) update.hourlyRate = safeMoney(update.hourlyRate);
+    if (update.weeklySalary !== undefined) update.weeklySalary = safeMoney(update.weeklySalary);
+    if (update.payType !== undefined && update.payType !== "weekly") update.payType = "hourly";
+    if (update.name !== undefined) {
+      update.name = String(update.name).trim();
+      if (!update.name) delete update.name;
+    }
 
-    const employee = await StaffUser.findByIdAndUpdate(req.params.id, update, { new: true })
-      .select("-password -pin");
+    if (await wouldRemoveLastOwner(target, update)) {
+      return res.status(409).json({ message: "Debe permanecer al menos un dueño activo" });
+    }
+
+    const employee = await StaffUser.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true })
+      .select("_id name role color locationId active hourlyRate payType weeklySalary");
     if (!employee) return res.status(404).json({ message: "Empleado no encontrado" });
     res.json({ employee });
   } catch (err) {
@@ -76,7 +193,23 @@ export const updateKioskEmployee = async (req, res) => {
 
 export const removeKioskEmployee = async (req, res) => {
   try {
-    await StaffUser.findByIdAndUpdate(req.params.id, { active: false });
+    const target = await StaffUser.findById(req.params.id)
+      .select("_id role locationId active");
+    if (!target) return res.status(404).json({ message: "Empleado no encontrado" });
+    if (sameId(target._id, req.staff.id)) {
+      return res.status(403).json({ message: "No puedes eliminar tu propia cuenta" });
+    }
+    if (!requestedLocationIsAllowed(req, target.locationId)) {
+      return res.status(403).json({ message: "No puedes administrar otra sucursal" });
+    }
+    if (!canManageStaffRole(req.staff.role, target.role)) {
+      return res.status(403).json({ message: "No tienes permiso para eliminar a este integrante" });
+    }
+    if (await wouldRemoveLastOwner(target, { active: false })) {
+      return res.status(409).json({ message: "Debe permanecer al menos un dueño activo" });
+    }
+
+    await StaffUser.findByIdAndUpdate(req.params.id, { active: false }, { runValidators: true });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ message: "Error", err: err.message });
@@ -86,12 +219,22 @@ export const removeKioskEmployee = async (req, res) => {
 /* ── TIME RECORDS ───────────────────────────────────────────────────────── */
 
 export const clockIn = async (req, res) => {
-  const { locationId, date } = req.body;
+  const { locationId } = req.body;
   const employeeId = req.staff.id;
+  if (!locationId || !requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "Sucursal no permitida" });
+  }
+  const locationError = checkStaffLocation(req);
+  if (locationError) return res.status(403).json({ message: locationError });
   try {
     const existing = await TimeRecord.findOne({ employeeId, clockOut: null, locationId });
     if (existing) return res.status(409).json({ message: "Ya tienes turno activo" });
-    const record = await TimeRecord.create({ employeeId, clockIn: new Date(), date, locationId });
+    const record = await TimeRecord.create({
+      employeeId,
+      clockIn: new Date(),
+      date: dateKeyInTimeZone(),
+      locationId,
+    });
     res.status(201).json({ record });
   } catch (err) {
     res.status(500).json({ message: "Error", err: err.message });
@@ -100,14 +243,55 @@ export const clockIn = async (req, res) => {
 
 export const clockOut = async (req, res) => {
   const employeeId = req.staff.id;
+  const locationError = checkStaffLocation(req);
+  if (locationError) return res.status(403).json({ message: locationError });
   try {
-    const record = await TimeRecord.findOneAndUpdate(
-      { employeeId, clockOut: null },
-      { clockOut: new Date() },
-      { new: true }
-    );
-    if (!record) return res.status(404).json({ message: "No hay turno activo" });
-    res.json({ record });
+    const open = await TimeRecord.findOne({ employeeId, clockOut: null });
+    if (!open) return res.status(404).json({ message: "No hay turno activo" });
+    const openBreak = open.breaks.find((b) => !b.end);
+    if (openBreak) {
+      return res.status(400).json({ message: "Termina tu lonche antes de marcar salida" });
+    }
+    open.clockOut = new Date();
+    await open.save();
+    res.json({ record: open });
+  } catch (err) {
+    res.status(500).json({ message: "Error", err: err.message });
+  }
+};
+
+/* ── LONCHE (break) ─────────────────────────────────────────────────────── */
+
+export const startBreak = async (req, res) => {
+  const employeeId = req.staff.id;
+  const locationError = checkStaffLocation(req);
+  if (locationError) return res.status(403).json({ message: locationError });
+  try {
+    const open = await TimeRecord.findOne({ employeeId, clockOut: null });
+    if (!open) return res.status(404).json({ message: "No tienes turno activo" });
+    if (open.breaks.some((b) => !b.end)) {
+      return res.status(409).json({ message: "Ya tienes un lonche en curso" });
+    }
+    open.breaks.push({ start: new Date() });
+    await open.save();
+    res.status(201).json({ record: open });
+  } catch (err) {
+    res.status(500).json({ message: "Error", err: err.message });
+  }
+};
+
+export const endBreak = async (req, res) => {
+  const employeeId = req.staff.id;
+  const locationError = checkStaffLocation(req);
+  if (locationError) return res.status(403).json({ message: locationError });
+  try {
+    const open = await TimeRecord.findOne({ employeeId, clockOut: null });
+    if (!open) return res.status(404).json({ message: "No tienes turno activo" });
+    const openBreak = open.breaks.find((b) => !b.end);
+    if (!openBreak) return res.status(404).json({ message: "No tienes un lonche en curso" });
+    openBreak.end = new Date();
+    await open.save();
+    res.json({ record: open });
   } catch (err) {
     res.status(500).json({ message: "Error", err: err.message });
   }
@@ -116,6 +300,9 @@ export const clockOut = async (req, res) => {
 export const getTimeRecords = async (req, res) => {
   const { locationId, date } = req.query;
   if (!locationId) return res.status(400).json({ message: "locationId requerido" });
+  if (!requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "No puedes consultar otra sucursal" });
+  }
   try {
     const filter = { locationId };
     if (date) filter.date = date;
@@ -131,6 +318,9 @@ export const getTimeRecords = async (req, res) => {
 export const getChecklist = async (req, res) => {
   const { locationId, date } = req.query;
   if (!locationId || !date) return res.status(400).json({ message: "locationId y date requeridos" });
+  if (!requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "No puedes consultar otra sucursal" });
+  }
   try {
     const docs = await ChecklistRecord.find({ locationId, date });
     // Shape: { apertura: { "0": {by,ts}, ... }, cierre: {...}, limpieza: {...} }
@@ -147,6 +337,12 @@ export const getChecklist = async (req, res) => {
 export const toggleChecklistItem = async (req, res) => {
   const { locationId, date, listId, idx, checked } = req.body;
   const by = req.staff.id;
+  if (!locationId || !requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "Sucursal no permitida" });
+  }
+  if (date !== dateKeyInTimeZone()) {
+    return res.status(400).json({ message: "Solo puedes actualizar la lista del día de hoy" });
+  }
   try {
     const doc = await ChecklistRecord.findOneAndUpdate(
       { locationId, date, listId },
@@ -168,10 +364,20 @@ export const toggleChecklistItem = async (req, res) => {
 /* ── TEMPERATURES ───────────────────────────────────────────────────────── */
 
 export const addTempRecord = async (req, res) => {
-  const { stationId, value, date, locationId } = req.body;
+  const { stationId, value, locationId } = req.body;
   const by = req.staff.id;
+  if (!locationId || !requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "Sucursal no permitida" });
+  }
   try {
-    const record = await TempRecord.create({ stationId, value: Number(value), by, date, locationId, ts: new Date() });
+    const record = await TempRecord.create({
+      stationId,
+      value: Number(value),
+      by,
+      date: dateKeyInTimeZone(),
+      locationId,
+      ts: new Date(),
+    });
     res.status(201).json({ record });
   } catch (err) {
     res.status(500).json({ message: "Error", err: err.message });
@@ -181,6 +387,9 @@ export const addTempRecord = async (req, res) => {
 export const getTempRecords = async (req, res) => {
   const { locationId, date } = req.query;
   if (!locationId) return res.status(400).json({ message: "locationId requerido" });
+  if (!requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "No puedes consultar otra sucursal" });
+  }
   try {
     const filter = { locationId };
     if (date) filter.date = date;
@@ -196,6 +405,9 @@ export const getTempRecords = async (req, res) => {
 export const getAnnouncements = async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.status(400).json({ message: "locationId requerido" });
+  if (!requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "No puedes consultar otra sucursal" });
+  }
   try {
     const announcements = await Announcement.find({ locationId }).sort({ createdAt: -1 });
     res.json({ announcements });
@@ -207,6 +419,9 @@ export const getAnnouncements = async (req, res) => {
 export const createAnnouncement = async (req, res) => {
   const { text, locationId } = req.body;
   const by = req.staff.id;
+  if (!locationId || !requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "Sucursal no permitida" });
+  }
   try {
     const announcement = await Announcement.create({ text, by, locationId });
     res.status(201).json({ announcement });
@@ -217,7 +432,12 @@ export const createAnnouncement = async (req, res) => {
 
 export const deleteAnnouncement = async (req, res) => {
   try {
-    await Announcement.findByIdAndDelete(req.params.id);
+    const announcement = await Announcement.findById(req.params.id).select("locationId");
+    if (!announcement) return res.status(404).json({ message: "Aviso no encontrado" });
+    if (!requestedLocationIsAllowed(req, announcement.locationId)) {
+      return res.status(403).json({ message: "No puedes modificar otra sucursal" });
+    }
+    await Announcement.deleteOne({ _id: announcement._id });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ message: "Error", err: err.message });
@@ -229,6 +449,9 @@ export const deleteAnnouncement = async (req, res) => {
 export const getSchedule = async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.status(400).json({ message: "locationId requerido" });
+  if (!requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "No puedes consultar otra sucursal" });
+  }
   try {
     const doc = await Schedule.findOne({ locationId });
     res.json({ schedule: doc?.schedule || {} });
@@ -239,6 +462,9 @@ export const getSchedule = async (req, res) => {
 
 export const saveSchedule = async (req, res) => {
   const { locationId, schedule } = req.body;
+  if (!locationId || !requestedLocationIsAllowed(req, locationId)) {
+    return res.status(403).json({ message: "Sucursal no permitida" });
+  }
   try {
     const doc = await Schedule.findOneAndUpdate(
       { locationId },

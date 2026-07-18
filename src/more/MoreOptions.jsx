@@ -19,6 +19,7 @@ const SECTIONS = [
       { icon: "📍", labelKey: "more.locations", path: "/ubicaciones" },
       { icon: "🥗", labelKey: "more.fullMenu", path: "/order" },
       { icon: "🥑", labelKey: "more.nutrition", path: null },
+      { icon: "🔳", labelKey: "more.qrCode", path: "/qr" },
     ],
   },
   {

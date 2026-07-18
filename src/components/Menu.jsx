@@ -12,11 +12,17 @@ const formatMenuPrice = (value) => {
   return `$${numericValue.toLocaleString("es-MX")} MXN`;
 };
 
-const Menu = ({ items = [] }) => {
+const Menu = ({ items = [], onSelect }) => {
   return (
     <div className={styles.menuGrid}>
       {items.map((item) => (
-        <div key={item.id} className={styles.menuCard}>
+        <button
+          key={item.id}
+          className={styles.menuCard}
+          type="button"
+          onClick={() => onSelect?.(item)}
+          aria-label={item.name}
+        >
           <div className={styles.imageWrap}>
             <img
               src={item.image}
@@ -32,7 +38,7 @@ const Menu = ({ items = [] }) => {
 
             <p className={styles.menuPrice}>{formatMenuPrice(item.price)}</p>
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );

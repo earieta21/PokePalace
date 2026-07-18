@@ -28,10 +28,34 @@
   display: flex;
   min-height: 100vh;
   background: var(--p-cream);
-  font-family: "Syne", system-ui, sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   color: var(--p-ink);
   /* override customer-site body padding */
   margin-top: 0;
+}
+
+/* Shared tokens for pages embedded in the unified Staff shell. Several
+   operational pages use these primitives without the legacy .portal wrapper. */
+.staffEmbed {
+  --p-g0: #0d1f14;
+  --p-g1: #1a3d2b;
+  --p-g2: #2d6a4f;
+  --p-g3: #52b788;
+  --p-g4: #b7e4c7;
+  --p-gold: #d4a017;
+  --p-cream: #faf7f0;
+  --p-surface: #ffffff;
+  --p-bg: #f5f3ee;
+  --p-ink: #0d1b0f;
+  --p-text: #0d1b0f;
+  --p-muted: #6b7b6e;
+  --p-border: rgba(45, 106, 79, 0.13);
+  --p-shadow: 0 2px 8px rgba(13, 27, 15, 0.06);
+  --p-shadow-md: 0 4px 16px rgba(13, 27, 15, 0.09);
+  --p-radius: 10px;
+  --p-radius-sm: 6px;
+  --p-topbar-h: 76px;
+  color-scheme: light;
 }
 
 /* ══════════════════════════════
@@ -113,7 +137,7 @@
   background: none;
   border: none;
   color: rgba(255, 255, 255, 0.5);
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -206,7 +230,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 7px;
   color: rgba(255, 255, 255, 0.48);
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -247,7 +271,7 @@
 }
 
 .topbarTitle {
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 14px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.88);
@@ -515,7 +539,7 @@
   color: #fff;
   border: none;
   border-radius: var(--p-radius-sm);
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -539,7 +563,7 @@
   background: rgba(0, 0, 0, 0.04);
   border: 1px solid var(--p-border);
   border-radius: var(--p-radius-sm);
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -557,7 +581,7 @@
 .textarea {
   width: 100%;
   padding: 9px 12px;
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 13px;
   color: var(--p-ink);
   background: var(--p-surface);
@@ -573,6 +597,17 @@
 .textarea:focus {
   border-color: var(--p-g2);
   box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.1);
+}
+
+/* Windows usa un menú nativo claro para los <option>; fijar ambos colores
+   evita texto blanco sobre fondo blanco en los selectores del portal. */
+.select {
+  color-scheme: light;
+}
+
+.select option {
+  color: #13261a;
+  background-color: #ffffff;
 }
 
 .label {
@@ -686,7 +721,7 @@
   background: transparent;
   border: 1px solid rgba(180, 40, 40, 0.2);
   border-radius: var(--p-radius-sm);
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 12px;
   font-weight: 600;
   color: #9b2c2c;
@@ -722,7 +757,7 @@
   color: #fff;
   border: none;
   border-radius: 5px;
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 11.5px;
   font-weight: 700;
   cursor: pointer;
@@ -737,7 +772,7 @@
   background: transparent;
   border: 1px solid rgba(0,0,0,0.12);
   border-radius: 5px;
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 11.5px;
   font-weight: 600;
   color: var(--p-muted);
@@ -755,7 +790,7 @@
   color: #fff;
   border: none;
   border-radius: var(--p-radius-sm);
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 13.5px;
   font-weight: 700;
   letter-spacing: 0.2px;
@@ -1074,7 +1109,7 @@
   background: rgba(82, 183, 136, 0.12);
   border: 1px solid rgba(82, 183, 136, 0.35);
   border-radius: var(--p-radius-sm);
-  font-family: "Syne", sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;

@@ -8,19 +8,22 @@ import {
   createPosOrder,
   getAnalytics,
   getFinance,
+  searchRewardCustomers,
 } from "../controllers/staffOrderController.js";
 
 const router = express.Router();
 
-const anyStaff    = requireStaffAuth([]);
 const seniorStaff = requireStaffAuth(["manager", "admin", "owner"]);
+const orderReaders = requireStaffAuth(["cashier", "kitchen", "manager", "admin", "owner"]);
+const posSalesStaff = requireStaffAuth(["cashier", "manager", "admin", "owner"]);
 
-router.get  ("/stats",         anyStaff,    getOrderStats);
+router.get  ("/stats",         posSalesStaff, getOrderStats);
 router.get  ("/analytics",     seniorStaff, getAnalytics);
 router.get  ("/finance",       seniorStaff, getFinance);
-router.get  ("/",              anyStaff,    getAllOrders);
-router.post ("/",              anyStaff,    createPosOrder);
-router.patch("/:id/status",    anyStaff,    updateOrderStatus);
-router.patch("/:id/pay",       anyStaff,    markAsPaid);
+router.get  ("/customers/search", posSalesStaff, searchRewardCustomers);
+router.get  ("/",              orderReaders, getAllOrders);
+router.post ("/",              posSalesStaff, createPosOrder);
+router.patch("/:id/status",    orderReaders, updateOrderStatus);
+router.patch("/:id/pay",       posSalesStaff, markAsPaid);
 
 export default router;

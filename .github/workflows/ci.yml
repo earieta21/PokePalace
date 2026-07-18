@@ -1,0 +1,61 @@
+# CI de Poke Palace — corre en cada push/PR a main.
+# No bloquea los deploys (Netlify/Render publican igual), pero avisa por
+# correo/GitHub cuando algo se rompe: el build del frontend o el flujo
+# crítico de ordenar en el backend.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    name: Build del frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # npm install (no ci) para replicar lo que hace Netlify al publicar
+      - run: npm install
+      - run: npm run build
+
+  backend:
+    name: Pruebas del backend
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm test 2>&1 | tee test-output.txt
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/pokepalace_ci
+          JWT_SECRET: ci-test-secret
+          PIN_PEPPER: ci-test-pepper
+      # Si las pruebas fallan, la salida se manda al monitor de errores de la
+      # app para poder diagnosticar sin acceso a los logs de Actions.
+      - name: Reportar fallo al monitor
+        if: failure()
+        run: |
+          tail -c 1800 test-output.txt > tail.txt
+          jq -n --rawfile s tail.txt '{message: "CI backend fallo", stack: $s, url: "ci://github-actions"}' \
+            | curl -s -X POST https://pokepalace.onrender.com/api/monitor/error \
+                -H 'Content-Type: application/json' --data @- || true

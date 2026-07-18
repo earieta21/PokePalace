@@ -6,9 +6,10 @@ import {
   User, TrendingUp,
 } from "lucide-react";
 import { API_URL } from "../config";
+import { tijuanaDateKey } from "../utils/date";
 
 const LOCATION_ID = "tij-centro-01";
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = () => tijuanaDateKey();
 const fmtTime = (d) => new Date(d).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 const fmtHM = (mins) => `${Math.floor(mins / 60)}h ${String(Math.round(mins % 60)).padStart(2, "0")}m`;
 const initials = (name) => name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -139,11 +140,22 @@ export default function EmployeeApp() {
     const { token: t, user } = await r.json();
     setToken(t);
     setMe(user);
+    if (user.isManager) {
+      const managed = await fetch(
+        `${API_URL}/api/kiosk/employees/manage?locationId=${LOCATION_ID}`,
+        { headers: { Authorization: `Bearer ${t}` } }
+      );
+      if (managed.ok) {
+        const data = await managed.json();
+        setEmployees(data.employees || []);
+      }
+    }
     setTab("inicio");
   }
 
   function handleLogout() {
     setToken(null); setMe(null);
+    setEmployees((current) => current.map(({ _id, name, color }) => ({ _id, name, color })));
     setTime([]); setChecklist({}); setTemps([]); setSchedule({}); setAnnouncements([]);
   }
 
@@ -334,7 +346,7 @@ function KioskLogin({ employees, onLogin }) {
                   </div>
                   <div className="relative min-w-0">
                     <p className="font-semibold text-white truncate">{e.name}</p>
-                    <p className={`text-xs capitalize mt-0.5 ${col.text}`}>{e.role}</p>
+                    <p className={`text-xs mt-0.5 ${col.text}`}>Personal</p>
                   </div>
                 </button>
               );
@@ -353,7 +365,7 @@ function KioskLogin({ employees, onLogin }) {
             {initials(selected.name)}
           </div>
           <p className="font-bold text-lg text-white mb-0.5">{selected.name}</p>
-          <p className={`text-xs capitalize mb-5 ${getColor(selected.color).text}`}>{selected.role}</p>
+          <p className={`text-xs mb-5 ${getColor(selected.color).text}`}>Personal</p>
 
           {/* PIN dots */}
           <div className="flex gap-4 mb-8">
@@ -374,7 +386,7 @@ function KioskLogin({ employees, onLogin }) {
             ))}
             <div />
             <PinKey onClick={() => press("0")}>0</PinKey>
-            <PinKey onClick={() => { setError(false); setPin((p) => p.slice(0, -1)); }} subtle>
+            <PinKey ariaLabel="Borrar último dígito" onClick={() => { setError(false); setPin((p) => p.slice(0, -1)); }} subtle>
               <Delete className="w-5 h-5 mx-auto" />
             </PinKey>
           </div>
@@ -384,9 +396,9 @@ function KioskLogin({ employees, onLogin }) {
   );
 }
 
-function PinKey({ children, onClick, subtle }) {
+function PinKey({ children, onClick, subtle, ariaLabel }) {
   return (
-    <button onClick={onClick}
+    <button type="button" onClick={onClick} aria-label={ariaLabel}
       className={`h-16 rounded-2xl text-xl font-semibold transition-all duration-100 active:scale-95 ${
         subtle
           ? "bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"

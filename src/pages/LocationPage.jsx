@@ -1,13 +1,17 @@
 import "./LocationPage.css";
 import { useLanguage } from "../i18n/LanguageContext";
+import { GOOGLE_MAPS_URL } from "../config";
 
 const LOCATION = {
   name: "Poke Palace",
   phone: "+52 663 108 6583",
-  mapsUrl: "https://maps.app.goo.gl/XY9uU2vr8MER54CG7?g_st=ic",
+  mapsUrl: GOOGLE_MAPS_URL,
 };
 
-const mapQuery = encodeURIComponent(LOCATION.mapsUrl);
+const MAP_EMBED_URL =
+  "https://www.openstreetmap.org/export/embed.html" +
+  "?bbox=-116.929307%2C32.445826%2C-116.909307%2C32.465826" +
+  "&layer=mapnik&marker=32.455826%2C-116.919307";
 
 export default function LocationPage() {
   const { t } = useLanguage();
@@ -28,8 +32,8 @@ export default function LocationPage() {
         <div className="mapPanel" aria-label={t("location.map")}>
           <iframe
             title={`${t("location.map")} ${LOCATION.name}`}
-            src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
-            loading="lazy"
+            src={MAP_EMBED_URL}
+            loading="eager"
             referrerPolicy="no-referrer-when-downgrade"
           />
         </div>

@@ -3,7 +3,7 @@
    Si las variables de entorno no están configuradas, cada función es un no-op
    silencioso: la app funciona igual sin cuentas de Brevo/Twilio. */
 
-const SITE_URL = process.env.SITE_URL || "https://pokepalace.netlify.app";
+const SITE_URL = process.env.SITE_URL || "https://pokepalace.org";
 
 /* ── Email via Brevo (https://www.brevo.com — plan gratis: 300 emails/día) ──
    Env vars: BREVO_API_KEY, EMAIL_FROM (remitente verificado en Brevo) */

@@ -1,44 +1,67 @@
+import crypto from "node:crypto";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import StaffUser from "../models/StaffUser.js";
+import { hashPin, isValidPin } from "../utils/staffPin.js";
 
 dotenv.config();
 
-const LOCATION_ID = "tij-centro-01";
+const locationId = process.env.KIOSK_LOCATION_ID;
 
-const employees = [
-  { name: "Eric",          email: "eric@pokepalace.com",    password: "emp123", role: "owner",   pin: "1234", color: "emerald" },
-  { name: "Sofía Reyes",   email: "sofia@pokepalace.com",   password: "emp123", role: "manager", pin: "2222", color: "amber"   },
-  { name: "Diego Luna",    email: "diego@pokepalace.com",   password: "emp123", role: "employee", pin: "3333", color: "sky"    },
-  { name: "Valeria Cruz",  email: "valeria@pokepalace.com", password: "emp123", role: "employee", pin: "4444", color: "rose"   },
-];
+const readEmployees = () => {
+  if (!process.env.KIOSK_EMPLOYEES_JSON) {
+    throw new Error("KIOSK_EMPLOYEES_JSON is required");
+  }
+  const employees = JSON.parse(process.env.KIOSK_EMPLOYEES_JSON);
+  if (!Array.isArray(employees) || employees.length === 0) {
+    throw new Error("KIOSK_EMPLOYEES_JSON must be a non-empty JSON array");
+  }
+  return employees;
+};
 
 const run = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("✅ MongoDB conectado");
-
-    for (const emp of employees) {
-      const exists = await StaffUser.findOne({ email: emp.email });
-      if (exists) {
-        await StaffUser.updateOne({ email: emp.email }, {
-          pin: emp.pin, color: emp.color, locationId: LOCATION_ID, active: true,
-        });
-        console.log(`⟳  Actualizado: ${emp.name}`);
-        continue;
-      }
-      const hashed = await bcrypt.hash(emp.password, 10);
-      await StaffUser.create({ ...emp, password: hashed, locationId: LOCATION_ID });
-      console.log(`✅ Creado: ${emp.name} · PIN ${emp.pin}`);
+    if (!process.env.MONGO_URI || !locationId) {
+      throw new Error("MONGO_URI and KIOSK_LOCATION_ID are required");
     }
+    const employees = readEmployees();
+    await mongoose.connect(process.env.MONGO_URI);
 
-    console.log("\n📋 PINs del kiosko:");
-    employees.forEach((e) => console.log(`   ${e.name.padEnd(16)} → ${e.pin}`));
-    process.exit(0);
+    for (const employee of employees) {
+      const { name, email, role = "employee", pin, color = "emerald" } = employee;
+      if (!name || !email || !isValidPin(pin)) {
+        throw new Error("Each employee requires name, email and a 4-digit PIN");
+      }
+
+      const pinHash = await hashPin(pin);
+      const existing = await StaffUser.findOne({ email });
+      if (existing) {
+        await StaffUser.updateOne(
+          { _id: existing._id },
+          { pin: pinHash, color, role, locationId, active: true },
+          { runValidators: true }
+        );
+      } else {
+        const generatedPassword = crypto.randomBytes(32).toString("base64url");
+        await StaffUser.create({
+          name,
+          email,
+          password: await bcrypt.hash(generatedPassword, 12),
+          role,
+          pin: pinHash,
+          color,
+          locationId,
+          active: true,
+        });
+      }
+      console.log(`Seeded employee: ${name}`);
+    }
   } catch (err) {
-    console.error("❌ Error:", err);
-    process.exit(1);
+    console.error("Error seeding kiosk employees:", err.message);
+    process.exitCode = 1;
+  } finally {
+    await mongoose.disconnect();
   }
 };
 

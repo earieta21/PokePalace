@@ -6,6 +6,7 @@ import {
   createItem,
   updateItem,
   restockItem,
+  restockBatch,
   deleteItem,
 } from "../controllers/staffInventoryController.js";
 
@@ -17,8 +18,9 @@ const seniorStaff = requireStaffAuth(["manager", "admin", "owner"]);
 router.get   ("/low-stock", anyStaff, getLowStock);
 router.get   ("/",          anyStaff, getInventory);
 router.post  ("/",    seniorStaff, createItem);
+router.post  ("/restock-batch", seniorStaff, restockBatch);
 router.patch ("/:id", seniorStaff, updateItem);
-router.patch ("/:id/restock", anyStaff, restockItem);
+router.patch ("/:id/restock", seniorStaff, restockItem);
 router.delete("/:id", seniorStaff, deleteItem);
 
 export default router;

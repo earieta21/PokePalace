@@ -1,4 +1,5 @@
 import React from "react";
+import { reportError } from "../monitor";
 
 // Stops a crash in one section (customer site or POS) from white-screening the other.
 // React error boundaries only catch render/lifecycle errors in their subtree, so this
@@ -15,6 +16,10 @@ export default class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error(`[ErrorBoundary:${this.props.label || "app"}]`, error, info);
+    reportError(
+      `[${this.props.label || "app"}] ${error?.message || error}`,
+      error?.stack || info?.componentStack
+    );
   }
 
   handleReload = () => {

@@ -1,10 +1,20 @@
 import Expense from "../models/Expense.js";
 import Order   from "../models/Order.js";
+import { nextDateKey, startOfDateKey } from "../utils/timeZone.js";
+
+const validateDateRange = (from, to) => {
+  if (from && !startOfDateKey(from)) return "La fecha inicial no es válida";
+  if (to && !startOfDateKey(to)) return "La fecha final no es válida";
+  if (from && to && from > to) return "La fecha inicial debe ser anterior a la final";
+  return null;
+};
 
 /* GET /api/staff/expenses?from=YYYY-MM-DD&to=YYYY-MM-DD */
 export const getExpenses = async (req, res) => {
   try {
     const { from, to } = req.query;
+    const dateError = validateDateRange(from, to);
+    if (dateError) return res.status(400).json({ message: dateError });
     const filter = {};
     if (from || to) {
       filter.date = {};
@@ -22,15 +32,23 @@ export const getExpenses = async (req, res) => {
 export const getFinanceSummary = async (req, res) => {
   try {
     const { from, to } = req.query;
+    const dateError = validateDateRange(from, to);
+    if (dateError) return res.status(400).json({ message: dateError });
 
     // Revenue = paid orders in the period
-    const orderFilter = { paymentStatus: "paid", total: { $ne: null } };
+    const orderFilter = {
+      paymentStatus: "paid",
+      status: { $ne: "cancelled" },
+      total: { $ne: null },
+    };
     if (from || to) {
       orderFilter.createdAt = {};
-      if (from) orderFilter.createdAt.$gte = new Date(`${from}T00:00:00.000Z`);
+      if (from) {
+        const start = startOfDateKey(from);
+        orderFilter.createdAt.$gte = start;
+      }
       if (to) {
-        const toDate = new Date(`${to}T23:59:59.999Z`);
-        orderFilter.createdAt.$lte = toDate;
+        orderFilter.createdAt.$lt = startOfDateKey(nextDateKey(to));
       }
     }
     const orders = await Order.find(orderFilter);
@@ -71,17 +89,24 @@ export const createExpense = async (req, res) => {
     if (!category || !description?.trim() || amount == null || !date) {
       return res.status(400).json({ message: "category, description, amount y date son requeridos" });
     }
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount < 0) {
+      return res.status(400).json({ message: "El monto debe ser un número mayor o igual a cero" });
+    }
+    if (!startOfDateKey(date)) {
+      return res.status(400).json({ message: "La fecha no es válida" });
+    }
     const expense = await Expense.create({
       category,
       description: description.trim(),
-      amount:      parseFloat(amount),
+      amount:      numericAmount,
       date,
-      locationId:  locationId || "tij-centro-01",
+      locationId:  req.staff?.locationId || locationId || "tij-centro-01",
       createdBy:   req.staff?.name || req.staff?.email || "staff",
     });
     res.status(201).json({ expense });
   } catch (err) {
-    res.status(500).json({ message: "Error al crear gasto", err: err.message });
+    res.status(400).json({ message: "Error al crear gasto", err: err.message });
   }
 };
 

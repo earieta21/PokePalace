@@ -14,7 +14,7 @@
       content="Poke bowls frescos en Tijuana. Arma tu bowl a tu gusto: elige base, proteína, marinado, complementos y toppings. Pide en línea y recoge en minutos. Abierto todos los días de 11 AM a 9 PM."
     />
     <meta name="keywords" content="poke, poke bowl, poke Tijuana, comida saludable Tijuana, bowls Tijuana, comida japonesa hawaiana, pedir poke en línea" />
-    <link rel="canonical" href="https://pokepalace.netlify.app/" />
+    <link rel="canonical" href="https://pokepalace.org/" />
 
     <!-- Open Graph — vista previa en WhatsApp, Facebook, Instagram -->
     <meta property="og:type" content="restaurant" />
@@ -22,10 +22,10 @@
     <meta property="og:title" content="Poke Palace — Poke Bowls en Tijuana" />
     <meta
       property="og:description"
-      content="Arma tu poke bowl a tu gusto y pídelo en línea. Ingredientes frescos todos los días. Recoge en minutos. 🥢🥑🍣"
+      content="Arma tu poke bowl a tu gusto y pídelo en línea. Ingredientes frescos todos los días. Recoge en minutos."
     />
-    <meta property="og:url" content="https://pokepalace.netlify.app/" />
-    <meta property="og:image" content="https://pokepalace.netlify.app/icons/icon-512.png" />
+    <meta property="og:url" content="https://pokepalace.org/" />
+    <meta property="og:image" content="https://pokepalace.org/icons/icon-512.png" />
     <meta property="og:image:width" content="512" />
     <meta property="og:image:height" content="512" />
     <meta property="og:locale" content="es_MX" />
@@ -34,7 +34,7 @@
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Poke Palace — Poke Bowls en Tijuana" />
     <meta name="twitter:description" content="Arma tu poke bowl a tu gusto y pídelo en línea. Recoge en minutos." />
-    <meta name="twitter:image" content="https://pokepalace.netlify.app/icons/icon-512.png" />
+    <meta name="twitter:image" content="https://pokepalace.org/icons/icon-512.png" />
 
     <!-- Datos estructurados — Google Maps y búsqueda local -->
     <script type="application/ld+json">
@@ -43,9 +43,9 @@
       "@type": "Restaurant",
       "name": "Poke Palace",
       "description": "Restaurante de poke bowls personalizables en Tijuana. Arma tu bowl con ingredientes frescos y pídelo en línea.",
-      "url": "https://pokepalace.netlify.app/",
-      "image": "https://pokepalace.netlify.app/icons/icon-1024.png",
-      "logo": "https://pokepalace.netlify.app/icons/icon-512.png",
+      "url": "https://pokepalace.org/",
+      "image": "https://pokepalace.org/icons/icon-1024.png",
+      "logo": "https://pokepalace.org/icons/icon-512.png",
       "telephone": "+526631086583",
       "servesCuisine": ["Poke", "Hawaiana", "Japonesa", "Saludable"],
       "priceRange": "$$",
@@ -73,13 +73,13 @@
           "closes": "21:00"
         }
       ],
-      "menu": "https://pokepalace.netlify.app/order",
+      "menu": "https://pokepalace.org/order",
       "acceptsReservations": "False",
       "potentialAction": {
         "@type": "OrderAction",
         "target": {
           "@type": "EntryPoint",
-          "urlTemplate": "https://pokepalace.netlify.app/order",
+          "urlTemplate": "https://pokepalace.org/order",
           "inLanguage": "es-MX",
           "actionPlatform": [
             "http://schema.org/DesktopWebPlatform",
@@ -105,7 +105,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
   </head>
@@ -114,8 +114,18 @@
     <script type="module" src="/src/main.jsx"></script>
     <script>
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("/sw.js");
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
+        });
+        navigator.serviceWorker
+          .register("/sw.js", { updateViaCache: "none" })
+          .then((registration) => registration.update())
+          .catch(() => {});
       }
     </script>
   </body>
 </html>
+

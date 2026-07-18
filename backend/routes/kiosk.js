@@ -1,8 +1,9 @@
 import express from "express";
 import { requireStaffAuth } from "../middleware/requireStaffAuth.js";
 import {
-  getKioskEmployees, createKioskEmployee, updateKioskEmployee, removeKioskEmployee,
-  clockIn, clockOut, getTimeRecords,
+  getKioskEmployees, getManagedKioskEmployees,
+  createKioskEmployee, updateKioskEmployee, removeKioskEmployee,
+  clockIn, clockOut, getTimeRecords, startBreak, endBreak,
   getChecklist, toggleChecklistItem,
   addTempRecord, getTempRecords,
   getAnnouncements, createAnnouncement, deleteAnnouncement,
@@ -14,8 +15,9 @@ const router = express.Router();
 const anyStaff   = requireStaffAuth([]);
 const managerOnly = requireStaffAuth(["owner", "manager", "admin"]);
 
-// Employees
-router.get   ("/employees",      getKioskEmployees);
+// Employees — nunca exponer nombres antes de autenticar al personal.
+router.get   ("/employees",      anyStaff, getKioskEmployees);
+router.get   ("/employees/manage", managerOnly, getManagedKioskEmployees);
 router.post  ("/employees",      managerOnly, createKioskEmployee);
 router.patch ("/employees/:id",  managerOnly, updateKioskEmployee);
 router.delete("/employees/:id",  managerOnly, removeKioskEmployee);
@@ -23,6 +25,8 @@ router.delete("/employees/:id",  managerOnly, removeKioskEmployee);
 // Time
 router.post("/time/clock-in",  anyStaff, clockIn);
 router.post("/time/clock-out", anyStaff, clockOut);
+router.post("/time/break-start", anyStaff, startBreak);
+router.post("/time/break-end",   anyStaff, endBreak);
 router.get ("/time",           anyStaff, getTimeRecords);
 
 // Checklist

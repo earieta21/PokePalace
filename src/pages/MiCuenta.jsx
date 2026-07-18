@@ -1,5 +1,5 @@
-import { useContext, useEffect, useState, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useContext, useEffect, useState } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useOrder } from "../order/OrderContext";
 import { API_URL } from "../config";
@@ -19,6 +19,7 @@ export default function MiCuenta() {
   const { loadFavorite, reorder } = useOrder();
   const { language, t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -27,7 +28,14 @@ export default function MiCuenta() {
   const [favorites, setFavorites] = useState([]);
   const [favLoading, setFavLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [activeTab, setActiveTab] = useState("orders");
+  const [activeTab, setActiveTab] = useState(
+    ["orders", "favorites", "rewards"].includes(searchParams.get("tab"))
+      ? searchParams.get("tab")
+      : "orders"
+  );
+
+  const [redemptions, setRedemptions] = useState([]);
+  const [redeemLoading, setRedeemLoading] = useState(false);
 
   // Refresh points on mount so balance is always current
   useEffect(() => { if (isLoggedIn) refreshUser?.(); }, [isLoggedIn]);
@@ -68,6 +76,25 @@ export default function MiCuenta() {
         // silently ignore
       } finally {
         setFavLoading(false);
+      }
+    })();
+  }, [isLoggedIn, token, activeTab]);
+
+  useEffect(() => {
+    if (!isLoggedIn || activeTab !== "rewards") return;
+
+    (async () => {
+      try {
+        setRedeemLoading(true);
+        const res = await fetch(`${API_URL}/api/rewards/mine`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) setRedemptions(data.redemptions || []);
+      } catch {
+        // silently ignore
+      } finally {
+        setRedeemLoading(false);
       }
     })();
   }, [isLoggedIn, token, activeTab]);
@@ -199,6 +226,12 @@ export default function MiCuenta() {
             onClick={() => setActiveTab("favorites")}
           >
             Mis Favoritos
+          </button>
+          <button
+            className={`${styles.tab} ${activeTab === "rewards" ? styles.tabActive : ""}`}
+            onClick={() => setActiveTab("rewards")}
+          >
+            Mis Premios
           </button>
         </div>
 
@@ -365,7 +398,54 @@ export default function MiCuenta() {
             )}
           </>
         )}
+
+        {/* Rewards tab */}
+        {activeTab === "rewards" && (
+          <>
+            {redeemLoading ? (
+              <p className={styles.muted}>Cargando…</p>
+            ) : redemptions.length === 0 ? (
+              <div className={styles.emptyFavorites}>
+                <p className={styles.muted}>Aún no has canjeado ningún premio.</p>
+                <p className={styles.muted}>
+                  Junta puntos ordenando y canjéalos en la sección de Premios.
+                </p>
+                <button className={styles.primaryBtn} onClick={() => navigate("/rewards-deals")}>
+                  Ver premios
+                </button>
+              </div>
+            ) : (
+              <div className={styles.orders}>
+                {redemptions.map((r) => (
+                  <div key={r._id} className={styles.orderCard}>
+                    <div className={styles.orderTop}>
+                      <p className={styles.orderDate}>{r.rewardName}</p>
+                      <span className={`${styles.status} ${
+                        r.status === "used" ? styles.status_completed
+                        : r.status === "expired" ? styles.status_cancelled
+                        : ""
+                      }`}>
+                        {r.status === "used" ? "Usado" : r.status === "expired" ? "Vencido" : "Activo"}
+                      </span>
+                    </div>
+                    <p className={styles.rewardCode}>{r.code}</p>
+                    <p className={styles.line}>
+                      {r.status === "used"
+                        ? `Usado el ${new Date(r.usedAt).toLocaleString("es-MX")}`
+                        : r.status === "expired"
+                        ? "Este código ya venció."
+                        : r.expiresAt
+                        ? `Válido hasta el ${new Date(r.expiresAt).toLocaleDateString("es-MX")} · muéstralo en el mostrador.`
+                        : "Muestra este código en el mostrador para reclamarlo."}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
 }
+

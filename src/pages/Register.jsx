@@ -1,5 +1,5 @@
 import { useContext, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./Register.module.css";
@@ -8,6 +8,8 @@ export default function Register() {
   const { register } = useContext(AuthContext);
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from || "/order";
 
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
@@ -22,7 +24,7 @@ export default function Register() {
     setLoading(true);
     try {
       await register(form);
-      navigate("/order"); // ✅ al crear cuenta, manda a ordenar
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || t("auth.registerError"));
     } finally {
@@ -92,7 +94,7 @@ export default function Register() {
 
         <p className={styles.footer}>
           {t("auth.haveAccount")}{" "}
-          <Link className={styles.link} to="/login">
+          <Link className={styles.link} to="/login" state={{ from }}>
             {t("auth.loginTitle")}
           </Link>
         </p>
@@ -100,3 +102,4 @@ export default function Register() {
     </div>
   );
 }
+
