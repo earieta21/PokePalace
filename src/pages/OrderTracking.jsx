@@ -21,7 +21,7 @@ const PAYMENT_KEYS = {
   pay_at_pickup: "summary.payAtPickup",
   cash: "summary.cash",
   card_terminal: "summary.cardTerminal",
-  online: "summary.payment",
+  online: "summary.online",
 };
 
 const STATUS_MESSAGES = {
@@ -400,6 +400,12 @@ export default function OrderTracking() {
           )}
           {order.paymentMethod && (
             <DetailRow label={t("summary.payment")} value={t(PAYMENT_KEYS[order.paymentMethod] || "summary.payment")} />
+          )}
+          {order.paymentMethod === "online" && (
+            <DetailRow
+              label="Estado del pago"
+              value={order.paymentStatus === "paid" ? "✅ Pagado" : "⏳ Pendiente"}
+            />
           )}
           {order.notes && <DetailRow label={t("summary.notes")} value={order.notes} />}
         </div>

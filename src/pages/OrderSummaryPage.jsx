@@ -88,6 +88,12 @@ export default function OrderSummaryPage() {
       saveActiveOrder(data.order._id);
       resetOrder();
       refreshUser?.(); // update points balance after redemption
+
+      if (data.order.paymentMethod === "online" && data.paymentUrl) {
+        window.location.href = data.paymentUrl; // Redirige al checkout hospedado por Clip
+        return;
+      }
+
       navigate(`/seguimiento/${data.order._id}`, { replace: true });
     } catch (e) {
       setSubmitError(e.message);
@@ -163,6 +169,7 @@ export default function OrderSummaryPage() {
         onConfirm={onConfirm}
         saving={saving}
         submitError={submitError}
+        showOnlinePayment
       />
     </>
   );

@@ -10,7 +10,7 @@ import {
   ITEM_LABELS,
 } from "./OrderLabels";
 
-const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" }) => {
+const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "", showOnlinePayment = false }) => {
   const { order } = useOrder();
   const { isLoggedIn, token } = useContext(AuthContext);
   const { language, t } = useLanguage();
@@ -66,6 +66,15 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
   const toppingsLabels = getListLabels(labels.topping, toppings);
 
   const pricing = computePricing(bowlSize, promoApplied);
+
+  const paymentOptions = [
+    ...(showOnlinePayment
+      ? [{ value: "online", icon: "⚡", label: t("summary.online"), badge: "Rápido y fácil" }]
+      : []),
+    { value: "pay_at_pickup", icon: "🏪", label: t("summary.payAtPickup") },
+    { value: "cash", icon: "💵", label: t("summary.cash") },
+    { value: "card_terminal", icon: "💳", label: t("summary.cardTerminal") },
+  ];
 
   // Time picker helpers
   const getMinTime = () => {
@@ -321,18 +330,25 @@ const OrderSummary = ({ onEditStep, onConfirm, saving = false, submitError = "" 
               </select>
             </label>
 
-            <label className={styles.field}>
+            <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
               <span>{t("summary.payment")}</span>
-              <select
-                name="paymentMethod"
-                value={order.paymentMethod || "pay_at_pickup"}
-                onChange={(e) => order.updateCheckout("paymentMethod", e.target.value)}
-              >
-                <option value="pay_at_pickup">{t("summary.payAtPickup")}</option>
-                <option value="cash">{t("summary.cash")}</option>
-                <option value="card_terminal">{t("summary.cardTerminal")}</option>
-              </select>
-            </label>
+              <div className={styles.paymentOptions}>
+                {paymentOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`${styles.paymentOption} ${
+                      (order.paymentMethod || "pay_at_pickup") === opt.value ? styles.paymentOptionActive : ""
+                    }`}
+                    onClick={() => order.updateCheckout("paymentMethod", opt.value)}
+                  >
+                    {opt.badge && <span className={styles.paymentBadge}>{opt.badge}</span>}
+                    <span className={styles.paymentIcon}>{opt.icon}</span>
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Scheduled pickup time — only for pickup */}

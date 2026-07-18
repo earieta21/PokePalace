@@ -3,6 +3,7 @@ import PromoCode from "../models/PromoCode.js";
 import User from "../models/User.js";
 import { computePricing } from "../pricing.js";
 import { sendEmail, orderConfirmationEmail } from "../utils/notify.js";
+import { createPaymentLink, getPaymentLinkStatus } from "../utils/clip.js";
 
 // 100 puntos = $25 MXN
 const POINTS_PER_REWARD = 100;
@@ -153,7 +154,21 @@ export const createOrder = async (req, res) => {
       isScheduled,
     });
 
-    res.status(201).json({ order });
+    let paymentUrl = null;
+    if (order.paymentMethod === "online") {
+      const link = await createPaymentLink({
+        orderId: order._id,
+        amount: order.total,
+        description: `Pedido Poke Palace #${order._id.toString().slice(-6).toUpperCase()}`,
+      });
+      if (link) {
+        order.clipPaymentRequestId = link.paymentRequestId;
+        await order.save();
+        paymentUrl = link.url;
+      }
+    }
+
+    res.status(201).json({ order, paymentUrl });
 
     // Email de confirmación (solo usuarios logueados — los invitados no dan email).
     // Fire-and-forget después de responder: no retrasa ni rompe la creación.
@@ -237,5 +252,29 @@ export const getOrderById = async (req, res) => {
     res.json({ order });
   } catch {
     res.status(500).json({ msg: "Error obteniendo la orden" });
+  }
+};
+
+/* Clip no documenta firma/secreto para verificar sus webhooks, así que el
+   body nunca se usa como fuente de verdad: solo dispara una consulta
+   autenticada server-to-server a Clip para confirmar el estado real antes
+   de marcar el pedido como pagado. */
+export const clipWebhook = async (req, res) => {
+  res.sendStatus(200); // Clip solo necesita el 200; el resto es best-effort.
+
+  try {
+    const paymentRequestId = req.body?.payment_request_id;
+    if (!paymentRequestId) return;
+
+    const order = await Order.findOne({ clipPaymentRequestId: paymentRequestId });
+    if (!order || order.paymentStatus === "paid") return;
+
+    const status = await getPaymentLinkStatus(paymentRequestId);
+    if (status?.status === "CHECKOUT_COMPLETED") {
+      order.paymentStatus = "paid";
+      await order.save();
+    }
+  } catch (err) {
+    console.error("clipWebhook error:", err.message);
   }
 };

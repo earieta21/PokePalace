@@ -39,6 +39,7 @@ const orderSchema = new mongoose.Schema(
       enum: ["pending", "paid"],
       default: "pending",
     },
+    clipPaymentRequestId: { type: String, default: null },
     source:   { type: String, enum: ["online", "pos"], default: "online" },
     total:    { type: Number, default: null },  // in MXN
 
