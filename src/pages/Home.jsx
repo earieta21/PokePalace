@@ -6,10 +6,10 @@ import { computeBowlSubtotal } from "../order/pricing";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./Home.module.css";
 
-import salmonBowl from "../assets/salmon.webp";
-import spicyTuna from "../assets/protein/tuna.webp";
-import tropicalShrimp from "../assets/protein/shrimp.webp";
-import citrusOctopus from "../assets/protein/octopus.webp";
+import salmonBowl from "../assets/menu-emerald-salmon-v2.webp";
+import spicyTuna from "../assets/menu-spicy-tuna-v2.webp";
+import tropicalShrimp from "../assets/menu-tropical-shrimp-v2.webp";
+import citrusOctopus from "../assets/menu-citrus-octopus-v2.webp";
 
 const Home = () => {
   const navigate = useNavigate();

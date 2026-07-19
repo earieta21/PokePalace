@@ -1,6 +1,6 @@
 import React from "react";
 import styles from "./HeroSection.module.css";
-import pokebowl from "../assets/poke.webp";
+import pokebowl from "../assets/hero-poke-realistic-v2.webp";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 
@@ -23,6 +23,10 @@ const HeroSection = () => {
           src={pokebowl}
           alt={t("home.heroImageAlt")}
           className={styles.heroImage}
+          width="1536"
+          height="1024"
+          fetchPriority="high"
+          decoding="async"
         />
         <div className={styles.overlay} />
       </div>

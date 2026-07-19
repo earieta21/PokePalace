@@ -29,6 +29,9 @@ const Menu = ({ items = [], onSelect }) => {
               alt={item.name}
               className={styles.menuImage}
               loading="lazy"
+              width="900"
+              height="675"
+              decoding="async"
             />
             <div className={styles.imageOverlay} />
           </div>

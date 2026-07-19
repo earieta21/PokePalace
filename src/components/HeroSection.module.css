@@ -16,6 +16,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: 62% center;
 }
 
 .overlay {
@@ -155,4 +156,5 @@
   .heroTitle { font-size: 30px; }
   .stats { gap: 16px; }
   .divider { display: none; }
+  .heroImage { object-position: 68% center; }
 }
