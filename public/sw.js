@@ -1,5 +1,5 @@
-const CACHE = "pokepalace-v5";
-const SHELL = ["/", "/index.html", "/manifest.json", "/icon.svg"];
+const CACHE = "pokepalace-v6";
+const SHELL = ["/", "/index.html", "/manifest.json", "/icons/icon-192.png"];
 
 // ── Install: pre-cache app shell ──────────────────────────────────────────────
 self.addEventListener("install", (e) => {
