@@ -22,7 +22,7 @@ const MENU = [
   { id: 4,  name: "Bowl Vegano",             price: 229, category: "Bowls", icon: "🥬" },
   { id: 6,  name: "Edamame",                 price:  69, category: "Entradas", icon: "🫛" },
   { id: 8,  name: "Ensalada de Algas",       price:  79, category: "Entradas", icon: "🥗" },
-  { id: 11, name: "Topochico",               price:  30, category: "Bebidas", icon: "🫧" },
+  { id: 11, name: "Topochico",               price:  35, category: "Bebidas", icon: "🫧" },
   { id: 13, name: "Coca-Zero",               price:  35, category: "Bebidas", icon: "🥤" },
   { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
   { id: 15, name: "Agua natural del día",    price:  30, category: "Bebidas", icon: "🍹" },
@@ -151,8 +151,8 @@ export default function POSPage({ styles }) {
   });
   const iva      = subtotal * IVA;
   const customRewardBowl = cart.find((i) => i.id === CUSTOM_BOWL_ID);
-  const bowlLines = cart.filter((i) => /bowl|pollo teriyaki/i.test(i.name));
-  const drinkLines = cart.filter((i) => /agua de coco|limonada de matcha/i.test(i.name));
+  const bowlLines = cart.filter((i) => /bowl/i.test(i.name));
+  const drinkLines = cart.filter((i) => /agua natural/i.test(i.name));
   let rewardDiscount = 0;
   if (reward?.type === "free_drink" && bowlLines.length && drinkLines.length) {
     rewardDiscount = Math.min(...drinkLines.map((item) => item.price));

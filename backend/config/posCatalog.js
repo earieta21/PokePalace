@@ -40,7 +40,7 @@ export const POS_CATALOG = Object.freeze([
   {
     // Mantiene catalogId/legacyId de "Agua Mineral" para que las órdenes
     // históricas y colas offline sigan resolviendo al mismo producto.
-    catalogId: "mineral-water", legacyId: 11, name: "Topochico", price: 30, category: "drinks",
+    catalogId: "mineral-water", legacyId: 11, name: "Topochico", price: 35, category: "drinks",
     inventoryRecipe: { topochico: 1 },
   },
   {
