@@ -4,7 +4,7 @@ import {
   TrendingUp, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
-  ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard,
+  ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard, Landmark,
   Menu, X,
 } from "lucide-react";
 import {
@@ -23,6 +23,7 @@ import POSPage from "../pos/pages/POSPage";
 import KDSPage from "../pos/pages/KDSPage";
 import OrderHistoryPage from "../pos/pages/OrderHistoryPage";
 import FinancePage from "../pos/pages/FinancePage";
+import FiscalPage from "../pos/pages/FiscalPage";
 import SalesDashboardPage from "../pos/pages/SalesDashboardPage";
 import SummaryPage from "../pos/pages/SummaryPage";
 import InventoryPage from "../pos/pages/InventoryPage";
@@ -134,8 +135,8 @@ const TABS_BY_ROLE = {
   cashier:  ["pos", "premios", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
   kitchen:  ["cocina", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
   manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
-  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
-  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "fiscal", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "fiscal", "panel"],
 };
 
 const TAB_META = {
@@ -147,6 +148,7 @@ const TAB_META = {
   ventas:  { label: "Ventas", title: "Panel de ventas", icon: Activity },
   inv:     { label: "Inventario", title: "Inventario", icon: Package },
   fin:     { label: "Finanzas", title: "Finanzas", icon: BarChart3 },
+  fiscal:  { label: "Fiscal", title: "Asistente fiscal (SAT)", icon: Landmark },
   disponibilidad: { label: "Tienda", title: "Disponibilidad de la tienda", icon: ToggleRight },
   panel:   { label: "Equipo", title: "Administración del equipo", icon: TrendingUp },
   inicio:  { label: "Inicio", title: "Mi turno", icon: Clock },
@@ -161,7 +163,7 @@ const TAB_GROUPS = [
   { id: "turno", label: "Mi turno", tabs: ["inicio", "tareas", "temp"] },
   { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv"] },
   { id: "equipo", label: "Equipo", tabs: ["horario", "avisos"] },
-  { id: "gestion", label: "Administración", tabs: ["resumen", "ventas", "fin", "panel"] },
+  { id: "gestion", label: "Administración", tabs: ["resumen", "ventas", "fin", "fiscal", "panel"] },
 ];
 
 const MOBILE_PRIMARY_BY_ROLE = {
@@ -493,6 +495,7 @@ export default function UnifiedStaffApp() {
             {tab === "ventas"  && <section className={shellStyles.portalSurface}><SalesDashboardPage styles={posStyles} /></section>}
             {tab === "inv"     && <InventoryPage styles={posStyles} />}
             {tab === "fin"     && <FinancePage styles={posStyles} />}
+            {tab === "fiscal"  && <FiscalPage styles={posStyles} />}
           </main>
         </div>
 
