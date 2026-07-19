@@ -20,14 +20,12 @@ const MENU = [
   { id: 2,  name: "Bowl Salmón y Aguacate",  price: 289, category: "Bowls", icon: "🥑" },
   { id: 3,  name: "Bowl Camarón Picante",    price: 249, category: "Bowls", icon: "🍤" },
   { id: 4,  name: "Bowl Vegano",             price: 229, category: "Bowls", icon: "🥬" },
-  { id: 5,  name: "Pollo Teriyaki",          price: 239, category: "Bowls", icon: "🍗" },
   { id: 6,  name: "Edamame",                 price:  69, category: "Entradas", icon: "🫛" },
-  { id: 7,  name: "Sopa de Miso",            price:  49, category: "Entradas", icon: "🍲" },
   { id: 8,  name: "Ensalada de Algas",       price:  79, category: "Entradas", icon: "🥗" },
-  { id: 9,  name: "Agua de Coco",            price:  55, category: "Bebidas", icon: "🥥" },
-  { id: 10, name: "Limonada de Matcha",      price:  65, category: "Bebidas", icon: "🍵" },
-  { id: 11, name: "Agua Mineral",            price:  30, category: "Bebidas", icon: "💧" },
-  { id: 12, name: "Smoothie de Mango",       price:  89, category: "Bebidas", icon: "🥭" },
+  { id: 11, name: "Topochico",               price:  30, category: "Bebidas", icon: "🫧" },
+  { id: 13, name: "Coca-Zero",               price:  35, category: "Bebidas", icon: "🥤" },
+  { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
+  { id: 15, name: "Agua natural del día",    price:  30, category: "Bebidas", icon: "🍹" },
 ];
 
 const MENU_CATEGORIES = ["Todos", "Bowls", "Entradas", "Bebidas"];

@@ -59,13 +59,13 @@ test("las matrices de rutas distinguen cocina, caja y empleado general", () => {
 
 test("el POS ignora precio y nombre manipulados cuando recibe un id de catálogo", () => {
   const [item] = resolvePosItems([{
-    catalogId: "coconut-water",
+    catalogId: "agua-del-dia",
     name: "Producto inventado",
     price: 0.01,
     qty: 2,
   }]);
-  assert.equal(item.name, "Agua de Coco");
-  assert.equal(item.price, 55);
+  assert.equal(item.name, "Agua natural del día");
+  assert.equal(item.price, 30);
   assert.equal(item.qty, 2);
 });
 
@@ -92,14 +92,14 @@ test("el POS rechaza productos, ids y cantidades fuera del catálogo", () => {
 
 test("el POS agrupa productos repetidos y limita su cantidad total", () => {
   const [item] = resolvePosItems([
-    { catalogId: "miso-soup", qty: 2 },
-    { name: "Sopa de Miso", price: 0, qty: 3 },
+    { catalogId: "edamame", qty: 2 },
+    { name: "Edamame", price: 0, qty: 3 },
   ]);
   assert.equal(item.qty, 5);
   assert.throws(
     () => resolvePosItems([
-      { catalogId: "miso-soup", qty: 60 },
-      { catalogId: "miso-soup", qty: 40 },
+      { catalogId: "edamame", qty: 60 },
+      { catalogId: "edamame", qty: 40 },
     ]),
     PosOrderValidationError
   );
@@ -140,7 +140,7 @@ test("el inventario POS suma ingredientes compartidos del bowl personalizado", (
 test("el servidor detecta productos e ingredientes agotados aunque el POS esté desactualizado", () => {
   const items = resolvePosItems([
     { catalogId: "bowl-salmon-avocado", qty: 1 },
-    { catalogId: "coconut-water", qty: 1 },
+    { catalogId: "agua-del-dia", qty: 1 },
   ]);
   const bowl = sanitizePosBowl({
     base: "white_rice",
@@ -152,9 +152,9 @@ test("el servidor detecta productos e ingredientes agotados aunque el POS esté 
     getUnavailablePosSelections({
       items,
       bowl,
-      unavailableItems: ["salmon", "coconut-water", "furikake", "not-selected"],
+      unavailableItems: ["salmon", "agua-del-dia", "furikake", "not-selected"],
     }),
-    ["coconut-water", "furikake", "salmon"]
+    ["agua-del-dia", "furikake", "salmon"]
   );
 });
 
