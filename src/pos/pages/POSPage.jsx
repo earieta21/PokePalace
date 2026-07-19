@@ -23,7 +23,7 @@ const MENU = [
   { id: 6,  name: "Edamame",                 price:  69, category: "Entradas", icon: "🫛" },
   { id: 8,  name: "Ensalada de Algas",       price:  79, category: "Entradas", icon: "🥗" },
   { id: 11, name: "Topochico",               price:  35, category: "Bebidas", icon: "🫧" },
-  { id: 13, name: "Coca-Zero",               price:  35, category: "Bebidas", icon: "🥤" },
+  { id: 13, name: "Coca-Zero",               price:  30, category: "Bebidas", icon: "🥤" },
   { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
   { id: 15, name: "Agua natural del día",    price:  30, category: "Bebidas", icon: "🍹" },
 ];

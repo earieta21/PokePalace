@@ -44,7 +44,7 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: { topochico: 1 },
   },
   {
-    catalogId: "coca-zero", legacyId: 13, name: "Coca-Zero", price: 35, category: "drinks",
+    catalogId: "coca-zero", legacyId: 13, name: "Coca-Zero", price: 30, category: "drinks",
     inventoryRecipe: { coca_zero: 1 },
   },
   {
