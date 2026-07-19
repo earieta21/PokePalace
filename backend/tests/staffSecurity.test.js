@@ -107,7 +107,7 @@ test("el POS agrupa productos repetidos y limita su cantidad total", () => {
 
 test("el inventario POS multiplica qty y desglosa recetas de bowls predefinidos", () => {
   const items = resolvePosItems([
-    { catalogId: "bowl-tuna-classic", qty: 2 },
+    { catalogId: "bowl-emerald-salmon", qty: 2 },
     { catalogId: "edamame", qty: 3 },
   ]);
   const demand = getPosInventoryDemand({ items });
@@ -127,7 +127,7 @@ test("el inventario POS suma ingredientes compartidos del bowl personalizado", (
     complements: ["cucumber"],
     toppings: ["sesame_seeds"],
     rewardExtraTopping: "sesame_seeds",
-    items: [{ catalogId: "bowl-tuna-classic", name: "Bowl Clásico de Atún", qty: 1 }],
+    items: [{ catalogId: "bowl-emerald-salmon", name: "Bowl de salmón esmeralda", qty: 1 }],
   });
 
   assert.equal(demand.white_rice, 2);
@@ -139,7 +139,7 @@ test("el inventario POS suma ingredientes compartidos del bowl personalizado", (
 
 test("el servidor detecta productos e ingredientes agotados aunque el POS esté desactualizado", () => {
   const items = resolvePosItems([
-    { catalogId: "bowl-salmon-avocado", qty: 1 },
+    { catalogId: "bowl-tropical-shrimp", qty: 1 },
     { catalogId: "agua-del-dia", qty: 1 },
   ]);
   const bowl = sanitizePosBowl({

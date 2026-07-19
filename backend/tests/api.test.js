@@ -986,7 +986,7 @@ test("cancelar una venta POS revierte inventario, puntos y premio una sola vez",
       rewardCode,
       paymentMethod: "cash",
       items: [
-        { catalogId: "bowl-tuna-classic", qty: 1 },
+        { catalogId: "bowl-emerald-salmon", qty: 1 },
         { catalogId: "agua-del-dia", qty: 1 },
       ],
     },

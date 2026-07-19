@@ -1,32 +1,39 @@
 // Source of truth for products sold through the POS. The browser may display
 // these prices, but only this server-side catalog is used to charge an order.
 export const POS_CATALOG = Object.freeze([
+  // Los 4 bowls de la casa — mismos nombres y recetas que los presets del
+  // inicio del sitio (src/order/OrderPage.jsx PRESETS), todos a precio de
+  // bowl normal.
   {
-    catalogId: "bowl-tuna-classic", legacyId: 1, name: "Bowl Clásico de Atún", price: 249, category: "bowls",
+    catalogId: "bowl-emerald-salmon", legacyId: 1, name: "Bowl de salmón esmeralda", price: 249, category: "bowls",
     inventoryRecipe: {
-      white_rice: 1, tuna: 1, cucumber: 1, edamame: 1,
-      soy_sauce: 1, sesame_seeds: 1,
+      white_rice: 1, salmon: 1, tuna: 1, shoyu_marinade: 1,
+      avocado: 1, cucumber: 1, edamame: 1,
+      spicy_mayo: 1, soy_sauce: 1, sesame_seeds: 1, nori_strips: 1,
     },
   },
   {
-    catalogId: "bowl-salmon-avocado", legacyId: 2, name: "Bowl Salmón y Aguacate", price: 289, category: "bowls",
+    catalogId: "bowl-spicy-tuna", legacyId: 2, name: "Bowl picante de atún crujiente", price: 249, category: "bowls",
     inventoryRecipe: {
-      white_rice: 1, salmon: 1, avocado: 1, cucumber: 1,
-      ponzu_sauce: 1, sesame_seeds: 1,
+      brown_rice: 1, tuna: 1, seared_tuna: 1, spicy_marinade: 1,
+      cucumber: 1, edamame: 1, corn: 1,
+      garlic_sriracha: 1, spicy_mayo: 1, red_pepper_flakes: 1, furikake: 1,
     },
   },
   {
-    catalogId: "bowl-spicy-shrimp", legacyId: 3, name: "Bowl Camarón Picante", price: 249, category: "bowls",
+    catalogId: "bowl-tropical-shrimp", legacyId: 3, name: "Bowl tropical de camarón", price: 249, category: "bowls",
     inventoryRecipe: {
-      brown_rice: 1, shrimp: 1, cucumber: 1, spicy_mayo: 1,
-      crispy_onions: 1, red_pepper_flakes: 1,
+      spring_mix: 1, shrimp: 1, salmon: 1, citrus_marinade: 1,
+      mango: 1, pineapple: 1, avocado: 1,
+      sweet_chili: 1, avocado_lime: 1, sesame_seeds: 1, crispy_onions: 1,
     },
   },
   {
-    catalogId: "bowl-vegan", legacyId: 4, name: "Bowl Vegano", price: 229, category: "bowls",
+    catalogId: "bowl-citrus-octopus", legacyId: 4, name: "Pulpo cítrico", price: 249, category: "bowls",
     inventoryRecipe: {
-      quinoa: 1, avocado: 1, cucumber: 1, mango: 1,
-      edamame: 1, sesame_seeds: 1,
+      spring_mix: 1, octopus: 1, shrimp: 1, citrus_marinade: 1,
+      cucumber: 1, mango: 1, avocado: 1,
+      avocado_lime: 1, soy_sauce: 1, sesame_seeds: 1, nori_strips: 1,
     },
   },
   {

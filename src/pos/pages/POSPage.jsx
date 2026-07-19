@@ -16,10 +16,10 @@ import ui from "./POSPage.module.css";
 const CUSTOM_BOWL_ID = "custom-bowl";
 
 const MENU = [
-  { id: 1,  name: "Bowl Clásico de Atún",    price: 249, category: "Bowls", icon: "🍣" },
-  { id: 2,  name: "Bowl Salmón y Aguacate",  price: 289, category: "Bowls", icon: "🥑" },
-  { id: 3,  name: "Bowl Camarón Picante",    price: 249, category: "Bowls", icon: "🍤" },
-  { id: 4,  name: "Bowl Vegano",             price: 229, category: "Bowls", icon: "🥬" },
+  { id: 1,  name: "Bowl de salmón esmeralda",        price: 249, category: "Bowls", icon: "🍣" },
+  { id: 2,  name: "Bowl picante de atún crujiente",  price: 249, category: "Bowls", icon: "🌶️" },
+  { id: 3,  name: "Bowl tropical de camarón",        price: 249, category: "Bowls", icon: "🍤" },
+  { id: 4,  name: "Pulpo cítrico",                   price: 249, category: "Bowls", icon: "🐙" },
   { id: 6,  name: "Edamame",                 price:  69, category: "Entradas", icon: "🫛" },
   { id: 8,  name: "Ensalada de Algas",       price:  79, category: "Entradas", icon: "🥗" },
   { id: 11, name: "Topochico",               price:  35, category: "Bebidas", icon: "🫧" },
