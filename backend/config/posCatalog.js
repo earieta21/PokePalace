@@ -30,36 +30,30 @@ export const POS_CATALOG = Object.freeze([
     },
   },
   {
-    catalogId: "teriyaki-chicken", legacyId: 5, name: "Pollo Teriyaki", price: 239, category: "bowls",
-    inventoryRecipe: { white_rice: 1, chicken: 1, teriyaki_sauce: 1, sesame_seeds: 1 },
-  },
-  {
     catalogId: "edamame", legacyId: 6, name: "Edamame", price: 69, category: "starters",
     inventoryRecipe: { edamame: 1 },
-  },
-  {
-    catalogId: "miso-soup", legacyId: 7, name: "Sopa de Miso", price: 49, category: "starters",
-    inventoryRecipe: { sopa_de_miso: 1 },
   },
   {
     catalogId: "seaweed-salad", legacyId: 8, name: "Ensalada de Algas", price: 79, category: "starters",
     inventoryRecipe: { ensalada_de_algas: 1 },
   },
   {
-    catalogId: "coconut-water", legacyId: 9, name: "Agua de Coco", price: 55, category: "drinks", rewardDrink: true,
-    inventoryRecipe: { agua_de_coco: 1 },
+    // Mantiene catalogId/legacyId de "Agua Mineral" para que las órdenes
+    // históricas y colas offline sigan resolviendo al mismo producto.
+    catalogId: "mineral-water", legacyId: 11, name: "Topochico", price: 30, category: "drinks",
+    inventoryRecipe: { topochico: 1 },
   },
   {
-    catalogId: "matcha-lemonade", legacyId: 10, name: "Limonada de Matcha", price: 65, category: "drinks", rewardDrink: true,
-    inventoryRecipe: { limonada_de_matcha: 1 },
+    catalogId: "coca-zero", legacyId: 13, name: "Coca-Zero", price: 35, category: "drinks",
+    inventoryRecipe: { coca_zero: 1 },
   },
   {
-    catalogId: "mineral-water", legacyId: 11, name: "Agua Mineral", price: 30, category: "drinks",
-    inventoryRecipe: { agua_mineral: 1 },
+    catalogId: "bottled-water", legacyId: 14, name: "Botella de Agua", price: 20, category: "drinks",
+    inventoryRecipe: { botella_de_agua: 1 },
   },
   {
-    catalogId: "mango-smoothie", legacyId: 12, name: "Smoothie de Mango", price: 89, category: "drinks",
-    inventoryRecipe: { smoothie_de_mango: 1 },
+    catalogId: "agua-del-dia", legacyId: 15, name: "Agua natural del día", price: 30, category: "drinks", rewardDrink: true,
+    inventoryRecipe: { agua_natural: 1 },
   },
 ]);
 

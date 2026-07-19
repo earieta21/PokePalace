@@ -803,22 +803,22 @@ test("el POS calcula catálogo, deduplica reintentos y descuenta inventario una 
   // debe completar inventario y conservar al cajero original.
   const recoveryId = `ci-pos-security:${Date.now()}:recovery`;
   const recoveryInventory = await Inventory.create({
-    item: `CI Security Miso ${Date.now()}`,
+    item: `CI Security Edamame ${Date.now()}`,
     unit: "porción",
     qty: 1,
     minQty: 0,
-    menuKeys: ["sopa_de_miso"],
+    menuKeys: ["edamame"],
   });
   const stagedOrder = await Order.create({
     staffId: staffFixtures.cashier._id,
     clientOrderId: recoveryId,
-    items: [{ catalogId: "miso-soup", name: "Sopa de Miso", price: 49, qty: 1 }],
+    items: [{ catalogId: "edamame", name: "Edamame", price: 69, qty: 1 }],
     customer: "Venta interrumpida CI",
     paymentMethod: "cash",
     paymentStatus: "paid",
     source: "pos",
-    subtotal: 49,
-    total: 49,
+    subtotal: 69,
+    total: 69,
     status: "pending",
   });
   const recovered = await staffRequest("manager", "/api/staff/orders", {
@@ -970,11 +970,11 @@ test("cancelar una venta POS revierte inventario, puntos y premio una sola vez",
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
   const inventory = await Inventory.create({
-    item: `CI Security Agua de Coco ${Date.now()}`,
+    item: `CI Security Agua del Dia ${Date.now()}`,
     unit: "porciÃ³n",
     qty: 2,
     minQty: 0,
-    menuKeys: ["agua_de_coco"],
+    menuKeys: ["agua_natural"],
   });
   const clientOrderId = `ci-pos-security:${Date.now()}:cancel`;
 
@@ -987,7 +987,7 @@ test("cancelar una venta POS revierte inventario, puntos y premio una sola vez",
       paymentMethod: "cash",
       items: [
         { catalogId: "bowl-tuna-classic", qty: 1 },
-        { catalogId: "coconut-water", qty: 1 },
+        { catalogId: "agua-del-dia", qty: 1 },
       ],
     },
   });

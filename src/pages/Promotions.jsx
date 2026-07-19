@@ -391,8 +391,8 @@ export default function RewardsPage() {
           <strong>{language === "es" ? "Condiciones" : "Terms"}</strong>
           <p>
             {language === "es"
-              ? "Agua de coco o limonada de matcha gratis en la siguiente visita con la compra de un bowl · Código válido por 7 días · Una participación por cuenta cada 30 días · No acumulable · Sujeto a disponibilidad."
-              : "Free coconut water or matcha lemonade on your next visit with a bowl purchase · Code valid for 7 days · One entry per account every 30 days · Cannot be combined · Subject to availability."}
+              ? "Agua natural del día gratis en la siguiente visita con la compra de un bowl · Código válido por 7 días · Una participación por cuenta cada 30 días · No acumulable · Sujeto a disponibilidad."
+              : "Free agua fresca of the day on your next visit with a bowl purchase · Code valid for 7 days · One entry per account every 30 days · Cannot be combined · Subject to availability."}
           </p>
         </div>
       </section>
