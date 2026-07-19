@@ -113,18 +113,57 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      if ("serviceWorker" in navigator) {
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener("controllerchange", () => {
-          if (refreshing) return;
-          refreshing = true;
-          window.location.reload();
+      // Las iPads del local corren en acceso guiado y nunca se recargan a mano:
+      // este bloque busca versiones nuevas cada 15 min y recarga solo cuando
+      // nadie ha tocado la pantalla, para no perder una orden a medio capturar.
+      (function () {
+        if (!("serviceWorker" in navigator)) return;
+
+        var IDLE_BEFORE_RELOAD_MS = 3 * 60 * 1000;
+        var lastInteraction = Date.now();
+        ["touchstart", "mousedown", "keydown", "scroll"].forEach(function (evt) {
+          window.addEventListener(evt, function () { lastInteraction = Date.now(); }, { passive: true, capture: true });
         });
+        var isIdle = function (ms) { return Date.now() - lastInteraction >= ms; };
+
+        var refreshing = false;
+        var reloadWhenIdle = function () {
+          if (refreshing) return;
+          if (isIdle(IDLE_BEFORE_RELOAD_MS)) {
+            refreshing = true;
+            window.location.reload();
+          } else {
+            setTimeout(reloadWhenIdle, 30 * 1000);
+          }
+        };
+
+        // Cuando una versión nueva del service worker toma control, se recarga
+        // en cuanto la pantalla lleve un rato sin tocarse.
+        navigator.serviceWorker.addEventListener("controllerchange", reloadWhenIdle);
+
         navigator.serviceWorker
           .register("/sw.js", { updateViaCache: "none" })
-          .then((registration) => registration.update())
-          .catch(() => {});
-      }
+          .then(function (registration) {
+            registration.update();
+            setInterval(function () {
+              registration.update().catch(function () {});
+            }, 15 * 60 * 1000);
+          })
+          .catch(function () {});
+
+        // Recarga de mantenimiento una vez al día a las 4 AM (hora del
+        // dispositivo) para que una iPad prendida 24/7 no acumule memoria.
+        setInterval(function () {
+          var now = new Date();
+          if (now.getHours() !== 4 || !isIdle(10 * 60 * 1000)) return;
+          var today = now.toISOString().slice(0, 10);
+          try {
+            if (sessionStorage.getItem("pp_maintenance_reload") === today) return;
+            sessionStorage.setItem("pp_maintenance_reload", today);
+          } catch (e) { /* sessionStorage bloqueado: recargar igual es seguro */ }
+          window.location.reload();
+        }, 10 * 60 * 1000);
+      })();
     </script>
   </body>
 </html>
