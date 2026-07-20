@@ -16,7 +16,7 @@ const INVENTORY_SECTIONS = [
   { name: "Otros", icon: "📦", categories: ["Equipo", "Oficina", "Otro"] },
 ];
 const SECTION_NAMES = INVENTORY_SECTIONS.map((section) => section.name);
-const UNITS = ["kg", "pz", "L", "paq", "botellas", "manojos", "bolsas", "latas", "cajas", "rollos", "gal"];
+const UNITS = ["kg", "g", "pz", "L", "ml", "paq", "botellas", "manojos", "bolsas", "latas", "cajas", "rollos", "gal"];
 const LEGACY_CATEGORY_LABELS = {
   Grains: "Granos",
   Proteins: "Proteínas",
