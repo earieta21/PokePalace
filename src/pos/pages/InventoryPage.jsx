@@ -11,6 +11,7 @@ import {
 
 const INVENTORY_SECTIONS = [
   { name: "Comida", icon: "🍣", categories: ["Proteínas", "Granos", "Verduras", "Salsas", "Extras", "Otro"] },
+  { name: "Bebidas", icon: "🥤", categories: ["Refrescos", "Aguas", "Otro"] },
   { name: "Limpieza", icon: "🧼", categories: ["Químicos", "Higiene", "Utensilios", "Desechables", "Otro"] },
   { name: "Empaque", icon: "🥡", categories: ["Contenedores", "Cubiertos", "Bolsas", "Servilletas", "Otro"] },
   { name: "Otros", icon: "📦", categories: ["Equipo", "Oficina", "Otro"] },
@@ -37,6 +38,16 @@ const CLEANING_PRODUCTS = [
   { name: "Bolsas para basura", category: "Desechables", unit: "bolsas" },
   { name: "Toallas de papel", category: "Desechables", unit: "rollos" },
   { name: "Esponjas o fibras", category: "Utensilios", unit: "pz" },
+];
+
+// menuKeys idénticas a inventoryRecipe en backend/config/posCatalog.js —
+// vincularlas aquí hace que vender la bebida en el POS descuente el
+// inventario solo, igual que con los ingredientes de los bowls.
+const BEVERAGE_PRODUCTS = [
+  { name: "Topochico", category: "Aguas", unit: "botellas", key: "topochico" },
+  { name: "Coca-Zero", category: "Refrescos", unit: "latas", key: "coca_zero" },
+  { name: "Botella de Agua", category: "Aguas", unit: "botellas", key: "botella_de_agua" },
+  { name: "Agua natural del día", category: "Aguas", unit: "L", key: "agua_natural" },
 ];
 
 const EMPTY_FORM = {
@@ -181,6 +192,17 @@ export default function InventoryPage({ styles }) {
       category: product.category,
       unit: product.unit,
       menuKeys: [],
+    }));
+  };
+
+  const pickBeverageProduct = (product) => {
+    setForm((previous) => ({
+      ...previous,
+      item: product.name,
+      section: "Bebidas",
+      category: product.category,
+      unit: product.unit,
+      menuKeys: [product.key],
     }));
   };
 
@@ -429,7 +451,7 @@ export default function InventoryPage({ styles }) {
             <button type="button" onClick={() => setShowGuide(false)} aria-label="Ocultar guía">×</button>
           </div>
           <div className={ui.guideSteps}>
-            <div className={ui.guideStep}><span>1</span><p><strong>Elige una sección</strong>Separa comida, limpieza y empaques.</p></div>
+            <div className={ui.guideStep}><span>1</span><p><strong>Elige una sección</strong>Separa comida, bebidas, limpieza y empaques.</p></div>
             <div className={ui.guideStep}><span>2</span><p><strong>Busca o filtra</strong>Encuentra rápido el artículo que necesitas.</p></div>
             <div className={ui.guideStep}><span>3</span><p><strong>Actualiza existencias</strong>Edita una cantidad o registra una entrega.</p></div>
           </div>
@@ -581,6 +603,28 @@ export default function InventoryPage({ styles }) {
               </div>
             )}
 
+            {form.section === "Bebidas" && (
+              <div className={ui.cleaningQuickPick}>
+                <div>
+                  <span>Bebidas del menú</span>
+                  <strong>Selecciona una para llenar los datos y vincularla automáticamente</strong>
+                </div>
+                <div className={ui.cleaningProductGrid}>
+                  {BEVERAGE_PRODUCTS.map((product) => (
+                    <button
+                      key={product.name}
+                      type="button"
+                      className={form.item === product.name ? ui.cleaningProductActive : ""}
+                      onClick={() => pickBeverageProduct(product)}
+                    >
+                      <span>🥤</span>
+                      <span><strong>{product.name}</strong><small>{product.category} · {product.unit}</small></span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className={ui.formStep}>
               <div className={ui.stepHeading}>
                 <span>2</span>
@@ -589,7 +633,7 @@ export default function InventoryPage({ styles }) {
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Nombre del artículo *</label>
-                  <input className={styles.input} placeholder={form.section === "Limpieza" ? "ej. Detergente" : "ej. Salmón"} value={form.item} onChange={f("item")} required />
+                  <input className={styles.input} placeholder={form.section === "Limpieza" ? "ej. Detergente" : form.section === "Bebidas" ? "ej. Topochico" : "ej. Salmón"} value={form.item} onChange={f("item")} required />
                 </div>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Categoría</label>

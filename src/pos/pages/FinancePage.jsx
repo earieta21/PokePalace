@@ -7,6 +7,7 @@ import ui from "./FinancePage.module.css";
 
 const CATEGORIES = [
   { name: "Ingredientes",  icon: "🥑" },
+  { name: "Bebidas",       icon: "🥤" },
   { name: "Limpieza",      icon: "🧼" },
   { name: "Empaque",       icon: "🥡" },
   { name: "Renta",         icon: "🏠" },

@@ -202,7 +202,7 @@
 
 .formSectionPicker {
   display: grid;
-  grid-template-columns: repeat(4, minmax(100px, 1fr));
+  grid-template-columns: repeat(5, minmax(100px, 1fr));
   gap: 8px;
 }
 
@@ -676,7 +676,7 @@
 
 .sectionGrid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
   gap: 9px;
 }
 

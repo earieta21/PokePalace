@@ -6,6 +6,7 @@ import { dateKeyInTimeZone, normalizeRestockLines } from "../utils/inventoryRest
 // Cada sección del inventario tiene su categoría contable en Finanzas.
 const EXPENSE_CATEGORY_BY_SECTION = {
   Comida:   "Ingredientes",
+  Bebidas:  "Bebidas",
   Limpieza: "Limpieza",
   Empaque:  "Empaque",
   Otros:    "Otros",
