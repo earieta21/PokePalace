@@ -1095,3 +1095,29 @@ test("cobrar registra el metodo de pago y rechaza metodos desconocidos", async (
   assert.equal(weirdBody.order.paymentStatus, "paid");
   assert.equal(weirdBody.order.paymentMethod, "pay_at_pickup");
 });
+
+test("el dueno puede marcar entrada y salida sin GPS; un empleado sin coordenadas no", async () => {
+  const ownerIn = await staffRequest("owner", "/api/kiosk/time/clock-in", {
+    method: "POST",
+    body: { locationId: "main" },
+  });
+  assert.equal(ownerIn.status, 201);
+
+  const ownerOut = await staffRequest("owner", "/api/kiosk/time/clock-out", {
+    method: "POST",
+    body: {},
+  });
+  assert.equal(ownerOut.status, 200);
+
+  const employeeIn = await staffRequest("employee", "/api/kiosk/time/clock-in", {
+    method: "POST",
+    body: { locationId: "main" },
+  });
+  assert.equal(employeeIn.status, 403);
+
+  const employeeFar = await staffRequest("employee", "/api/kiosk/time/clock-in", {
+    method: "POST",
+    body: { locationId: "main", lat: 32.5327, lng: -117.0182 },
+  });
+  assert.equal(employeeFar.status, 403);
+});

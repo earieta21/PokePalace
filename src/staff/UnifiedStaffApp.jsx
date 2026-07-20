@@ -304,6 +304,12 @@ export default function UnifiedStaffApp() {
   async function withDeviceLocation(fn) {
     setClockError(""); setClockBusy(true);
     try {
+      // El dueño no está atado al candado GPS: ni se le pide permiso de
+      // ubicación al navegador (el backend lo exime de la validación).
+      if (me?.role === "owner") {
+        await fn({ lat: null, lng: null });
+        return;
+      }
       const { lat, lng } = await getDeviceLocation();
       await fn({ lat, lng });
     } catch (err) {
