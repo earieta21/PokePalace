@@ -54,6 +54,10 @@ const EMPTY_FORM = {
   item: "", section: "Comida", category: "Proteínas", unit: "kg",
   qty: "", minQty: "", cost: "", supplier: "", menuKeys: [],
   registerExpense: true,
+  // "unit": el costo capturado es por kg/pieza/etc. "total": se capturó lo
+  // que costó toda la compra y la app calcula el costo por unidad sola —
+  // evita el error de anotar el total pagado en el campo de costo unitario.
+  costMode: "unit", totalPaid: "",
 };
 
 // Ingredientes reales del builder — se usan para autocompletar nombre/categoría/unidad
@@ -274,6 +278,15 @@ export default function InventoryPage({ styles, role }) {
   const removeMenuKey = (key) =>
     setForm((p) => ({ ...p, menuKeys: p.menuKeys.filter((k) => k !== key) }));
 
+  // Cuando se captura "lo que pagué en total", el costo por unidad se
+  // calcula solo (total ÷ cantidad) — nadie tiene que dividir a mano ni
+  // confundir "precio por kilo" con "lo que costó toda la compra".
+  const formQtyNum = parseFloat(form.qty) || 0;
+  const formTotalPaidNum = parseFloat(form.totalPaid) || 0;
+  const effectiveUnitCost = form.costMode === "total"
+    ? (formQtyNum > 0 ? formTotalPaidNum / formQtyNum : 0)
+    : (parseFloat(form.cost) || 0);
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!form.item || !form.qty) return;
@@ -286,7 +299,7 @@ export default function InventoryPage({ styles, role }) {
         unit:     form.unit,
         qty:      parseFloat(form.qty),
         minQty:   form.minQty ? parseFloat(form.minQty) : 0,
-        cost:     form.cost   ? parseFloat(form.cost)   : 0,
+        cost:     effectiveUnitCost,
         supplier: form.supplier,
         menuKeys: form.menuKeys,
         registerExpense: form.registerExpense,
@@ -753,15 +766,46 @@ export default function InventoryPage({ styles, role }) {
                     <input className={styles.input} type="number" min="0" step="0.01" placeholder="0" value={form.minQty} onChange={f("minQty")} />
                   </div>
                   <div className={styles.formGroup}>
-                    <label className={styles.label}>Costo por unidad ($)</label>
-                    <input className={styles.input} type="number" min="0" step="0.01" placeholder="0.00" value={form.cost} onChange={f("cost")} />
+                    <label className={styles.label}>Costo</label>
+                    <div className={ui.categoryPicker} style={{ marginBottom: 6 }}>
+                      <button
+                        type="button"
+                        aria-pressed={form.costMode !== "total"}
+                        onClick={() => setForm((previous) => ({ ...previous, costMode: "unit" }))}
+                      >
+                        Sé el costo por unidad
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={form.costMode === "total"}
+                        onClick={() => setForm((previous) => ({ ...previous, costMode: "total" }))}
+                      >
+                        Sé lo que pagué en total
+                      </button>
+                    </div>
+                    {form.costMode === "total" ? (
+                      <>
+                        <input
+                          className={styles.input} type="number" min="0" step="0.01"
+                          placeholder="0.00 — total de la compra"
+                          value={form.totalPaid} onChange={f("totalPaid")}
+                        />
+                        <small style={{ display: "block", marginTop: 4, color: "var(--p-muted)", fontSize: 11 }}>
+                          {formQtyNum > 0
+                            ? `= $${effectiveUnitCost.toLocaleString("es-MX", { maximumFractionDigits: 2 })} por ${form.unit}`
+                            : "Captura la cantidad actual arriba para calcular el costo por unidad."}
+                        </small>
+                      </>
+                    ) : (
+                      <input className={styles.input} type="number" min="0" step="0.01" placeholder="0.00" value={form.cost} onChange={f("cost")} />
+                    )}
                   </div>
                 </div>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Proveedor</label>
                   <input className={styles.input} placeholder="ej. Ocean Fresh" value={form.supplier} onChange={f("supplier")} />
                 </div>
-                {parseFloat(form.cost) > 0 && parseFloat(form.qty) > 0 && (
+                {effectiveUnitCost > 0 && formQtyNum > 0 && (
                   <label className={ui.expenseToggle}>
                     <input
                       type="checkbox"
@@ -769,7 +813,7 @@ export default function InventoryPage({ styles, role }) {
                       onChange={(e) => setForm((previous) => ({ ...previous, registerExpense: e.target.checked }))}
                     />
                     <span>
-                      Registrar la compra en <strong>Finanzas</strong> — ${(parseFloat(form.qty) * parseFloat(form.cost)).toLocaleString("es-MX", { maximumFractionDigits: 2 })}
+                      Registrar la compra en <strong>Finanzas</strong> — ${(formQtyNum * effectiveUnitCost).toLocaleString("es-MX", { maximumFractionDigits: 2 })}
                     </span>
                   </label>
                 )}
@@ -958,7 +1002,7 @@ export default function InventoryPage({ styles, role }) {
                   </td>
                   <td>
                     {isEditing ? (
-                      <div className={ui.moneyEdit}><span>$</span><input type="number" min="0" step="0.01" aria-label="Costo por unidad" value={editForm.cost} onChange={(e) => setEditForm((p) => ({ ...p, cost: e.target.value }))} /></div>
+                      <div className={ui.moneyEdit}><span>$</span><input type="number" min="0" step="0.01" aria-label="Costo por unidad" title="Precio de UNA unidad (kg, pieza, litro…) — no el total pagado por toda la compra" placeholder="por unidad" value={editForm.cost} onChange={(e) => setEditForm((p) => ({ ...p, cost: e.target.value }))} /></div>
                     ) : row.cost > 0 ? `$${Number(row.cost).toFixed(2)}` : <span className={ui.mutedValue}>—</span>}
                   </td>
                   <td><span className={`${styles.badge} ${styles[cls]}`}>{label}</span></td>
