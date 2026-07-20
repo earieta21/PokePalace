@@ -499,7 +499,7 @@ export default function UnifiedStaffApp() {
             {tab === "hist"    && <section className={shellStyles.portalSurface}><OrderHistoryPage styles={posStyles} /></section>}
             {tab === "resumen" && <SummaryPage styles={posStyles} />}
             {tab === "ventas"  && <section className={shellStyles.portalSurface}><SalesDashboardPage styles={posStyles} /></section>}
-            {tab === "inv"     && <InventoryPage styles={posStyles} />}
+            {tab === "inv"     && <InventoryPage styles={posStyles} role={me?.role} />}
             {tab === "fin"     && <FinancePage styles={posStyles} />}
             {tab === "fiscal"  && <FiscalPage styles={posStyles} />}
           </main>

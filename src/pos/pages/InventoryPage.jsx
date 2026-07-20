@@ -92,7 +92,7 @@ const STATUS_CFG = {
 const parseKeys = (str) =>
   str.split(",").map((k) => k.trim().toLowerCase()).filter(Boolean);
 
-export default function InventoryPage({ styles }) {
+export default function InventoryPage({ styles, role }) {
   const { staffToken } = useContext(StaffAuthContext);
   const api = createStaffApi(staffToken);
 
@@ -105,6 +105,11 @@ export default function InventoryPage({ styles }) {
   const [stockFilter, setStockFilter] = useState("Todos");
   const [search, setSearch]   = useState("");
   const [showGuide, setShowGuide] = useState(true);
+
+  // Registrar en Finanzas el valor de existencias que ya estaban cargadas
+  // (nunca pasaron por "Recibir mercancía") — solo dueño/admin.
+  const canBackfillExpenses = role === "owner" || role === "admin";
+  const [backfilling, setBackfilling] = useState(false);
 
   // Add-item form
   const [showForm, setShowForm] = useState(false);
@@ -142,6 +147,24 @@ export default function InventoryPage({ styles }) {
   };
 
   useEffect(() => { load(); }, [staffToken]);
+
+  const backfillExpenses = async () => {
+    if (backfilling) return;
+    setBackfilling(true);
+    setError("");
+    try {
+      const r = await api.post("/api/staff/inventory/backfill-expenses", {});
+      setNotice(
+        r.gastosRegistrados > 0
+          ? `Se registraron $${r.total.toLocaleString("es-MX")} en Finanzas por ${r.gastosRegistrados} artículo${r.gastosRegistrados !== 1 ? "s" : ""} con existencia.`
+          : "No había artículos pendientes de registrar — Finanzas ya está al día."
+      );
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBackfilling(false);
+    }
+  };
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -420,6 +443,16 @@ export default function InventoryPage({ styles }) {
           <button className={styles.btnGhost} onClick={exportCSV} disabled={loading || visible.length === 0} title="Descargar la vista actual">
             ↓ Exportar
           </button>
+          {canBackfillExpenses && (
+            <button
+              className={styles.btnGhost}
+              onClick={backfillExpenses}
+              disabled={backfilling}
+              title="Registra en Finanzas el valor de existencias que nunca pasaron por Recibir mercancía"
+            >
+              {backfilling ? "Registrando…" : "$ Registrar existencias en Finanzas"}
+            </button>
+          )}
           <button
             className={receiving ? styles.btnGhost : `${styles.btnPrimary} ${ui.receiveButton}`}
             onClick={() => {

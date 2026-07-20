@@ -201,6 +201,34 @@ export const restockBatch = async (req, res) => {
   }
 };
 
+/* POST /api/staff/inventory/backfill-expenses
+   Registra en Finanzas el valor de las existencias que YA estaban cargadas
+   en el inventario (p. ej. la carga inicial antes de abrir), que nunca
+   pasaron por "Recibir mercancía" y por eso no generaron gasto. Idempotente
+   vía sourceRef — correrlo varias veces no duplica nada. */
+export const backfillInventoryExpenses = async (req, res) => {
+  try {
+    const items = await Inventory.find({ qty: { $gt: 0 }, cost: { $gt: 0 } });
+    const results = await Promise.all(items.map((item) =>
+      recordPurchaseExpense({
+        item,
+        qty: item.qty,
+        staff: req.staff,
+        sourceRef: `inventory-initial:${item._id}`,
+      })
+    ));
+    const created = results.filter(Boolean);
+    const total = created.reduce((sum, expense) => sum + expense.amount, 0);
+    res.json({
+      itemsConsiderados: items.length,
+      gastosRegistrados: created.length,
+      total: parseFloat(total.toFixed(2)),
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error al registrar existencias iniciales", err: err.message });
+  }
+};
+
 /* GET /api/staff/inventory/low-stock */
 export const getLowStock = async (req, res) => {
   try {
