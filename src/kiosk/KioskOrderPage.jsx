@@ -25,14 +25,15 @@ export default function KioskOrderPage() {
   useIdleTimeout(goToWelcome, IDLE_TIMEOUT_MS);
 
   const nextStep = () => setStep((prev) => prev + 1);
+  const prevStep = () => setStep((prev) => Math.max(0, prev - 1));
   const goToSummary = () => navigate("/kiosk/summary");
 
   const steps = [
-    <BaseSelection key="base" onNext={nextStep} />,
-    <ProteinSelection key="protein" onNext={nextStep} />,
-    <ComplementsSelection key="complements" onNext={nextStep} />,
-    <SauceSelection key="sauce" onNext={nextStep} />,
-    <ToppingsSelection key="toppings" onNext={goToSummary} />,
+    <BaseSelection key="base" onNext={nextStep} onBack={prevStep} />,
+    <ProteinSelection key="protein" onNext={nextStep} onBack={prevStep} />,
+    <ComplementsSelection key="complements" onNext={nextStep} onBack={prevStep} />,
+    <SauceSelection key="sauce" onNext={nextStep} onBack={prevStep} />,
+    <ToppingsSelection key="toppings" onNext={goToSummary} onBack={prevStep} />,
   ];
 
   return (

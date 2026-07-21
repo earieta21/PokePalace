@@ -5,10 +5,6 @@ export const CUSTOMER_ORDER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,99}$/;
 const BOWL_CATALOG = Object.freeze({
   base: new Set(["white_rice", "brown_rice", "quinoa", "spring_mix"]),
   proteins: new Set(["tuna", "salmon", "shrimp", "tofu", "octopus", "seared_tuna"]),
-  marinades: new Set([
-    "citrus_marinade", "shoyu_marinade", "ponzu_marinade", "spicy_marinade",
-    "sesame_marinade", "wasabi_marinade", "miso_marinade", "garlic_ginger_marinade",
-  ]),
   complements: new Set([
     "shredded_carrots", "cucumber", "mango", "jicama", "seaweed", "avocado",
     "edamame", "red_onion", "beet", "surimi", "spicy_surimi",
@@ -57,7 +53,6 @@ export function sanitizeCustomerBowl({
   base,
   protein,
   proteins,
-  marinades,
   complements,
   sauces,
   toppings,
@@ -77,10 +72,13 @@ export function sanitizeCustomerBowl({
   return {
     base,
     proteins: safeProteins,
+    // Los marinados ya no forman parte del armador — cualquier valor
+    // enviado por el cliente (favoritos o pedidos repetidos antiguos) se
+    // ignora en vez de validarse.
+    marinades: [],
     // El límite de complementos "gratis" (6) es una regla de precio, no de
     // catálogo — aquí solo se valida contra el tamaño real del catálogo, para
     // permitir complementos extra de pago sin un tope artificial.
-    marinades: normalizeCatalogList(marinades, "marinades", 2),
     complements: normalizeCatalogList(complements, "complements", BOWL_CATALOG.complements.size),
     sauces: normalizeCatalogList(sauces, "sauces", 2),
     toppings: normalizeCatalogList(toppings, "toppings", 5),
@@ -106,7 +104,6 @@ export function findUnavailableCustomerBowlItems(bowl, unavailableItems) {
   const selectedIds = [
     bowl.base,
     ...(Array.isArray(bowl.proteins) ? bowl.proteins : []),
-    ...(Array.isArray(bowl.marinades) ? bowl.marinades : []),
     ...(Array.isArray(bowl.complements) ? bowl.complements : []),
     ...(Array.isArray(bowl.sauces) ? bowl.sauces : []),
     ...(Array.isArray(bowl.toppings) ? bowl.toppings : []),

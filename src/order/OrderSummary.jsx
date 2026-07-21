@@ -59,6 +59,43 @@ const OrderSummary = ({
     }
   }, [fulfillment, updateCheckout]);
 
+  // Restaura el código promocional guardado en el pedido (localStorage) al
+  // recargar la página o al volver del flujo de "editar" — sin esto,
+  // promoApplied nace en null y el total mostrado no incluye el descuento
+  // aunque el pedido sí lo tenga guardado.
+  const savedPromoCode = order?.promoCode || "";
+  useEffect(() => {
+    const code = savedPromoCode.trim();
+    if (!code) return undefined;
+    if (promoApplied?.code === code.toUpperCase()) return undefined;
+
+    let cancelled = false;
+    setPromoInput(code);
+    fetch(`${API_URL}/api/promo-codes/validate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.code === code.toUpperCase()) {
+          setPromoApplied(data);
+          onPromoChange?.(data);
+        } else {
+          // El código guardado ya no es válido — se limpia para que el
+          // total mostrado siempre coincida con lo que de verdad cobrará
+          // el servidor.
+          updateCheckout("promoCode", "");
+          onPromoChange?.(null);
+        }
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedPromoCode]);
+
   const prettifyId = (value) => {
     if (!value || typeof value !== "string") return t("summary.empty");
     return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -377,7 +414,17 @@ const OrderSummary = ({
               <select
                 name="fulfillment"
                 value={order.fulfillment === "dine_in" ? "dine_in" : "pickup"}
-                onChange={(e) => order.updateCheckout("fulfillment", e.target.value)}
+                onChange={(e) => {
+                  const nextFulfillment = e.target.value;
+                  order.updateCheckout("fulfillment", nextFulfillment);
+                  // La programación de hora solo aplica a "para llevar" — si
+                  // el cliente cambia a "comer aquí", se descarta para que no
+                  // quede una hora programada obsoleta pegada al pedido.
+                  if (nextFulfillment === "dine_in") {
+                    order.updateCheckout("isScheduled", false);
+                    order.updateCheckout("scheduledPickupTime", "");
+                  }
+                }}
               >
                 <option value="pickup">{t("summary.pickup")}</option>
                 <option value="dine_in">{t("summary.dineIn")}</option>
@@ -429,6 +476,8 @@ const OrderSummary = ({
                     onChange={(e) => order.updateCheckout("scheduledPickupTime", e.target.value)}
                     min={getMinTime()}
                     max={getMaxTime()}
+                    required
+                    aria-required="true"
                   />
                 </label>
               )}

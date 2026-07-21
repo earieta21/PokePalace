@@ -49,6 +49,11 @@ export default function KioskSummaryPage() {
       return;
     }
 
+    if (order?.isScheduled && !order?.scheduledPickupTime) {
+      setSubmitError("Elige la fecha y hora para tu pedido programado.");
+      return;
+    }
+
     try {
       setSaving(true);
       setSubmitError("");

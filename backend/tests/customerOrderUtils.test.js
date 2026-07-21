@@ -55,13 +55,16 @@ test("un clientOrderId siempre deriva la misma reserva y otros ids no colisionan
   assert.throws(() => stableCustomerOrderObjectId(""), /clientOrderId/);
 });
 
-test("el catálogo rechaza ids, duplicados y límites manipulados y deriva el tamaño", () => {
+test("el catálogo rechaza ids, duplicados y límites manipulados, ignora marinados y deriva el tamaño", () => {
   const bowl = sanitizeCustomerBowl({
     base: "white_rice",
     proteins: ["salmon", "tuna", "shrimp"],
+    // Los marinados ya no son parte del armador — se ignoran aunque el
+    // cliente los siga enviando desde un favorito o pedido repetido viejo.
     marinades: ["ponzu_marinade"],
   });
   assert.equal(bowl.bowlSize, "large");
+  assert.deepEqual(bowl.marinades, []);
   assert.throws(
     () => sanitizeCustomerBowl({ base: "arroz", proteins: ["salmon"] }),
     /base válida/
@@ -101,7 +104,6 @@ test("la disponibilidad del servidor cubre cada sección con los mismos ids del 
   const bowl = sanitizeCustomerBowl({
     base: "white_rice",
     proteins: ["salmon", "tuna"],
-    marinades: ["ponzu_marinade"],
     complements: ["avocado"],
     sauces: ["spicy_mayo"],
     toppings: ["furikake"],
@@ -111,13 +113,12 @@ test("la disponibilidad del servidor cubre cada sección con los mismos ids del 
     findUnavailableCustomerBowlItems(bowl, [
       "white_rice",
       "salmon",
-      "ponzu_marinade",
       "avocado",
       "spicy_mayo",
       "furikake",
       "not_in_catalog",
     ]),
-    ["white_rice", "salmon", "ponzu_marinade", "avocado", "spicy_mayo", "furikake"]
+    ["white_rice", "salmon", "avocado", "spicy_mayo", "furikake"]
   );
   assert.deepEqual(findUnavailableCustomerBowlItems(bowl, ["WHITE_RICE"]), []);
   assert.deepEqual(findUnavailableCustomerBowlItems(bowl, null), []);

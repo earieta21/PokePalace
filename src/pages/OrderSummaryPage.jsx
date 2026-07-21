@@ -128,6 +128,11 @@ export default function OrderSummaryPage() {
       return;
     }
 
+    if (order?.isScheduled && !order?.scheduledPickupTime) {
+      setSubmitError(t("summary.missingSchedule"));
+      return;
+    }
+
     try {
       setSaving(true);
       setSubmitError("");
