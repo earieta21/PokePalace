@@ -90,6 +90,13 @@ test("el catálogo acepta el inventario vigente del armador", () => {
   assert.deepEqual(bowl.toppings, ["black_olives", "toasted_peanuts", "masago", "croutons"]);
 });
 
+test("un bowl de 1 sola proteína es válido y cuesta lo mismo que uno de 2", () => {
+  const bowl = sanitizeCustomerBowl({ base: "white_rice", proteins: ["salmon"] });
+  assert.equal(bowl.bowlSize, "normal");
+  assert.deepEqual(bowl.proteins, ["salmon"]);
+  assert.equal(computePricing(bowl.bowlSize, null).total, BOWL_BASE_PRICE);
+});
+
 test("la disponibilidad del servidor cubre cada sección con los mismos ids del cliente", () => {
   const bowl = sanitizeCustomerBowl({
     base: "white_rice",

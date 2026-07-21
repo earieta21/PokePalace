@@ -206,6 +206,13 @@ test("el bowl personalizado rechaza duplicados, ingredientes falsos y excesos", 
   );
 });
 
+test("el POS acepta un bowl de 1 sola proteína al mismo precio que uno de 2", () => {
+  const bowl = sanitizePosBowl({ base: "white_rice", proteins: ["salmon"] });
+  assert.equal(bowl.bowlSize, "normal");
+  assert.deepEqual(bowl.proteins, ["salmon"]);
+  assert.equal(computeBowlSubtotal(bowl.bowlSize), 230);
+});
+
 test("el POS acepta los ingredientes vigentes del bowl", () => {
   const bowl = sanitizePosBowl({
     base: "quinoa",

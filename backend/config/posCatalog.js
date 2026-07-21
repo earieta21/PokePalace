@@ -153,7 +153,7 @@ const BOWL_RULES = Object.freeze({
   },
   proteins: {
     allowed: new Set(["tuna", "salmon", "shrimp", "tofu", "octopus", "seared_tuna"]),
-    min: 2,
+    min: 1,
     max: 3,
   },
   marinades: {

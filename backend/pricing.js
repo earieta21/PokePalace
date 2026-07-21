@@ -1,7 +1,7 @@
 // Single source of truth for bowl pricing. Mirrored in src/order/pricing.js
 // for client-side display — the server always recomputes from scratch and
 // never trusts a price submitted by the client.
-export const BOWL_BASE_PRICE = 230;       // bowl mediano (2 proteínas, 100 g)
+export const BOWL_BASE_PRICE = 230;       // bowl mediano (1-2 proteínas, 100 g)
 export const LARGE_BOWL_UPCHARGE = 20;    // bowl grande (3 proteínas, 120 g) = 230 + 20 = 250
 export const EXTRA_SCOOP_PRICE = 40;      // porción extra (40 g) de una proteína ya elegida
 export const COMPLEMENT_FREE_LIMIT = 6;   // complementos incluidos sin costo
