@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
-import { LARGE_BOWL_UPCHARGE } from "./pricing";
+import { LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, EXTRA_SCOOP_MAX } from "./pricing";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./ProteinSelection.module.css";
@@ -29,17 +29,21 @@ const ProteinSelection = ({ onNext, onBack }) => {
     if (Array.isArray(order.proteins) && order.proteins.length > 0) return order.proteins;
     return order.protein ? [order.protein] : [];
   });
+  const [extraScoops, setExtraScoops] = useState(() =>
+    Array.isArray(order.extraScoopProteins) ? order.extraScoopProteins : []
+  );
   const [error, setError] = useState("");
 
   const handleSelection = (proteinId) => {
     setSelectedProteins((prev) => {
-      const next = prev.includes(proteinId)
+      const isRemoving = prev.includes(proteinId);
+      const next = isRemoving
         ? prev.filter((id) => id !== proteinId)
         : prev.length < MAX_PROTEINS
           ? [...prev, proteinId]
           : prev;
 
-      if (!prev.includes(proteinId) && prev.length >= MAX_PROTEINS) {
+      if (!isRemoving && prev.length >= MAX_PROTEINS) {
         setError(t("order.proteinMaxError"));
         return prev;
       }
@@ -50,8 +54,34 @@ const ProteinSelection = ({ onNext, onBack }) => {
       updateOrder("bowlSize", nextSize);
       updateOrder("proteinUpcharge", nextSize === "large" ? LARGE_BOWL_UPCHARGE : 0);
       setError("");
+
+      // Un scoop extra solo tiene sentido sobre una proteína ya elegida — si
+      // se quita del bowl, cualquier scoop extra pegado a ella se descarta.
+      if (isRemoving && extraScoops.includes(proteinId)) {
+        const nextScoops = extraScoops.filter((id) => id !== proteinId);
+        setExtraScoops(nextScoops);
+        updateOrder("extraScoopProteins", nextScoops);
+      }
+
       return next;
     });
+  };
+
+  const scoopCountFor = (proteinId) => extraScoops.filter((id) => id === proteinId).length;
+
+  const addScoop = (proteinId) => {
+    if (extraScoops.length >= EXTRA_SCOOP_MAX) return;
+    const next = [...extraScoops, proteinId];
+    setExtraScoops(next);
+    updateOrder("extraScoopProteins", next);
+  };
+
+  const removeScoop = (proteinId) => {
+    const idx = extraScoops.lastIndexOf(proteinId);
+    if (idx === -1) return;
+    const next = [...extraScoops.slice(0, idx), ...extraScoops.slice(idx + 1)];
+    setExtraScoops(next);
+    updateOrder("extraScoopProteins", next);
   };
 
   const handleNext = () => {
@@ -128,6 +158,62 @@ const ProteinSelection = ({ onNext, onBack }) => {
           );
         })}
       </div>
+
+      {selectedProteins.length > 0 && (
+        <div className={styles.extraScoopSection}>
+          <p className={styles.extraScoopTitle}>{t("order.extraScoopTitle")}</p>
+          <p className={styles.extraScoopHint}>{t("order.extraScoopHint")}</p>
+
+          <div className={styles.extraScoopList}>
+            {selectedProteins.map((proteinId) => {
+              const name = getItemLabel("protein", proteinId, language);
+              const count = scoopCountFor(proteinId);
+              const atMax = extraScoops.length >= EXTRA_SCOOP_MAX;
+              return (
+                <div key={proteinId} className={styles.extraScoopRow}>
+                  <span className={styles.extraScoopName}>{name}</span>
+                  <div className={styles.stepper}>
+                    <button
+                      type="button"
+                      className={styles.stepperBtn}
+                      onClick={() => removeScoop(proteinId)}
+                      disabled={count === 0}
+                      aria-label={t("order.extraScoopRemove", { name })}
+                    >
+                      −
+                    </button>
+                    <span className={styles.stepperCount} aria-live="polite">{count}</span>
+                    <button
+                      type="button"
+                      className={styles.stepperBtn}
+                      onClick={() => addScoop(proteinId)}
+                      disabled={atMax}
+                      aria-label={t("order.extraScoopAdd", { name })}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {extraScoops.length > 0 && (
+            <p className={styles.extraScoopTotal}>
+              {t("order.extraScoopTotal", {
+                count: extraScoops.length,
+                price: EXTRA_SCOOP_PRICE,
+                total: extraScoops.length * EXTRA_SCOOP_PRICE,
+              })}
+            </p>
+          )}
+          {extraScoops.length >= EXTRA_SCOOP_MAX && (
+            <p className={styles.extraScoopMaxNotice}>
+              {t("order.extraScoopMaxError", { max: EXTRA_SCOOP_MAX })}
+            </p>
+          )}
+        </div>
+      )}
 
       {error && (
         <p className={styles.error} role="alert">

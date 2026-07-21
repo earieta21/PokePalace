@@ -3,6 +3,7 @@
 export const BOWL_BASE_PRICE = 230;       // bowl mediano (1-2 proteínas, 100 g)
 export const LARGE_BOWL_UPCHARGE = 20;    // bowl grande (3 proteínas, 120 g) = 230 + 20 = 250
 export const EXTRA_SCOOP_PRICE = 40;      // porción extra (40 g) de una proteína ya elegida
+export const EXTRA_SCOOP_MAX = 3;         // tope de scoops extra por bowl (ver backend/utils/customerOrder.js)
 export const COMPLEMENT_FREE_LIMIT = 6;   // complementos incluidos sin costo
 export const EXTRA_COMPLEMENT_PRICE = 15; // cada complemento más allá del límite gratis
 export const TAX_RATE = 0; // IVA incluido en precio

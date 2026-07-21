@@ -115,6 +115,15 @@ const OrderSummary = ({
     labels.protein,
     Array.isArray(proteins) && proteins.length > 0 ? proteins : protein ? [protein] : []
   );
+  const extraScoopChips = (() => {
+    if (!Array.isArray(extraScoopProteins) || extraScoopProteins.length === 0) return [];
+    const counts = new Map();
+    extraScoopProteins.forEach((id) => counts.set(id, (counts.get(id) || 0) + 1));
+    return [...counts.entries()].map(([id, count]) => {
+      const label = labels.protein?.[id] || prettifyId(id);
+      return count > 1 ? `${label} ×${count}` : label;
+    });
+  })();
   const complementsLabels = getListLabels(labels.complement, complements);
   const saucesLabels = getListLabels(labels.sauce, sauces);
   const toppingsLabels = getListLabels(labels.topping, toppings);
@@ -303,6 +312,15 @@ const OrderSummary = ({
               : t("summary.normalDesc")}
           </p>
         </div>
+
+        {extraScoopChips.length > 0 && (
+          <Section
+            icon="➕"
+            title={t("summary.extraScoops")}
+            chips={extraScoopChips}
+            onEdit={() => onEditStep(1)}
+          />
+        )}
 
         <Section
           icon="🥗"
