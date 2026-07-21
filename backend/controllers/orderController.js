@@ -263,6 +263,7 @@ export const createOrder = async (req, res) => {
       complements,
       sauces,
       toppings,
+      extraScoopProteins,
       customer,
       phone,
       notes,
@@ -282,6 +283,7 @@ export const createOrder = async (req, res) => {
         complements,
         sauces,
         toppings,
+        extraScoopProteins,
       });
     } catch (validationError) {
       return res.status(400).json({ msg: validationError.message });
@@ -332,7 +334,11 @@ export const createOrder = async (req, res) => {
       : null;
 
     const resolvedBowlSize = safeBowl.bowlSize;
-    const { subtotal, discount: promoDiscount, tax, total: baseTotal } = computePricing(resolvedBowlSize, resolvedPromo);
+    const { subtotal, discount: promoDiscount, tax, total: baseTotal } = computePricing(
+      resolvedBowlSize,
+      resolvedPromo,
+      { extraScoops: safeBowl.extraScoopProteins.length, complementsCount: safeBowl.complements.length }
+    );
 
     // The balance decrement and order marker are also one atomic write. A
     // concurrent/reloaded retry reads the durable amount from that marker.
@@ -377,6 +383,7 @@ export const createOrder = async (req, res) => {
       complements: safeBowl.complements,
       sauces: safeBowl.sauces,
       toppings: safeBowl.toppings,
+      extraScoopProteins: safeBowl.extraScoopProteins,
       promoCode:      promoDoc?.code || null,
       subtotal,
       discountAmount: totalDiscount,

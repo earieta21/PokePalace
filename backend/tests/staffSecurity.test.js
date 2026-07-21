@@ -64,9 +64,24 @@ test("el POS ignora precio y nombre manipulados cuando recibe un id de catálogo
     price: 0.01,
     qty: 2,
   }]);
-  assert.equal(item.name, "Agua natural del día");
-  assert.equal(item.price, 30);
+  assert.equal(item.name, "Agua fresca · Pepino, Limón y Chía");
+  assert.equal(item.price, 35);
   assert.equal(item.qty, 2);
+});
+
+test("las dos aguas frescas cuestan 35 pesos", () => {
+  const items = resolvePosItems([
+    { catalogId: "agua-del-dia", qty: 1 },
+    { catalogId: "agua-jamaica", qty: 1 },
+  ]);
+
+  assert.deepEqual(
+    items.map(({ catalogId, price }) => ({ catalogId, price })),
+    [
+      { catalogId: "agua-del-dia", price: 35 },
+      { catalogId: "agua-jamaica", price: 35 },
+    ]
+  );
 });
 
 test("el POS mantiene compatibilidad por nombre exacto sin confiar en price", () => {
@@ -177,7 +192,7 @@ test("el tamaño y precio del bowl se derivan de proteínas validadas", () => {
     toppings: ["furikake"],
   });
   assert.equal(bowl.bowlSize, "large");
-  assert.equal(computeBowlSubtotal(bowl.bowlSize), 289);
+  assert.equal(computeBowlSubtotal(bowl.bowlSize), 250);
 });
 
 test("el bowl personalizado rechaza duplicados, ingredientes falsos y excesos", () => {
@@ -197,4 +212,17 @@ test("el bowl personalizado rechaza duplicados, ingredientes falsos y excesos", 
     }),
     PosOrderValidationError
   );
+});
+
+test("el POS acepta los ingredientes vigentes del bowl", () => {
+  const bowl = sanitizePosBowl({
+    base: "quinoa",
+    proteins: ["tuna", "tofu"],
+    complements: ["seaweed", "red_onion", "beet", "surimi", "spicy_surimi"],
+    sauces: ["red_sauce", "sriracha"],
+    toppings: ["black_olives", "toasted_peanuts", "masago", "croutons"],
+  });
+
+  assert.equal(bowl.bowlSize, "normal");
+  assert.deepEqual(bowl.proteins, ["tuna", "tofu"]);
 });

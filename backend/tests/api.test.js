@@ -158,7 +158,7 @@ test("crear orden valida: el precio lo pone el servidor, no el cliente", async (
   }, { "X-Order-Token": attempt.orderToken });
   assert.equal(r.status, 201);
   const { order } = await r.json();
-  assert.equal(order.total, 249); // precio real del bowl normal
+  assert.equal(order.total, 230); // precio real del bowl mediano
   assert.equal(order.paymentStatus, "pending");
   assert.equal(order.source, "online");
 });
@@ -994,9 +994,9 @@ test("cancelar una venta POS revierte inventario, puntos y premio una sola vez",
   assert.equal(created.status, 201);
   const createdBody = await created.json();
   const orderId = createdBody.order._id;
-  assert.equal(createdBody.order.total, 249);
+  assert.equal(createdBody.order.total, 230);
   assert.equal((await Inventory.findById(inventory._id)).qty, 1);
-  assert.equal((await User.findById(customer._id)).points, 24);
+  assert.equal((await User.findById(customer._id)).points, 23);
   assert.equal((await Redemption.findById(redemption._id)).status, "used");
 
   const cancelled = await staffRequest("cashier", `/api/staff/orders/${orderId}/status`, {

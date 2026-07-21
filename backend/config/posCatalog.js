@@ -5,7 +5,7 @@ export const POS_CATALOG = Object.freeze([
   // inicio del sitio (src/order/OrderPage.jsx PRESETS), todos a precio de
   // bowl normal.
   {
-    catalogId: "bowl-emerald-salmon", legacyId: 1, name: "Bowl de salmón esmeralda", price: 249, category: "bowls",
+    catalogId: "bowl-emerald-salmon", legacyId: 1, name: "Bowl de salmón esmeralda", price: 230, category: "bowls",
     inventoryRecipe: {
       white_rice: 1, salmon: 1, tuna: 1, shoyu_marinade: 1,
       avocado: 1, cucumber: 1, edamame: 1,
@@ -13,7 +13,7 @@ export const POS_CATALOG = Object.freeze([
     },
   },
   {
-    catalogId: "bowl-spicy-tuna", legacyId: 2, name: "Bowl picante de atún crujiente", price: 249, category: "bowls",
+    catalogId: "bowl-spicy-tuna", legacyId: 2, name: "Bowl picante de atún crujiente", price: 230, category: "bowls",
     inventoryRecipe: {
       brown_rice: 1, tuna: 1, seared_tuna: 1, spicy_marinade: 1,
       cucumber: 1, edamame: 1, corn: 1,
@@ -21,7 +21,7 @@ export const POS_CATALOG = Object.freeze([
     },
   },
   {
-    catalogId: "bowl-tropical-shrimp", legacyId: 3, name: "Bowl tropical de camarón", price: 249, category: "bowls",
+    catalogId: "bowl-tropical-shrimp", legacyId: 3, name: "Bowl tropical de camarón", price: 230, category: "bowls",
     inventoryRecipe: {
       spring_mix: 1, shrimp: 1, salmon: 1, citrus_marinade: 1,
       mango: 1, pineapple: 1, avocado: 1,
@@ -29,7 +29,7 @@ export const POS_CATALOG = Object.freeze([
     },
   },
   {
-    catalogId: "bowl-citrus-octopus", legacyId: 4, name: "Pulpo cítrico", price: 249, category: "bowls",
+    catalogId: "bowl-citrus-octopus", legacyId: 4, name: "Pulpo cítrico", price: 230, category: "bowls",
     inventoryRecipe: {
       spring_mix: 1, octopus: 1, shrimp: 1, citrus_marinade: 1,
       cucumber: 1, mango: 1, avocado: 1,
@@ -59,8 +59,13 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: { botella_de_agua: 1 },
   },
   {
-    catalogId: "agua-del-dia", legacyId: 15, name: "Agua natural del día", price: 30, category: "drinks", rewardDrink: true,
+    // Conserva el catalogId anterior para que ventas pendientes del POS sigan resolviendo.
+    catalogId: "agua-del-dia", legacyId: 15, name: "Agua fresca · Pepino, Limón y Chía", price: 35, category: "drinks", rewardDrink: true,
     inventoryRecipe: { agua_natural: 1 },
+  },
+  {
+    catalogId: "agua-jamaica", legacyId: 16, name: "Agua fresca · Jamaica", price: 35, category: "drinks", rewardDrink: true,
+    inventoryRecipe: { agua_jamaica: 1 },
   },
 ]);
 
@@ -138,6 +143,12 @@ export const resolvePosItems = (items) => {
   return [...resolved.values()];
 };
 
+const COMPLEMENTS_CATALOG = new Set([
+  "shredded_carrots", "cucumber", "mango", "jicama", "seaweed", "avocado",
+  "edamame", "red_onion", "beet", "surimi", "spicy_surimi",
+  "kale", "peas", "corn", "pineapple", "chia_seeds",
+]);
+
 const BOWL_RULES = Object.freeze({
   base: {
     allowed: new Set(["white_rice", "brown_rice", "quinoa", "spring_mix"]),
@@ -145,7 +156,7 @@ const BOWL_RULES = Object.freeze({
     max: 1,
   },
   proteins: {
-    allowed: new Set(["tuna", "salmon", "shrimp", "octopus", "seared_tuna"]),
+    allowed: new Set(["tuna", "salmon", "shrimp", "tofu", "octopus", "seared_tuna"]),
     min: 2,
     max: 3,
   },
@@ -156,16 +167,17 @@ const BOWL_RULES = Object.freeze({
     ]),
     max: 2,
   },
+  // Sin tope artificial: los primeros COMPLEMENT_FREE_LIMIT van gratis y cada
+  // uno extra cuesta EXTRA_COMPLEMENT_PRICE (ver pricing.js) — el único
+  // límite real es el tamaño del catálogo mismo.
   complements: {
-    allowed: new Set([
-      "shredded_carrots", "cucumber", "mango", "jicama", "seaweed", "avocado",
-      "edamame", "kale", "peas", "corn", "pineapple", "chia_seeds",
-    ]),
-    max: 6,
+    allowed: COMPLEMENTS_CATALOG,
+    max: COMPLEMENTS_CATALOG.size,
   },
   sauces: {
     allowed: new Set([
       "spicy_mayo", "soy_sauce", "ponzu_sauce", "sesame_ginger", "wasabi_vinaigrette",
+      "sweet_dressing", "citrus_dressing", "red_sauce", "sriracha", "cilantro_dressing",
       "sweet_chili", "garlic_sriracha", "avocado_lime", "miso_dressing", "yuzu_kosho",
     ]),
     max: 2,
@@ -173,6 +185,7 @@ const BOWL_RULES = Object.freeze({
   toppings: {
     allowed: new Set([
       "sesame_seeds", "crispy_onions", "nori_strips", "red_pepper_flakes",
+      "black_olives", "toasted_peanuts", "masago", "croutons",
       "pickled_radish", "toasted_coconut", "pumpkin_seeds", "furikake",
     ]),
     max: 5,
@@ -180,7 +193,11 @@ const BOWL_RULES = Object.freeze({
 });
 
 export const POS_TOPPING_LABELS = Object.freeze({
+  black_olives: "Aceitunas Negras",
+  toasted_peanuts: "Cacahuate Tostado",
   sesame_seeds: "Ajonjolí",
+  masago: "Masago",
+  croutons: "Crotones",
   crispy_onions: "Cebolla Crujiente",
   nori_strips: "Tiras de Alga Nori",
   red_pepper_flakes: "Pimienta Roja en Hojuelas",
@@ -210,7 +227,22 @@ const sanitizeChoiceList = (name, value) => {
   return [...list];
 };
 
-export const sanitizePosBowl = ({ base, proteins, marinades, complements, sauces, toppings }) => {
+// Un "scoop extra" es una porción adicional (40 g, $40) de una proteína ya
+// elegida — admite repetidos (dos scoops extra de salmón es válido) pero
+// cada entrada debe corresponder a una proteína ya presente en `proteins`.
+const EXTRA_SCOOP_MAX = 3;
+const sanitizeExtraScoops = (value, chosenProteins) => {
+  const list = value === undefined ? [] : value;
+  if (!Array.isArray(list) || list.length > EXTRA_SCOOP_MAX) {
+    throw new PosOrderValidationError("Cantidad de scoops extra no permitida");
+  }
+  if (list.some((id) => typeof id !== "string" || !chosenProteins.includes(id))) {
+    throw new PosOrderValidationError("El scoop extra debe ser de una proteína ya elegida");
+  }
+  return [...list];
+};
+
+export const sanitizePosBowl = ({ base, proteins, marinades, complements, sauces, toppings, extraScoopProteins }) => {
   if (typeof base !== "string" || !BOWL_RULES.base.allowed.has(base)) {
     throw new PosOrderValidationError("Selecciona una base válida para el bowl");
   }
@@ -226,6 +258,7 @@ export const sanitizePosBowl = ({ base, proteins, marinades, complements, sauces
     complements: sanitizeChoiceList("complements", complements),
     sauces: sanitizeChoiceList("sauces", sauces),
     toppings: sanitizeChoiceList("toppings", toppings),
+    extraScoopProteins: sanitizeExtraScoops(extraScoopProteins, safeProteins),
   };
 };
 
@@ -256,7 +289,7 @@ export const getPosInventoryDemand = (order = {}) => {
   const demand = new Map();
 
   if (order.base) addDemand(demand, order.base);
-  for (const field of ["proteins", "marinades", "complements", "sauces", "toppings"]) {
+  for (const field of ["proteins", "marinades", "complements", "sauces", "toppings", "extraScoopProteins"]) {
     for (const key of Array.isArray(order[field]) ? order[field] : []) addDemand(demand, key);
   }
   if (order.rewardExtraTopping) addDemand(demand, order.rewardExtraTopping);
@@ -301,7 +334,7 @@ export const getUnavailablePosSelections = ({
 
   if (bowl) {
     consider(bowl.base);
-    for (const field of ["proteins", "marinades", "complements", "sauces", "toppings"]) {
+    for (const field of ["proteins", "marinades", "complements", "sauces", "toppings", "extraScoopProteins"]) {
       for (const key of Array.isArray(bowl[field]) ? bowl[field] : []) consider(key);
     }
   }

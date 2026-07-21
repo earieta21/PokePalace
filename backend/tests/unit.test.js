@@ -1,9 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { computePricing, BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "../pricing.js";
+import {
+  computePricing, computeExtrasSubtotal, BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE,
+  EXTRA_SCOOP_PRICE, COMPLEMENT_FREE_LIMIT, EXTRA_COMPLEMENT_PRICE,
+} from "../pricing.js";
 import { distanceMeters, isWithinRestaurant, RESTAURANT_LOCATION } from "../utils/geo.js";
 import { isValidPin, hashPin, comparePin } from "../utils/staffPin.js";
+import { sanitizeCustomerBowl } from "../utils/customerOrder.js";
 
 /* ── Precios: la fuente de verdad de lo que se le cobra al cliente ── */
 
@@ -39,6 +43,36 @@ test("promo porcentual defensiva nunca supera el 100 por ciento", () => {
   });
   assert.equal(discount, BOWL_BASE_PRICE);
   assert.equal(total, 0);
+});
+
+test("sin extras, el subtotal de extras es cero", () => {
+  assert.equal(computeExtrasSubtotal(), 0);
+  assert.equal(computeExtrasSubtotal({ extraScoops: 0, complementsCount: COMPLEMENT_FREE_LIMIT }), 0);
+});
+
+test("cada scoop extra cuesta EXTRA_SCOOP_PRICE", () => {
+  assert.equal(computeExtrasSubtotal({ extraScoops: 2 }), 2 * EXTRA_SCOOP_PRICE);
+});
+
+test("los primeros COMPLEMENT_FREE_LIMIT complementos son gratis, el resto cuesta EXTRA_COMPLEMENT_PRICE", () => {
+  assert.equal(computeExtrasSubtotal({ complementsCount: COMPLEMENT_FREE_LIMIT + 2 }), 2 * EXTRA_COMPLEMENT_PRICE);
+  // Nunca negativo si hay menos complementos que el límite gratis.
+  assert.equal(computeExtrasSubtotal({ complementsCount: 1 }), 0);
+});
+
+test("el bowl grande con scoops y complementos extra suma todo", () => {
+  const { total } = computePricing("large", null, { extraScoops: 1, complementsCount: COMPLEMENT_FREE_LIMIT + 1 });
+  assert.equal(total, BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE + EXTRA_SCOOP_PRICE + EXTRA_COMPLEMENT_PRICE);
+});
+
+test("el scoop extra solo se acepta de una proteina ya elegida", () => {
+  const bowl = sanitizeCustomerBowl({
+    base: "white_rice", proteins: ["salmon", "tuna"], extraScoopProteins: ["salmon", "salmon"],
+  });
+  assert.deepEqual(bowl.extraScoopProteins, ["salmon", "salmon"]); // duplicados permitidos
+  assert.throws(() => sanitizeCustomerBowl({
+    base: "white_rice", proteins: ["salmon", "tuna"], extraScoopProteins: ["shrimp"],
+  }), TypeError);
 });
 
 /* ── Geocerca: el candado GPS de las checadas ── */

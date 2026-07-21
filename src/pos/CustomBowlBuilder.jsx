@@ -2,30 +2,33 @@ import { useState } from "react";
 import {
   BASE_LABELS,
   PROTEIN_LABELS,
-  MARINADE_LABELS,
   COMPLEMENT_LABELS,
   SAUCE_LABELS,
   TOPPING_LABELS,
 } from "../order/OrderLabels";
+import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, computeExtrasSubtotal } from "../order/pricing";
 
 // Real base ids only — BASE_LABELS has a legacy "mixed_greens" alias pointing
 // at the same label as "spring_mix", which would render as a duplicate chip.
-const BASE_IDS = ["white_rice", "brown_rice", "quinoa", "spring_mix"];
-const PROTEIN_IDS = Object.keys(PROTEIN_LABELS);
-const MARINADE_IDS = Object.keys(MARINADE_LABELS);
-const COMPLEMENT_IDS = Object.keys(COMPLEMENT_LABELS);
-const SAUCE_IDS = Object.keys(SAUCE_LABELS);
-const TOPPING_IDS = Object.keys(TOPPING_LABELS);
+const BASE_IDS = ["white_rice", "spring_mix", "quinoa"];
+const PROTEIN_IDS = ["tuna", "salmon", "shrimp", "tofu"];
+const COMPLEMENT_IDS = [
+  "shredded_carrots", "seaweed", "edamame", "red_onion", "cucumber",
+  "pineapple", "beet", "surimi", "spicy_surimi", "avocado",
+];
+const SAUCE_IDS = [
+  "spicy_mayo", "sweet_dressing", "citrus_dressing", "red_sauce",
+  "sriracha", "cilantro_dressing",
+];
+const TOPPING_IDS = [
+  "black_olives", "toasted_peanuts", "sesame_seeds", "nori_strips", "masago", "croutons",
+];
 
 const MIN_PROTEINS = 1;
 const MAX_PROTEINS = 3;
-const MAX_MARINADES = 2;
-const MAX_COMPLEMENTS = 6;
+const MAX_COMPLEMENTS = COMPLEMENT_IDS.length;
 const MAX_SAUCES = 2;
 const MAX_TOPPINGS = 5;
-
-export const BOWL_BASE_PRICE = 249;
-export const LARGE_BOWL_UPCHARGE = 40;
 
 const emptyDraft = () => ({
   base: null,
@@ -88,7 +91,9 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
   const [error, setError] = useState("");
 
   const isLarge = draft.proteins.length === MAX_PROTEINS;
-  const price = BOWL_BASE_PRICE + (isLarge ? LARGE_BOWL_UPCHARGE : 0);
+  const price = BOWL_BASE_PRICE
+    + (isLarge ? LARGE_BOWL_UPCHARGE : 0)
+    + computeExtrasSubtotal({ complementsCount: draft.complements.length });
 
   const handleAdd = () => {
     if (!draft.base) return setError("Selecciona una base.");
@@ -120,7 +125,7 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
 
       <ChipGroup
         title="Proteínas"
-        hint=" · 3 = bowl grande (+$40 MXN)"
+        hint={` · 3 = bowl grande (+$${LARGE_BOWL_UPCHARGE} MXN)`}
         ids={PROTEIN_IDS}
         labels={PROTEIN_LABELS}
         selected={draft.proteins}
@@ -129,16 +134,8 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
       />
 
       <ChipGroup
-        title="Marinados"
-        ids={MARINADE_IDS}
-        labels={MARINADE_LABELS}
-        selected={draft.marinades}
-        max={MAX_MARINADES}
-        onToggle={(id) => setDraft((d) => ({ ...d, marinades: toggleInList(d.marinades, id, MAX_MARINADES) }))}
-      />
-
-      <ChipGroup
         title="Complementos"
+        hint=" · más de 6 cuestan $15 c/u"
         ids={COMPLEMENT_IDS}
         labels={COMPLEMENT_LABELS}
         selected={draft.complements}
@@ -147,7 +144,7 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
       />
 
       <ChipGroup
-        title="Salsas"
+        title="Aderezos"
         ids={SAUCE_IDS}
         labels={SAUCE_LABELS}
         selected={draft.sauces}

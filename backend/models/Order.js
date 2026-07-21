@@ -25,6 +25,9 @@ const orderSchema = new mongoose.Schema(
     complements: { type: [String], default: [] },
     sauces:      { type: [String], default: [] },
     toppings:    { type: [String], default: [] },
+    // Porciones extra (40 g, $40 c/u) de una proteína ya elegida — puede
+    // repetir el mismo id (dos scoops extra de salmón = ["salmon","salmon"]).
+    extraScoopProteins: { type: [String], default: [] },
 
     // POS orders: flat item list [{name, price, qty}]
     items: { type: Array, default: [] },

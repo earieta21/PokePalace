@@ -45,7 +45,10 @@ function orderLines(order) {
     } else if (order.protein) {
       lines.push(`Proteína: ${order.protein}`);
     }
-    lines.push(order.bowlSize === "large" ? "Bowl grande" : "Bowl normal");
+    lines.push(order.bowlSize === "large" ? "Bowl grande" : "Bowl mediano");
+    if (order.extraScoopProteins?.length) {
+      lines.push(`⚠️ SCOOP EXTRA: ${order.extraScoopProteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
+    }
     if (order.marinades?.length)
       lines.push(`Marinados: ${order.marinades.map((id) => label(MARINADE_LABELS, id)).join(", ")}`);
     if (order.complements?.length)

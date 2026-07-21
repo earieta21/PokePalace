@@ -43,7 +43,10 @@ export default function OrderSummaryPage() {
   const [validatedPromo, setValidatedPromo] = useState(null);
   const userPoints     = user?.points ?? 0;
   const derivedBowlSize = order?.proteins?.length === 3 ? "large" : "normal";
-  const orderTotalAfterPromo = computePricing(derivedBowlSize, validatedPromo).total;
+  const orderTotalAfterPromo = computePricing(derivedBowlSize, validatedPromo, {
+    extraScoops: Array.isArray(order?.extraScoopProteins) ? order.extraScoopProteins.length : 0,
+    complementsCount: Array.isArray(order?.complements) ? order.complements.length : 0,
+  }).total;
   const redeemableBlocks = Math.min(
     Math.floor(userPoints / POINTS_PER_REWARD),
     Math.floor(orderTotalAfterPromo / REWARD_VALUE_MXN)

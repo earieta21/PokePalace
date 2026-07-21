@@ -8,7 +8,7 @@ import { sendSMS, sendWhatsApp } from "../utils/notify.js";
 import { awardLoyaltyPoints } from "../utils/loyalty.js";
 import { reconcileOnlineOrderCancellation } from "./orderController.js";
 import { getRewardById } from "../config/rewardsCatalog.js";
-import { computeBowlSubtotal } from "../pricing.js";
+import { BOWL_BASE_PRICE, computeBowlSubtotal, computeExtrasSubtotal } from "../pricing.js";
 import {
   getPosInventoryDemand,
   getUnavailablePosSelections,
@@ -705,7 +705,8 @@ export const createPosOrder = async (req, res) => {
   try {
     const {
       items, customer, phone, notes, fulfillment, paymentMethod, rewardCode, customerUserId,
-      base, proteins, marinades, complements, sauces, toppings, clientOrderId, rewardTopping,
+      base, proteins, marinades, complements, sauces, toppings, extraScoopProteins,
+      clientOrderId, rewardTopping,
     } = req.body;
 
     try {
@@ -749,7 +750,7 @@ export const createPosOrder = async (req, res) => {
       safeItems = resolvePosItems(items === undefined ? [] : items);
       const wantsCustomBowl = base !== undefined || proteins !== undefined;
       if (wantsCustomBowl) {
-        safeBowl = sanitizePosBowl({ base, proteins, marinades, complements, sauces, toppings });
+        safeBowl = sanitizePosBowl({ base, proteins, marinades, complements, sauces, toppings, extraScoopProteins });
       }
       if (rewardTopping !== undefined && rewardTopping !== null && rewardTopping !== "") {
         safeRewardTopping = sanitizePosRewardTopping(rewardTopping);
@@ -785,7 +786,10 @@ export const createPosOrder = async (req, res) => {
 
     const itemsSubtotal = safeItems.reduce((sum, item) => sum + item.price * item.qty, 0);
     const customBowlPrice = hasBowl
-      ? computeBowlSubtotal(safeBowl.bowlSize)
+      ? computeBowlSubtotal(safeBowl.bowlSize) + computeExtrasSubtotal({
+          extraScoops: safeBowl.extraScoopProteins.length,
+          complementsCount: safeBowl.complements.length,
+        })
       : 0;
     const subtotal = itemsSubtotal + customBowlPrice;
 
@@ -813,7 +817,7 @@ export const createPosOrder = async (req, res) => {
       if (reward.type === "free_drink") {
         const drinks = safeItems.filter((item) => item.rewardDrink);
         if (!drinks.length) {
-          return res.status(400).json({ message: "Agrega el Agua natural del día a la orden" });
+          return res.status(400).json({ message: "Agrega un agua fresca a la orden" });
         }
         rewardDiscount = Math.min(...drinks.map((item) => item.price));
       } else if (reward.type === "extra_topping") {
@@ -832,7 +836,7 @@ export const createPosOrder = async (req, res) => {
         rewardDiscount = 40;
       } else if (reward.type === "free_bowl") {
         const eligibleBowlPrice = hasBowl ? customBowlPrice : Math.min(...bowlItems.map((item) => item.price));
-        rewardDiscount = Math.min(249, eligibleBowlPrice);
+        rewardDiscount = Math.min(BOWL_BASE_PRICE, eligibleBowlPrice);
       }
       rewardDiscount = Math.min(rewardDiscount, subtotal);
     }
@@ -884,6 +888,7 @@ export const createPosOrder = async (req, res) => {
         complements: safeBowl.complements,
         sauces: safeBowl.sauces,
         toppings: safeBowl.toppings,
+        extraScoopProteins: safeBowl.extraScoopProteins,
       }),
     });
 

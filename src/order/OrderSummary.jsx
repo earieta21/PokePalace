@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 import { useOrder } from "./OrderContext";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
-import { computePricing } from "./pricing";
+import { computePricing, COMPLEMENT_FREE_LIMIT, EXTRA_COMPLEMENT_PRICE } from "./pricing";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./OrderSummary.module.css";
 
@@ -32,6 +32,7 @@ const OrderSummary = ({
     sauces = [],
     complements = [],
     toppings = [],
+    extraScoopProteins = [],
     fulfillment = "pickup",
     updateCheckout,
   } = order || {};
@@ -57,8 +58,6 @@ const OrderSummary = ({
     }
   }, [fulfillment, updateCheckout]);
 
-  const finalMarinades = marinades;
-
   const prettifyId = (value) => {
     if (!value || typeof value !== "string") return t("summary.empty");
     return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -74,7 +73,6 @@ const OrderSummary = ({
     return values.map((v) => map?.[v] || prettifyId(v));
   };
 
-  const marinadesLabels = getListLabels(labels.marinade, finalMarinades);
   const proteinLabels = getListLabels(
     labels.protein,
     Array.isArray(proteins) && proteins.length > 0 ? proteins : protein ? [protein] : []
@@ -84,9 +82,14 @@ const OrderSummary = ({
   const toppingsLabels = getListLabels(labels.topping, toppings);
 
   const pricedBowlSize = proteinLabels.length === 3 ? "large" : "normal";
-  const pricing = computePricing(pricedBowlSize, promoApplied);
+  const extraScoopsCount = Array.isArray(extraScoopProteins) ? extraScoopProteins.length : 0;
+  const pricing = computePricing(pricedBowlSize, promoApplied, {
+    extraScoops: extraScoopsCount,
+    complementsCount: complements.length,
+  });
   const appliedPointsDiscount = Math.min(Math.max(0, pointsDiscount), pricing.total);
   const finalTotal = Math.max(0, pricing.total - appliedPointsDiscount);
+  const extraComplementsCount = Math.max(0, complements.length - COMPLEMENT_FREE_LIMIT);
 
   // Time picker helpers — mantiene el rango en línea con lo que de verdad
   // acepta el backend (11:00–21:00), para no dejar elegir una hora que
@@ -260,19 +263,11 @@ const OrderSummary = ({
         </div>
 
         <Section
-          icon="✨"
-          title={t("summary.marinades")}
-          chips={marinadesLabels}
-          emptyText={t("summary.noMarinades")}
-          onEdit={() => onEditStep(2)}
-        />
-
-        <Section
           icon="🥗"
           title={t("summary.complements")}
           chips={complementsLabels}
           emptyText={t("summary.noComplements")}
-          onEdit={() => onEditStep(3)}
+          onEdit={() => onEditStep(2)}
         />
 
         <Section
@@ -280,7 +275,7 @@ const OrderSummary = ({
           title={t("summary.sauces")}
           chips={saucesLabels}
           emptyText={t("summary.noSauces")}
-          onEdit={() => onEditStep(4)}
+          onEdit={() => onEditStep(3)}
         />
 
         <Section
@@ -288,7 +283,7 @@ const OrderSummary = ({
           title={t("summary.toppings")}
           chips={toppingsLabels}
           emptyText={t("summary.noToppings")}
-          onEdit={() => onEditStep(5)}
+          onEdit={() => onEditStep(4)}
         />
 
         {/* Save as favorite */}

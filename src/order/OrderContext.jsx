@@ -13,6 +13,7 @@ const blankOrder = () => ({
   sauces: [],
   complements: [],
   toppings: [],
+  extraScoopProteins: [],
   customer: "",
   phone: "",
   notes: "",
@@ -66,6 +67,7 @@ export const OrderProvider = ({ children }) => {
       complements: favorite.complements || [],
       sauces: favorite.sauces || [],
       toppings: favorite.toppings || [],
+      extraScoopProteins: [],
     }));
   }, []);
 
@@ -80,6 +82,7 @@ export const OrderProvider = ({ children }) => {
       complements: pastOrder.complements || [],
       sauces: pastOrder.sauces || [],
       toppings: pastOrder.toppings || [],
+      extraScoopProteins: [],
       customer: pastOrder.customer || prev.customer,
       phone: pastOrder.phone || prev.phone,
       fulfillment: pastOrder.fulfillment || "pickup",
