@@ -60,12 +60,8 @@ export const POS_CATALOG = Object.freeze([
   },
   {
     // Conserva el catalogId anterior para que ventas pendientes del POS sigan resolviendo.
-    catalogId: "agua-del-dia", legacyId: 15, name: "Agua fresca · Pepino, Limón y Chía", price: 35, category: "drinks", rewardDrink: true,
+    catalogId: "agua-del-dia", legacyId: 15, name: "Agua del día", price: 35, category: "drinks", rewardDrink: true,
     inventoryRecipe: { agua_natural: 1 },
-  },
-  {
-    catalogId: "agua-jamaica", legacyId: 16, name: "Agua fresca · Jamaica", price: 35, category: "drinks", rewardDrink: true,
-    inventoryRecipe: { agua_jamaica: 1 },
   },
 ]);
 

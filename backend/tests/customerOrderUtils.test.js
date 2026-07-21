@@ -76,6 +76,20 @@ test("el catálogo rechaza ids, duplicados y límites manipulados y deriva el ta
   );
 });
 
+test("el catálogo acepta el inventario vigente del armador", () => {
+  const bowl = sanitizeCustomerBowl({
+    base: "spring_mix",
+    proteins: ["tofu", "shrimp"],
+    complements: ["red_onion", "beet", "surimi", "spicy_surimi"],
+    sauces: ["citrus_dressing", "cilantro_dressing"],
+    toppings: ["black_olives", "toasted_peanuts", "masago", "croutons"],
+  });
+
+  assert.deepEqual(bowl.proteins, ["tofu", "shrimp"]);
+  assert.deepEqual(bowl.sauces, ["citrus_dressing", "cilantro_dressing"]);
+  assert.deepEqual(bowl.toppings, ["black_olives", "toasted_peanuts", "masago", "croutons"]);
+});
+
 test("la disponibilidad del servidor cubre cada sección con los mismos ids del cliente", () => {
   const bowl = sanitizeCustomerBowl({
     base: "white_rice",

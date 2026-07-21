@@ -10,7 +10,7 @@ export const REWARDS = [
     cost: 50,
     icon: "🥤",
     name: { es: "Bebida gratis", en: "Free drink" },
-    desc: { es: "Agua natural del día", en: "Agua fresca of the day" },
+    desc: { es: "Agua del día", en: "Agua fresca of the day" },
     terms: { es: "Con la compra de un bowl. Agrega la bebida a la orden.", en: "With a bowl purchase. Add the drink to the order." },
     type: "free_drink",
   },
@@ -38,7 +38,7 @@ export const REWARDS = [
     icon: "🥗",
     name: { es: "Bowl gratis", en: "Free bowl" },
     desc: { es: "Un bowl completo de tu elección", en: "A full bowl of your choice" },
-    terms: { es: "Cubre hasta $249. Tamaño grande y extras se cobran.", en: "Covers up to $249. Large size and extras cost extra." },
+    terms: { es: "Cubre hasta $230. Tamaño grande y extras se cobran.", en: "Covers up to $230. Large size and extras cost extra." },
     type: "free_bowl",
   },
 ];
@@ -48,7 +48,7 @@ export const STORY_REWARD = {
   cost: 0,
   icon: "🥤",
   name: { es: "Bebida por historia", en: "Story drink" },
-  desc: { es: "Agua natural del día", en: "Agua fresca of the day" },
+  desc: { es: "Agua del día", en: "Agua fresca of the day" },
   terms: {
     es: "Con la compra de un bowl. Agrega la bebida a la orden. Válido por 7 días, una vez cada 30 días y no acumulable.",
     en: "With a bowl purchase. Add the drink to the order. Valid for 7 days, once every 30 days, and cannot be combined.",

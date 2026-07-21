@@ -310,6 +310,12 @@
   gap: 10px;
 }
 
+.actionButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .submitError {
   width: 100%;
   padding: 10px 14px;
@@ -340,6 +346,28 @@
 }
 
 .confirmButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.restartButton {
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius-md);
+  padding: 13px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.restartButton:hover:not(:disabled) {
+  background: var(--bg-muted);
+  border-color: var(--text-3);
+}
+
+.restartButton:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -615,6 +643,15 @@
   }
 
   .confirmButton {
+    width: 100%;
+  }
+
+  .actionButtons {
+    flex-direction: column-reverse;
+    width: 100%;
+  }
+
+  .restartButton {
     width: 100%;
   }
 }

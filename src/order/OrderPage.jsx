@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import BaseSelection from "./BaseSelection";
 import ProteinSelection from "./ProteinSelection";
-import MarinadeSelection from "./MarinadeSelection";
 import ComplementsSelection from "./ComplementsSelection";
 import SauceSelection from "./SauceSelection";
 import ToppingsSelection from "./ToppingsSelection";
@@ -13,11 +12,12 @@ import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "./pricing";
 import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
+const LAST_STEP = TOTAL_STEPS - 1;
+const SUMMARY_STEP = TOTAL_STEPS;
 const STEP_NAME_KEYS = [
   "summary.base",
   "summary.protein",
-  "summary.marinades",
   "summary.complements",
   "summary.sauces",
   "summary.toppings",
@@ -31,9 +31,8 @@ const PRESETS = [
     base: "white_rice",
     proteins: ["salmon", "tuna"],
     bowlSize: "normal",
-    marinades: ["shoyu_marinade"],
     complements: ["avocado", "cucumber", "edamame"],
-    sauces: ["spicy_mayo", "soy_sauce"],
+    sauces: ["spicy_mayo", "citrus_dressing"],
     toppings: ["sesame_seeds", "nori_strips"],
   },
   {
@@ -41,35 +40,32 @@ const PRESETS = [
     nameKey: "order.presetTropicalShrimp",
     tagKey: "order.presetFreshLight",
     base: "spring_mix",
-    proteins: ["shrimp", "salmon"],
+    proteins: ["shrimp", "tofu"],
     bowlSize: "normal",
-    marinades: ["citrus_marinade"],
-    complements: ["mango", "pineapple", "avocado"],
-    sauces: ["sweet_chili", "avocado_lime"],
-    toppings: ["sesame_seeds", "crispy_onions"],
+    complements: ["pineapple", "avocado", "cucumber"],
+    sauces: ["sweet_dressing", "cilantro_dressing"],
+    toppings: ["sesame_seeds", "masago"],
   },
   {
     id: "spicy_tuna",
     nameKey: "order.presetSpicyTuna",
     tagKey: "order.presetFlavorful",
-    base: "brown_rice",
-    proteins: ["tuna", "seared_tuna"],
+    base: "quinoa",
+    proteins: ["tuna", "salmon"],
     bowlSize: "normal",
-    marinades: ["spicy_marinade"],
-    complements: ["cucumber", "edamame", "corn"],
-    sauces: ["garlic_sriracha", "spicy_mayo"],
-    toppings: ["red_pepper_flakes", "furikake"],
+    complements: ["cucumber", "edamame", "spicy_surimi"],
+    sauces: ["sriracha", "spicy_mayo"],
+    toppings: ["masago", "nori_strips"],
   },
   {
     id: "citrus_octopus",
-    nameKey: "order.presetCitrusOctopus",
+    nameKey: "order.presetCitrusTofu",
     tagKey: "order.presetFreshLight",
     base: "spring_mix",
-    proteins: ["octopus", "shrimp"],
+    proteins: ["tofu", "shrimp"],
     bowlSize: "normal",
-    marinades: ["citrus_marinade"],
-    complements: ["cucumber", "mango", "avocado"],
-    sauces: ["avocado_lime", "soy_sauce"],
+    complements: ["cucumber", "beet", "avocado"],
+    sauces: ["citrus_dressing", "cilantro_dressing"],
     toppings: ["sesame_seeds", "nori_strips"],
   },
 ];
@@ -187,19 +183,13 @@ function BowlMiniSummary({ order, step, language, t }) {
     const names = order.proteins.map((id) => labels.protein[id] || id);
     parts.push({ icon: "🐟", text: names.join(", ") });
   }
-  if (step >= 3 && Array.isArray(order.marinades) && order.marinades.length > 0) {
-    parts.push({
-      icon: "✨",
-      text: countLabel(order.marinades.length, "order.marinadeCountOne", "order.marinadeCountMany"),
-    });
-  }
-  if (step >= 4 && Array.isArray(order.complements) && order.complements.length > 0) {
+  if (step >= 3 && Array.isArray(order.complements) && order.complements.length > 0) {
     parts.push({
       icon: "🥗",
       text: countLabel(order.complements.length, "order.complementCountOne", "order.complementCountMany"),
     });
   }
-  if (step >= 5 && Array.isArray(order.sauces) && order.sauces.length > 0) {
+  if (step >= 4 && Array.isArray(order.sauces) && order.sauces.length > 0) {
     parts.push({
       icon: "🥣",
       text: countLabel(order.sauces.length, "order.sauceCountOne", "order.sauceCountMany"),
@@ -297,7 +287,7 @@ const OrderPage = () => {
   const { language, t } = useLanguage();
   const [step, setStep] = useState(() => {
     const savedStep = Number(order.draftStep);
-    return Number.isInteger(savedStep) && savedStep >= 0 && savedStep <= 5 ? savedStep : 0;
+    return Number.isInteger(savedStep) && savedStep >= 0 && savedStep <= LAST_STEP ? savedStep : 0;
   });
   const location = useLocation();
   const navigate = useNavigate();
@@ -315,11 +305,11 @@ const OrderPage = () => {
       .catch(() => {});
   }, []);
 
-  // Si el cliente ya había llegado al resumen (draftStep=6) y vuelve a entrar
+  // Si el cliente ya había llegado al resumen y vuelve a entrar
   // a "Ordenar" desde el menú sin pedir un paso específico, regrésalo
   // directo al resumen en vez de dejarlo en el último paso del armador.
   useEffect(() => {
-    if (!searchParams.has("step") && !requestedPreset && Number(order.draftStep) === 6) {
+    if (!searchParams.has("step") && !requestedPreset && Number(order.draftStep) >= SUMMARY_STEP) {
       navigate("/summary", { state: { guest: isGuest }, replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -330,7 +320,7 @@ const OrderPage = () => {
     const preset = PRESETS.find((candidate) => candidate.id === requestedPreset);
     if (!preset) return;
     loadFavorite(preset);
-    updateOrder("draftStep", 6);
+    updateOrder("draftStep", SUMMARY_STEP);
     navigate("/summary", { state: { guest: isGuest }, replace: true });
   }, [isGuest, loadFavorite, navigate, requestedPreset, updateOrder]);
 
@@ -342,13 +332,13 @@ const OrderPage = () => {
   useEffect(() => {
     if (!searchParams.has("step")) return;
     const qsStep = Number(searchParams.get("step"));
-    if (!Number.isNaN(qsStep) && qsStep >= 0 && qsStep <= 5) {
+    if (!Number.isNaN(qsStep) && qsStep >= 0 && qsStep <= LAST_STEP) {
       setOrderStep(qsStep);
     }
   }, [searchParams, setOrderStep]);
 
   const nextStep = () => {
-    const next = Math.min(step + 1, 5);
+    const next = Math.min(step + 1, LAST_STEP);
     setOrderStep(next);
   };
 
@@ -361,10 +351,10 @@ const OrderPage = () => {
   };
 
   const goToSummary = () => {
-    // 6 es un valor centinela: significa "ya llegó al resumen", distinto
-    // de estar en el paso 5 (Toppings) del armador. Así, si vuelve a entrar
+    // TOTAL_STEPS es un valor centinela: significa "ya llegó al resumen",
+    // distinto de estar en el último paso del armador. Así, si vuelve a entrar
     // a "Ordenar" más tarde, lo mandamos directo al resumen otra vez.
-    updateOrder("draftStep", 6);
+    updateOrder("draftStep", SUMMARY_STEP);
     navigate("/summary", { state: { guest: isGuest } });
   };
 
@@ -378,14 +368,13 @@ const OrderPage = () => {
 
   const handleSelectPreset = (preset) => {
     loadFavorite(preset);
-    updateOrder("draftStep", 6);
+    updateOrder("draftStep", SUMMARY_STEP);
     navigate("/summary", { state: { guest: isGuest } });
   };
 
   const steps = [
     <BaseSelection key="base" onNext={handleNext} onBack={prevStep} />,
     <ProteinSelection key="protein" onNext={handleNext} onBack={prevStep} />,
-    <MarinadeSelection key="marinade" onNext={handleNext} onBack={prevStep} />,
     <ComplementsSelection key="complements" onNext={handleNext} onBack={prevStep} />,
     <SauceSelection key="sauce" onNext={handleNext} onBack={prevStep} />,
     <ToppingsSelection key="toppings" onNext={goToSummary} onBack={prevStep} />,

@@ -31,6 +31,12 @@ export default function KioskSummaryPage() {
     navigate("/kiosk/order", { state: { initialStep: stepIndex } });
   };
 
+  const onRestart = () => {
+    clearOrderSubmission("kiosk");
+    resetOrder();
+    navigate("/kiosk/order", { state: { initialStep: 0 }, replace: true });
+  };
+
   const onConfirm = async () => {
     const selectedProteins = Array.isArray(order?.proteins) ? order.proteins : [];
     if (!order?.base || selectedProteins.length < 1) {
@@ -110,6 +116,7 @@ export default function KioskSummaryPage() {
       </button>
       <OrderSummary
         onEditStep={onEditStep}
+        onRestart={onRestart}
         onConfirm={onConfirm}
         saving={saving}
         submitError={submitError}

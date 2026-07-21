@@ -47,7 +47,7 @@ const BEVERAGE_PRODUCTS = [
   { name: "Topochico", category: "Aguas", unit: "botellas", key: "topochico" },
   { name: "Coca-Zero", category: "Refrescos", unit: "latas", key: "coca_zero" },
   { name: "Botella de Agua", category: "Aguas", unit: "botellas", key: "botella_de_agua" },
-  { name: "Agua natural del día", category: "Aguas", unit: "L", key: "agua_natural" },
+  { name: "Agua del día", category: "Aguas", unit: "L", key: "agua_natural" },
 ];
 
 const EMPTY_FORM = {

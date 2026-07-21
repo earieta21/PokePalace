@@ -11,21 +11,22 @@ import {
 import CustomBowlBuilder from "../CustomBowlBuilder";
 import { getRewardById } from "../../data/rewardsCatalog.js";
 import { TOPPING_LABELS } from "../../order/OrderLabels.jsx";
+import { BOWL_BASE_PRICE } from "../../order/pricing.js";
 import ui from "./POSPage.module.css";
 
 const CUSTOM_BOWL_ID = "custom-bowl";
 
 const MENU = [
-  { id: 1,  name: "Bowl de salmón esmeralda",        price: 249, category: "Bowls", icon: "🍣" },
-  { id: 2,  name: "Bowl picante de atún crujiente",  price: 249, category: "Bowls", icon: "🌶️" },
-  { id: 3,  name: "Bowl tropical de camarón",        price: 249, category: "Bowls", icon: "🍤" },
-  { id: 4,  name: "Pulpo cítrico",                   price: 249, category: "Bowls", icon: "🐙" },
+  { id: 1,  name: "Bowl de salmón esmeralda",        price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍣" },
+  { id: 2,  name: "Bowl picante de atún crujiente",  price: BOWL_BASE_PRICE, category: "Bowls", icon: "🌶️" },
+  { id: 3,  name: "Bowl tropical de camarón",        price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍤" },
+  { id: 4,  name: "Pulpo cítrico",                   price: BOWL_BASE_PRICE, category: "Bowls", icon: "🐙" },
   { id: 6,  name: "Edamame",                 price:  69, category: "Entradas", icon: "🫛" },
   { id: 8,  name: "Ensalada de Algas",       price:  79, category: "Entradas", icon: "🥗" },
   { id: 11, name: "Topochico",               price:  35, category: "Bebidas", icon: "🫧" },
   { id: 13, name: "Coca-Zero",               price:  30, category: "Bebidas", icon: "🥤" },
   { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
-  { id: 15, name: "Agua natural del día",    price:  30, category: "Bebidas", icon: "🍹" },
+  { id: 15, name: "Agua del día",              price:  35, category: "Bebidas", icon: "🥤", rewardDrink: true },
 ];
 
 const MENU_CATEGORIES = ["Todos", "Bowls", "Entradas", "Bebidas"];
@@ -152,14 +153,14 @@ export default function POSPage({ styles }) {
   const iva      = subtotal * IVA;
   const customRewardBowl = cart.find((i) => i.id === CUSTOM_BOWL_ID);
   const bowlLines = cart.filter((i) => /bowl/i.test(i.name));
-  const drinkLines = cart.filter((i) => /agua natural/i.test(i.name));
+  const drinkLines = cart.filter((item) => item.rewardDrink);
   let rewardDiscount = 0;
   if (reward?.type === "free_drink" && bowlLines.length && drinkLines.length) {
     rewardDiscount = Math.min(...drinkLines.map((item) => item.price));
   } else if (reward?.type === "double_protein" && customRewardBowl?.bowl?.proteins?.length >= 3) {
     rewardDiscount = 40;
   } else if (reward?.type === "free_bowl" && bowlLines.length) {
-    rewardDiscount = Math.min(249, Math.min(...bowlLines.map((item) => item.price)));
+    rewardDiscount = Math.min(BOWL_BASE_PRICE, Math.min(...bowlLines.map((item) => item.price)));
   }
   const total = Math.max(0, subtotal + iva - rewardDiscount);
   const rewardsMultiplier = (rewardsCustomer?.lifetimePoints ?? 0) >= 300 ? 2 : 1;
@@ -550,4 +551,3 @@ export default function POSPage({ styles }) {
     </div>
   );
 }
-

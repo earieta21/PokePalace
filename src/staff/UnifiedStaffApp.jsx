@@ -1246,7 +1246,7 @@ function RewardsRedeemTab({ token }) {
               <p className="text-violet-300 text-sm font-semibold">Código generado para {issuedStory.socialHandle}</p>
               <p className="my-2 text-3xl font-mono font-bold tracking-widest text-white">{issuedStory.code}</p>
               <p className="text-slate-400 text-xs">
-                Agua natural del día. Válido hasta el {new Date(issuedStory.expiresAt).toLocaleDateString("es-MX")} con la compra de un bowl.
+                Agua del día. Válido hasta el {new Date(issuedStory.expiresAt).toLocaleDateString("es-MX")} con la compra de un bowl.
               </p>
             </div>
 

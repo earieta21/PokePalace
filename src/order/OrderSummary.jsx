@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 import { useOrder } from "./OrderContext";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
-import { computePricing, COMPLEMENT_FREE_LIMIT, EXTRA_COMPLEMENT_PRICE } from "./pricing";
+import { computePricing } from "./pricing";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./OrderSummary.module.css";
 
@@ -12,6 +12,7 @@ import {
 
 const OrderSummary = ({
   onEditStep,
+  onRestart,
   onConfirm,
   onPromoChange,
   pointsDiscount = 0,
@@ -89,8 +90,6 @@ const OrderSummary = ({
   });
   const appliedPointsDiscount = Math.min(Math.max(0, pointsDiscount), pricing.total);
   const finalTotal = Math.max(0, pricing.total - appliedPointsDiscount);
-  const extraComplementsCount = Math.max(0, complements.length - COMPLEMENT_FREE_LIMIT);
-
   // Time picker helpers — mantiene el rango en línea con lo que de verdad
   // acepta el backend (11:00–21:00), para no dejar elegir una hora que
   // luego se va a rechazar al confirmar. Usa la hora LOCAL del navegador
@@ -160,6 +159,12 @@ const OrderSummary = ({
     setPromoError("");
     onPromoChange?.(null);
     order.updateCheckout("promoCode", "");
+  };
+
+  const handleRestart = () => {
+    if (window.confirm(t("summary.restartConfirm"))) {
+      onRestart?.();
+    }
   };
 
   const handleSaveFavorite = async () => {
@@ -518,15 +523,25 @@ const OrderSummary = ({
           {submitError && (
             <p className={styles.submitError} role="alert">{submitError}</p>
           )}
-          <button
-            className={styles.confirmButton}
-            onClick={onConfirm}
-            type="button"
-            disabled={saving}
-            aria-busy={saving}
-          >
-            {saving ? t("summary.sending") : `${t("summary.confirm")} — $${finalTotal.toFixed(2)}`}
-          </button>
+          <div className={styles.actionButtons}>
+            <button
+              className={styles.restartButton}
+              onClick={handleRestart}
+              type="button"
+              disabled={saving}
+            >
+              {t("summary.restart")}
+            </button>
+            <button
+              className={styles.confirmButton}
+              onClick={onConfirm}
+              type="button"
+              disabled={saving}
+              aria-busy={saving}
+            >
+              {saving ? t("summary.sending") : `${t("summary.confirm")} — $${finalTotal.toFixed(2)}`}
+            </button>
+          </div>
         </div>
       </div>
     </div>

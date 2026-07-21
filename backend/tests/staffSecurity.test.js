@@ -64,24 +64,16 @@ test("el POS ignora precio y nombre manipulados cuando recibe un id de catálogo
     price: 0.01,
     qty: 2,
   }]);
-  assert.equal(item.name, "Agua fresca · Pepino, Limón y Chía");
+  assert.equal(item.name, "Agua del día");
   assert.equal(item.price, 35);
   assert.equal(item.qty, 2);
 });
 
-test("las dos aguas frescas cuestan 35 pesos", () => {
-  const items = resolvePosItems([
-    { catalogId: "agua-del-dia", qty: 1 },
-    { catalogId: "agua-jamaica", qty: 1 },
-  ]);
+test("el agua del día cuesta 35 pesos", () => {
+  const [item] = resolvePosItems([{ catalogId: "agua-del-dia", qty: 1 }]);
 
-  assert.deepEqual(
-    items.map(({ catalogId, price }) => ({ catalogId, price })),
-    [
-      { catalogId: "agua-del-dia", price: 35 },
-      { catalogId: "agua-jamaica", price: 35 },
-    ]
-  );
+  assert.equal(item.name, "Agua del día");
+  assert.equal(item.price, 35);
 });
 
 test("el POS mantiene compatibilidad por nombre exacto sin confiar en price", () => {

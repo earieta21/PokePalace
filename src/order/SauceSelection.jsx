@@ -5,16 +5,11 @@ import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./SauceSelection.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
 
-import avocadoLime from "../assets/dressings/avocadoLime.webp";
 import garlicSiracha from "../assets/dressings/garlicSiracha.webp";
-import miso from "../assets/dressings/miso.webp";
-import punzu from "../assets/dressings/punzu.webp";
-import sesameGinger from "../assets/dressings/sesameGinger.webp";
-import soya from "../assets/dressings/soya.webp";
 import spicyMayo from "../assets/dressings/spicyMayo.webp";
 import sweetChili from "../assets/dressings/sweetChili.webp";
-import wasabi from "../assets/dressings/wasabi.webp";
-import yuzuKosho from "../assets/dressings/yuzuKosho.webp";
+import citrus from "../assets/marinades/citrico.webp";
+import cilantroDressing from "../assets/dressings/cilantroDressing.jpg";
 
 const MAX_SAUCES = 2;
 
@@ -25,15 +20,11 @@ const SauceSelection = ({ onNext, onBack }) => {
 
   const sauces = [
     { id: "spicy_mayo",         image: spicyMayo },
-    { id: "soy_sauce",          image: soya },
-    { id: "ponzu_sauce",        image: punzu },
-    { id: "sesame_ginger",      image: sesameGinger },
-    { id: "wasabi_vinaigrette", image: wasabi },
-    { id: "sweet_chili",        image: sweetChili },
-    { id: "garlic_sriracha",    image: garlicSiracha },
-    { id: "avocado_lime",       image: avocadoLime },
-    { id: "miso_dressing",      image: miso },
-    { id: "yuzu_kosho",         image: yuzuKosho },
+    { id: "sweet_dressing",     image: sweetChili },
+    { id: "citrus_dressing",    image: citrus },
+    { id: "red_sauce",          image: garlicSiracha },
+    { id: "sriracha",           image: garlicSiracha },
+    { id: "cilantro_dressing",  image: cilantroDressing },
   ];
 
   const [selectedSauces, setSelectedSauces] = useState(order.sauces || []);
@@ -67,7 +58,7 @@ const SauceSelection = ({ onNext, onBack }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>{t("order.step", { step: 5, total: 6 })}</div>
+        <div className={styles.badge}>{t("order.step", { step: 4, total: 5 })}</div>
         <h2 className={styles.title}>{t("order.sauceTitle")}</h2>
         <p className={styles.subtitle}>
           {t("order.sauceSubtitle", { max: MAX_SAUCES })}

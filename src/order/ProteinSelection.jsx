@@ -9,8 +9,7 @@ import { useAvailability } from "../context/AvailabilityContext";
 import tuna from "../assets/protein/tuna.webp";
 import salmon from "../assets/protein/salmon.webp";
 import shrimp from "../assets/protein/shrimp.webp";
-import octopus from "../assets/protein/octopus.webp";
-import searedTuna from "../assets/protein/searedTuna.webp";
+import tofu from "../assets/protein/tofu.jpg";
 
 const ProteinSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
@@ -23,8 +22,7 @@ const ProteinSelection = ({ onNext, onBack }) => {
     { id: "tuna", image: tuna },
     { id: "salmon", image: salmon },
     { id: "shrimp", image: shrimp },
-    { id: "octopus", image: octopus },
-    { id: "seared_tuna", image: searedTuna },
+    { id: "tofu", image: tofu },
   ];
 
   const [selectedProteins, setSelectedProteins] = useState(() => {
@@ -67,7 +65,7 @@ const ProteinSelection = ({ onNext, onBack }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>{t("order.step", { step: 2, total: 6 })}</div>
+        <div className={styles.badge}>{t("order.step", { step: 2, total: 5 })}</div>
         <h2 className={styles.title}>{t("order.proteinTitle")}</h2>
         <p className={styles.subtitle}>
           {t("order.proteinSubtitle")}

@@ -817,7 +817,7 @@ export const createPosOrder = async (req, res) => {
       if (reward.type === "free_drink") {
         const drinks = safeItems.filter((item) => item.rewardDrink);
         if (!drinks.length) {
-          return res.status(400).json({ message: "Agrega un agua fresca a la orden" });
+          return res.status(400).json({ message: "Agrega el Agua del día a la orden" });
         }
         rewardDiscount = Math.min(...drinks.map((item) => item.price));
       } else if (reward.type === "extra_topping") {

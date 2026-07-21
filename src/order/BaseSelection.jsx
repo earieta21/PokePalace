@@ -17,13 +17,9 @@ const BaseSelection = ({ onNext, onBack }) => {
 
   const bases = [
     { id: "white_rice", image: whiteRice },
-    { id: "brown_rice", image: brownRice },
+    { id: "spring_mix", image: mixedGreens },
     { id: "quinoa", image: quinoa },
-    {
-      id: "spring_mix",
-      description: language === "es" ? "Arroz con ensalada" : "Rice with greens",
-      image: mixedGreens,
-    },
+    { id: "brown_rice", image: brownRice, comingSoon: true },
   ];
 
   const [selectedBase, setSelectedBase] = useState(order.base || null);
@@ -47,7 +43,7 @@ const BaseSelection = ({ onNext, onBack }) => {
   return (
     <div className={styles.container}>
         <div className={styles.header}>
-          <div className={styles.badge}>{t("order.step", { step: 1, total: 6 })}</div>
+          <div className={styles.badge}>{t("order.step", { step: 1, total: 5 })}</div>
           <h2 className={styles.title}>{t("order.baseTitle")}</h2>
           <p className={styles.subtitle}>
             {t("order.baseSubtitle")}
@@ -58,7 +54,7 @@ const BaseSelection = ({ onNext, onBack }) => {
           {bases.map((base) => {
             const name = getItemLabel("base", base.id, language);
             const isSelected = selectedBase === base.id;
-            const isUnavailable = unavailableItems.includes(base.id);
+            const isUnavailable = base.comingSoon || unavailableItems.includes(base.id);
             const isSelectionBlocked = isUnavailable && !isSelected;
             return (
             <button
@@ -92,7 +88,9 @@ const BaseSelection = ({ onNext, onBack }) => {
                   alignItems: "center", justifyContent: "center",
                   background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
                 }}>
-                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>{t("order.soldOut")}</span>
+                  <span style={{ background: base.comingSoon ? "#4a7a5a" : "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>
+                    {base.comingSoon ? t("order.comingSoon") : t("order.soldOut")}
+                  </span>
                 </div>
               )}
             </button>

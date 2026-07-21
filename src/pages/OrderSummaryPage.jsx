@@ -107,6 +107,15 @@ export default function OrderSummaryPage() {
     navigate(`/order?step=${stepIndex}&edit=1`, { state: { guest: isGuest } });
   };
 
+  const onRestart = () => {
+    const actor = isLoggedIn
+      ? `user:${user?._id || user?.id || "authenticated"}`
+      : "guest";
+    clearOrderSubmission(actor);
+    resetOrder();
+    navigate("/order?step=0", { state: { guest: isGuest }, replace: true });
+  };
+
   const onConfirm = async () => {
     const selectedProteins = Array.isArray(order?.proteins) ? order.proteins : [];
     if (!order?.base || selectedProteins.length < 1) {
@@ -255,6 +264,7 @@ export default function OrderSummaryPage() {
 
       <OrderSummary
         onEditStep={onEditStep}
+        onRestart={onRestart}
         onConfirm={onConfirm}
         onPromoChange={setValidatedPromo}
         pointsDiscount={usePoints ? pointsDiscount : 0}
