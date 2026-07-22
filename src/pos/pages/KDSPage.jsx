@@ -9,6 +9,7 @@ import {
   SAUCE_LABELS,
   TOPPING_LABELS,
 } from "../../order/OrderLabels";
+import { orderTimingLabel } from "../orderTiming.js";
 
 const STATUS_CFG = {
   pending:   { cls: "badgeYellow", label: "Nuevo" },
@@ -60,13 +61,6 @@ function orderLines(order) {
   }
 
   return lines.length ? lines : ["Bowl personalizado"];
-}
-
-function elapsed(createdAt) {
-  const secs = Math.floor((Date.now() - new Date(createdAt)) / 1000);
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function playNewOrderBeep() {
@@ -142,7 +136,23 @@ export default function KDSPage({ styles, role }) {
   useEffect(() => {
     load();
     const id = setInterval(load, 15000);
-    return () => clearInterval(id);
+
+    // iOS pausa los timers de una pestaña en segundo plano (pantalla
+    // apagada/bloqueada) para ahorrar batería — el poll de 15s no corre
+    // mientras tanto. Al volver a estar visible, se refresca de inmediato
+    // en vez de esperar al siguiente tick, para no quedarse con órdenes
+    // viejas hasta que alguien haga un refresh manual.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, [load]);
 
   const advance = async (order) => {
@@ -179,6 +189,19 @@ export default function KDSPage({ styles, role }) {
 
   return (
     <div>
+      {/* Error de conexión/sesión — banner fijo y visible, para que el
+          personal note de inmediato si el auto-refresco dejó de funcionar
+          en vez de asumir que solo no hay pedidos nuevos. */}
+      {error && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 9997,
+          background: "#dc2626", color: "#fff", textAlign: "center",
+          padding: "10px 16px", fontWeight: 700, fontSize: 13,
+        }}>
+          ⚠️ No se pudo actualizar la cocina: {error} — toca "Actualizar" o vuelve a entrar con tu PIN si sigue.
+        </div>
+      )}
+
       {/* Screen flash on new order — visible even if not looking at the toast */}
       {screenFlash && (
         <div style={{
@@ -224,7 +247,6 @@ export default function KDSPage({ styles, role }) {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {error && <span style={{ color: "red", fontSize: 12 }}>{error}</span>}
           <button className={styles.btnGhost} onClick={load}>Actualizar</button>
         </div>
       </div>
@@ -253,7 +275,7 @@ export default function KDSPage({ styles, role }) {
                 <div className={styles.kdsHeader}>
                   <span className={styles.kdsNum}>#{order._id.slice(-5).toUpperCase()}</span>
                   <span className={`${styles.badge} ${styles[cfg.cls]}`}>{cfg.label}</span>
-                  <span className={styles.kdsTimer}>{elapsed(order.createdAt)}</span>
+                  <span className={styles.kdsTimer}>{orderTimingLabel(order)}</span>
                 </div>
                 <div className={styles.kdsBody}>
                   <p style={{ fontSize: 11, color: "var(--p-muted)", marginBottom: 6 }}>{cliente}</p>
