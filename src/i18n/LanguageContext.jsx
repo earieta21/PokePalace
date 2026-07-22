@@ -13,6 +13,8 @@ const TRANSLATIONS = {
     "nav.order": "Ordenar",
     "nav.rewards": "Premios",
     "nav.more": "Más",
+    "footer.operatedBy": "Poke Palace es operado por Eric Alexander Arrieta Nova.",
+    "footer.privacyLink": "Aviso de Privacidad",
     "language.switchTo": "English",
     "language.label": "Cambiar idioma",
 
@@ -331,6 +333,8 @@ const TRANSLATIONS = {
     "nav.order": "Order",
     "nav.rewards": "Rewards",
     "nav.more": "More",
+    "footer.operatedBy": "Poke Palace is operated by Eric Alexander Arrieta Nova.",
+    "footer.privacyLink": "Privacy Policy",
     "language.switchTo": "Español",
     "language.label": "Change language",
 

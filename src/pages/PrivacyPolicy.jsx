@@ -2,6 +2,8 @@ import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./PrivacyPolicy.module.css";
 
 const CONTACT_EMAIL = "earrieta21@gmail.com";
+const LEGAL_NAME = "Eric Alexander Arrieta Nova";
+const LEGAL_RFC = "AINE020521HN6";
 
 const CONTENT = {
   es: {
@@ -11,7 +13,7 @@ const CONTENT = {
       {
         title: "1. Responsable de los datos",
         body: [
-          `Poke Palace ("nosotros") es responsable del tratamiento de los datos personales que nos proporcionas a través de nuestro sitio web, aplicación y kioscos de autoservicio, de conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).`,
+          `Poke Palace ("nosotros") es el nombre comercial bajo el cual opera ${LEGAL_NAME} (RFC: ${LEGAL_RFC}), responsable del tratamiento de los datos personales que nos proporcionas a través de nuestro sitio web, aplicación y kioscos de autoservicio, de conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP).`,
           `Puedes contactarnos para cualquier duda relacionada con este aviso escribiendo a ${CONTACT_EMAIL}.`,
         ],
       },
@@ -78,7 +80,7 @@ const CONTENT = {
       {
         title: "1. Data controller",
         body: [
-          `Poke Palace ("we") is responsible for processing the personal data you provide through our website, app, and self-service kiosks, in accordance with Mexico's Federal Law on Protection of Personal Data Held by Private Parties (LFPDPPP).`,
+          `Poke Palace ("we") is the trade name under which ${LEGAL_NAME} (RFC: ${LEGAL_RFC}) operates, responsible for processing the personal data you provide through our website, app, and self-service kiosks, in accordance with Mexico's Federal Law on Protection of Personal Data Held by Private Parties (LFPDPPP).`,
           `You can reach us with any questions about this policy at ${CONTACT_EMAIL}.`,
         ],
       },
