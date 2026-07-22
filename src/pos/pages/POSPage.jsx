@@ -11,7 +11,7 @@ import {
 import CustomBowlBuilder from "../CustomBowlBuilder";
 import { getRewardById } from "../../data/rewardsCatalog.js";
 import { TOPPING_LABELS } from "../../order/OrderLabels.jsx";
-import { BOWL_BASE_PRICE } from "../../order/pricing.js";
+import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "../../order/pricing.js";
 import ui from "./POSPage.module.css";
 
 const CUSTOM_BOWL_ID = "custom-bowl";
@@ -21,6 +21,10 @@ const MENU = [
   { id: 2,  name: "Bowl picante de atún crujiente",  price: BOWL_BASE_PRICE, category: "Bowls", icon: "🌶️" },
   { id: 3,  name: "Bowl tropical de camarón",        price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍤" },
   { id: 4,  name: "Pulpo cítrico",                   price: BOWL_BASE_PRICE, category: "Bowls", icon: "🐙" },
+  // Venta rapida sin ingredientes especificos - para cuando no da tiempo de
+  // capturar el bowl personalizado completo (ej. fila larga).
+  { id: 20, name: "Bowl mediano", price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗" },
+  { id: 21, name: "Bowl grande",  price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🥗" },
   { id: 6,  name: "Edamame",                 price:  69, category: "Entradas", icon: "🫛" },
   { id: 8,  name: "Ensalada de Algas",       price:  79, category: "Entradas", icon: "🥗" },
   { id: 11, name: "Topochico",               price:  35, category: "Bebidas", icon: "🫧" },

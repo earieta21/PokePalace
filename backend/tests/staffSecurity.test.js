@@ -76,6 +76,19 @@ test("el agua del día cuesta 35 pesos", () => {
   assert.equal(item.price, 35);
 });
 
+test("el bowl mediano/grande de venta rapida cobra el precio correcto y no descuenta inventario", () => {
+  const [mediano, grande] = resolvePosItems([
+    { catalogId: "bowl-mediano-rapido", qty: 1 },
+    { catalogId: "bowl-grande-rapido", qty: 1 },
+  ]);
+
+  assert.equal(mediano.name, "Bowl mediano");
+  assert.equal(mediano.price, 230);
+  assert.equal(grande.name, "Bowl grande");
+  assert.equal(grande.price, 250);
+
+  assert.deepEqual(getPosInventoryDemand({ items: [mediano, grande] }), {});
+});
 test("el POS mantiene compatibilidad por nombre exacto sin confiar en price", () => {
   const [item] = resolvePosItems([{ name: "Edamame", price: 9999, qty: 1 }]);
   assert.equal(item.catalogId, "edamame");

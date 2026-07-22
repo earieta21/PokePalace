@@ -36,6 +36,18 @@ export const POS_CATALOG = Object.freeze([
       avocado_lime: 1, soy_sauce: 1, sesame_seeds: 1, nori_strips: 1,
     },
   },
+  // Venta rápida sin ingredientes específicos — para cobrar de una vez
+  // cuando no da tiempo de capturar el bowl personalizado completo (ej.
+  // fila larga). No trae inventoryRecipe a propósito: no se sabe qué
+  // llevó el bowl, así que no se descuenta inventario por esta venta.
+  {
+    catalogId: "bowl-mediano-rapido", legacyId: 20, name: "Bowl mediano", price: 230, category: "bowls",
+    inventoryRecipe: {},
+  },
+  {
+    catalogId: "bowl-grande-rapido", legacyId: 21, name: "Bowl grande", price: 250, category: "bowls",
+    inventoryRecipe: {},
+  },
   {
     catalogId: "edamame", legacyId: 6, name: "Edamame", price: 69, category: "starters",
     inventoryRecipe: { edamame: 1 },
