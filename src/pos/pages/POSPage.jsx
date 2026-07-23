@@ -38,6 +38,16 @@ const MENU_CATEGORIES = ["Todos", "Bowls", "Entradas", "Bebidas"];
 
 const IVA = 0; // IVA incluido en precio
 
+// Local helper running on the register's Mac (see pos-printer-helper/) that
+// kicks the cash drawer directly. The browser's own print job doesn't
+// reliably trigger the printer's drawer-kick trailer for the full rendered
+// ticket, so this is a dedicated, minimal print job sent straight to CUPS.
+const DRAWER_HELPER_URL = "http://127.0.0.1:9111/open-drawer";
+
+function openCashDrawer() {
+  fetch(DRAWER_HELPER_URL, { method: "POST" }).catch(() => {});
+}
+
 const PAYMENT_METHOD_LABELS = {
   card_terminal: "Tarjeta",
   cash: "Efectivo",
@@ -344,6 +354,7 @@ export default function POSPage({ styles }) {
       setSuccess(`Orden enviada — $${data.order.total.toLocaleString("es-MX")} MXN${pointsMessage}`);
       setLastReceipt(data.order);
       setPrintRequested(true);
+      if (paymentMethod !== "pay_at_pickup") openCashDrawer();
       pendingSaleRef.current = null;
     } catch (e) {
       if (isNetworkError(e)) {
