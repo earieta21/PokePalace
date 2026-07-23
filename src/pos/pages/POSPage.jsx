@@ -45,7 +45,7 @@ const IVA = 0; // IVA incluido en precio
 const DRAWER_HELPER_URL = "http://127.0.0.1:9111/open-drawer";
 
 function openCashDrawer() {
-  fetch(DRAWER_HELPER_URL, { method: "POST" }).catch(() => {});
+  fetch(DRAWER_HELPER_URL, { method: "POST", credentials: "include" }).catch(() => {});
 }
 
 const PAYMENT_METHOD_LABELS = {
