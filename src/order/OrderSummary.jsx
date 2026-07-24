@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 import { useOrder } from "./OrderContext";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
-import { computePricing } from "./pricing";
+import { PREMIUM_PROTEIN_PRICES, computePricing } from "./pricing";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./OrderSummary.module.css";
 
@@ -111,10 +111,13 @@ const OrderSummary = ({
     return values.map((v) => map?.[v] || prettifyId(v));
   };
 
-  const proteinLabels = getListLabels(
-    labels.protein,
-    Array.isArray(proteins) && proteins.length > 0 ? proteins : protein ? [protein] : []
-  );
+  const selectedProteinIds =
+    Array.isArray(proteins) && proteins.length > 0 ? proteins : protein ? [protein] : [];
+  const proteinLabels = selectedProteinIds.map((id) => {
+    const label = labels.protein?.[id] || prettifyId(id);
+    const upcharge = PREMIUM_PROTEIN_PRICES[id] || 0;
+    return upcharge > 0 ? `${label} (+$${upcharge})` : label;
+  });
   const extraScoopChips = (() => {
     if (!Array.isArray(extraScoopProteins) || extraScoopProteins.length === 0) return [];
     const counts = new Map();
@@ -133,6 +136,7 @@ const OrderSummary = ({
   const pricing = computePricing(pricedBowlSize, promoApplied, {
     extraScoops: extraScoopsCount,
     complementsCount: complements.length,
+    proteins: selectedProteinIds,
   });
   const appliedPointsDiscount = Math.min(Math.max(0, pointsDiscount), pricing.total);
   const finalTotal = Math.max(0, pricing.total - appliedPointsDiscount);

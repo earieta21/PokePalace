@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   computePricing, computeExtrasSubtotal, BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE,
   EXTRA_SCOOP_PRICE, COMPLEMENT_FREE_LIMIT, EXTRA_COMPLEMENT_PRICE,
+  PREMIUM_PROTEIN_PRICES,
 } from "../pricing.js";
 import { distanceMeters, isWithinRestaurant, RESTAURANT_LOCATION } from "../utils/geo.js";
 import { isValidPin, hashPin, comparePin } from "../utils/staffPin.js";
@@ -52,6 +53,15 @@ test("sin extras, el subtotal de extras es cero", () => {
 
 test("cada scoop extra cuesta EXTRA_SCOOP_PRICE", () => {
   assert.equal(computeExtrasSubtotal({ extraScoops: 2 }), 2 * EXTRA_SCOOP_PRICE);
+});
+
+test("el atún sellado suma 15 pesos como proteína premium", () => {
+  assert.equal(PREMIUM_PROTEIN_PRICES.seared_tuna, 15);
+  assert.equal(computeExtrasSubtotal({ proteins: ["tuna", "seared_tuna"] }), 15);
+  assert.equal(
+    computePricing("normal", null, { proteins: ["seared_tuna"] }).total,
+    BOWL_BASE_PRICE + 15
+  );
 });
 
 test("los primeros COMPLEMENT_FREE_LIMIT complementos son gratis, el resto cuesta EXTRA_COMPLEMENT_PRICE", () => {

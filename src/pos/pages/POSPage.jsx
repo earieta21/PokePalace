@@ -32,9 +32,11 @@ const MENU = [
   { id: 13, name: "Coca-Zero",               price:  30, category: "Bebidas", icon: "🥤" },
   { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
   { id: 15, name: "Agua del día",              price:  35, category: "Bebidas", icon: "🥤", rewardDrink: true },
+  { id: 16, name: "Cacao Rice Cake",          price:  30, category: "Extras", icon: "🍫" },
+  { id: 17, name: "Choco Rice Cake",          price:  35, category: "Extras", icon: "🍫" },
 ];
 
-const MENU_CATEGORIES = ["Todos", "Bowls", "Entradas", "Bebidas"];
+const MENU_CATEGORIES = ["Todos", "Bowls", "Entradas", "Bebidas", "Extras"];
 
 const IVA = 0; // IVA incluido en precio
 

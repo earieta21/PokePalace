@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { computeBowlSubtotal } from "../pricing.js";
+import { computeBowlSubtotal, computeExtrasSubtotal } from "../pricing.js";
 import {
   canAssignStaffRole,
   canManageStaffRole,
@@ -74,6 +74,19 @@ test("el agua del día cuesta 35 pesos", () => {
 
   assert.equal(item.name, "Agua del día");
   assert.equal(item.price, 35);
+});
+
+test("los rice cakes del POS cobran sus precios de catálogo", () => {
+  const [cacao, choco] = resolvePosItems([
+    { catalogId: "cacao-rice-cake", qty: 1 },
+    { catalogId: "choco-rice-cake", qty: 1 },
+  ]);
+
+  assert.equal(cacao.name, "Cacao Rice Cake");
+  assert.equal(cacao.price, 30);
+  assert.equal(choco.name, "Choco Rice Cake");
+  assert.equal(choco.price, 35);
+  assert.deepEqual(getPosInventoryDemand({ items: [cacao, choco] }), {});
 });
 
 test("el bowl mediano/grande de venta rapida cobra el precio correcto y no descuenta inventario", () => {
@@ -237,4 +250,14 @@ test("el POS acepta los ingredientes vigentes del bowl", () => {
 
   assert.equal(bowl.bowlSize, "normal");
   assert.deepEqual(bowl.proteins, ["tuna", "tofu"]);
+});
+
+test("el POS acepta atún sellado y calcula su extra de 15 pesos", () => {
+  const bowl = sanitizePosBowl({
+    base: "white_rice",
+    proteins: ["tuna", "seared_tuna"],
+  });
+
+  assert.deepEqual(bowl.proteins, ["tuna", "seared_tuna"]);
+  assert.equal(computeExtrasSubtotal({ proteins: bowl.proteins }), 15);
 });

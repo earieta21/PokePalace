@@ -6,6 +6,9 @@ export const EXTRA_SCOOP_PRICE = 40;      // porción extra (40 g) de una prote�
 export const EXTRA_SCOOP_MAX = 3;         // tope de scoops extra por bowl (ver backend/utils/customerOrder.js)
 export const COMPLEMENT_FREE_LIMIT = 6;   // complementos incluidos sin costo
 export const EXTRA_COMPLEMENT_PRICE = 15; // cada complemento más allá del límite gratis
+export const PREMIUM_PROTEIN_PRICES = Object.freeze({
+  seared_tuna: 15,
+});
 export const TAX_RATE = 0; // IVA incluido en precio
 
 const round2 = (n) => Math.round(n * 100) / 100;
@@ -13,10 +16,15 @@ const round2 = (n) => Math.round(n * 100) / 100;
 export const computeBowlSubtotal = (bowlSize) =>
   BOWL_BASE_PRICE + (bowlSize === "large" ? LARGE_BOWL_UPCHARGE : 0);
 
-export const computeExtrasSubtotal = ({ extraScoops = 0, complementsCount = 0 } = {}) => {
+export const computePremiumProteinSubtotal = (proteins = []) =>
+  (Array.isArray(proteins) ? proteins : [])
+    .reduce((sum, proteinId) => sum + (PREMIUM_PROTEIN_PRICES[proteinId] || 0), 0);
+
+export const computeExtrasSubtotal = ({ extraScoops = 0, complementsCount = 0, proteins = [] } = {}) => {
   const scoopsCost = Math.max(0, Number(extraScoops) || 0) * EXTRA_SCOOP_PRICE;
   const extraComplements = Math.max(0, (Number(complementsCount) || 0) - COMPLEMENT_FREE_LIMIT);
-  return scoopsCost + extraComplements * EXTRA_COMPLEMENT_PRICE;
+  const premiumProteinsCost = computePremiumProteinSubtotal(proteins);
+  return scoopsCost + extraComplements * EXTRA_COMPLEMENT_PRICE + premiumProteinsCost;
 };
 
 export const computeDiscount = (subtotal, promo) => {

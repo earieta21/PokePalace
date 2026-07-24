@@ -789,6 +789,7 @@ export const createPosOrder = async (req, res) => {
       ? computeBowlSubtotal(safeBowl.bowlSize) + computeExtrasSubtotal({
           extraScoops: safeBowl.extraScoopProteins.length,
           complementsCount: safeBowl.complements.length,
+          proteins: safeBowl.proteins,
         })
       : 0;
     const subtotal = itemsSubtotal + customBowlPrice;

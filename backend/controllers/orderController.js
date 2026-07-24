@@ -337,7 +337,11 @@ export const createOrder = async (req, res) => {
     const { subtotal, discount: promoDiscount, tax, total: baseTotal } = computePricing(
       resolvedBowlSize,
       resolvedPromo,
-      { extraScoops: safeBowl.extraScoopProteins.length, complementsCount: safeBowl.complements.length }
+      {
+        extraScoops: safeBowl.extraScoopProteins.length,
+        complementsCount: safeBowl.complements.length,
+        proteins: safeBowl.proteins,
+      }
     );
 
     // The balance decrement and order marker are also one atomic write. A

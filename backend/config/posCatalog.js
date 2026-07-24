@@ -75,6 +75,14 @@ export const POS_CATALOG = Object.freeze([
     catalogId: "agua-del-dia", legacyId: 15, name: "Agua del día", price: 35, category: "drinks", rewardDrink: true,
     inventoryRecipe: { agua_natural: 1 },
   },
+  {
+    catalogId: "cacao-rice-cake", legacyId: 16, name: "Cacao Rice Cake", price: 30, category: "extras",
+    inventoryRecipe: {},
+  },
+  {
+    catalogId: "choco-rice-cake", legacyId: 17, name: "Choco Rice Cake", price: 35, category: "extras",
+    inventoryRecipe: {},
+  },
 ]);
 
 const normalizeName = (value) => String(value || "").normalize("NFKC").trim().toLocaleLowerCase("es-MX");

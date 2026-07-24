@@ -6,12 +6,17 @@ import {
   SAUCE_LABELS,
   TOPPING_LABELS,
 } from "../order/OrderLabels";
-import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, computeExtrasSubtotal } from "../order/pricing";
+import {
+  BOWL_BASE_PRICE,
+  LARGE_BOWL_UPCHARGE,
+  PREMIUM_PROTEIN_PRICES,
+  computeExtrasSubtotal,
+} from "../order/pricing";
 
 // Real base ids only — BASE_LABELS has a legacy "mixed_greens" alias pointing
 // at the same label as "spring_mix", which would render as a duplicate chip.
 const BASE_IDS = ["white_rice", "spring_mix", "quinoa"];
-const PROTEIN_IDS = ["tuna", "salmon", "shrimp", "tofu"];
+const PROTEIN_IDS = ["tuna", "salmon", "shrimp", "tofu", "seared_tuna"];
 const COMPLEMENT_IDS = [
   "shredded_carrots", "seaweed", "edamame", "red_onion", "cucumber",
   "pineapple", "beet", "surimi", "spicy_surimi", "avocado",
@@ -45,7 +50,7 @@ function toggleInList(list, id, max) {
   return [...list, id];
 }
 
-function ChipGroup({ title, hint, ids, labels, selected, max, onToggle }) {
+function ChipGroup({ title, hint, ids, labels, selected, max, onToggle, optionPrices = {} }) {
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
@@ -78,6 +83,7 @@ function ChipGroup({ title, hint, ids, labels, selected, max, onToggle }) {
               }}
             >
               {active ? "✓ " : ""}{labels[id] || id}
+              {optionPrices[id] ? ` (+$${optionPrices[id]})` : ""}
             </button>
           );
         })}
@@ -93,7 +99,10 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
   const isLarge = draft.proteins.length === MAX_PROTEINS;
   const price = BOWL_BASE_PRICE
     + (isLarge ? LARGE_BOWL_UPCHARGE : 0)
-    + computeExtrasSubtotal({ complementsCount: draft.complements.length });
+    + computeExtrasSubtotal({
+      complementsCount: draft.complements.length,
+      proteins: draft.proteins,
+    });
 
   const handleAdd = () => {
     if (!draft.base) return setError("Selecciona una base.");
@@ -130,6 +139,7 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
         labels={PROTEIN_LABELS}
         selected={draft.proteins}
         max={MAX_PROTEINS}
+        optionPrices={PREMIUM_PROTEIN_PRICES}
         onToggle={(id) => { setDraft((d) => ({ ...d, proteins: toggleInList(d.proteins, id, MAX_PROTEINS) })); setError(""); }}
       />
 

@@ -97,7 +97,20 @@ test("un bowl de 1 sola proteína es válido y cuesta lo mismo que uno de 2", ()
   const bowl = sanitizeCustomerBowl({ base: "white_rice", proteins: ["salmon"] });
   assert.equal(bowl.bowlSize, "normal");
   assert.deepEqual(bowl.proteins, ["salmon"]);
-  assert.equal(computePricing(bowl.bowlSize, null).total, BOWL_BASE_PRICE);
+  assert.equal(computePricing(bowl.bowlSize, null, { proteins: bowl.proteins }).total, BOWL_BASE_PRICE);
+});
+
+test("el pedido público acepta atún sellado y cobra su extra de 15 pesos", () => {
+  const bowl = sanitizeCustomerBowl({
+    base: "white_rice",
+    proteins: ["tuna", "seared_tuna"],
+  });
+
+  assert.deepEqual(bowl.proteins, ["tuna", "seared_tuna"]);
+  assert.equal(
+    computePricing(bowl.bowlSize, null, { proteins: bowl.proteins }).total,
+    BOWL_BASE_PRICE + 15
+  );
 });
 
 test("la disponibilidad del servidor cubre cada sección con los mismos ids del cliente", () => {

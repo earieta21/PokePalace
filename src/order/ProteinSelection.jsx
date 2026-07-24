@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
-import { LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, EXTRA_SCOOP_MAX } from "./pricing";
+import {
+  LARGE_BOWL_UPCHARGE,
+  EXTRA_SCOOP_PRICE,
+  EXTRA_SCOOP_MAX,
+  PREMIUM_PROTEIN_PRICES,
+} from "./pricing";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./ProteinSelection.module.css";
@@ -10,6 +15,7 @@ import tuna from "../assets/protein/tuna.webp";
 import salmon from "../assets/protein/salmon.webp";
 import shrimp from "../assets/protein/shrimp.webp";
 import tofu from "../assets/protein/tofu.jpg";
+import searedTuna from "../assets/protein/searedTuna.webp";
 
 const ProteinSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
@@ -23,6 +29,7 @@ const ProteinSelection = ({ onNext, onBack }) => {
     { id: "salmon", image: salmon },
     { id: "shrimp", image: shrimp },
     { id: "tofu", image: tofu },
+    { id: "seared_tuna", image: searedTuna },
   ];
 
   const [selectedProteins, setSelectedProteins] = useState(() => {
@@ -144,7 +151,14 @@ const ProteinSelection = ({ onNext, onBack }) => {
               )}
             </div>
 
-            <p className={styles.name}>{name}</p>
+            <p className={styles.name}>
+              <span>{name}</span>
+              {PREMIUM_PROTEIN_PRICES[protein.id] && (
+                <small className={styles.premiumPrice}>
+                  +${PREMIUM_PROTEIN_PRICES[protein.id]} MXN
+                </small>
+              )}
+            </p>
             {isUnavailable && (
               <div style={{
                 position: "absolute", inset: 0, display: "flex",
