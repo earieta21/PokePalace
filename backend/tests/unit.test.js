@@ -55,12 +55,12 @@ test("cada scoop extra cuesta EXTRA_SCOOP_PRICE", () => {
   assert.equal(computeExtrasSubtotal({ extraScoops: 2 }), 2 * EXTRA_SCOOP_PRICE);
 });
 
-test("el atún sellado suma 15 pesos como proteína premium", () => {
-  assert.equal(PREMIUM_PROTEIN_PRICES.seared_tuna, 15);
-  assert.equal(computeExtrasSubtotal({ proteins: ["tuna", "seared_tuna"] }), 15);
+test("el atún sellado suma 20 pesos como proteína premium", () => {
+  assert.equal(PREMIUM_PROTEIN_PRICES.seared_tuna, 20);
+  assert.equal(computeExtrasSubtotal({ proteins: ["tuna", "seared_tuna"] }), 20);
   assert.equal(
     computePricing("normal", null, { proteins: ["seared_tuna"] }).total,
-    BOWL_BASE_PRICE + 15
+    BOWL_BASE_PRICE + 20
   );
 });
 

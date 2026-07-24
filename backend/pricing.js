@@ -7,7 +7,7 @@ export const EXTRA_SCOOP_PRICE = 40;      // porción extra (40 g) de una prote�
 export const COMPLEMENT_FREE_LIMIT = 6;   // complementos incluidos sin costo
 export const EXTRA_COMPLEMENT_PRICE = 15; // cada complemento más allá del límite gratis
 export const PREMIUM_PROTEIN_PRICES = Object.freeze({
-  seared_tuna: 15,
+  seared_tuna: 20,
 });
 export const TAX_RATE = 0; // IVA incluido en precio
 

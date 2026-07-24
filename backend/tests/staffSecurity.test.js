@@ -252,12 +252,12 @@ test("el POS acepta los ingredientes vigentes del bowl", () => {
   assert.deepEqual(bowl.proteins, ["tuna", "tofu"]);
 });
 
-test("el POS acepta atún sellado y calcula su extra de 15 pesos", () => {
+test("el POS acepta atún sellado y calcula su extra de 20 pesos", () => {
   const bowl = sanitizePosBowl({
     base: "white_rice",
     proteins: ["tuna", "seared_tuna"],
   });
 
   assert.deepEqual(bowl.proteins, ["tuna", "seared_tuna"]);
-  assert.equal(computeExtrasSubtotal({ proteins: bowl.proteins }), 15);
+  assert.equal(computeExtrasSubtotal({ proteins: bowl.proteins }), 20);
 });
