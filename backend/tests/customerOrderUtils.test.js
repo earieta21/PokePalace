@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   findUnavailableCustomerBowlItems,
   isCustomerManagedOrder,
+  isRestaurantClosedDay,
   isWithinRestaurantHours,
   normalizeCustomerOrderId,
   sanitizeCustomerBowl,
@@ -18,10 +19,22 @@ test("solo órdenes online entran a cancelación y reversión de cliente", () =>
 });
 
 test("los horarios de pedidos usan America/Tijuana en verano e invierno", () => {
-  assert.equal(isWithinRestaurantHours(new Date("2026-07-15T17:59:59Z")), false); // 10:59 PDT
-  assert.equal(isWithinRestaurantHours(new Date("2026-07-15T18:00:00Z")), true);  // 11:00 PDT
-  assert.equal(isWithinRestaurantHours(new Date("2026-01-15T04:59:59Z")), true);  // 20:59 PST
-  assert.equal(isWithinRestaurantHours(new Date("2026-01-15T05:00:00Z")), false); // 21:00 PST
+  // 15 de julio 2026 es miércoles en hora de Tijuana — se usa jueves 16
+  // para probar solo el límite de hora, sin que el día cerrado interfiera.
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-16T17:59:59Z")), false); // 10:59 PDT, jueves
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-16T18:00:00Z")), true);  // 11:00 PDT, jueves
+  // "2026-01-15T04:59:59Z" cae en 14 de enero local (miércoles) por el
+  // cambio de zona horaria — se usa el 16 en UTC (= 15 de enero local,
+  // jueves) para aislar el límite de hora del día cerrado.
+  assert.equal(isWithinRestaurantHours(new Date("2026-01-16T04:59:59Z")), true);  // 20:59 PST, jueves
+  assert.equal(isWithinRestaurantHours(new Date("2026-01-16T05:00:00Z")), false); // 21:00 PST, jueves
+});
+
+test("el restaurante permanece cerrado todo el miércoles sin importar la hora", () => {
+  // 15 de julio 2026 es miércoles en horario de Tijuana.
+  assert.equal(isRestaurantClosedDay(new Date("2026-07-15T18:30:00Z")), true);  // 11:30 PDT, miércoles
+  assert.equal(isRestaurantClosedDay(new Date("2026-07-16T18:30:00Z")), false); // 11:30 PDT, jueves
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-15T18:30:00Z")), false); // dentro de horario pero cerrado por día
 });
 
 test("el canje se limita a bloques completos que caben en el total", () => {

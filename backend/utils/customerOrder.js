@@ -123,8 +123,20 @@ export function normalizeCustomerOrderId(value) {
   return normalized;
 }
 
+// Miércoles (0=domingo, 1=lunes, ..., 3=miércoles, ..., 6=sábado) — el
+// restaurante no abre ese día, sin importar la hora.
+const CLOSED_WEEKDAY = 3;
+
+export function isRestaurantClosedDay(date = new Date()) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return true;
+  const { year, month, day } = zonedParts(date);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return weekday === CLOSED_WEEKDAY;
+}
+
 export function isWithinRestaurantHours(date = new Date(), openHour = 11, closeHour = 21) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
+  if (isRestaurantClosedDay(date)) return false;
   const { hour } = zonedParts(date);
   return hour >= openHour && hour < closeHour;
 }

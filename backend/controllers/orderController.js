@@ -15,6 +15,7 @@ import {
 import {
   findUnavailableCustomerBowlItems,
   isCustomerManagedOrder,
+  isRestaurantClosedDay,
   isWithinRestaurantHours,
   normalizeCustomerOrderId,
   sanitizeCustomerBowl,
@@ -55,6 +56,10 @@ const validateScheduledTime = (scheduledPickupTime) => {
   const now = new Date();
   const minTime = new Date(now.getTime() + 15 * 60 * 1000);
   if (scheduled < minTime) return "La hora debe ser al menos 15 minutos desde ahora";
+
+  if (isRestaurantClosedDay(scheduled)) {
+    return "Cerramos los miércoles — elige otro día para tu pedido programado.";
+  }
 
   if (!isWithinBusinessHours(scheduled)) {
     return `El restaurante acepta pedidos de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00`;
@@ -321,7 +326,9 @@ export const createOrder = async (req, res) => {
       isScheduled = true;
     } else if (!isWithinBusinessHours(new Date())) {
       return res.status(400).json({
-        msg: `El restaurante está cerrado ahora. Aceptamos pedidos de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00 — puedes programar tu pedido para más tarde.`,
+        msg: isRestaurantClosedDay(new Date())
+          ? "Hoy miércoles estamos cerrados. Puedes programar tu pedido para otro día, o pide de jueves a martes de 11:00 a 21:00."
+          : `El restaurante está cerrado ahora. Aceptamos pedidos de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00 — puedes programar tu pedido para más tarde.`,
       });
     }
 

@@ -102,10 +102,17 @@ after(async () => {
 });
 
 // Hora programada determinista: mañana a las 15:00 del reloj del servidor
-// (dentro del horario 11-21 sin importar a qué hora corra el CI).
+// (dentro del horario 11-21 sin importar a qué hora corra el CI). El
+// restaurante cierra los miércoles — si "mañana" cae en miércoles, se
+// salta al jueves para que esto nunca falle solo por la fecha en que
+// corra CI.
 function tomorrowAt15() {
-  const tomorrowKey = nextDateKey(dateKeyInTimeZone());
-  const [year, month, day] = tomorrowKey.split("-").map(Number);
+  let key = nextDateKey(dateKeyInTimeZone());
+  let [year, month, day] = key.split("-").map(Number);
+  if (new Date(Date.UTC(year, month - 1, day)).getUTCDay() === 3) {
+    key = nextDateKey(key);
+    [year, month, day] = key.split("-").map(Number);
+  }
   return zonedDateTimeToUtc({ year, month, day, hour: 15 }).toISOString();
 }
 
