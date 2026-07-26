@@ -152,6 +152,18 @@ test("el servidor responde", async () => {
   assert.equal(r.status, 200);
 });
 
+test("el resumen protegido informa el total de clientes registrados", async () => {
+  const expectedCustomers = await User.countDocuments({ role: "user" });
+  const managerResponse = await staffRequest("manager", "/api/staff/summary");
+
+  assert.equal(managerResponse.status, 200);
+  const summary = await managerResponse.json();
+  assert.equal(summary.registeredCustomers, expectedCustomers);
+
+  const cashierResponse = await staffRequest("cashier", "/api/staff/summary");
+  assert.equal(cashierResponse.status, 403);
+});
+
 test("crear orden valida: el precio lo pone el servidor, no el cliente", async () => {
   const attempt = customerAttempt("price");
   const r = await postJSON("/api/orders", {
