@@ -303,6 +303,34 @@ test("una orden invitada exige su token secreto para consultar y cancelar", asyn
   assert.equal(retried.status, 200);
 });
 
+test("el QR de seguimiento del kiosco puede autenticarse con ?ot= en vez del header", async () => {
+  const attempt = customerAttempt("kiosk-qr");
+  const created = await postJSON("/api/orders", {
+    base: "white_rice",
+    proteins: ["salmon"],
+    customer: "Cliente de kiosco",
+    phone: "6630000002",
+    scheduledPickupTime: tomorrowAt15(),
+    clientOrderId: attempt.clientOrderId,
+  }, { "X-Order-Token": attempt.orderToken });
+  assert.equal(created.status, 201);
+  const { order, orderToken } = await created.json();
+
+  // Sin token: no autorizado (simula abrir el link sin el query param).
+  const withoutToken = await fetch(`${BASE}/api/orders/${order._id}`);
+  assert.equal(withoutToken.status, 404);
+
+  // Token equivocado por query param: tampoco autorizado.
+  const wrongQueryToken = await fetch(`${BASE}/api/orders/${order._id}?ot=token-equivocado`);
+  assert.equal(wrongQueryToken.status, 404);
+
+  // Token correcto por query param (así llega desde el QR del kiosco, en un
+  // celular que nunca tuvo el header X-Order-Token guardado localmente).
+  const viaQuery = await fetch(`${BASE}/api/orders/${order._id}?ot=${orderToken}`);
+  assert.equal(viaQuery.status, 200);
+  assert.equal((await viaQuery.json()).order.customer, "Cliente de kiosco");
+});
+
 test("solo el dueño ve su orden y cancelar revierte puntos/promo exactamente una vez", async () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const ownerRegistration = await postJSON("/api/auth/register", {

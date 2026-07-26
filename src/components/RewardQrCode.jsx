@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import qrcode from "../vendor/qrcode-generator.js";
 
-export default function RewardQrCode({ value, className = "", size = 220 }) {
+export default function RewardQrCode({ value, className = "", size = 220, ariaLabel = "Código QR para guardar el premio" }) {
   const qrData = useMemo(() => {
     if (!value) return null;
 
@@ -32,7 +32,7 @@ export default function RewardQrCode({ value, className = "", size = 220 }) {
       height={size}
       viewBox={`${-quietZone} ${-quietZone} ${viewBoxSize} ${viewBoxSize}`}
       role="img"
-      aria-label="Código QR para guardar el premio"
+      aria-label={ariaLabel}
       shapeRendering="crispEdges"
     >
       <rect x={-quietZone} y={-quietZone} width={viewBoxSize} height={viewBoxSize} rx="2" fill="#ffffff" />

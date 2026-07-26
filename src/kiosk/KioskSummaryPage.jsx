@@ -97,7 +97,15 @@ export default function KioskSummaryPage() {
       const shortCode = data.order._id.slice(-6).toUpperCase();
       clearOrderSubmission("kiosk", submission.clientOrderId);
       resetOrder();
-      navigate("/kiosk/done", { replace: true, state: { shortCode, total: data.order.total } });
+      navigate("/kiosk/done", {
+        replace: true,
+        state: {
+          shortCode,
+          total: data.order.total,
+          orderId: data.order._id,
+          orderToken: submission.orderToken,
+        },
+      });
     } catch (e) {
       setSubmitError(e.message);
     } finally {

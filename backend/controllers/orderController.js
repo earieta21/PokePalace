@@ -28,9 +28,15 @@ const POINTS_PER_REWARD = 100;
 const REWARD_VALUE_MXN  = 25;
 const ORDER_TOKEN_HEADER = "x-order-token";
 
+// El header es el camino normal (mismo dispositivo que hizo el pedido). El
+// query param ?ot= solo se usa para el link/QR de seguimiento del kiosco,
+// donde el cliente abre la orden desde OTRO dispositivo (su celular) que
+// nunca tuvo el token guardado en su localStorage.
 const requestOrderToken = (req) => {
-  const value = req.get(ORDER_TOKEN_HEADER);
-  return typeof value === "string" && value.length <= 256 ? value.trim() : "";
+  const header = req.get(ORDER_TOKEN_HEADER);
+  if (typeof header === "string" && header.length <= 256) return header.trim();
+  const query = req.query?.ot;
+  return typeof query === "string" && query.length <= 256 ? query.trim() : "";
 };
 
 const customerCanAccessOrder = (req, order) => {
