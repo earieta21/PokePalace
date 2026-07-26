@@ -30,6 +30,55 @@
   flex-wrap: wrap;
 }
 
+.customerSection {
+  margin-bottom: 20px;
+}
+
+.customerCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 20px;
+  border: 1px solid rgba(74, 122, 90, 0.24);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(74, 122, 90, 0.12), rgba(255, 255, 255, 0.92)),
+    var(--p-surface);
+  box-shadow: var(--p-shadow);
+}
+
+.customerCard small,
+.customerCard strong {
+  display: block;
+}
+
+.customerCard small {
+  margin-bottom: 3px;
+  color: var(--p-g2);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.customerCard strong {
+  font-size: 16px;
+}
+
+.customerCard p {
+  margin: 3px 0 0;
+  color: var(--p-muted);
+  font-size: 11px;
+}
+
+.customerCard b {
+  color: var(--p-g2);
+  font-family: "DM Mono", monospace;
+  font-size: 34px;
+  line-height: 1;
+}
+
 .sectionTitle {
   display: flex;
   align-items: flex-end;
@@ -311,6 +360,16 @@
   .headerActions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .customerCard {
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .customerCard b {
+    font-size: 28px;
   }
 
   .dayBars {
