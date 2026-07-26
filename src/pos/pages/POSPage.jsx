@@ -21,13 +21,10 @@ const MENU = [
   { id: 1,  name: "Bowl de salmón esmeralda",        price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍣" },
   { id: 2,  name: "Bowl picante de atún crujiente",  price: BOWL_BASE_PRICE, category: "Bowls", icon: "🌶️" },
   { id: 3,  name: "Bowl tropical de camarón",        price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍤" },
-  { id: 4,  name: "Pulpo cítrico",                   price: BOWL_BASE_PRICE, category: "Bowls", icon: "🐙" },
   // Venta rapida sin ingredientes especificos - para cuando no da tiempo de
   // capturar el bowl personalizado completo (ej. fila larga).
   { id: 20, name: "Bowl mediano", price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗" },
   { id: 21, name: "Bowl grande",  price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🥗" },
-  { id: 6,  name: "Edamame",                 price:  69, category: "Entradas", icon: "🫛" },
-  { id: 8,  name: "Ensalada de Algas",       price:  79, category: "Entradas", icon: "🥗" },
   { id: 11, name: "Topochico",               price:  35, category: "Bebidas", icon: "🫧" },
   { id: 13, name: "Coca-Zero",               price:  30, category: "Bebidas", icon: "🥤" },
   { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
@@ -36,7 +33,7 @@ const MENU = [
   { id: 17, name: "Choco Rice Cake",          price:  35, category: "Extras", icon: "🍫" },
 ];
 
-const MENU_CATEGORIES = ["Todos", "Bowls", "Entradas", "Bebidas", "Extras"];
+const MENU_CATEGORIES = ["Todos", "Bowls", "Bebidas", "Extras"];
 
 const IVA = 0; // IVA incluido en precio
 

@@ -675,22 +675,22 @@ test("la jerarquía protege owner/admin y conserva los flujos de caja/cocina", a
   assert.equal((await staffRequest("kitchen", "/api/staff/orders?limit=1")).status, 200);
   assert.equal((await staffRequest("kitchen", "/api/staff/orders", {
     method: "POST",
-    body: { items: [{ catalogId: "edamame", qty: 1 }] },
+    body: { items: [{ catalogId: "coca-zero", qty: 1 }] },
   })).status, 403);
 });
 
 test("el POS calcula catálogo, deduplica reintentos y descuenta inventario una vez", async () => {
   const clientOrderId = `ci-pos-security:${Date.now()}:${Math.random().toString(16).slice(2)}`;
   const inventory = await Inventory.create({
-    item: `CI Security Edamame ${Date.now()}`,
+    item: `CI Security Coca-Zero ${Date.now()}`,
     unit: "porción",
     qty: 5,
     minQty: 0,
-    menuKeys: ["edamame"],
+    menuKeys: ["coca_zero"],
   });
   const payload = {
     clientOrderId,
-    items: [{ catalogId: "edamame", name: "Artículo manipulado", price: 0.01, qty: 2 }],
+    items: [{ catalogId: "coca-zero", name: "Artículo manipulado", price: 0.01, qty: 2 }],
     customer: "Mostrador CI",
     phone: "6630000001",
     fulfillment: "pickup",
@@ -700,10 +700,10 @@ test("el POS calcula catálogo, deduplica reintentos y descuenta inventario una 
   const created = await staffRequest("cashier", "/api/staff/orders", { method: "POST", body: payload });
   assert.equal(created.status, 201);
   const firstBody = await created.json();
-  assert.equal(firstBody.order.subtotal, 138);
-  assert.equal(firstBody.order.total, 138);
-  assert.equal(firstBody.order.items[0].name, "Edamame");
-  assert.equal(firstBody.order.items[0].price, 69);
+  assert.equal(firstBody.order.subtotal, 60);
+  assert.equal(firstBody.order.total, 60);
+  assert.equal(firstBody.order.items[0].name, "Coca-Zero");
+  assert.equal(firstBody.order.items[0].price, 30);
 
   const retried = await staffRequest("cashier", "/api/staff/orders", { method: "POST", body: payload });
   assert.equal(retried.status, 200);
@@ -803,22 +803,22 @@ test("el POS calcula catálogo, deduplica reintentos y descuenta inventario una 
   // debe completar inventario y conservar al cajero original.
   const recoveryId = `ci-pos-security:${Date.now()}:recovery`;
   const recoveryInventory = await Inventory.create({
-    item: `CI Security Edamame ${Date.now()}`,
+    item: `CI Security Coca-Zero ${Date.now()}`,
     unit: "porción",
     qty: 1,
     minQty: 0,
-    menuKeys: ["edamame"],
+    menuKeys: ["coca_zero"],
   });
   const stagedOrder = await Order.create({
     staffId: staffFixtures.cashier._id,
     clientOrderId: recoveryId,
-    items: [{ catalogId: "edamame", name: "Edamame", price: 69, qty: 1 }],
+    items: [{ catalogId: "coca-zero", name: "Coca-Zero", price: 30, qty: 1 }],
     customer: "Venta interrumpida CI",
     paymentMethod: "cash",
     paymentStatus: "paid",
     source: "pos",
-    subtotal: 69,
-    total: 69,
+    subtotal: 30,
+    total: 30,
     status: "pending",
   });
   const recovered = await staffRequest("manager", "/api/staff/orders", {
@@ -837,7 +837,7 @@ test("el POS calcula catálogo, deduplica reintentos y descuenta inventario una 
     method: "POST",
     body: {
       clientOrderId: `ci-pos-security:${Date.now()}:unknown`,
-      items: [{ id: 999, name: "Edamame", price: 1, qty: 1 }],
+      items: [{ id: 999, name: "Coca-Zero", price: 1, qty: 1 }],
     },
   });
   assert.equal(unknownProduct.status, 400);
@@ -847,19 +847,19 @@ test("el POS calcula catálogo, deduplica reintentos y descuenta inventario una 
   try {
     await StoreSettings.findOneAndUpdate(
       { key: "main" },
-      { $set: { unavailableItems: ["edamame"] } },
+      { $set: { unavailableItems: ["coca-zero"] } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
     const stalePos = await staffRequest("cashier", "/api/staff/orders", {
       method: "POST",
       body: {
         clientOrderId: unavailableClientOrderId,
-        items: [{ catalogId: "edamame", qty: 1 }],
+        items: [{ catalogId: "coca-zero", qty: 1 }],
         paymentMethod: "cash",
       },
     });
     assert.equal(stalePos.status, 409);
-    assert.deepEqual((await stalePos.json()).unavailableItems, ["edamame"]);
+    assert.deepEqual((await stalePos.json()).unavailableItems, ["coca-zero"]);
     assert.equal(await Order.exists({ clientOrderId: unavailableClientOrderId }), null);
   } finally {
     await StoreSettings.findOneAndUpdate(
@@ -896,7 +896,7 @@ test("el premio de topping extra deja una instrucción verificable para cocina",
       rewardCode,
       rewardTopping: "furikake",
       paymentMethod: "cash",
-      items: [{ catalogId: "edamame", qty: 1 }],
+      items: [{ catalogId: "coca-zero", qty: 1 }],
     },
   });
   assert.equal(withoutBowl.status, 400);

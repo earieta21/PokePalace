@@ -6,7 +6,6 @@ const PREP_ITEMS = [
   { name: "Edamame (sin vaina)",     target: 3,  done: 1  },
   { name: "Aguacate (rebanado)",     target: 10, done: 6  },
   { name: "Mango (en cubos)",        target: 3,  done: 3  },
-  { name: "Ensalada de Algas",       target: 5,  done: 2  },
   { name: "Salsa Ponzu (lote)",      target: 2,  done: 2  },
   { name: "Mayo Picante",            target: 2,  done: 1  },
 ];

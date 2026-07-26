@@ -50,7 +50,6 @@ const TRANSLATIONS = {
     "menu.emeraldSalmon": "Bowl de salmón esmeralda",
     "menu.spicyTuna": "Bowl picante de atún crujiente",
     "menu.tropicalShrimp": "Bowl tropical de camarón",
-    "menu.citrusOctopus": "Tofu cítrico",
 
     "order.next": "Siguiente",
     "order.selected": "Seleccionados",
@@ -108,8 +107,6 @@ const TRANSLATIONS = {
     "order.presetTropicalShrimp": "Tropical Camarón",
     "order.presetFreshLight": "Fresco y ligero",
     "order.presetSpicyTuna": "Atún Picante",
-    "order.presetCitrusOctopus": "Tofu Cítrico",
-    "order.presetCitrusTofu": "Tofu Cítrico",
     "order.presetFlavorful": "Con mucho sabor",
     "order.presetCustomizable": "Personalizable",
     "order.presetFromScratch": "o arma el tuyo desde cero",
@@ -370,7 +367,6 @@ const TRANSLATIONS = {
     "menu.emeraldSalmon": "Emerald Salmon Bowl",
     "menu.spicyTuna": "Spicy Tuna Crunch",
     "menu.tropicalShrimp": "Tropical Shrimp Bowl",
-    "menu.citrusOctopus": "Citrus Tofu",
 
     "order.next": "Next",
     "order.selected": "Selected",
@@ -428,8 +424,6 @@ const TRANSLATIONS = {
     "order.presetTropicalShrimp": "Tropical Shrimp",
     "order.presetFreshLight": "Fresh and light",
     "order.presetSpicyTuna": "Spicy Tuna",
-    "order.presetCitrusOctopus": "Citrus Tofu",
-    "order.presetCitrusTofu": "Citrus Tofu",
     "order.presetFlavorful": "Full of flavor",
     "order.presetCustomizable": "Customizable",
     "order.presetFromScratch": "or build yours from scratch",

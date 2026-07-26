@@ -57,17 +57,6 @@ const PRESETS = [
     sauces: ["sriracha", "spicy_mayo"],
     toppings: ["masago", "nori_strips"],
   },
-  {
-    id: "citrus_octopus",
-    nameKey: "order.presetCitrusTofu",
-    tagKey: "order.presetFreshLight",
-    base: "spring_mix",
-    proteins: ["tofu", "shrimp"],
-    bowlSize: "normal",
-    complements: ["cucumber", "beet", "avocado"],
-    sauces: ["citrus_dressing", "cilantro_dressing"],
-    toppings: ["sesame_seeds", "nori_strips"],
-  },
 ];
 
 function StepProgress({ step, t }) {

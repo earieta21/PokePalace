@@ -9,7 +9,6 @@ import styles from "./Home.module.css";
 import salmonBowl from "../assets/menu/emeraldSalmon.webp";
 import spicyTuna from "../assets/menu/spicyTuna.webp";
 import tropicalShrimp from "../assets/menu/tropicalShrimp.webp";
-import citrusTofu from "../assets/protein/tofu.jpg";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -36,13 +35,6 @@ const Home = () => {
       price: computeBowlSubtotal("normal"),
       image: tropicalShrimp,
       orderUrl: "/order?preset=tropical_shrimp",
-    },
-    {
-      id: "citrus_octopus",
-      name: t("menu.citrusOctopus"),
-      price: computeBowlSubtotal("normal"),
-      image: citrusTofu,
-      orderUrl: "/order?preset=citrus_octopus",
     },
   ];
 

@@ -1,7 +1,7 @@
 // Source of truth for products sold through the POS. The browser may display
 // these prices, but only this server-side catalog is used to charge an order.
 export const POS_CATALOG = Object.freeze([
-  // Los 4 bowls de la casa — mismos nombres y recetas que los presets del
+  // Los bowls de la casa — mismos nombres y recetas que los presets del
   // inicio del sitio (src/order/OrderPage.jsx PRESETS), todos a precio de
   // bowl normal.
   {
@@ -28,14 +28,6 @@ export const POS_CATALOG = Object.freeze([
       sweet_chili: 1, avocado_lime: 1, sesame_seeds: 1, crispy_onions: 1,
     },
   },
-  {
-    catalogId: "bowl-citrus-octopus", legacyId: 4, name: "Pulpo cítrico", price: 230, category: "bowls",
-    inventoryRecipe: {
-      spring_mix: 1, octopus: 1, shrimp: 1, citrus_marinade: 1,
-      cucumber: 1, mango: 1, avocado: 1,
-      avocado_lime: 1, soy_sauce: 1, sesame_seeds: 1, nori_strips: 1,
-    },
-  },
   // Venta rápida sin ingredientes específicos — para cobrar de una vez
   // cuando no da tiempo de capturar el bowl personalizado completo (ej.
   // fila larga). No trae inventoryRecipe a propósito: no se sabe qué
@@ -47,14 +39,6 @@ export const POS_CATALOG = Object.freeze([
   {
     catalogId: "bowl-grande-rapido", legacyId: 21, name: "Bowl grande", price: 250, category: "bowls",
     inventoryRecipe: {},
-  },
-  {
-    catalogId: "edamame", legacyId: 6, name: "Edamame", price: 69, category: "starters",
-    inventoryRecipe: { edamame: 1 },
-  },
-  {
-    catalogId: "seaweed-salad", legacyId: 8, name: "Ensalada de Algas", price: 79, category: "starters",
-    inventoryRecipe: { ensalada_de_algas: 1 },
   },
   {
     // Mantiene catalogId/legacyId de "Agua Mineral" para que las órdenes

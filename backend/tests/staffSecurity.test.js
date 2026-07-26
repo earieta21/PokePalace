@@ -103,9 +103,9 @@ test("el bowl mediano/grande de venta rapida cobra el precio correcto y no descu
   assert.deepEqual(getPosInventoryDemand({ items: [mediano, grande] }), {});
 });
 test("el POS mantiene compatibilidad por nombre exacto sin confiar en price", () => {
-  const [item] = resolvePosItems([{ name: "Edamame", price: 9999, qty: 1 }]);
-  assert.equal(item.catalogId, "edamame");
-  assert.equal(item.price, 69);
+  const [item] = resolvePosItems([{ name: "Coca-Zero", price: 9999, qty: 1 }]);
+  assert.equal(item.catalogId, "coca-zero");
+  assert.equal(item.price, 30);
 });
 
 test("el POS rechaza productos, ids y cantidades fuera del catálogo", () => {
@@ -114,25 +114,25 @@ test("el POS rechaza productos, ids y cantidades fuera del catálogo", () => {
     PosOrderValidationError
   );
   assert.throws(
-    () => resolvePosItems([{ id: 999, name: "Edamame", price: 1, qty: 1 }]),
+    () => resolvePosItems([{ id: 999, name: "Coca-Zero", price: 1, qty: 1 }]),
     PosOrderValidationError
   );
   assert.throws(
-    () => resolvePosItems([{ catalogId: "edamame", qty: 1.5 }]),
+    () => resolvePosItems([{ catalogId: "coca-zero", qty: 1.5 }]),
     PosOrderValidationError
   );
 });
 
 test("el POS agrupa productos repetidos y limita su cantidad total", () => {
   const [item] = resolvePosItems([
-    { catalogId: "edamame", qty: 2 },
-    { name: "Edamame", price: 0, qty: 3 },
+    { catalogId: "coca-zero", qty: 2 },
+    { name: "Coca-Zero", price: 0, qty: 3 },
   ]);
   assert.equal(item.qty, 5);
   assert.throws(
     () => resolvePosItems([
-      { catalogId: "edamame", qty: 60 },
-      { catalogId: "edamame", qty: 40 },
+      { catalogId: "coca-zero", qty: 60 },
+      { catalogId: "coca-zero", qty: 40 },
     ]),
     PosOrderValidationError
   );
@@ -141,7 +141,7 @@ test("el POS agrupa productos repetidos y limita su cantidad total", () => {
 test("el inventario POS multiplica qty y desglosa recetas de bowls predefinidos", () => {
   const items = resolvePosItems([
     { catalogId: "bowl-emerald-salmon", qty: 2 },
-    { catalogId: "edamame", qty: 3 },
+    { catalogId: "coca-zero", qty: 3 },
   ]);
   const demand = getPosInventoryDemand({ items });
 
@@ -149,8 +149,10 @@ test("el inventario POS multiplica qty y desglosa recetas de bowls predefinidos"
   assert.equal(demand.tuna, 2);
   assert.equal(demand.cucumber, 2);
   assert.equal(demand.soy_sauce, 2);
-  // Dos porciones dentro de los bowls, más tres entradas independientes.
-  assert.equal(demand.edamame, 5);
+  // El edamame viene solo de la receta del bowl (ya no hay producto edamame suelto).
+  assert.equal(demand.edamame, 2);
+  // Producto independiente sumado aparte.
+  assert.equal(demand.coca_zero, 3);
 });
 
 test("el inventario POS suma ingredientes compartidos del bowl personalizado", () => {
