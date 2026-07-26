@@ -134,6 +134,7 @@ export default function POSPage({ styles }) {
   const [menuSearch, setMenuSearch] = useState("");
   const [showCustomerDetails, setShowCustomerDetails] = useState(false);
   const [showReward, setShowReward] = useState(false);
+  const [showLoyalty, setShowLoyalty] = useState(false);
   const [rewardsCustomer, setRewardsCustomer] = useState(null);
   const [customerLookup, setCustomerLookup] = useState("");
   const [customerMatches, setCustomerMatches] = useState([]);
@@ -226,6 +227,7 @@ export default function POSPage({ styles }) {
     setRewardTopping("");
     setShowCustomerDetails(false);
     setShowReward(false);
+    setShowLoyalty(false);
     setRewardsCustomer(null);
     setCustomerLookup("");
     setCustomerMatches([]);
@@ -400,6 +402,7 @@ export default function POSPage({ styles }) {
     setRewardTopping("");
     setShowCustomerDetails(false);
     setShowReward(false);
+    setShowLoyalty(false);
     setRewardsCustomer(null);
     setCustomerLookup("");
     setCustomerMatches([]);
@@ -559,15 +562,20 @@ export default function POSPage({ styles }) {
             </div>
           </div>
 
+          <button
+            type="button"
+            className={ui.detailsToggle}
+            aria-expanded={showLoyalty || Boolean(rewardsCustomer)}
+            onClick={() => setShowLoyalty((visible) => !visible)}
+          >
+            <span>
+              <span className={ui.loyaltyIcon} aria-hidden="true">★</span>{" "}
+              {rewardsCustomer ? rewardsCustomer.name : "Cliente Rewards"} <small>Opcional · suma puntos</small>
+            </span>
+            <span>{(showLoyalty || rewardsCustomer) ? "−" : "+"}</span>
+          </button>
+          {(showLoyalty || rewardsCustomer) && (
           <section className={ui.loyaltyPanel} aria-label="Cliente Rewards">
-            <div className={ui.loyaltyHeading}>
-              <span className={ui.loyaltyIcon}>★</span>
-              <div>
-                <strong>Cliente Rewards</strong>
-                <small>Opcional · vincula la compra para sumar puntos</small>
-              </div>
-            </div>
-
             {rewardsCustomer ? (
               <div className={ui.loyaltySelected}>
                 <div>
@@ -618,6 +626,7 @@ export default function POSPage({ styles }) {
               </>
             )}
           </section>
+          )}
 
           <button type="button" className={ui.detailsToggle} aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails((visible) => !visible)}>
             <span>Cliente y notas <small>Opcional</small></span><span>{showCustomerDetails ? "−" : "+"}</span>
