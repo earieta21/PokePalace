@@ -14,12 +14,12 @@ export const REWARDS = [
   },
   {
     id: 2,
-    cost: 75,
-    icon: "✨",
-    name: { es: "Topping extra", en: "Extra topping" },
-    desc: { es: "Cualquier topping de tu elección", en: "Any topping of your choice" },
-    terms: { es: "Con la compra de un bowl. Un topping adicional.", en: "With a bowl purchase. One additional topping." },
-    type: "extra_topping",
+    cost: 100,
+    icon: "🍫",
+    name: { es: "Choco Rice Cake", en: "Choco Rice Cake" },
+    desc: { es: "Un Choco Rice Cake de cortesía", en: "A complimentary Choco Rice Cake" },
+    terms: { es: "Con la compra de un bowl. Agrega el Choco Rice Cake a la orden.", en: "With a bowl purchase. Add the Choco Rice Cake to the order." },
+    type: "free_snack",
   },
   {
     id: 4,

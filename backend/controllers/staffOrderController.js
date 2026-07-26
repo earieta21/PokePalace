@@ -821,6 +821,12 @@ export const createPosOrder = async (req, res) => {
           return res.status(400).json({ message: "Agrega el Agua del día a la orden" });
         }
         rewardDiscount = Math.min(...drinks.map((item) => item.price));
+      } else if (reward.type === "free_snack") {
+        const snacks = safeItems.filter((item) => item.rewardSnack);
+        if (!snacks.length) {
+          return res.status(400).json({ message: "Agrega el Choco Rice Cake a la orden" });
+        }
+        rewardDiscount = Math.min(...snacks.map((item) => item.price));
       } else if (reward.type === "extra_topping") {
         if (!safeRewardTopping) {
           return res.status(400).json({

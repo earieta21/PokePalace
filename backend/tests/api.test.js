@@ -917,85 +917,66 @@ test("el POS calcula catálogo, deduplica reintentos y descuenta inventario una 
   }
 });
 
-test("el premio de topping extra deja una instrucción verificable para cocina", async () => {
+test("el premio de Choco Rice Cake exige un bowl y el producto en la orden, y revierte al cancelar", async () => {
   const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const rewardCode = `CIPOSTOP${suffix}`;
+  const rewardCode = `CIPOSSNACK${suffix}`;
   const redemption = await Redemption.create({
     rewardId: 2,
-    rewardName: "Topping extra",
-    pointsCost: 75,
+    rewardName: "Choco Rice Cake",
+    pointsCost: 100,
     code: rewardCode,
     status: "active",
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-  });
-  const toppingInventory = await Inventory.create({
-    item: `CI Security Furikake ${suffix}`,
-    unit: "porción",
-    qty: 3,
-    minQty: 0,
-    menuKeys: ["furikake"],
   });
 
   const withoutBowl = await staffRequest("cashier", "/api/staff/orders", {
     method: "POST",
     body: {
-      clientOrderId: `ci-pos-security:${suffix}:topping-no-bowl`,
+      clientOrderId: `ci-pos-security:${suffix}:snack-no-bowl`,
       rewardCode,
-      rewardTopping: "furikake",
       paymentMethod: "cash",
-      items: [{ catalogId: "coca-zero", qty: 1 }],
+      items: [{ catalogId: "choco-rice-cake", qty: 1 }],
     },
   });
   assert.equal(withoutBowl.status, 400);
   assert.equal((await Redemption.findById(redemption._id)).status, "active");
 
-  const withoutSelection = await staffRequest("cashier", "/api/staff/orders", {
+  const withoutSnack = await staffRequest("cashier", "/api/staff/orders", {
     method: "POST",
     body: {
-      clientOrderId: `ci-pos-security:${suffix}:topping-no-selection`,
+      clientOrderId: `ci-pos-security:${suffix}:snack-missing`,
       rewardCode,
       paymentMethod: "cash",
-      base: "white_rice",
-      proteins: ["tuna", "salmon"],
+      items: [{ catalogId: "bowl-emerald-salmon", qty: 1 }],
     },
   });
-  assert.equal(withoutSelection.status, 400);
-  assert.match((await withoutSelection.json()).message, /Selecciona el topping extra/);
+  assert.equal(withoutSnack.status, 400);
+  assert.match((await withoutSnack.json()).message, /Agrega el Choco Rice Cake/);
   assert.equal((await Redemption.findById(redemption._id)).status, "active");
 
   const created = await staffRequest("cashier", "/api/staff/orders", {
     method: "POST",
     body: {
-      clientOrderId: `ci-pos-security:${suffix}:topping-ok`,
+      clientOrderId: `ci-pos-security:${suffix}:snack-ok`,
       rewardCode,
-      rewardTopping: "furikake",
       paymentMethod: "cash",
-      notes: "Sin cebolla",
-      base: "white_rice",
-      proteins: ["tuna", "salmon"],
-      toppings: ["furikake"],
+      items: [
+        { catalogId: "bowl-emerald-salmon", qty: 1 },
+        { catalogId: "choco-rice-cake", qty: 1 },
+      ],
     },
   });
   assert.equal(created.status, 201);
   const body = await created.json();
-  assert.equal(body.order.discountAmount, 0);
-  assert.equal(body.order.rewardExtraTopping, "furikake");
-  assert.match(body.order.notes, /Sin cebolla/);
-  assert.match(body.order.notes, /PREMIO REWARDS: agregar 1 porción extra de Furikake/);
+  assert.equal(body.order.discountAmount, 35);
+  assert.equal(body.order.total, 230);
   assert.equal((await Redemption.findById(redemption._id)).status, "used");
-  assert.equal((await Inventory.findById(toppingInventory._id)).qty, 1);
 
   const cancelled = await staffRequest("cashier", `/api/staff/orders/${body.order._id}/status`, {
     method: "PATCH",
     body: { status: "cancelled" },
   });
   assert.equal(cancelled.status, 200);
-  const restoredInventory = await Inventory.findById(toppingInventory._id)
-    .select("+deductedOrderIds +processedOrderIds +orderDeductions");
-  assert.equal(restoredInventory.qty, 3);
-  assert.deepEqual(restoredInventory.deductedOrderIds, []);
-  assert.deepEqual(restoredInventory.processedOrderIds, []);
-  assert.deepEqual(restoredInventory.orderDeductions, []);
   assert.equal((await Redemption.findById(redemption._id)).status, "active");
 });
 

@@ -30,7 +30,7 @@ const MENU = [
   { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
   { id: 15, name: "Agua del día",              price:  35, category: "Bebidas", icon: "🥤", rewardDrink: true },
   { id: 16, name: "Cacao Rice Cake",          price:  30, category: "Extras", icon: "🍫" },
-  { id: 17, name: "Choco Rice Cake",          price:  35, category: "Extras", icon: "🍫" },
+  { id: 17, name: "Choco Rice Cake",          price:  35, category: "Extras", icon: "🍫", rewardSnack: true },
 ];
 
 const MENU_CATEGORIES = ["Todos", "Bowls", "Bebidas", "Extras"];
@@ -265,9 +265,12 @@ export default function POSPage({ styles }) {
   const customRewardBowl = cart.find((i) => i.id === CUSTOM_BOWL_ID);
   const bowlLines = cart.filter((i) => /bowl/i.test(i.name));
   const drinkLines = cart.filter((item) => item.rewardDrink);
+  const snackLines = cart.filter((item) => item.rewardSnack);
   let rewardDiscount = 0;
   if (reward?.type === "free_drink" && bowlLines.length && drinkLines.length) {
     rewardDiscount = Math.min(...drinkLines.map((item) => item.price));
+  } else if (reward?.type === "free_snack" && bowlLines.length && snackLines.length) {
+    rewardDiscount = Math.min(...snackLines.map((item) => item.price));
   } else if (reward?.type === "double_protein" && customRewardBowl?.bowl?.proteins?.length >= 3) {
     rewardDiscount = 40;
   } else if (reward?.type === "free_bowl" && bowlLines.length) {

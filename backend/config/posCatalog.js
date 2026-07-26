@@ -64,7 +64,7 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: {},
   },
   {
-    catalogId: "choco-rice-cake", legacyId: 17, name: "Choco Rice Cake", price: 35, category: "extras",
+    catalogId: "choco-rice-cake", legacyId: 17, name: "Choco Rice Cake", price: 35, category: "extras", rewardSnack: true,
     inventoryRecipe: {},
   },
 ]);
@@ -137,6 +137,7 @@ export const resolvePosItems = (items) => {
       qty: combinedQty,
       category: catalogItem.category,
       rewardDrink: Boolean(catalogItem.rewardDrink),
+      rewardSnack: Boolean(catalogItem.rewardSnack),
     });
   }
 
