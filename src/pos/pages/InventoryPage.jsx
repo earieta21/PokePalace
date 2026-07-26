@@ -139,6 +139,7 @@ export default function InventoryPage({ styles, role }) {
   const [receiving, setReceiving]         = useState(false);
   const [receiveSearch, setReceiveSearch] = useState("");
   const [receiveQty, setReceiveQty]       = useState({}); // { itemId: "3.5" }
+  const [receiveCost, setReceiveCost]     = useState({}); // { itemId: "42.00" } — costo de ESTA compra, opcional
   const [receiveSaving, setReceiveSaving] = useState(false);
   const [receiveRequestId, setReceiveRequestId] = useState("");
 
@@ -244,6 +245,7 @@ export default function InventoryPage({ styles, role }) {
   const closeReceiving = () => {
     setReceiving(false);
     setReceiveQty({});
+    setReceiveCost({});
     setReceiveSearch("");
     setReceiveRequestId("");
   };
@@ -396,6 +398,11 @@ export default function InventoryPage({ styles, role }) {
     }));
   };
 
+  const updateReceiveCost = (id, value) => {
+    setReceiveRequestId("");
+    setReceiveCost((previous) => ({ ...previous, [id]: value }));
+  };
+
   const submitReceiving = async () => {
     const entries = Object.entries(receiveQty).filter(([, v]) => parseFloat(v) > 0);
     if (entries.length === 0) return;
@@ -406,7 +413,14 @@ export default function InventoryPage({ styles, role }) {
       if (!receiveRequestId) setReceiveRequestId(requestId);
       const result = await api.post("/api/staff/inventory/restock-batch", {
         requestId,
-        lines: entries.map(([itemId, value]) => ({ itemId, amount: parseFloat(value) })),
+        lines: entries.map(([itemId, value]) => {
+          const costValue = parseFloat(receiveCost[itemId]);
+          return {
+            itemId,
+            amount: parseFloat(value),
+            ...(costValue > 0 ? { cost: costValue } : {}),
+          };
+        }),
       });
       setItems((prev) => {
         const map = new Map(prev.map((i) => [i._id, i]));
@@ -415,6 +429,7 @@ export default function InventoryPage({ styles, role }) {
       });
       const spent = result.expenses.reduce((sum, expense) => sum + (expense?.amount || 0), 0);
       setReceiveQty({});
+      setReceiveCost({});
       setReceiveSearch("");
       setReceiveRequestId("");
       setReceiving(false);
@@ -576,6 +591,20 @@ export default function InventoryPage({ styles, role }) {
                               aria-label={`Cantidad recibida de ${row.item}`}
                             />
                             <span style={{ fontSize: 11, color: "var(--p-muted)", width: 34 }}>{row.unit}</span>
+                            {hasValue && (
+                              <label className={ui.receiveCostField}>
+                                <span>$</span>
+                                <input
+                                  type="number" min="0" step="0.01"
+                                  placeholder={row.cost > 0 ? row.cost.toFixed(2) : "costo"}
+                                  value={receiveCost[row._id] ?? ""}
+                                  onChange={(e) => updateReceiveCost(row._id, e.target.value)}
+                                  className={ui.receiveCostInput}
+                                  aria-label={`Costo por ${row.unit} de esta compra de ${row.item}`}
+                                />
+                                <span>/{row.unit}</span>
+                              </label>
+                            )}
                           </div>
                         );
                       })}
@@ -587,7 +616,7 @@ export default function InventoryPage({ styles, role }) {
           )}
 
           <div className={ui.receiveFooter}>
-            <span>2. Revisa las cantidades y guarda la recepción. Si el artículo tiene costo por unidad, el gasto se anota solo en Finanzas.</span>
+            <span>2. Si el precio cambió, captura el costo de esta compra (si lo dejas en blanco se usa el costo anterior). Revisa las cantidades y guarda la recepción — el gasto se anota solo en Finanzas.</span>
             <button className={styles.btnPrimary} disabled={pendingReceiveCount === 0 || receiveSaving} onClick={submitReceiving}>
               {receiveSaving ? "Guardando…" : `Guardar recepción${pendingReceiveCount > 0 ? ` (${pendingReceiveCount})` : ""}`}
             </button>

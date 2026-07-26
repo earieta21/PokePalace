@@ -548,6 +548,25 @@
   text-align: center;
 }
 
+.receiveCostField {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--p-muted);
+  font-size: 12px;
+}
+
+.receiveCostInput {
+  width: 68px;
+  padding: 6px;
+  border: 1px solid var(--p-g3);
+  border-radius: 6px;
+  outline: 0;
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  text-align: center;
+}
+
 .receiveFooter {
   display: flex;
   align-items: center;
