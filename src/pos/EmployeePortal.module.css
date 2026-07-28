@@ -637,59 +637,197 @@
 /* ══════════════════════════════
    KDS PAGE
 ══════════════════════════════ */
+.kdsPageHeader {
+  margin-bottom: 28px;
+}
+
+.kdsPageHeader .pageTitle {
+  font-size: 30px;
+}
+
+.kdsPageHeader .pageSubtitle {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
 .kdsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 24px;
+  align-items: start;
 }
 
 .kdsCard {
+  display: flex;
+  min-width: 0;
+  min-height: 500px;
+  flex-direction: column;
   background: var(--p-surface);
-  border-radius: var(--p-radius);
-  border: 1px solid var(--p-border);
-  box-shadow: var(--p-shadow);
+  border-radius: 16px;
+  border: 2px solid var(--p-border);
+  box-shadow: 0 10px 28px rgba(13, 27, 15, 0.11);
   overflow: hidden;
+}
+
+.kdsCardPending {
+  border-color: rgba(212, 160, 23, 0.52);
+  border-top: 8px solid #d4a017;
+  box-shadow: 0 12px 32px rgba(151, 104, 0, 0.16);
+}
+
+.kdsCardPreparing {
+  border-color: rgba(59, 130, 246, 0.42);
+  border-top: 8px solid #3b82f6;
 }
 
 .kdsCardReady {
   border-color: rgba(82, 183, 136, 0.4);
+  border-top: 8px solid #52b788;
 }
 
 .kdsHeader {
-  padding: 10px 14px;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  padding: 18px 20px;
   border-bottom: 1px solid var(--p-border);
-  background: rgba(13, 31, 20, 0.025);
+  background: rgba(13, 31, 20, 0.035);
 }
 
 .kdsNum {
   font-family: "DM Mono", monospace;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
   color: var(--p-ink);
+}
+
+.kdsHeader .badge {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .kdsTimer {
+  justify-self: end;
   font-family: "DM Mono", monospace;
-  font-size: 11px;
-  color: var(--p-muted);
+  font-size: 15px;
+  font-weight: 800;
+  color: #405347;
+  text-align: right;
 }
 
 .kdsBody {
-  padding: 12px 14px;
+  flex: 1;
+  padding: 22px 24px 24px;
+}
+
+.kdsCustomerLabel,
+.kdsItemsTitle,
+.kdsCriticalNote span {
+  color: var(--p-muted);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.kdsCustomerLabel {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.kdsCustomer {
+  margin: 0 0 10px;
+  color: var(--p-ink);
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.kdsMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 0 18px;
+}
+
+.kdsMeta span {
+  padding: 6px 9px;
+  border: 1px solid rgba(45, 106, 79, 0.18);
+  border-radius: 999px;
+  background: rgba(45, 106, 79, 0.07);
+  color: #375443;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.kdsCriticalNote {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 16px;
+  padding: 15px 16px;
+  border: 1px solid rgba(217, 119, 6, 0.45);
+  border-left: 5px solid #d97706;
+  border-radius: 11px;
+  background: #fff8e8;
+  color: #713f12;
+}
+
+.kdsCriticalNote strong {
+  overflow-wrap: anywhere;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.kdsItems {
+  padding: 5px 0 0;
+}
+
+.kdsItemsTitle {
+  margin: 0;
+  padding: 0 0 7px;
 }
 
 .kdsItem {
-  font-size: 12.5px;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(105px, 0.72fr) minmax(0, 1.28fr);
+  align-items: start;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(45, 106, 79, 0.13);
   color: var(--p-ink);
-  padding: 4px 0;
-  border-bottom: 1px solid rgba(45, 106, 79, 0.06);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  line-height: 1.4;
+}
+
+.kdsItem > span {
+  color: #52675a;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.kdsItem > strong {
+  overflow-wrap: anywhere;
+  color: var(--p-ink);
+  font-size: 17px;
+  font-weight: 850;
+}
+
+.kdsItem > .kdsItemQuantity {
+  justify-self: end;
+  min-width: 52px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(45, 106, 79, 0.12);
+  color: var(--p-g1);
+  font-family: "DM Mono", monospace;
+  font-size: 19px;
+  text-align: center;
 }
 
 .kdsItem:last-child {
@@ -708,11 +846,12 @@
 }
 
 .kdsFooter {
-  padding: 10px 14px;
+  padding: 16px 20px 20px;
   border-top: 1px solid var(--p-border);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  background: rgba(13, 31, 20, 0.018);
 }
 
 .kdsBtnCancel {
@@ -785,14 +924,15 @@
 
 .kdsBtnReady {
   width: 100%;
-  padding: 13px 8px;
+  min-height: 58px;
+  padding: 16px 12px;
   background: var(--p-g2);
   color: #fff;
   border: none;
   border-radius: var(--p-radius-sm);
   font-family: "Inter", sans-serif;
-  font-size: 13.5px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 850;
   letter-spacing: 0.2px;
   cursor: pointer;
   transition: opacity 130ms, transform 100ms;
@@ -811,6 +951,40 @@
   box-shadow: none;
   font-size: 12.5px;
   font-weight: 600;
+}
+
+.kdsReadyMessage {
+  display: block;
+  padding: 13px 8px;
+  color: var(--p-muted);
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.kdsNewOrderAlert {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 16px 30px;
+  transform: translateX(-50%);
+  border: 3px solid rgba(255, 255, 255, 0.72);
+  border-radius: 16px;
+  background: #087f5b;
+  color: #fff;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.34);
+  font-size: 20px;
+  font-weight: 900;
+  animation: alertIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.kdsNewOrderAlert > span {
+  font-size: 28px;
 }
 
 /* ══════════════════════════════
@@ -1350,6 +1524,10 @@
     grid-template-columns: 1fr;
   }
 
+  .kdsGrid {
+    grid-template-columns: 1fr;
+  }
+
   .finRow {
     grid-template-columns: 1fr;
   }
@@ -1370,5 +1548,41 @@
 
   .formRow {
     grid-template-columns: 1fr;
+  }
+
+  .kdsCard {
+    min-height: 0;
+  }
+
+  .kdsHeader {
+    grid-template-columns: auto 1fr;
+    padding: 16px;
+  }
+
+  .kdsTimer {
+    grid-column: 1 / -1;
+    justify-self: start;
+    text-align: left;
+  }
+
+  .kdsBody {
+    padding: 18px 16px 20px;
+  }
+
+  .kdsItem {
+    grid-template-columns: minmax(90px, 0.62fr) minmax(0, 1.38fr);
+    gap: 12px;
+  }
+
+  .kdsFooter {
+    padding: 14px 16px 16px;
+  }
+
+  .kdsNewOrderAlert {
+    top: 12px;
+    width: calc(100% - 24px);
+    justify-content: center;
+    padding: 14px 18px;
+    font-size: 17px;
   }
 }

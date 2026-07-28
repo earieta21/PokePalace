@@ -33,30 +33,52 @@ function orderLines(order) {
   const lines = [];
 
   if (order.items?.length) {
-    lines.push(...order.items.map((i) => `${i.name} ×${i.qty}`));
+    lines.push(...order.items.map((i) => ({
+      label: i.name,
+      value: `×${i.qty}`,
+      quantity: true,
+    })));
   }
 
   const label = (map, id) => map[id] ?? id;
 
   if (order.base) {
-    lines.push(`Base: ${label(BASE_LABELS, order.base)}`);
+    lines.push({ label: "Base", value: label(BASE_LABELS, order.base) });
     if (order.proteins?.length) {
-      lines.push(`Proteínas: ${order.proteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
+      lines.push({
+        label: "Proteínas",
+        value: order.proteins.map((id) => label(PROTEIN_LABELS, id)).join(", "),
+      });
     } else if (order.protein) {
-      lines.push(`Proteína: ${order.protein}`);
+      lines.push({ label: "Proteína", value: order.protein });
     }
-    lines.push(order.bowlSize === "large" ? "Bowl grande" : "Bowl normal");
+    lines.push({
+      label: "Tamaño",
+      value: order.bowlSize === "large" ? "Bowl grande" : "Bowl normal",
+    });
     if (order.marinades?.length)
-      lines.push(`Marinados: ${order.marinades.map((id) => label(MARINADE_LABELS, id)).join(", ")}`);
+      lines.push({
+        label: "Marinados",
+        value: order.marinades.map((id) => label(MARINADE_LABELS, id)).join(", "),
+      });
     if (order.complements?.length)
-      lines.push(`Complementos: ${order.complements.map((id) => label(COMPLEMENT_LABELS, id)).join(", ")}`);
+      lines.push({
+        label: "Complementos",
+        value: order.complements.map((id) => label(COMPLEMENT_LABELS, id)).join(", "),
+      });
     if (order.sauces?.length)
-      lines.push(`Salsas: ${order.sauces.map((id) => label(SAUCE_LABELS, id)).join(", ")}`);
+      lines.push({
+        label: "Salsas",
+        value: order.sauces.map((id) => label(SAUCE_LABELS, id)).join(", "),
+      });
     if (order.toppings?.length)
-      lines.push(`Toppings: ${order.toppings.map((id) => label(TOPPING_LABELS, id)).join(", ")}`);
+      lines.push({
+        label: "Toppings",
+        value: order.toppings.map((id) => label(TOPPING_LABELS, id)).join(", "),
+      });
   }
 
-  return lines.length ? lines : ["Bowl personalizado"];
+  return lines.length ? lines : [{ label: "Producto", value: "Bowl personalizado" }];
 }
 
 function elapsed(createdAt) {
@@ -194,15 +216,8 @@ export default function KDSPage({ styles, role }) {
 
       {/* New order alert toast */}
       {alertCount > 0 && (
-        <div style={{
-          position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)",
-          zIndex: 9999, background: "#10b981", color: "#fff",
-          padding: "12px 24px", borderRadius: 999,
-          fontWeight: 800, fontSize: 15, boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-          display: "flex", alignItems: "center", gap: 8,
-          animation: "alertIn 0.3s cubic-bezier(0.34,1.56,0.64,1)",
-        }}>
-          <span style={{ fontSize: 20 }}>🛎</span>
+        <div className={styles.kdsNewOrderAlert}>
+          <span aria-hidden="true">🛎</span>
           {alertCount === 1 ? "¡Pedido nuevo!" : `¡${alertCount} pedidos nuevos!`}
           <style>{`
             @keyframes alertIn {
@@ -213,7 +228,7 @@ export default function KDSPage({ styles, role }) {
         </div>
       )}
 
-      <div className={styles.pageHeader}>
+      <div className={`${styles.pageHeader} ${styles.kdsPageHeader}`}>
         <div>
           <h1 className={styles.pageTitle}>Pantalla de Cocina</h1>
           <p className={styles.pageSubtitle}>
@@ -246,32 +261,55 @@ export default function KDSPage({ styles, role }) {
               "Cliente";
 
             return (
-              <div key={order._id} className={`${styles.kdsCard} ${isReady ? styles.kdsCardReady : ""}`}>
+              <div
+                key={order._id}
+                className={[
+                  styles.kdsCard,
+                  order.status === "pending" ? styles.kdsCardPending : "",
+                  order.status === "preparing" ? styles.kdsCardPreparing : "",
+                  isReady ? styles.kdsCardReady : "",
+                ].filter(Boolean).join(" ")}
+              >
                 <div className={styles.kdsHeader}>
                   <span className={styles.kdsNum}>#{order._id.slice(-5).toUpperCase()}</span>
                   <span className={`${styles.badge} ${styles[cfg.cls]}`}>{cfg.label}</span>
                   <span className={styles.kdsTimer}>{elapsed(order.createdAt)}</span>
                 </div>
                 <div className={styles.kdsBody}>
-                  <p style={{ fontSize: 11, color: "var(--p-muted)", marginBottom: 6 }}>{cliente}</p>
-                  <p style={{ fontSize: 11, color: "var(--p-muted)", marginBottom: 8 }}>
-                    {FULFILLMENT_LABEL[order.fulfillment] ?? "Recoger"}
-                    {order.phone ? ` · ${order.phone}` : ""}
-                    {order.paymentMethod ? ` · ${PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod}` : ""}
-                  </p>
+                  <span className={styles.kdsCustomerLabel}>Cliente</span>
+                  <p className={styles.kdsCustomer}>{cliente}</p>
+                  <div className={styles.kdsMeta}>
+                    <span>{FULFILLMENT_LABEL[order.fulfillment] ?? "Recoger"}</span>
+                    {order.phone && <span>{order.phone}</span>}
+                    {order.paymentMethod && (
+                      <span>{PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod}</span>
+                    )}
+                  </div>
                   {order.notes && (
-                    <p style={{ fontSize: 12, color: "var(--p-text)", marginBottom: 8, fontWeight: 700 }}>
-                      Nota: {order.notes}
-                    </p>
+                    <div className={styles.kdsCriticalNote}>
+                      <span>Indicaciones especiales</span>
+                      <strong>{order.notes}</strong>
+                    </div>
                   )}
-                  {lines.map((line) => (
-                    <div key={line} className={styles.kdsItem}><span>{line}</span></div>
-                  ))}
+                  <div className={styles.kdsItems}>
+                    <p className={styles.kdsItemsTitle}>Preparar</p>
+                    {lines.map((line, index) => (
+                      <div
+                        key={`${order._id}-${index}-${line.label}-${line.value}`}
+                        className={styles.kdsItem}
+                      >
+                        <span>{line.label}</span>
+                        <strong className={line.quantity ? styles.kdsItemQuantity : ""}>
+                          {line.value}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div className={styles.kdsFooter}>
                   {isReady ? (
                     isKitchenOnly ? (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--p-muted)" }}>
+                      <span className={styles.kdsReadyMessage}>
                         Esperando entrega en caja
                       </span>
                     ) : (
