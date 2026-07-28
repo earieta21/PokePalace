@@ -7,7 +7,7 @@ import ComplementsSelection from "./ComplementsSelection";
 import SauceSelection from "./SauceSelection";
 import ToppingsSelection from "./ToppingsSelection";
 import { useOrder } from "./OrderContext";
-import { ITEM_LABELS } from "./OrderLabels";
+import { ITEM_LABELS, getBaseLabel } from "./OrderLabels";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "./pricing";
 import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -166,7 +166,7 @@ function BowlMiniSummary({ order, step, language, t }) {
   const countLabel = (count, oneKey, manyKey) => t(count === 1 ? oneKey : manyKey, { count });
 
   if (order.base) {
-    parts.push({ icon: "🍚", text: labels.base[order.base] || order.base });
+    parts.push({ icon: "🍚", text: getBaseLabel(order.bases, order.base, language) });
   }
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
     const names = order.proteins.map((id) => labels.protein[id] || id);

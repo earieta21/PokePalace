@@ -10,6 +10,8 @@ import brownRice from "../assets/base/brownRice.webp";
 import quinoa from "../assets/base/quinoa.webp";
 import mixedGreens from "../assets/base/mixedGreens.webp";
 
+const MAX_BASES = 2;
+
 const BaseSelection = ({ onNext, onBack }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
@@ -22,18 +24,31 @@ const BaseSelection = ({ onNext, onBack }) => {
     { id: "brown_rice", image: brownRice, comingSoon: true },
   ];
 
-  const [selectedBase, setSelectedBase] = useState(order.base || null);
+  const [selectedBases, setSelectedBases] = useState(() => {
+    if (Array.isArray(order.bases) && order.bases.length > 0) return order.bases;
+    return order.base ? [order.base] : [];
+  });
   const [error, setError] = useState("");
 
   const handleSelection = (baseId) => {
-    const nextBase = selectedBase === baseId ? null : baseId;
-    setSelectedBase(nextBase);
-    updateOrder("base", nextBase);
-    setError("");
+    setSelectedBases((prev) => {
+      const isRemoving = prev.includes(baseId);
+      if (!isRemoving && prev.length >= MAX_BASES) {
+        setError(t("order.baseMaxError"));
+        return prev;
+      }
+      const next = isRemoving ? prev.filter((id) => id !== baseId) : [...prev, baseId];
+      updateOrder("bases", next);
+      // `base` se conserva como la primera elegida — así lo que solo lee un
+      // valor (favoritos, tickets viejos) sigue funcionando sin cambios.
+      updateOrder("base", next[0] || "");
+      setError("");
+      return next;
+    });
   };
 
   const handleNext = () => {
-    if (!selectedBase) {
+    if (selectedBases.length < 1) {
       setError(t("order.baseError"));
       return;
     }
@@ -50,10 +65,14 @@ const BaseSelection = ({ onNext, onBack }) => {
           </p>
         </div>
 
+        <div className={styles.selectionInfo}>
+          <span>{t("order.baseHint", { max: MAX_BASES })}</span>
+        </div>
+
         <div className={styles.grid}>
           {bases.map((base) => {
             const name = getItemLabel("base", base.id, language);
-            const isSelected = selectedBase === base.id;
+            const isSelected = selectedBases.includes(base.id);
             const isUnavailable = base.comingSoon || unavailableItems.includes(base.id);
             const isSelectionBlocked = isUnavailable && !isSelected;
             return (

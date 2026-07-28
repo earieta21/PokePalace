@@ -172,6 +172,17 @@ test("el inventario POS suma ingredientes compartidos del bowl personalizado", (
   assert.equal(demand.sesame_seeds, 3);
 });
 
+test("un bowl mitad y mitad reparte la porción de base entre las 2 elegidas", () => {
+  const demand = getPosInventoryDemand({
+    bases: ["white_rice", "quinoa"],
+    proteins: ["tuna"],
+  });
+
+  assert.equal(demand.white_rice, 0.5);
+  assert.equal(demand.quinoa, 0.5);
+  assert.equal(demand.tuna, 1);
+});
+
 test("el servidor detecta productos e ingredientes agotados aunque el POS esté desactualizado", () => {
   const items = resolvePosItems([
     { catalogId: "bowl-tropical-shrimp", qty: 1 },

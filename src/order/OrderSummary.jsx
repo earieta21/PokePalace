@@ -8,6 +8,7 @@ import styles from "./OrderSummary.module.css";
 
 import {
   ITEM_LABELS,
+  getBaseLabel,
 } from "./OrderLabels";
 
 const OrderSummary = ({
@@ -27,6 +28,7 @@ const OrderSummary = ({
 
   const {
     base = "",
+    bases = [],
     protein = "",
     proteins = [],
     marinades = [],
@@ -99,11 +101,6 @@ const OrderSummary = ({
   const prettifyId = (value) => {
     if (!value || typeof value !== "string") return t("summary.empty");
     return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  };
-
-  const getLabel = (map, value) => {
-    if (!value) return t("summary.empty");
-    return map?.[value] || prettifyId(value);
   };
 
   const getListLabels = (map, values = []) => {
@@ -297,7 +294,7 @@ const OrderSummary = ({
         <Section
           icon="🍚"
           title={t("summary.base")}
-          value={getLabel(labels.base, base)}
+          value={getBaseLabel(bases, base, language) || t("summary.empty")}
           onEdit={() => onEditStep(0)}
         />
 

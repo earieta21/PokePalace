@@ -12,6 +12,7 @@ const filterAvailable = (list, unavailableSet) =>
 
 const blankOrder = () => ({
   base: "",
+  bases: [],
   protein: "",
   proteins: [],
   bowlSize: "normal",
@@ -67,9 +68,16 @@ export const OrderProvider = ({ children }) => {
   const loadFavorite = useCallback((favorite) => {
     const unavailable = new Set(unavailableItems);
     const proteins = filterAvailable(favorite.proteins, unavailable);
+    // Los favoritos guardados antes de "mitad y mitad" solo traen `base`
+    // (string) — se envuelve en un arreglo de 1 para tratarlo igual.
+    const favoriteBases = Array.isArray(favorite.bases) && favorite.bases.length > 0
+      ? favorite.bases
+      : favorite.base ? [favorite.base] : [];
+    const bases = filterAvailable(favoriteBases, unavailable);
     setOrder((prevOrder) => ({
       ...prevOrder,
-      base: favorite.base && !unavailable.has(favorite.base) ? favorite.base : "",
+      base: bases[0] || "",
+      bases,
       proteins,
       protein: proteins.join(", "),
       // Se recalcula a partir de las proteínas que sobrevivieron el filtro
@@ -89,9 +97,14 @@ export const OrderProvider = ({ children }) => {
   const reorder = useCallback((pastOrder) => {
     const unavailable = new Set(unavailableItems);
     const proteins = filterAvailable(pastOrder.proteins, unavailable);
+    const pastBases = Array.isArray(pastOrder.bases) && pastOrder.bases.length > 0
+      ? pastOrder.bases
+      : pastOrder.base ? [pastOrder.base] : [];
+    const bases = filterAvailable(pastBases, unavailable);
     setOrder((prev) => ({
       ...prev,
-      base: pastOrder.base && !unavailable.has(pastOrder.base) ? pastOrder.base : "",
+      base: bases[0] || "",
+      bases,
       proteins,
       protein: proteins.join(", "),
       bowlSize: proteins.length === 3 ? "large" : "normal",

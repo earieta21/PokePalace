@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
 import { GOOGLE_REVIEW_URL } from "../config";
-import { getItemLabel } from "../order/OrderLabels";
+import { getItemLabel, getBaseLabel } from "../order/OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import { clearActiveOrder, getOrderAccessToken, saveActiveOrder } from "../utils/orderAccess";
 import styles from "./OrderTracking.module.css";
@@ -492,7 +492,7 @@ export default function OrderTracking() {
       <section className={styles.section}>
         <p className={styles.sectionTitle}>{t("tracking.yourBowl")}</p>
         <div className={styles.detailCard}>
-          {order.base && <DetailRow label={t("common.base")} value={getItemLabel("base", order.base, language)} />}
+          {order.base && <DetailRow label={t("common.base")} value={getBaseLabel(order.bases, order.base, language)} />}
           {getProteinsText(order, language) && <DetailRow label={t("common.proteins")} value={getProteinsText(order, language)} />}
           <DetailRow label={t("tracking.size")} value={order.bowlSize === "large" ? t("summary.large") : t("summary.normal")} />
           {order.marinades?.length > 0 && <DetailRow label={t("summary.marinades")} value={order.marinades.map((id) => getItemLabel("marinade", id, language)).join(", ")} />}

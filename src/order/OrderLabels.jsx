@@ -263,3 +263,18 @@ export const getItemDescription = (category, id, language = "es") =>
   ITEM_DESCRIPTIONS[language]?.[category]?.[id]
   || ITEM_DESCRIPTIONS.es?.[category]?.[id]
   || "";
+
+// Junta 1 o 2 bases en una sola etiqueta legible — "Arroz Blanco" o
+// "Arroz Blanco + Quinoa (mitad y mitad)" cuando el bowl es mitad y mitad.
+export const getBaseLabel = (bases, base, language = "es") => {
+  const list = Array.isArray(bases) && bases.length > 0
+    ? bases
+    : base
+      ? [base]
+      : [];
+  if (list.length === 0) return "";
+  const names = list.map((id) => getItemLabel("base", id, language));
+  if (names.length < 2) return names[0] || "";
+  const suffix = language === "en" ? " (half & half)" : " (mitad y mitad)";
+  return `${names.join(" + ")}${suffix}`;
+};

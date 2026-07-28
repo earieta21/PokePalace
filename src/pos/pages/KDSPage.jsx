@@ -40,7 +40,10 @@ function orderLines(order) {
   const label = (map, id) => map[id] ?? id;
 
   if (order.base) {
-    lines.push(`Base: ${label(BASE_LABELS, order.base)}`);
+    const baseText = order.bases?.length > 1
+      ? `${order.bases.map((id) => label(BASE_LABELS, id)).join(" + ")} (mitad y mitad)`
+      : label(BASE_LABELS, order.base);
+    lines.push(`Base: ${baseText}`);
     if (order.proteins?.length) {
       lines.push(`Proteínas: ${order.proteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
     } else if (order.protein) {

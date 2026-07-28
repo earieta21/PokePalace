@@ -268,6 +268,7 @@ export const createOrder = async (req, res) => {
 
     const {
       base,
+      bases,
       protein,
       proteins,
       marinades,
@@ -288,6 +289,7 @@ export const createOrder = async (req, res) => {
     try {
       safeBowl = sanitizeCustomerBowl({
         base,
+        bases,
         protein,
         proteins,
         marinades,
@@ -392,6 +394,7 @@ export const createOrder = async (req, res) => {
       paymentStatus: "pending",
       source: "online",
       base: safeBowl.base,
+      bases: safeBowl.bases,
       protein: selectedProteins.join(", "),
       proteins: selectedProteins,
       bowlSize: resolvedBowlSize,

@@ -289,7 +289,14 @@ const addDemand = (demand, key, amount = 1) => {
 export const getPosInventoryDemand = (order = {}) => {
   const demand = new Map();
 
-  if (order.base) addDemand(demand, order.base);
+  // "Mitad y mitad" reparte la porción normal de base entre las 2 elegidas
+  // (0.5 c/u) en vez de sumar una porción completa de cada una.
+  if (Array.isArray(order.bases) && order.bases.length > 0) {
+    const portion = 1 / order.bases.length;
+    for (const key of order.bases) addDemand(demand, key, portion);
+  } else if (order.base) {
+    addDemand(demand, order.base);
+  }
   for (const field of ["proteins", "marinades", "complements", "sauces", "toppings", "extraScoopProteins"]) {
     for (const key of Array.isArray(order[field]) ? order[field] : []) addDemand(demand, key);
   }

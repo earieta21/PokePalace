@@ -17,6 +17,10 @@ const orderSchema = new mongoose.Schema(
 
     // Bowl-builder fields (customer orders)
     base:        { type: String, default: null },
+    // Cuando el cliente pide "mitad y mitad", trae las 2 bases elegidas —
+    // `base` sigue guardando la primera para no romper a quien solo lea ese
+    // campo (KDS viejo, reportes, etc.).
+    bases:       { type: [String], default: [] },
     protein:     { type: String, default: null },
     proteins:    { type: [String], default: [] },
     bowlSize:    { type: String, enum: ["normal", "large"], default: "normal" },

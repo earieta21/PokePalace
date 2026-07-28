@@ -51,6 +51,7 @@ const normalizeExtraScoops = (value, chosenProteins) => {
 
 export function sanitizeCustomerBowl({
   base,
+  bases,
   protein,
   proteins,
   complements,
@@ -58,9 +59,22 @@ export function sanitizeCustomerBowl({
   toppings,
   extraScoopProteins,
 }) {
-  if (typeof base !== "string" || !BOWL_CATALOG.base.has(base)) {
+  // "Mitad y mitad" manda 2 bases en `bases`; los pedidos normales (y los
+  // clientes viejos que solo conocen `base`) siguen mandando 1 sola.
+  const baseInput = Array.isArray(bases) && bases.length > 0
+    ? bases
+    : typeof base === "string" && base
+      ? [base]
+      : [];
+  if (
+    baseInput.length === 0 ||
+    baseInput.length > 2 ||
+    new Set(baseInput).size !== baseInput.length ||
+    baseInput.some((id) => typeof id !== "string" || !BOWL_CATALOG.base.has(id))
+  ) {
     throw new TypeError("Selecciona una base válida");
   }
+  const safeBases = [...baseInput];
   const proteinInput = Array.isArray(proteins)
     ? proteins
     : typeof protein === "string" && protein
@@ -70,7 +84,8 @@ export function sanitizeCustomerBowl({
   if (safeProteins.length < 1) throw new TypeError("Selecciona al menos 1 proteína");
 
   return {
-    base,
+    base: safeBases[0],
+    bases: safeBases,
     proteins: safeProteins,
     // Los marinados ya no forman parte del armador — cualquier valor
     // enviado por el cliente (favoritos o pedidos repetidos antiguos) se
@@ -102,7 +117,7 @@ export function findUnavailableCustomerBowlItems(bowl, unavailableItems) {
     unavailableItems.filter((item) => typeof item === "string")
   );
   const selectedIds = [
-    bowl.base,
+    ...(Array.isArray(bowl.bases) && bowl.bases.length > 0 ? bowl.bases : [bowl.base]),
     ...(Array.isArray(bowl.proteins) ? bowl.proteins : []),
     ...(Array.isArray(bowl.complements) ? bowl.complements : []),
     ...(Array.isArray(bowl.sauces) ? bowl.sauces : []),

@@ -126,6 +126,45 @@ test("el pedido público acepta atún sellado y cobra su extra de 20 pesos", () 
   );
 });
 
+test("mitad y mitad acepta 2 bases distintas y guarda la primera en `base` por compatibilidad", () => {
+  const bowl = sanitizeCustomerBowl({
+    bases: ["white_rice", "quinoa"],
+    proteins: ["salmon"],
+  });
+  assert.deepEqual(bowl.bases, ["white_rice", "quinoa"]);
+  assert.equal(bowl.base, "white_rice");
+});
+
+test("mitad y mitad rechaza más de 2 bases, bases repetidas o ids inválidos", () => {
+  assert.throws(
+    () => sanitizeCustomerBowl({ bases: ["white_rice", "quinoa", "spring_mix"], proteins: ["salmon"] }),
+    /base válida/
+  );
+  assert.throws(
+    () => sanitizeCustomerBowl({ bases: ["white_rice", "white_rice"], proteins: ["salmon"] }),
+    /base válida/
+  );
+  assert.throws(
+    () => sanitizeCustomerBowl({ bases: ["white_rice", "arroz"], proteins: ["salmon"] }),
+    /base válida/
+  );
+  assert.throws(
+    () => sanitizeCustomerBowl({ bases: [], proteins: ["salmon"] }),
+    /base válida/
+  );
+});
+
+test("la disponibilidad del servidor revisa las 2 bases de un bowl mitad y mitad", () => {
+  const bowl = sanitizeCustomerBowl({
+    bases: ["white_rice", "quinoa"],
+    proteins: ["salmon"],
+  });
+
+  assert.deepEqual(findUnavailableCustomerBowlItems(bowl, ["quinoa"]), ["quinoa"]);
+  assert.deepEqual(findUnavailableCustomerBowlItems(bowl, ["white_rice", "quinoa"]).sort(), ["quinoa", "white_rice"]);
+  assert.deepEqual(findUnavailableCustomerBowlItems(bowl, ["spring_mix"]), []);
+});
+
 test("la disponibilidad del servidor cubre cada sección con los mismos ids del cliente", () => {
   const bowl = sanitizeCustomerBowl({
     base: "white_rice",

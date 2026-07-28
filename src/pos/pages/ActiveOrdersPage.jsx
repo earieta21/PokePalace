@@ -33,7 +33,8 @@ function itemSummary(order) {
     const parts = [];
     if (order.proteins?.length) parts.push(order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", "));
     else if (order.protein) parts.push(order.protein);
-    parts.push(`en ${order.base}`);
+    const baseText = order.bases?.length > 1 ? order.bases.join(" + ") : order.base;
+    parts.push(`en ${baseText}`);
     const size = order.bowlSize === "large" ? "Bowl grande" : "Bowl normal";
     segments.push(`${size}: ${parts.join(" ")}`);
   }
