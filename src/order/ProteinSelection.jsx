@@ -102,7 +102,7 @@ const ProteinSelection = ({ onNext, onBack }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>{t("order.step", { step: 2, total: 5 })}</div>
+        <div className={styles.badge}>{t("order.step", { step: 2, total: 6 })}</div>
         <h2 className={styles.title}>{t("order.proteinTitle")}</h2>
         <p className={styles.subtitle}>
           {t("order.proteinSubtitle")}

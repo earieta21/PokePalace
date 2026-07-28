@@ -84,9 +84,7 @@ export const OrderProvider = ({ children }) => {
       // de disponibilidad — no del bowlSize guardado, que puede haber
       // quedado obsoleto si se quitó una proteína no disponible.
       bowlSize: proteins.length === 3 ? "large" : "normal",
-      // Los marinados ya no forman parte del armador — se ignoran aunque el
-      // favorito o pedido guardado los traiga de antes.
-      marinades: [],
+      marinades: filterAvailable(favorite.marinades, unavailable),
       complements: filterAvailable(favorite.complements, unavailable),
       sauces: filterAvailable(favorite.sauces, unavailable),
       toppings: filterAvailable(favorite.toppings, unavailable),
@@ -108,7 +106,7 @@ export const OrderProvider = ({ children }) => {
       proteins,
       protein: proteins.join(", "),
       bowlSize: proteins.length === 3 ? "large" : "normal",
-      marinades: [],
+      marinades: filterAvailable(pastOrder.marinades, unavailable),
       complements: filterAvailable(pastOrder.complements, unavailable),
       sauces: filterAvailable(pastOrder.sauces, unavailable),
       toppings: filterAvailable(pastOrder.toppings, unavailable),

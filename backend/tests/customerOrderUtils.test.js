@@ -68,16 +68,14 @@ test("un clientOrderId siempre deriva la misma reserva y otros ids no colisionan
   assert.throws(() => stableCustomerOrderObjectId(""), /clientOrderId/);
 });
 
-test("el catálogo rechaza ids, duplicados y límites manipulados, ignora marinados y deriva el tamaño", () => {
+test("el catálogo rechaza ids, duplicados y límites manipulados y deriva el tamaño", () => {
   const bowl = sanitizeCustomerBowl({
     base: "white_rice",
     proteins: ["salmon", "tuna", "shrimp"],
-    // Los marinados ya no son parte del armador — se ignoran aunque el
-    // cliente los siga enviando desde un favorito o pedido repetido viejo.
-    marinades: ["ponzu_marinade"],
+    marinades: ["citrus_marinade"],
   });
   assert.equal(bowl.bowlSize, "large");
-  assert.deepEqual(bowl.marinades, []);
+  assert.deepEqual(bowl.marinades, ["citrus_marinade"]);
   assert.throws(
     () => sanitizeCustomerBowl({ base: "arroz", proteins: ["salmon"] }),
     /base válida/
@@ -89,6 +87,28 @@ test("el catálogo rechaza ids, duplicados y límites manipulados, ignora marina
   assert.throws(
     () => sanitizeCustomerBowl({ base: "white_rice", proteins: ["salmon"], sauces: ["hack"] }),
     /sauces/
+  );
+});
+
+test("el armador solo acepta el catálogo curado de marinados (cítrico, spicy y dulce)", () => {
+  const bowl = sanitizeCustomerBowl({
+    base: "white_rice",
+    proteins: ["salmon"],
+    marinades: ["spicy_marinade", "sweet_marinade"],
+  });
+  assert.deepEqual(bowl.marinades, ["spicy_marinade", "sweet_marinade"]);
+
+  assert.throws(
+    () => sanitizeCustomerBowl({ base: "white_rice", proteins: ["salmon"], marinades: ["ponzu_marinade"] }),
+    /marinades/
+  );
+  assert.throws(
+    () => sanitizeCustomerBowl({
+      base: "white_rice",
+      proteins: ["salmon"],
+      marinades: ["citrus_marinade", "spicy_marinade", "sweet_marinade"],
+    }),
+    /marinades/
   );
 });
 

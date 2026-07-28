@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import BaseSelection from "./BaseSelection";
 import ProteinSelection from "./ProteinSelection";
+import MarinadeSelection from "./MarinadeSelection";
 import ComplementsSelection from "./ComplementsSelection";
 import SauceSelection from "./SauceSelection";
 import ToppingsSelection from "./ToppingsSelection";
@@ -12,12 +13,13 @@ import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "./pricing";
 import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 const LAST_STEP = TOTAL_STEPS - 1;
 const SUMMARY_STEP = TOTAL_STEPS;
 const STEP_NAME_KEYS = [
   "summary.base",
   "summary.protein",
+  "summary.marinades",
   "summary.complements",
   "summary.sauces",
   "summary.toppings",
@@ -171,6 +173,12 @@ function BowlMiniSummary({ order, step, language, t }) {
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
     const names = order.proteins.map((id) => labels.protein[id] || id);
     parts.push({ icon: "🐟", text: names.join(", ") });
+  }
+  if (step >= 2 && Array.isArray(order.marinades) && order.marinades.length > 0) {
+    parts.push({
+      icon: "🧉",
+      text: countLabel(order.marinades.length, "order.marinadeCountOne", "order.marinadeCountMany"),
+    });
   }
   if (step >= 3 && Array.isArray(order.complements) && order.complements.length > 0) {
     parts.push({
@@ -364,6 +372,7 @@ const OrderPage = () => {
   const steps = [
     <BaseSelection key="base" onNext={handleNext} onBack={prevStep} />,
     <ProteinSelection key="protein" onNext={handleNext} onBack={prevStep} />,
+    <MarinadeSelection key="marinade" onNext={handleNext} onBack={prevStep} />,
     <ComplementsSelection key="complements" onNext={handleNext} onBack={prevStep} />,
     <SauceSelection key="sauce" onNext={handleNext} onBack={prevStep} />,
     <ToppingsSelection key="toppings" onNext={goToSummary} onBack={prevStep} />,

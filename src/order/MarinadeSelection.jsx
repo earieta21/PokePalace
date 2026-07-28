@@ -6,13 +6,8 @@ import styles from "./MarinadeSelection.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
 
 import citrico from "../assets/marinades/citrico.webp";
-import garlicGinger from "../assets/marinades/garlicGinger.webp";
-import miso from "../assets/marinades/miso.webp";
-import punzu from "../assets/marinades/punzu.webp";
-import sesame from "../assets/marinades/sesame.webp";
-import shoyu from "../assets/marinades/shoyu.webp";
 import spicy from "../assets/marinades/spicy.webp";
-import wassabi from "../assets/marinades/wassabi.webp";
+import sweetChili from "../assets/dressings/sweetChili.webp";
 
 const MAX_MARINADES = 2;
 
@@ -22,14 +17,9 @@ const MarinadeSelection = ({ onNext, onBack }) => {
   const { unavailableItems } = useAvailability();
 
   const marinades = [
-    { id: "citrus_marinade",        image: citrico },
-    { id: "shoyu_marinade",         image: shoyu },
-    { id: "ponzu_marinade",         image: punzu },
-    { id: "spicy_marinade",         image: spicy },
-    { id: "sesame_marinade",        image: sesame },
-    { id: "wasabi_marinade",        image: wassabi },
-    { id: "miso_marinade",          image: miso },
-    { id: "garlic_ginger_marinade", image: garlicGinger },
+    { id: "citrus_marinade", image: citrico },
+    { id: "spicy_marinade",  image: spicy },
+    { id: "sweet_marinade",  image: sweetChili },
   ];
 
   const [selectedMarinades, setSelectedMarinades] = useState(

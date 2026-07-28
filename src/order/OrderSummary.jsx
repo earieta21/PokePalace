@@ -124,6 +124,7 @@ const OrderSummary = ({
       return count > 1 ? `${label} ×${count}` : label;
     });
   })();
+  const marinadesLabels = getListLabels(labels.marinade, marinades);
   const complementsLabels = getListLabels(labels.complement, complements);
   const saucesLabels = getListLabels(labels.sauce, sauces);
   const toppingsLabels = getListLabels(labels.topping, toppings);
@@ -324,11 +325,19 @@ const OrderSummary = ({
         )}
 
         <Section
+          icon="🧉"
+          title={t("summary.marinades")}
+          chips={marinadesLabels}
+          emptyText={t("summary.noMarinades")}
+          onEdit={() => onEditStep(2)}
+        />
+
+        <Section
           icon="🥗"
           title={t("summary.complements")}
           chips={complementsLabels}
           emptyText={t("summary.noComplements")}
-          onEdit={() => onEditStep(2)}
+          onEdit={() => onEditStep(3)}
         />
 
         <Section
@@ -336,7 +345,7 @@ const OrderSummary = ({
           title={t("summary.sauces")}
           chips={saucesLabels}
           emptyText={t("summary.noSauces")}
-          onEdit={() => onEditStep(3)}
+          onEdit={() => onEditStep(4)}
         />
 
         <Section
@@ -344,7 +353,7 @@ const OrderSummary = ({
           title={t("summary.toppings")}
           chips={toppingsLabels}
           emptyText={t("summary.noToppings")}
-          onEdit={() => onEditStep(4)}
+          onEdit={() => onEditStep(5)}
         />
 
         {/* Save as favorite */}

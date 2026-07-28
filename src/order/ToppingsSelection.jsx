@@ -61,7 +61,7 @@ const ToppingsSelection = ({ onNext, onBack }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>{t("order.step", { step: 5, total: 5 })}</div>
+        <div className={styles.badge}>{t("order.step", { step: 6, total: 6 })}</div>
         <h2 className={styles.title}>{t("order.toppingsTitle")}</h2>
         <p className={styles.subtitle}>
           {t("order.toppingsSubtitle", { max: MAX_TOPPINGS })}

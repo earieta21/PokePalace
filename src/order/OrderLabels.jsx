@@ -19,11 +19,12 @@ export const MARINADE_LABELS = {
   citrus_marinade:        "Marinado Cítrico",
   shoyu_marinade:         "Marinado Shoyu",
   ponzu_marinade:         "Marinado Ponzu",
-  spicy_marinade:         "Marinado Picante",
+  spicy_marinade:         "Marinado Spicy",
   sesame_marinade:        "Marinado de Sésamo",
   wasabi_marinade:        "Marinado de Wasabi",
   miso_marinade:          "Marinado de Miso",
   garlic_ginger_marinade: "Marinado de Ajo y Jengibre",
+  sweet_marinade:         "Marinado Dulce",
 };
 
 export const COMPLEMENT_LABELS = {
@@ -112,6 +113,7 @@ export const ITEM_LABELS = {
       wasabi_marinade: "Wasabi Marinade",
       miso_marinade: "Miso Marinade",
       garlic_ginger_marinade: "Garlic Ginger Marinade",
+      sweet_marinade: "Sweet Marinade",
     },
     complement: {
       shredded_carrots: "Shredded Carrots",
@@ -176,6 +178,7 @@ export const ITEM_DESCRIPTIONS = {
       wasabi_marinade: "Toque picante suave con jengibre",
       miso_marinade: "Pasta de soya fermentada, umami",
       garlic_ginger_marinade: "Ajo fresco y jengibre picado",
+      sweet_marinade: "Miel y salsa de soya, sabor suave y dulce",
     },
     sauce: {
       spicy_mayo: "Mayonesa con sriracha y limón",
@@ -219,6 +222,7 @@ export const ITEM_DESCRIPTIONS = {
       wasabi_marinade: "Mild wasabi kick with ginger",
       miso_marinade: "Fermented soybean paste with umami",
       garlic_ginger_marinade: "Fresh garlic and chopped ginger",
+      sweet_marinade: "Honey and soy sauce, mild and sweet",
     },
     sauce: {
       spicy_mayo: "Mayonnaise with sriracha and lime",

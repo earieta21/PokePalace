@@ -5,6 +5,7 @@ import useIdleTimeout from "./useIdleTimeout";
 
 import BaseSelection from "../order/BaseSelection";
 import ProteinSelection from "../order/ProteinSelection";
+import MarinadeSelection from "../order/MarinadeSelection";
 import ComplementsSelection from "../order/ComplementsSelection";
 import SauceSelection from "../order/SauceSelection";
 import ToppingsSelection from "../order/ToppingsSelection";
@@ -31,6 +32,7 @@ export default function KioskOrderPage() {
   const steps = [
     <BaseSelection key="base" onNext={nextStep} onBack={prevStep} />,
     <ProteinSelection key="protein" onNext={nextStep} onBack={prevStep} />,
+    <MarinadeSelection key="marinade" onNext={nextStep} onBack={prevStep} />,
     <ComplementsSelection key="complements" onNext={nextStep} onBack={prevStep} />,
     <SauceSelection key="sauce" onNext={nextStep} onBack={prevStep} />,
     <ToppingsSelection key="toppings" onNext={goToSummary} onBack={prevStep} />,

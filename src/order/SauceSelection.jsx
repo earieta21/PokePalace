@@ -7,8 +7,6 @@ import { useAvailability } from "../context/AvailabilityContext";
 
 import garlicSiracha from "../assets/dressings/garlicSiracha.webp";
 import spicyMayo from "../assets/dressings/spicyMayo.webp";
-import sweetChili from "../assets/dressings/sweetChili.webp";
-import citrus from "../assets/marinades/citrico.webp";
 import cilantroDressing from "../assets/dressings/cilantroDressing.jpg";
 
 const MAX_SAUCES = 2;
@@ -20,9 +18,6 @@ const SauceSelection = ({ onNext, onBack }) => {
 
   const sauces = [
     { id: "spicy_mayo",         image: spicyMayo },
-    { id: "sweet_dressing",     image: sweetChili },
-    { id: "citrus_dressing",    image: citrus },
-    { id: "red_sauce",          image: garlicSiracha },
     { id: "sriracha",           image: garlicSiracha },
     { id: "cilantro_dressing",  image: cilantroDressing },
   ];
@@ -58,7 +53,7 @@ const SauceSelection = ({ onNext, onBack }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>{t("order.step", { step: 4, total: 5 })}</div>
+        <div className={styles.badge}>{t("order.step", { step: 5, total: 6 })}</div>
         <h2 className={styles.title}>{t("order.sauceTitle")}</h2>
         <p className={styles.subtitle}>
           {t("order.sauceSubtitle", { max: MAX_SAUCES })}

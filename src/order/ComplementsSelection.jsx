@@ -74,7 +74,7 @@ const ComplementsSelection = ({ onNext, onBack }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>{t("order.step", { step: 3, total: 5 })}</div>
+        <div className={styles.badge}>{t("order.step", { step: 4, total: 6 })}</div>
         <h2 className={styles.title}>{t("order.complementsTitle")}</h2>
         <p className={styles.subtitle}>
           {t("order.complementsSubtitle", { free: COMPLEMENT_FREE_LIMIT, price: EXTRA_COMPLEMENT_PRICE })}
