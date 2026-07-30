@@ -43,20 +43,8 @@ const PAYMENT_METHOD_LABELS = {
   pay_at_pickup: "Pendiente de pago",
 };
 
-// A second, near-blank print of this same size reliably triggers the
-// Epson driver's cash-drawer-kick trailer, unlike the full rendered ticket
-// (likely due to its variable page length) — see kickOnly below.
-function Receipt({ order, kickOnly }) {
+function Receipt({ order }) {
   if (!order || typeof document === "undefined") return null;
-
-  if (kickOnly) {
-    return createPortal(
-      <section className={ui.receipt} aria-label="Apertura de cajón">
-        <div style={{ padding: "4mm" }}>&nbsp;</div>
-      </section>,
-      document.body,
-    );
-  }
 
   const printedAt = new Date(order.createdAt || Date.now()).toLocaleString("es-MX", {
     dateStyle: "short",
@@ -113,7 +101,6 @@ export default function POSPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
   const api = createStaffApi(staffToken);
   const pendingSaleRef = useRef(null);
-  const needsDrawerKickRef = useRef(false);
 
   const [cart, setCart]         = useState([]);
   const [cliente, setCliente]   = useState("");
@@ -142,7 +129,6 @@ export default function POSPage({ styles }) {
   const [customerSearchDone, setCustomerSearchDone] = useState(false);
   const [lastReceipt, setLastReceipt] = useState(null);
   const [printRequested, setPrintRequested] = useState(false);
-  const [drawerKickRequested, setDrawerKickRequested] = useState(false);
 
   const printLastReceipt = () => {
     if (!lastReceipt) return;
@@ -154,24 +140,9 @@ export default function POSPage({ styles }) {
     const timer = window.setTimeout(() => {
       window.print();
       setPrintRequested(false);
-      if (needsDrawerKickRef.current) {
-        needsDrawerKickRef.current = false;
-        window.setTimeout(() => setDrawerKickRequested(true), 600);
-      }
     }, 250);
     return () => window.clearTimeout(timer);
   }, [printRequested, lastReceipt]);
-
-  // Separate, near-blank print dedicated to opening the cash drawer — see
-  // the comment on Receipt/kickOnly for why this needs to be its own job.
-  useEffect(() => {
-    if (!drawerKickRequested || !lastReceipt) return;
-    const timer = window.setTimeout(() => {
-      window.print();
-      setDrawerKickRequested(false);
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [drawerKickRequested, lastReceipt]);
 
   const tryFlushQueue = useCallback(async () => {
     if (getQueuedOrders().length === 0) return;
@@ -376,7 +347,6 @@ export default function POSPage({ styles }) {
           : "";
       setSuccess(`Orden enviada — $${data.order.total.toLocaleString("es-MX")} MXN${pointsMessage}`);
       setLastReceipt(data.order);
-      needsDrawerKickRef.current = paymentMethod !== "pay_at_pickup";
       setPrintRequested(true);
       pendingSaleRef.current = null;
     } catch (e) {
@@ -687,7 +657,7 @@ export default function POSPage({ styles }) {
         </div>
       </aside>
       </div>
-      <Receipt order={lastReceipt} kickOnly={drawerKickRequested} />
+      <Receipt order={lastReceipt} />
     </div>
   );
 }
