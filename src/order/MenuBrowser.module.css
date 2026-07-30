@@ -2,7 +2,7 @@
   width: 100%;
   display: flex;
   justify-content: center;
-  padding: 20px 0 100px;
+  padding: 20px 0 160px;
 }
 
 .container {
@@ -173,7 +173,11 @@
 .cartBar {
   position: fixed;
   left: 50%;
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  /* La barra de navegación inferior (Navbar.module.css) vive fija en
+     bottom:16px con 64px de alto — esta barra tiene que quedar arriba de
+     esa, si no la app la tapa por completo (mismo z-index de pila que el
+     footer, que ya deja este mismo espacio libre). */
+  bottom: calc(90px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: min(500px, calc(100% - 32px));
   display: flex;
