@@ -31,105 +31,190 @@
   color: var(--text-2);
 }
 
+/* ---- Arma tu propio bowl (hero card) ---- */
+
 .buildBowlCard {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 18px 20px;
+  min-height: 96px;
+  padding: 20px 22px;
   margin-bottom: 28px;
-  border: 1.5px solid var(--accent-border);
-  border-radius: var(--radius-lg);
-  background: var(--accent-bg);
+  border: none;
+  border-radius: 22px;
+  overflow: hidden;
+  background-size: cover;
+  background-position: 70% center;
   cursor: pointer;
   text-align: left;
+  box-shadow: 0 14px 34px rgba(13, 27, 15, 0.16);
   transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
 .buildBowlCard:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  box-shadow: 0 18px 44px rgba(13, 27, 15, 0.22);
+}
+
+.buildBowlOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, rgba(10, 22, 15, 0.88) 0%, rgba(10, 22, 15, 0.72) 42%, rgba(10, 22, 15, 0.28) 100%);
 }
 
 .buildBowlIcon {
-  font-size: 28px;
+  position: relative;
+  font-size: 30px;
   flex-shrink: 0;
+}
+
+.buildBowlText {
+  position: relative;
+  min-width: 0;
 }
 
 .buildBowlCard strong {
   display: block;
-  font-size: 15.5px;
-  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffffff;
 }
 
 .buildBowlHint {
   display: block;
   font-size: 12.5px;
-  color: var(--text-2);
-  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.78);
+  margin-top: 3px;
 }
 
 .buildBowlArrow {
+  position: relative;
   margin-left: auto;
-  font-size: 18px;
-  color: var(--accent);
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
   flex-shrink: 0;
 }
 
+/* ---- Categories ---- */
+
 .section {
-  margin-bottom: 24px;
+  margin-bottom: 26px;
 }
 
 .sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   margin: 0 0 12px;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 15.5px;
+  font-weight: 800;
   color: var(--text);
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
 }
+
+/* ---- Product card ---- */
 
 .card {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-lg);
+  flex-direction: column;
+  border-radius: 20px;
+  overflow: hidden;
   background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 22px rgba(13, 27, 15, 0.06);
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
 }
 
-.cardIcon {
-  font-size: 26px;
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(13, 27, 15, 0.1);
+  border-color: var(--accent-border);
+}
+
+.cardPhotoWrap {
+  position: relative;
+  width: 100%;
+  height: 130px;
+}
+
+.cardPhoto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cardPhotoOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.06) 0%, rgba(0, 0, 0, 0.02) 55%, rgba(0, 0, 0, 0.16) 100%);
+}
+
+.cardIconOnly {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+}
+
+.cardIconBadge {
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--accent-bg);
+  font-size: 24px;
 }
 
 .cardBody {
+  display: flex;
   flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cardWithPhoto .cardBody {
+  padding: 12px 14px 14px;
+}
+
+.cardBodyText {
   min-width: 0;
 }
 
 .cardName {
   margin: 0;
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
-  line-height: 1.3;
+  line-height: 1.32;
 }
 
 .cardPrice {
-  margin: 2px 0 0;
-  font-size: 12.5px;
-  color: var(--text-2);
+  margin: 4px 0 0;
+  display: inline-flex;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
 }
 
 .addBtn {
   flex-shrink: 0;
-  padding: 8px 16px;
+  padding: 9px 16px;
   border-radius: var(--radius-md);
   border: none;
   background: var(--accent);
@@ -137,6 +222,15 @@
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.addBtn:hover {
+  background: var(--accent-2);
+}
+
+.addBtn:active {
+  transform: scale(0.96);
 }
 
 .stepper {
@@ -147,8 +241,8 @@
 }
 
 .stepperBtn {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   border: 1.5px solid var(--accent-border);
   background: var(--accent-bg);
@@ -169,6 +263,8 @@
   font-weight: 700;
   color: var(--text);
 }
+
+/* ---- Floating cart bar ---- */
 
 .cartBar {
   position: fixed;

@@ -1,9 +1,16 @@
 import React from "react";
 import { useOrder } from "./OrderContext";
 import { CUSTOMER_CATALOG, CUSTOMER_CATALOG_CATEGORIES } from "../data/customerCatalog";
+import buildBowlBg from "../assets/poke.webp";
 import styles from "./MenuBrowser.module.css";
 
 const formatPrice = (value) => `$${Number(value).toLocaleString("es-MX")} MXN`;
+
+const CATEGORY_ICONS = {
+  Bowls: "🍣",
+  Bebidas: "🥤",
+  Extras: "🍫",
+};
 
 // Pantalla compartida entre la app/sitio web (`src/pages/MenuPage.jsx`) y el
 // kiosco (`src/kiosk/KioskMenuPage.jsx`) — mismo carrito (OrderContext), solo
@@ -38,9 +45,15 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart }) => {
           </p>
         </div>
 
-        <button type="button" className={styles.buildBowlCard} onClick={handleBuildBowl}>
+        <button
+          type="button"
+          className={styles.buildBowlCard}
+          style={{ backgroundImage: `url(${buildBowlBg})` }}
+          onClick={handleBuildBowl}
+        >
+          <div className={styles.buildBowlOverlay} />
           <span className={styles.buildBowlIcon} aria-hidden="true">🍚</span>
-          <span>
+          <span className={styles.buildBowlText}>
             <strong>Arma tu propio bowl</strong>
             <span className={styles.buildBowlHint}>Elige base, proteínas, marinados y más</span>
           </span>
@@ -52,42 +65,58 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart }) => {
           if (items.length === 0) return null;
           return (
             <div key={category} className={styles.section}>
-              <h3 className={styles.sectionTitle}>{category}</h3>
+              <h3 className={styles.sectionTitle}>
+                <span aria-hidden="true">{CATEGORY_ICONS[category]}</span> {category}
+              </h3>
               <div className={styles.grid}>
                 {items.map((item) => {
                   const qty = qtyForCatalogItem(item.catalogId);
                   return (
-                    <div key={item.catalogId} className={styles.card}>
-                      <span className={styles.cardIcon} aria-hidden="true">{item.icon}</span>
-                      <div className={styles.cardBody}>
-                        <p className={styles.cardName}>{item.name}</p>
-                        <p className={styles.cardPrice}>{formatPrice(item.price)}</p>
-                      </div>
-                      {qty > 0 ? (
-                        <div className={styles.stepper}>
-                          <button
-                            type="button"
-                            className={styles.stepperBtn}
-                            onClick={() => handleRemove(item)}
-                            aria-label={`Quitar ${item.name}`}
-                          >
-                            −
-                          </button>
-                          <span className={styles.stepperCount} aria-live="polite">{qty}</span>
-                          <button
-                            type="button"
-                            className={styles.stepperBtn}
-                            onClick={() => handleAdd(item)}
-                            aria-label={`Agregar otro ${item.name}`}
-                          >
-                            +
-                          </button>
+                    <div
+                      key={item.catalogId}
+                      className={`${styles.card} ${item.image ? styles.cardWithPhoto : styles.cardIconOnly}`}
+                    >
+                      {item.image ? (
+                        <div className={styles.cardPhotoWrap}>
+                          <img src={item.image} alt="" className={styles.cardPhoto} loading="lazy" />
+                          <div className={styles.cardPhotoOverlay} />
                         </div>
                       ) : (
-                        <button type="button" className={styles.addBtn} onClick={() => handleAdd(item)}>
-                          Agregar
-                        </button>
+                        <span className={styles.cardIconBadge} aria-hidden="true">{item.icon}</span>
                       )}
+
+                      <div className={styles.cardBody}>
+                        <div className={styles.cardBodyText}>
+                          <p className={styles.cardName}>{item.name}</p>
+                          <p className={styles.cardPrice}>{formatPrice(item.price)}</p>
+                        </div>
+
+                        {qty > 0 ? (
+                          <div className={styles.stepper}>
+                            <button
+                              type="button"
+                              className={styles.stepperBtn}
+                              onClick={() => handleRemove(item)}
+                              aria-label={`Quitar ${item.name}`}
+                            >
+                              −
+                            </button>
+                            <span className={styles.stepperCount} aria-live="polite">{qty}</span>
+                            <button
+                              type="button"
+                              className={styles.stepperBtn}
+                              onClick={() => handleAdd(item)}
+                              aria-label={`Agregar otro ${item.name}`}
+                            >
+                              +
+                            </button>
+                          </div>
+                        ) : (
+                          <button type="button" className={styles.addBtn} onClick={() => handleAdd(item)}>
+                            Agregar
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

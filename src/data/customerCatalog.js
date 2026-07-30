@@ -1,3 +1,7 @@
+import emeraldSalmon from "../assets/menu/emeraldSalmon.webp";
+import spicyTuna from "../assets/menu/spicyTuna.webp";
+import tropicalShrimp from "../assets/menu/tropicalShrimp.webp";
+
 // Catálogo de artículos que un cliente puede agregar directo al carrito sin
 // pasar por el armador: bowls de la casa (receta fija), bebidas y extras.
 // Mismos catalogId/nombre/precio que backend/config/posCatalog.js (fuente de
@@ -16,6 +20,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
     category: "Bowls",
     categoryKey: "bowls",
     icon: "🍣",
+    image: emeraldSalmon,
   },
   {
     catalogId: "bowl-spicy-tuna",
@@ -24,6 +29,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
     category: "Bowls",
     categoryKey: "bowls",
     icon: "🌶️",
+    image: spicyTuna,
   },
   {
     catalogId: "bowl-tropical-shrimp",
@@ -32,6 +38,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
     category: "Bowls",
     categoryKey: "bowls",
     icon: "🍤",
+    image: tropicalShrimp,
   },
   {
     catalogId: "mineral-water",
