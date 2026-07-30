@@ -25,6 +25,20 @@ function elapsed(createdAt) {
 function itemSummary(order) {
   const segments = [];
 
+  if (order.cartItems?.length) {
+    for (const line of order.cartItems) {
+      if (line.kind === "item") {
+        segments.push(`${line.name} ×${line.qty}`);
+        continue;
+      }
+      const proteins = line.proteins?.length ? line.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ") : "";
+      const baseText = line.bases?.length > 1 ? line.bases.join(" + ") : line.base;
+      const size = line.bowlSize === "large" ? "Bowl grande" : "Bowl normal";
+      segments.push(`${size}: ${proteins} en ${baseText}`);
+    }
+    return segments.join(" + ") || "Bowl personalizado";
+  }
+
   if (order.items?.length) {
     segments.push(order.items.map((i) => `${i.name} ×${i.qty}`).join(", "));
   }

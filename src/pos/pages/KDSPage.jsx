@@ -32,12 +32,46 @@ const PAYMENT_LABEL = {
 
 function orderLines(order) {
   const lines = [];
+  const label = (map, id) => map[id] ?? id;
+
+  // Carrito de cliente/kiosco (1+ bowls y/o artículos) — cada línea se marca
+  // por separado para que cocina no mezcle los ingredientes de 2 bowls.
+  if (order.cartItems?.length) {
+    const bowlCount = order.cartItems.filter((l) => l.kind === "bowl").length;
+    let bowlNumber = 0;
+    for (const line of order.cartItems) {
+      if (line.kind === "item") {
+        lines.push(`${line.name} ×${line.qty}`);
+        continue;
+      }
+      bowlNumber += 1;
+      lines.push(bowlCount > 1 ? `— Bowl ${bowlNumber} —` : "— Bowl —");
+      const baseText = line.bases?.length > 1
+        ? `${line.bases.map((id) => label(BASE_LABELS, id)).join(" + ")} (mitad y mitad)`
+        : label(BASE_LABELS, line.base);
+      lines.push(`Base: ${baseText}`);
+      if (line.proteins?.length) {
+        lines.push(`Proteínas: ${line.proteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
+      }
+      lines.push(line.bowlSize === "large" ? "Bowl grande" : "Bowl mediano");
+      if (line.extraScoopProteins?.length) {
+        lines.push(`⚠️ SCOOP EXTRA: ${line.extraScoopProteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
+      }
+      if (line.marinades?.length)
+        lines.push(`Marinados: ${line.marinades.map((id) => label(MARINADE_LABELS, id)).join(", ")}`);
+      if (line.complements?.length)
+        lines.push(`Complementos: ${line.complements.map((id) => label(COMPLEMENT_LABELS, id)).join(", ")}`);
+      if (line.sauces?.length)
+        lines.push(`Salsas: ${line.sauces.map((id) => label(SAUCE_LABELS, id)).join(", ")}`);
+      if (line.toppings?.length)
+        lines.push(`Toppings: ${line.toppings.map((id) => label(TOPPING_LABELS, id)).join(", ")}`);
+    }
+    return lines.length ? lines : ["Bowl personalizado"];
+  }
 
   if (order.items?.length) {
     lines.push(...order.items.map((i) => `${i.name} ×${i.qty}`));
   }
-
-  const label = (map, id) => map[id] ?? id;
 
   if (order.base) {
     const baseText = order.bases?.length > 1

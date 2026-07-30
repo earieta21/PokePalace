@@ -489,22 +489,49 @@ export default function OrderTracking() {
         </section>
       )}
 
-      <section className={styles.section}>
-        <p className={styles.sectionTitle}>{t("tracking.yourBowl")}</p>
-        <div className={styles.detailCard}>
-          {order.base && <DetailRow label={t("common.base")} value={getBaseLabel(order.bases, order.base, language)} />}
-          {getProteinsText(order, language) && <DetailRow label={t("common.proteins")} value={getProteinsText(order, language)} />}
-          <DetailRow label={t("tracking.size")} value={order.bowlSize === "large" ? t("summary.large") : t("summary.normal")} />
-          {order.marinades?.length > 0 && <DetailRow label={t("summary.marinades")} value={order.marinades.map((id) => getItemLabel("marinade", id, language)).join(", ")} />}
-          {order.complements?.length > 0 && <DetailRow label={t("common.complements")} value={order.complements.map((id) => getItemLabel("complement", id, language)).join(", ")} />}
-          {order.sauces?.length > 0 && <DetailRow label={t("common.sauces")} value={order.sauces.map((id) => getItemLabel("sauce", id, language)).join(", ")} />}
-          {order.toppings?.length > 0 && <DetailRow label={t("common.toppings")} value={order.toppings.map((id) => getItemLabel("topping", id, language)).join(", ")} />}
-        </div>
-      </section>
+      {order.cartItems?.length > 0 ? (
+        order.cartItems.map((line, idx) => (
+          <section className={styles.section} key={line.catalogId ? `${line.catalogId}-${idx}` : `bowl-${idx}`}>
+            <p className={styles.sectionTitle}>
+              {line.kind === "item" ? line.name : t("tracking.yourBowl")}
+            </p>
+            <div className={styles.detailCard}>
+              {line.kind === "item" ? (
+                <DetailRow label={t("summary.total")} value={`×${line.qty} — $${(line.price * line.qty).toFixed(2)}`} />
+              ) : (
+                <>
+                  <DetailRow label={t("common.base")} value={getBaseLabel(line.bases, line.base, language)} />
+                  {line.proteins?.length > 0 && (
+                    <DetailRow label={t("common.proteins")} value={line.proteins.map((id) => getItemLabel("protein", id, language)).join(", ")} />
+                  )}
+                  <DetailRow label={t("tracking.size")} value={line.bowlSize === "large" ? t("summary.large") : t("summary.normal")} />
+                  {line.marinades?.length > 0 && <DetailRow label={t("summary.marinades")} value={line.marinades.map((id) => getItemLabel("marinade", id, language)).join(", ")} />}
+                  {line.complements?.length > 0 && <DetailRow label={t("common.complements")} value={line.complements.map((id) => getItemLabel("complement", id, language)).join(", ")} />}
+                  {line.sauces?.length > 0 && <DetailRow label={t("common.sauces")} value={line.sauces.map((id) => getItemLabel("sauce", id, language)).join(", ")} />}
+                  {line.toppings?.length > 0 && <DetailRow label={t("common.toppings")} value={line.toppings.map((id) => getItemLabel("topping", id, language)).join(", ")} />}
+                </>
+              )}
+            </div>
+          </section>
+        ))
+      ) : (
+        <section className={styles.section}>
+          <p className={styles.sectionTitle}>{t("tracking.yourBowl")}</p>
+          <div className={styles.detailCard}>
+            {order.base && <DetailRow label={t("common.base")} value={getBaseLabel(order.bases, order.base, language)} />}
+            {getProteinsText(order, language) && <DetailRow label={t("common.proteins")} value={getProteinsText(order, language)} />}
+            <DetailRow label={t("tracking.size")} value={order.bowlSize === "large" ? t("summary.large") : t("summary.normal")} />
+            {order.marinades?.length > 0 && <DetailRow label={t("summary.marinades")} value={order.marinades.map((id) => getItemLabel("marinade", id, language)).join(", ")} />}
+            {order.complements?.length > 0 && <DetailRow label={t("common.complements")} value={order.complements.map((id) => getItemLabel("complement", id, language)).join(", ")} />}
+            {order.sauces?.length > 0 && <DetailRow label={t("common.sauces")} value={order.sauces.map((id) => getItemLabel("sauce", id, language)).join(", ")} />}
+            {order.toppings?.length > 0 && <DetailRow label={t("common.toppings")} value={order.toppings.map((id) => getItemLabel("topping", id, language)).join(", ")} />}
+          </div>
+        </section>
+      )}
 
       <div className={styles.actions}>
         <Link to="/mi-cuenta" className={styles.ghostBtn}>{t("tracking.myOrders")}</Link>
-        <Link to="/order" className={styles.primaryBtn}>{t("tracking.orderAgain")}</Link>
+        <Link to="/menu" className={styles.primaryBtn}>{t("tracking.orderAgain")}</Link>
       </div>
     </div>
   );

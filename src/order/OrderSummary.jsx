@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 import { useOrder } from "./OrderContext";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
-import { PREMIUM_PROTEIN_PRICES, computePricing } from "./pricing";
+import { PREMIUM_PROTEIN_PRICES, computeCartPricing } from "./pricing";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./OrderSummary.module.css";
 
@@ -12,7 +12,8 @@ import {
 } from "./OrderLabels";
 
 const OrderSummary = ({
-  onEditStep,
+  onBuildBowl,
+  onBrowseMenu,
   onRestart,
   onConfirm,
   onPromoChange,
@@ -21,24 +22,13 @@ const OrderSummary = ({
   submitError = "",
   showOnlinePayment = false,
 }) => {
-  const { order } = useOrder();
+  const { order, startNewBowl, editCartBowl, removeCartLine, updateCartItemQty } = useOrder();
   const { isLoggedIn, token } = useContext(AuthContext);
   const { language, t } = useLanguage();
   const labels = ITEM_LABELS[language] || ITEM_LABELS.es;
 
-  const {
-    base = "",
-    bases = [],
-    protein = "",
-    proteins = [],
-    marinades = [],
-    sauces = [],
-    complements = [],
-    toppings = [],
-    extraScoopProteins = [],
-    fulfillment = "pickup",
-    updateCheckout,
-  } = order || {};
+  const cart = Array.isArray(order?.cart) ? order.cart : [];
+  const { fulfillment = "pickup", updateCheckout } = order || {};
 
   // Promo code state
   const [promoInput, setPromoInput] = useState("");
@@ -46,12 +36,14 @@ const OrderSummary = ({
   const [promoError, setPromoError] = useState("");
   const [promoApplied, setPromoApplied] = useState(null);
 
-  // Save favorite state
+  // Save favorite state — solo tiene sentido cuando el carrito es 1 solo
+  // bowl (los favoritos siguen siendo de un bowl, no de un carrito entero).
   const [showSaveFavorite, setShowSaveFavorite] = useState(false);
   const [favoriteName, setFavoriteName] = useState("");
   const [savingFavorite, setSavingFavorite] = useState(false);
   const [favoriteMsg, setFavoriteMsg] = useState("");
   const [favoriteSuccess, setFavoriteSuccess] = useState(false);
+  const soleBowlLine = cart.length === 1 && cart[0].kind === "bowl" ? cart[0] : null;
 
   // Delivery is temporarily unavailable until the checkout can collect an address.
   // Normalize old saved drafts so they cannot silently submit as delivery orders.
@@ -108,34 +100,13 @@ const OrderSummary = ({
     return values.map((v) => map?.[v] || prettifyId(v));
   };
 
-  const selectedProteinIds =
-    Array.isArray(proteins) && proteins.length > 0 ? proteins : protein ? [protein] : [];
-  const proteinLabels = selectedProteinIds.map((id) => {
+  const proteinLabelsFor = (proteins) => (Array.isArray(proteins) ? proteins : []).map((id) => {
     const label = labels.protein?.[id] || prettifyId(id);
     const upcharge = PREMIUM_PROTEIN_PRICES[id] || 0;
     return upcharge > 0 ? `${label} (+$${upcharge})` : label;
   });
-  const extraScoopChips = (() => {
-    if (!Array.isArray(extraScoopProteins) || extraScoopProteins.length === 0) return [];
-    const counts = new Map();
-    extraScoopProteins.forEach((id) => counts.set(id, (counts.get(id) || 0) + 1));
-    return [...counts.entries()].map(([id, count]) => {
-      const label = labels.protein?.[id] || prettifyId(id);
-      return count > 1 ? `${label} ×${count}` : label;
-    });
-  })();
-  const marinadesLabels = getListLabels(labels.marinade, marinades);
-  const complementsLabels = getListLabels(labels.complement, complements);
-  const saucesLabels = getListLabels(labels.sauce, sauces);
-  const toppingsLabels = getListLabels(labels.topping, toppings);
 
-  const pricedBowlSize = proteinLabels.length === 3 ? "large" : "normal";
-  const extraScoopsCount = Array.isArray(extraScoopProteins) ? extraScoopProteins.length : 0;
-  const pricing = computePricing(pricedBowlSize, promoApplied, {
-    extraScoops: extraScoopsCount,
-    complementsCount: complements.length,
-    proteins: selectedProteinIds,
-  });
+  const pricing = computeCartPricing(cart, promoApplied);
   const appliedPointsDiscount = Math.min(Math.max(0, pointsDiscount), pricing.total);
   const finalTotal = Math.max(0, pricing.total - appliedPointsDiscount);
   // Time picker helpers — mantiene el rango en línea con lo que de verdad
@@ -215,8 +186,18 @@ const OrderSummary = ({
     }
   };
 
+  const handleEditBowl = (cartId) => {
+    editCartBowl(cartId);
+    onBuildBowl?.();
+  };
+
+  const handleAddAnotherBowl = () => {
+    startNewBowl();
+    onBuildBowl?.();
+  };
+
   const handleSaveFavorite = async () => {
-    if (!favoriteName.trim()) return;
+    if (!favoriteName.trim() || !soleBowlLine) return;
     setSavingFavorite(true);
     setFavoriteMsg("");
     setFavoriteSuccess(false);
@@ -229,13 +210,14 @@ const OrderSummary = ({
         },
         body: JSON.stringify({
           name: favoriteName.trim(),
-          base,
-          proteins: Array.isArray(proteins) && proteins.length > 0 ? proteins : protein ? [protein] : [],
-          bowlSize: pricedBowlSize,
-          marinades,
-          complements,
-          sauces,
-          toppings,
+          base: soleBowlLine.base,
+          bases: soleBowlLine.bases,
+          proteins: soleBowlLine.proteins,
+          bowlSize: soleBowlLine.bowlSize,
+          marinades: soleBowlLine.marinades,
+          complements: soleBowlLine.complements,
+          sauces: soleBowlLine.sauces,
+          toppings: soleBowlLine.toppings,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -252,32 +234,82 @@ const OrderSummary = ({
     }
   };
 
-  const Section = ({ icon, title, value, chips, emptyText, onEdit }) => (
+  const BowlLineCard = ({ line }) => {
+    const proteinLabels = proteinLabelsFor(line.proteins);
+    const marinadesLabels = getListLabels(labels.marinade, line.marinades);
+    const complementsLabels = getListLabels(labels.complement, line.complements);
+    const saucesLabels = getListLabels(labels.sauce, line.sauces);
+    const toppingsLabels = getListLabels(labels.topping, line.toppings);
+    const rows = [
+      { icon: "🍚", title: t("summary.base"), value: getBaseLabel(line.bases, line.base, language) },
+      { icon: "🐟", title: t("summary.protein"), value: proteinLabels.join(", ") },
+      marinadesLabels.length > 0 && { icon: "🧉", title: t("summary.marinades"), value: marinadesLabels.join(", ") },
+      complementsLabels.length > 0 && { icon: "🥗", title: t("summary.complements"), value: complementsLabels.join(", ") },
+      saucesLabels.length > 0 && { icon: "🥣", title: t("summary.sauces"), value: saucesLabels.join(", ") },
+      toppingsLabels.length > 0 && { icon: "🌿", title: t("summary.toppings"), value: toppingsLabels.join(", ") },
+    ].filter(Boolean);
+
+    return (
+      <div className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <h3 className={styles.subTitle}>
+              <span className={styles.sectionIcon} aria-hidden="true">🍱</span>
+              {line.bowlSize === "large" ? t("summary.large") : t("summary.normal")}
+              <span className={styles.subTitleCount}>· ${line.price.toFixed(2)}</span>
+            </h3>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button className={styles.editButton} onClick={() => handleEditBowl(line.cartId)} type="button">
+              {t("summary.edit")}
+            </button>
+            <button className={styles.editButton} onClick={() => removeCartLine(line.cartId)} type="button">
+              {t("summary.remove")}
+            </button>
+          </div>
+        </div>
+        {rows.map((row) => (
+          <p key={row.title} className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+            <span aria-hidden="true">{row.icon}</span>
+            <strong>{row.title}:</strong> {row.value}
+          </p>
+        ))}
+      </div>
+    );
+  };
+
+  const ItemLineCard = ({ line }) => (
     <div className={styles.section}>
       <div className={styles.sectionHeader}>
         <div>
-          <h3 className={styles.subTitle}>
-            <span className={styles.sectionIcon} aria-hidden="true">{icon}</span>
-            {title}
-            {chips && chips.length > 0 && <span className={styles.subTitleCount}>· {chips.length}</span>}
-          </h3>
-          {value ? <p className={styles.detail}>{value}</p> : null}
+          <h3 className={styles.subTitle}>{line.name}</h3>
+          <p className={styles.detail}>${line.price.toFixed(2)} MXN c/u</p>
         </div>
-        <button className={styles.editButton} onClick={onEdit} type="button" aria-label={`${t("summary.edit")}: ${title}`}>
-          {t("summary.edit")}
-        </button>
-      </div>
-      {chips ? (
-        chips.length > 0 ? (
-          <div className={styles.chips}>
-            {chips.map((chip, idx) => (
-              <span key={`${chip}-${idx}`} className={styles.chip}>{chip}</span>
-            ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              type="button"
+              className={styles.editButton}
+              onClick={() => updateCartItemQty(line.cartId, line.qty - 1)}
+              aria-label={`Quitar un ${line.name}`}
+            >
+              −
+            </button>
+            <span aria-live="polite">{line.qty}</span>
+            <button
+              type="button"
+              className={styles.editButton}
+              onClick={() => updateCartItemQty(line.cartId, line.qty + 1)}
+              aria-label={`Agregar otro ${line.name}`}
+            >
+              +
+            </button>
           </div>
-        ) : (
-          <div className={styles.emptyRow}>{emptyText}</div>
-        )
-      ) : null}
+          <button className={styles.editButton} onClick={() => removeCartLine(line.cartId)} type="button">
+            {t("summary.remove")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 
@@ -292,72 +324,34 @@ const OrderSummary = ({
           </p>
         </div>
 
-        <Section
-          icon="🍚"
-          title={t("summary.base")}
-          value={getBaseLabel(bases, base, language) || t("summary.empty")}
-          onEdit={() => onEditStep(0)}
-        />
+        {cart.length === 0 ? (
+          <div className={styles.emptyRow}>
+            <p>Tu carrito está vacío.</p>
+            <button className={styles.favBtn} type="button" onClick={() => onBrowseMenu?.()}>
+              Ir al menú
+            </button>
+          </div>
+        ) : (
+          <>
+            {cart.map((line) => (
+              line.kind === "item"
+                ? <ItemLineCard key={line.cartId} line={line} />
+                : <BowlLineCard key={line.cartId} line={line} />
+            ))}
 
-        <Section
-          icon="🐟"
-          title={t("summary.protein")}
-          value={proteinLabels.length > 0 ? proteinLabels.join(", ") : t("summary.empty")}
-          onEdit={() => onEditStep(1)}
-        />
-
-        <div className={styles.sizeNotice}>
-          <span>{pricedBowlSize === "large" ? t("summary.large") : t("summary.normal")}</span>
-          <p>
-            {pricedBowlSize === "large"
-              ? t("summary.largeDesc")
-              : t("summary.normalDesc")}
-          </p>
-        </div>
-
-        {extraScoopChips.length > 0 && (
-          <Section
-            icon="➕"
-            title={t("summary.extraScoops")}
-            chips={extraScoopChips}
-            onEdit={() => onEditStep(1)}
-          />
+            <div className={styles.actionButtons} style={{ marginBottom: 20 }}>
+              <button className={styles.restartButton} type="button" onClick={handleAddAnotherBowl}>
+                + Agregar otro bowl
+              </button>
+              <button className={styles.restartButton} type="button" onClick={() => onBrowseMenu?.()}>
+                + Agregar del menú
+              </button>
+            </div>
+          </>
         )}
 
-        <Section
-          icon="🧉"
-          title={t("summary.marinades")}
-          chips={marinadesLabels}
-          emptyText={t("summary.noMarinades")}
-          onEdit={() => onEditStep(2)}
-        />
-
-        <Section
-          icon="🥗"
-          title={t("summary.complements")}
-          chips={complementsLabels}
-          emptyText={t("summary.noComplements")}
-          onEdit={() => onEditStep(3)}
-        />
-
-        <Section
-          icon="🥣"
-          title={t("summary.sauces")}
-          chips={saucesLabels}
-          emptyText={t("summary.noSauces")}
-          onEdit={() => onEditStep(4)}
-        />
-
-        <Section
-          icon="🌿"
-          title={t("summary.toppings")}
-          chips={toppingsLabels}
-          emptyText={t("summary.noToppings")}
-          onEdit={() => onEditStep(5)}
-        />
-
-        {/* Save as favorite */}
-        {isLoggedIn && (
+        {/* Save as favorite — solo si el carrito es 1 solo bowl */}
+        {isLoggedIn && soleBowlLine && (
           <div className={styles.favoriteSection}>
             {!showSaveFavorite ? (
               <button
@@ -613,7 +607,7 @@ const OrderSummary = ({
               className={styles.confirmButton}
               onClick={onConfirm}
               type="button"
-              disabled={saving}
+              disabled={saving || cart.length === 0}
               aria-busy={saving}
             >
               {saving ? t("summary.sending") : `${t("summary.confirm")} — $${finalTotal.toFixed(2)}`}

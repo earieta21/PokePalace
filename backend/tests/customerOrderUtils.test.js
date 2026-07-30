@@ -2,11 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   findUnavailableCustomerBowlItems,
+  findUnavailableCustomerCartItems,
   isCustomerManagedOrder,
   isRestaurantClosedDay,
   isWithinRestaurantHours,
   normalizeCustomerOrderId,
   sanitizeCustomerBowl,
+  sanitizeCustomerCart,
   usefulPointsToRedeem,
 } from "../utils/customerOrder.js";
 import { stableCustomerOrderObjectId } from "../utils/orderReservations.js";
@@ -207,4 +209,61 @@ test("la disponibilidad del servidor cubre cada sección con los mismos ids del 
   );
   assert.deepEqual(findUnavailableCustomerBowlItems(bowl, ["WHITE_RICE"]), []);
   assert.deepEqual(findUnavailableCustomerBowlItems(bowl, null), []);
+});
+
+test("el carrito acepta 2 bowls y un artículo del catálogo en un solo pedido", () => {
+  const cart = sanitizeCustomerCart([
+    { base: "white_rice", proteins: ["salmon"] },
+    { base: "quinoa", proteins: ["tuna", "shrimp"] },
+    { kind: "item", catalogId: "coca-zero", qty: 2 },
+  ]);
+
+  assert.equal(cart.length, 3);
+  assert.equal(cart[0].kind, "bowl");
+  assert.equal(cart[0].base, "white_rice");
+  assert.equal(cart[1].kind, "bowl");
+  assert.equal(cart[1].base, "quinoa");
+  assert.equal(cart[2].kind, "item");
+  assert.equal(cart[2].catalogId, "coca-zero");
+  assert.equal(cart[2].qty, 2);
+  assert.equal(cart[2].price, 30); // precio autoritativo del servidor, no el del cliente
+});
+
+test("el carrito rechaza los bowls de venta rápida del POS (sin receta para un cliente)", () => {
+  assert.throws(
+    () => sanitizeCustomerCart([{ kind: "item", catalogId: "bowl-mediano-rapido", qty: 1 }]),
+    /Artículo 1/
+  );
+  assert.throws(
+    () => sanitizeCustomerCart([{ kind: "item", catalogId: "bowl-grande-rapido", qty: 1 }]),
+    /Artículo 1/
+  );
+});
+
+test("el carrito rechaza estar vacío o exceder el máximo de líneas", () => {
+  assert.throws(() => sanitizeCustomerCart([]), /carrito está vacío/);
+  assert.throws(() => sanitizeCustomerCart(null), /carrito está vacío/);
+  const tooMany = Array.from({ length: 13 }, () => ({ base: "white_rice", proteins: ["salmon"] }));
+  assert.throws(() => sanitizeCustomerCart(tooMany), /máximo/);
+});
+
+test("un bowl inválido dentro del carrito señala cuál línea falló", () => {
+  assert.throws(
+    () => sanitizeCustomerCart([
+      { base: "white_rice", proteins: ["salmon"] },
+      { base: "arroz", proteins: ["salmon"] },
+    ]),
+    /Bowl 2:.*base válida/
+  );
+});
+
+test("la disponibilidad del carrito revisa bowls y artículos por separado", () => {
+  const cart = sanitizeCustomerCart([
+    { base: "white_rice", proteins: ["salmon"] },
+    { kind: "item", catalogId: "coca-zero", qty: 1 },
+  ]);
+
+  assert.deepEqual(findUnavailableCustomerCartItems(cart, ["salmon"]), ["salmon"]);
+  assert.deepEqual(findUnavailableCustomerCartItems(cart, ["coca_zero"]), ["coca_zero"]);
+  assert.deepEqual(findUnavailableCustomerCartItems(cart, ["not_in_cart"]), []);
 });

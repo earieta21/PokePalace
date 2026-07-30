@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 
 // Customer pages — lazy loaded
+const MenuPage         = lazy(() => import("./pages/MenuPage"));
 const OrderPage        = lazy(() => import("./order/OrderPage"));
 const RewardsDeals     = lazy(() => import("./pages/Promotions"));
 const EarnPoints       = lazy(() => import("./pages/EarnPoints"));
@@ -28,6 +29,7 @@ const PrivacyPolicy    = lazy(() => import("./pages/PrivacyPolicy"));
 // Kiosk & staff — lazy loaded (never used by regular customers)
 const KioskLayout      = lazy(() => import("./kiosk/KioskLayout"));
 const KioskWelcome     = lazy(() => import("./kiosk/KioskWelcome"));
+const KioskMenuPage    = lazy(() => import("./kiosk/KioskMenuPage"));
 const KioskOrderPage   = lazy(() => import("./kiosk/KioskOrderPage"));
 const KioskSummaryPage = lazy(() => import("./kiosk/KioskSummaryPage"));
 const KioskDonePage    = lazy(() => import("./kiosk/KioskDonePage"));
@@ -88,6 +90,7 @@ const App = () => {
               <Route path="/qr" element={<QrCodePage />} />
               <Route path="/aviso-de-privacidad" element={<PrivacyPolicy />} />
 
+              <Route path="/menu" element={<MenuPage />} />
               <Route path="/order" element={<OrderPage />} />
               <Route path="/summary" element={<OrderSummaryPage />} />
               <Route path="/seguimiento/:orderId" element={<OrderTracking />} />
@@ -113,6 +116,7 @@ const App = () => {
             {/* ✅ Self-service kiosk (counter tablet) */}
             <Route element={<KioskLayout />}>
               <Route path="/kiosk" element={<KioskWelcome />} />
+              <Route path="/kiosk/menu" element={<KioskMenuPage />} />
               <Route path="/kiosk/order" element={<KioskOrderPage />} />
               <Route path="/kiosk/summary" element={<KioskSummaryPage />} />
               <Route path="/kiosk/done" element={<KioskDonePage />} />

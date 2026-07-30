@@ -1,4 +1,6 @@
 import { zonedParts } from "./timeZone.js";
+import { computeBowlSubtotal, computeExtrasSubtotal } from "../pricing.js";
+import { getUnavailablePosSelections, resolvePosItems } from "../config/posCatalog.js";
 
 export const CUSTOMER_ORDER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,99}$/;
 
@@ -126,6 +128,91 @@ export function findUnavailableCustomerBowlItems(bowl, unavailableItems) {
   ];
 
   return [...new Set(selectedIds.filter((item) => unavailable.has(item)))];
+}
+
+// Artículos del catálogo POS que existen solo para que el personal cobre
+// rápido sin capturar el bowl completo (no traen receta de inventario) — no
+// tienen sentido como elección deliberada de un cliente armando su pedido.
+export const CUSTOMER_EXCLUDED_CATALOG_IDS = new Set([
+  "bowl-mediano-rapido",
+  "bowl-grande-rapido",
+]);
+
+const MAX_CART_LINES = 12;
+
+const priceCustomerBowl = (bowl) => {
+  const subtotal = computeBowlSubtotal(bowl.bowlSize) + computeExtrasSubtotal({
+    extraScoops: bowl.extraScoopProteins.length,
+    complementsCount: bowl.complements.length,
+    proteins: bowl.proteins,
+  });
+  return Math.round(subtotal * 100) / 100;
+};
+
+// Valida un carrito completo de cliente/kiosco: 1 o más bowls personalizados
+// y/o artículos del catálogo (bebidas, entradas, bowls de la casa). Cada
+// línea de bowl se valida igual que un pedido de un solo bowl; las líneas de
+// artículo reutilizan `resolvePosItems` (mismo precio/tope/deduplicación que
+// ya usa el POS) para no duplicar esa lógica.
+export function sanitizeCustomerCart(cart) {
+  if (!Array.isArray(cart) || cart.length === 0) {
+    throw new TypeError("Tu carrito está vacío");
+  }
+  if (cart.length > MAX_CART_LINES) {
+    throw new TypeError(`Tu carrito admite máximo ${MAX_CART_LINES} artículos`);
+  }
+
+  const bowlLines = [];
+  const rawItemLines = [];
+  cart.forEach((line, index) => {
+    if (line?.kind === "item") {
+      const catalogId = String(line?.catalogId || "").trim();
+      if (CUSTOMER_EXCLUDED_CATALOG_IDS.has(catalogId)) {
+        throw new TypeError(`Artículo ${index + 1}: no disponible para pedidos en línea`);
+      }
+      rawItemLines.push({ catalogId, qty: line?.qty });
+    } else {
+      try {
+        const bowl = sanitizeCustomerBowl(line || {});
+        bowlLines.push({ kind: "bowl", ...bowl, price: priceCustomerBowl(bowl), qty: 1 });
+      } catch (bowlError) {
+        throw new TypeError(`Bowl ${index + 1}: ${bowlError.message}`);
+      }
+    }
+  });
+
+  const itemLines = rawItemLines.length > 0
+    ? resolvePosItems(rawItemLines).map((item) => ({
+        kind: "item",
+        catalogId: item.catalogId,
+        name: item.name,
+        price: item.price,
+        qty: item.qty,
+      }))
+    : [];
+
+  return [...bowlLines, ...itemLines];
+}
+
+// Como findUnavailableCustomerBowlItems, pero para un carrito completo — cada
+// línea de bowl se revisa igual que hoy; las líneas de artículo reutilizan
+// getUnavailablePosSelections (misma revisión que ya usa el POS).
+export function findUnavailableCustomerCartItems(cart, unavailableItems) {
+  if (!Array.isArray(cart) || cart.length === 0) return [];
+
+  const found = new Set();
+  for (const line of cart) {
+    if (line.kind === "item") {
+      for (const id of getUnavailablePosSelections({ items: [line], unavailableItems })) {
+        found.add(id);
+      }
+    } else {
+      for (const id of findUnavailableCustomerBowlItems(line, unavailableItems)) {
+        found.add(id);
+      }
+    }
+  }
+  return [...found].sort();
 }
 
 export function normalizeCustomerOrderId(value) {

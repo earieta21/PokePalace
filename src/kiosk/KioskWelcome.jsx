@@ -41,7 +41,7 @@ export default function KioskWelcome() {
 
       <button
         type="button"
-        onClick={() => navigate("/kiosk/order")}
+        onClick={() => navigate("/kiosk/menu")}
         style={{
           padding: "22px 56px",
           borderRadius: 999,

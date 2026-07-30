@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useOrder } from "../order/OrderContext";
 import useIdleTimeout from "./useIdleTimeout";
 
@@ -11,12 +11,15 @@ import SauceSelection from "../order/SauceSelection";
 import ToppingsSelection from "../order/ToppingsSelection";
 
 const IDLE_TIMEOUT_MS = 60000;
+const LAST_STEP = 5;
 
 export default function KioskOrderPage() {
-  const location = useLocation();
-  const [step, setStep] = useState(() => location.state?.initialStep ?? 0);
+  const { order, updateOrder, resetOrder, addBowlToCart } = useOrder();
+  const [step, setStep] = useState(() => {
+    const savedStep = Number(order.draftStep);
+    return Number.isInteger(savedStep) && savedStep >= 0 && savedStep <= LAST_STEP ? savedStep : 0;
+  });
   const navigate = useNavigate();
-  const { resetOrder } = useOrder();
 
   const goToWelcome = useCallback(() => {
     resetOrder();
@@ -25,9 +28,20 @@ export default function KioskOrderPage() {
 
   useIdleTimeout(goToWelcome, IDLE_TIMEOUT_MS);
 
-  const nextStep = () => setStep((prev) => prev + 1);
-  const prevStep = () => setStep((prev) => Math.max(0, prev - 1));
-  const goToSummary = () => navigate("/kiosk/summary");
+  const setOrderStep = (nextStep) => {
+    setStep(nextStep);
+    updateOrder("draftStep", nextStep);
+  };
+  const nextStep = () => setOrderStep(Math.min(step + 1, LAST_STEP));
+  const prevStep = () => setOrderStep(Math.max(0, step - 1));
+
+  // Confirma el bowl en construcción como línea del carrito y regresa al
+  // menú para que el cliente decida si agrega otro bowl/artículo o va al
+  // carrito — igual que en la app web.
+  const finishBowl = () => {
+    addBowlToCart();
+    navigate("/kiosk/menu");
+  };
 
   const steps = [
     <BaseSelection key="base" onNext={nextStep} onBack={prevStep} />,
@@ -35,7 +49,7 @@ export default function KioskOrderPage() {
     <MarinadeSelection key="marinade" onNext={nextStep} onBack={prevStep} />,
     <ComplementsSelection key="complements" onNext={nextStep} onBack={prevStep} />,
     <SauceSelection key="sauce" onNext={nextStep} onBack={prevStep} />,
-    <ToppingsSelection key="toppings" onNext={goToSummary} onBack={prevStep} />,
+    <ToppingsSelection key="toppings" onNext={finishBowl} onBack={prevStep} />,
   ];
 
   return (

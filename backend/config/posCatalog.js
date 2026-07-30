@@ -282,40 +282,56 @@ const addDemand = (demand, key, amount = 1) => {
   demand.set(cleanKey, (demand.get(cleanKey) || 0) + cleanAmount);
 };
 
+// Suma la demanda de ingredientes de un bowl (ya sea los campos planos de
+// nivel superior de una orden, o una línea kind:"bowl" del carrito) — "mitad
+// y mitad" reparte la porción normal de base entre las 2 elegidas (0.5 c/u)
+// en vez de sumar una porción completa de cada una.
+const addBowlDemand = (demand, bowlLike) => {
+  if (Array.isArray(bowlLike.bases) && bowlLike.bases.length > 0) {
+    const portion = 1 / bowlLike.bases.length;
+    for (const key of bowlLike.bases) addDemand(demand, key, portion);
+  } else if (bowlLike.base) {
+    addDemand(demand, bowlLike.base);
+  }
+  for (const field of ["proteins", "marinades", "complements", "sauces", "toppings", "extraScoopProteins"]) {
+    for (const key of Array.isArray(bowlLike[field]) ? bowlLike[field] : []) addDemand(demand, key);
+  }
+};
+
+const addItemDemand = (demand, item) => {
+  const qty = Number(item?.qty ?? 1);
+  if (!Number.isInteger(qty) || qty <= 0) return;
+  const catalogItem = catalogItemForStoredLine(item);
+  const recipe = catalogItem?.inventoryRecipe;
+  if (recipe && typeof recipe === "object") {
+    for (const [key, portions] of Object.entries(recipe)) {
+      addDemand(demand, key, portions * qty);
+    }
+  } else {
+    // Preserve stock matching for historical POS orders created before the
+    // canonical catalog carried recipes.
+    addDemand(demand, inventoryKeyFromName(item?.name), qty);
+  }
+};
+
 // Converts a complete order into ingredient portions. Flat POS products use
 // their canonical recipe and multiply every ingredient by item.qty; a custom
-// bowl contributes each selected ingredient once. The resulting object is
-// deterministic, which also makes retries safe to reconcile.
+// bowl contributes each selected ingredient once. A cliente/kiosco cart
+// (order.cartItems) contributes the same way, once per line. The resulting
+// object is deterministic, which also makes retries safe to reconcile.
 export const getPosInventoryDemand = (order = {}) => {
   const demand = new Map();
 
-  // "Mitad y mitad" reparte la porción normal de base entre las 2 elegidas
-  // (0.5 c/u) en vez de sumar una porción completa de cada una.
-  if (Array.isArray(order.bases) && order.bases.length > 0) {
-    const portion = 1 / order.bases.length;
-    for (const key of order.bases) addDemand(demand, key, portion);
-  } else if (order.base) {
-    addDemand(demand, order.base);
-  }
-  for (const field of ["proteins", "marinades", "complements", "sauces", "toppings", "extraScoopProteins"]) {
-    for (const key of Array.isArray(order[field]) ? order[field] : []) addDemand(demand, key);
-  }
+  addBowlDemand(demand, order);
   if (order.rewardExtraTopping) addDemand(demand, order.rewardExtraTopping);
 
   for (const item of Array.isArray(order.items) ? order.items : []) {
-    const qty = Number(item?.qty ?? 1);
-    if (!Number.isInteger(qty) || qty <= 0) continue;
-    const catalogItem = catalogItemForStoredLine(item);
-    const recipe = catalogItem?.inventoryRecipe;
-    if (recipe && typeof recipe === "object") {
-      for (const [key, portions] of Object.entries(recipe)) {
-        addDemand(demand, key, portions * qty);
-      }
-    } else {
-      // Preserve stock matching for historical POS orders created before the
-      // canonical catalog carried recipes.
-      addDemand(demand, inventoryKeyFromName(item?.name), qty);
-    }
+    addItemDemand(demand, item);
+  }
+
+  for (const line of Array.isArray(order.cartItems) ? order.cartItems : []) {
+    if (line?.kind === "item") addItemDemand(demand, line);
+    else addBowlDemand(demand, line || {});
   }
 
   return Object.fromEntries([...demand.entries()].sort(([a], [b]) => a.localeCompare(b)));

@@ -3,7 +3,7 @@ import PromoCode from "../models/PromoCode.js";
 import User from "../models/User.js";
 import StoreSettings from "../models/StoreSettings.js";
 import mongoose from "mongoose";
-import { computePricing } from "../pricing.js";
+import { computeCartPricing } from "../pricing.js";
 import { sendEmail, orderConfirmationEmail } from "../utils/notify.js";
 import { createPaymentLink, getPaymentLinkStatus } from "../utils/clip.js";
 import { expireStalePoints } from "../utils/loyalty.js";
@@ -13,12 +13,12 @@ import {
   orderAccessTokenMatches,
 } from "../utils/orderAccess.js";
 import {
-  findUnavailableCustomerBowlItems,
+  findUnavailableCustomerCartItems,
   isCustomerManagedOrder,
   isRestaurantClosedDay,
   isWithinRestaurantHours,
   normalizeCustomerOrderId,
-  sanitizeCustomerBowl,
+  sanitizeCustomerCart,
   usefulPointsToRedeem,
 } from "../utils/customerOrder.js";
 import { stableCustomerOrderObjectId } from "../utils/orderReservations.js";
@@ -267,15 +267,7 @@ export const createOrder = async (req, res) => {
     }
 
     const {
-      base,
-      bases,
-      protein,
-      proteins,
-      marinades,
-      complements,
-      sauces,
-      toppings,
-      extraScoopProteins,
+      cart,
       customer,
       phone,
       notes,
@@ -285,25 +277,15 @@ export const createOrder = async (req, res) => {
       paymentMethod,
     } = req.body;
 
-    let safeBowl;
+    let safeCart;
     try {
-      safeBowl = sanitizeCustomerBowl({
-        base,
-        bases,
-        protein,
-        proteins,
-        marinades,
-        complements,
-        sauces,
-        toppings,
-        extraScoopProteins,
-      });
+      safeCart = sanitizeCustomerCart(cart);
     } catch (validationError) {
       return res.status(400).json({ msg: validationError.message });
     }
 
-    const unavailableSelections = findUnavailableCustomerBowlItems(
-      safeBowl,
+    const unavailableSelections = findUnavailableCustomerCartItems(
+      safeCart,
       storeSettings?.unavailableItems
     );
     if (unavailableSelections.length > 0) {
@@ -313,7 +295,14 @@ export const createOrder = async (req, res) => {
         unavailableItems: unavailableSelections,
       });
     }
-    const selectedProteins = safeBowl.proteins;
+
+    // Espejo del primer bowl (y de los artículos planos) en los campos
+    // legado — red de seguridad para cualquier lector que aún no distinga
+    // `cartItems`, no la fuente de verdad (esa es `cartItems` completo).
+    const firstBowl = safeCart.find((line) => line.kind === "bowl") || null;
+    const legacyItems = safeCart
+      .filter((line) => line.kind === "item")
+      .map((line) => ({ catalogId: line.catalogId, name: line.name, price: line.price, qty: line.qty }));
 
     const cleanCustomer = typeof customer === "string" ? customer.trim() : "";
     const cleanPhone = typeof phone === "string" ? phone.trim() : "";
@@ -348,15 +337,9 @@ export const createOrder = async (req, res) => {
       ? { discountType: promoDoc.discountType, discountValue: promoDoc.discountValue }
       : null;
 
-    const resolvedBowlSize = safeBowl.bowlSize;
-    const { subtotal, discount: promoDiscount, tax, total: baseTotal } = computePricing(
-      resolvedBowlSize,
-      resolvedPromo,
-      {
-        extraScoops: safeBowl.extraScoopProteins.length,
-        complementsCount: safeBowl.complements.length,
-        proteins: safeBowl.proteins,
-      }
+    const { subtotal, discount: promoDiscount, tax, total: baseTotal } = computeCartPricing(
+      safeCart,
+      resolvedPromo
     );
 
     // The balance decrement and order marker are also one atomic write. A
@@ -393,17 +376,19 @@ export const createOrder = async (req, res) => {
       paymentMethod: paymentMethod === "online" ? "online" : "pay_at_pickup",
       paymentStatus: "pending",
       source: "online",
-      base: safeBowl.base,
-      bases: safeBowl.bases,
-      protein: selectedProteins.join(", "),
-      proteins: selectedProteins,
-      bowlSize: resolvedBowlSize,
-      proteinUpcharge: selectedProteins.length === 3 ? 1 : 0,
-      marinades: safeBowl.marinades,
-      complements: safeBowl.complements,
-      sauces: safeBowl.sauces,
-      toppings: safeBowl.toppings,
-      extraScoopProteins: safeBowl.extraScoopProteins,
+      cartItems: safeCart,
+      items: legacyItems,
+      base: firstBowl?.base ?? null,
+      bases: firstBowl?.bases ?? [],
+      protein: (firstBowl?.proteins ?? []).join(", "),
+      proteins: firstBowl?.proteins ?? [],
+      bowlSize: firstBowl?.bowlSize ?? "normal",
+      proteinUpcharge: firstBowl?.proteins?.length === 3 ? 1 : 0,
+      marinades: firstBowl?.marinades ?? [],
+      complements: firstBowl?.complements ?? [],
+      sauces: firstBowl?.sauces ?? [],
+      toppings: firstBowl?.toppings ?? [],
+      extraScoopProteins: firstBowl?.extraScoopProteins ?? [],
       promoCode:      promoDoc?.code || null,
       subtotal,
       discountAmount: totalDiscount,

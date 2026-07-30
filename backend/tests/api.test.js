@@ -167,8 +167,7 @@ test("el resumen protegido informa el total de clientes registrados", async () =
 test("crear orden valida: el precio lo pone el servidor, no el cliente", async () => {
   const attempt = customerAttempt("price");
   const r = await postJSON("/api/orders", {
-    base: "white_rice",
-    proteins: ["salmon"],
+    cart: [{ base: "white_rice", proteins: ["salmon"] }],
     customer: "Prueba CI",
     phone: "6630000000",
     scheduledPickupTime: tomorrowAt15(),
@@ -212,8 +211,7 @@ test("checkout rechaza ingredientes agotados antes de reservar promo o puntos", 
     );
 
     const response = await postJSON("/api/orders", {
-      base: "white_rice",
-      proteins: ["salmon", "tuna"],
+      cart: [{ base: "white_rice", proteins: ["salmon", "tuna"] }],
       customer: "Disponibilidad CI",
       phone: "6630000099",
       scheduledPickupTime: tomorrowAt15(),
@@ -252,8 +250,7 @@ test("checkout rechaza ingredientes agotados antes de reservar promo o puntos", 
 test("una orden invitada exige su token secreto para consultar y cancelar", async () => {
   const attempt = customerAttempt("guest-access");
   const created = await postJSON("/api/orders", {
-    base: "white_rice",
-    proteins: ["salmon"],
+    cart: [{ base: "white_rice", proteins: ["salmon"] }],
     customer: "Invitado protegido",
     phone: "6630000001",
     scheduledPickupTime: tomorrowAt15(),
@@ -306,8 +303,7 @@ test("una orden invitada exige su token secreto para consultar y cancelar", asyn
 test("el QR de seguimiento del kiosco puede autenticarse con ?ot= en vez del header", async () => {
   const attempt = customerAttempt("kiosk-qr");
   const created = await postJSON("/api/orders", {
-    base: "white_rice",
-    proteins: ["salmon"],
+    cart: [{ base: "white_rice", proteins: ["salmon"] }],
     customer: "Cliente de kiosco",
     phone: "6630000002",
     scheduledPickupTime: tomorrowAt15(),
@@ -364,8 +360,7 @@ test("solo el dueño ve su orden y cancelar revierte puntos/promo exactamente un
       Authorization: `Bearer ${owner.token}`,
     },
     body: JSON.stringify({
-      base: "white_rice",
-      proteins: ["salmon"],
+      cart: [{ base: "white_rice", proteins: ["salmon"] }],
       customer: "Dueño CI",
       phone: "6630000002",
       scheduledPickupTime: tomorrowAt15(),
@@ -554,8 +549,7 @@ test("un retry recupera reservas confirmadas sin gastar promo ni puntos dos vece
       Authorization: `Bearer ${account.token}`,
     },
     body: JSON.stringify({
-      base: "white_rice",
-      proteins: ["salmon"],
+      cart: [{ base: "white_rice", proteins: ["salmon"] }],
       customer: "Cliente ACK perdido",
       phone: "6630000003",
       scheduledPickupTime: tomorrowAt15(),
@@ -646,8 +640,7 @@ test("orden sin base ni proteina se rechaza", async () => {
 
 test("mas de 3 proteinas se rechaza", async () => {
   const r = await postCustomerOrder({
-    base: "white_rice",
-    proteins: ["salmon", "tuna", "shrimp", "tofu"],
+    cart: [{ base: "white_rice", proteins: ["salmon", "tuna", "shrimp", "tofu"] }],
     customer: "Prueba CI",
     phone: "6630000000",
     scheduledPickupTime: tomorrowAt15(),
@@ -657,8 +650,7 @@ test("mas de 3 proteinas se rechaza", async () => {
 
 test("orden sin nombre/telefono se rechaza", async () => {
   const r = await postCustomerOrder({
-    base: "white_rice",
-    proteins: ["salmon"],
+    cart: [{ base: "white_rice", proteins: ["salmon"] }],
     scheduledPickupTime: tomorrowAt15(),
   }, "missing-contact");
   assert.equal(r.status, 400);
@@ -1082,8 +1074,7 @@ test("el monitor de errores acepta reportes", async () => {
 
 test("cobrar registra el metodo de pago y rechaza metodos desconocidos", async () => {
   const created = await postCustomerOrder({
-    base: "white_rice",
-    proteins: ["salmon"],
+    cart: [{ base: "white_rice", proteins: ["salmon"] }],
     customer: "Cobro con metodo CI",
     phone: "6630000042",
     scheduledPickupTime: tomorrowAt15(),
@@ -1104,8 +1095,7 @@ test("cobrar registra el metodo de pago y rechaza metodos desconocidos", async (
   // Un metodo desconocido no debe corromper el registro: se ignora y el
   // metodo original de la orden se conserva.
   const other = await postCustomerOrder({
-    base: "white_rice",
-    proteins: ["salmon"],
+    cart: [{ base: "white_rice", proteins: ["salmon"] }],
     customer: "Cobro metodo invalido CI",
     phone: "6630000043",
     scheduledPickupTime: tomorrowAt15(),

@@ -1,5 +1,34 @@
 import mongoose from "mongoose";
 
+// Una línea del carrito de cliente/kiosco: un bowl personalizado completo o
+// un artículo del catálogo (bebida, entrada, bowl de la casa) con cantidad.
+// Convive con los campos planos de abajo (que siguen siendo lo único que usa
+// el POS/personal) — un pedido de cliente nuevo llena `cartItems` y además
+// replica el primer bowl en los campos planos, por compatibilidad con
+// cualquier lector que aún no distinga carritos.
+const cartLineSchema = new mongoose.Schema(
+  {
+    kind: { type: String, enum: ["bowl", "item"], required: true },
+    // Campos de bowl (kind: "bowl")
+    base:        { type: String, default: null },
+    bases:       { type: [String], default: [] },
+    proteins:    { type: [String], default: [] },
+    bowlSize:    { type: String, enum: ["normal", "large"], default: "normal" },
+    marinades:   { type: [String], default: [] },
+    complements: { type: [String], default: [] },
+    sauces:      { type: [String], default: [] },
+    toppings:    { type: [String], default: [] },
+    extraScoopProteins: { type: [String], default: [] },
+    // Campos de artículo de catálogo (kind: "item")
+    catalogId: { type: String, default: null },
+    name:      { type: String, default: null },
+    // Compartidos
+    price: { type: Number, default: 0 },
+    qty:   { type: Number, default: 1 },
+  },
+  { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
   {
     // Customer-side orders: user is set. POS orders: staffId is set.
@@ -35,6 +64,11 @@ const orderSchema = new mongoose.Schema(
 
     // POS orders: flat item list [{name, price, qty}]
     items: { type: Array, default: [] },
+
+    // Carrito de cliente/kiosco con 1 o más bowls y/o artículos del menú —
+    // ver cartLineSchema arriba. Vacío para pedidos POS y para pedidos de
+    // cliente de antes de esta función (que solo usan los campos planos).
+    cartItems: { type: [cartLineSchema], default: [] },
 
     // Shared optional fields
     customer: { type: String, default: null }, // "Table 4", "Walk-in", customer name

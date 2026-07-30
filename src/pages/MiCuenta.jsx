@@ -14,6 +14,14 @@ const getProteinsText = (order, language) => {
   return order.protein || "-";
 };
 
+const cartLineBrief = (line, language) => {
+  if (line.kind === "item") return `${line.name} ×${line.qty}`;
+  const proteins = (line.proteins || []).map((id) => getItemLabel("protein", id, language)).join(", ");
+  const baseLabel = getBaseLabel(line.bases, line.base, language);
+  const size = line.bowlSize === "large" ? "Grande" : "Mediano";
+  return `Bowl ${size}: ${proteins} en ${baseLabel}`;
+};
+
 export default function MiCuenta() {
   const { user, token, isLoggedIn, logout, refreshUser } = useContext(AuthContext);
   const { loadFavorite, reorder } = useOrder();
@@ -262,22 +270,30 @@ export default function MiCuenta() {
                       </div>
                     </div>
 
-                    <p className={styles.line}>
-                      <strong>{t("common.base")}:</strong> {o.base ? getBaseLabel(o.bases, o.base, language) : t("common.none")}{" "}
-                      <span className={styles.muted}>•</span>{" "}
-                      <strong>{t("common.proteins")}:</strong> {getProteinsText(o, language)}
-                    </p>
+                    {o.cartItems?.length > 0 ? (
+                      <p className={styles.line}>
+                        <strong>{language === "es" ? "Pedido" : "Order"}:</strong>{" "}
+                        {o.cartItems.map((line, idx) => `${idx > 0 ? " + " : ""}${cartLineBrief(line, language)}`).join("")}
+                      </p>
+                    ) : (
+                      <>
+                        <p className={styles.line}>
+                          <strong>{t("common.base")}:</strong> {o.base ? getBaseLabel(o.bases, o.base, language) : t("common.none")}{" "}
+                          <span className={styles.muted}>•</span>{" "}
+                          <strong>{t("common.proteins")}:</strong> {getProteinsText(o, language)}
+                        </p>
+                        <p className={styles.line}>
+                          <strong>{t("tracking.size")}:</strong>{" "}
+                          {o.bowlSize === "large" ? t("summary.large") : t("summary.normal")}
+                        </p>
+                      </>
+                    )}
 
-                    <p className={styles.line}>
-                      <strong>{t("tracking.size")}:</strong>{" "}
-                      {o.bowlSize === "large" ? t("summary.large") : t("summary.normal")}
-                      {o.total != null ? (
-                        <>
-                          <span className={styles.muted}> • </span>
-                          <strong>{t("common.total")}:</strong> ${o.total} MXN
-                        </>
-                      ) : null}
-                    </p>
+                    {o.total != null && (
+                      <p className={styles.line}>
+                        <strong>{t("common.total")}:</strong> ${o.total} MXN
+                      </p>
+                    )}
 
                     <p className={styles.line}>
                       <strong>{t("summary.fulfillment")}:</strong>{" "}
@@ -290,22 +306,26 @@ export default function MiCuenta() {
                       ) : null}
                     </p>
 
-                    <p className={styles.line}>
-                      <strong>{t("common.complements")}:</strong>{" "}
-                      {(o.complements || []).map((id) => getItemLabel("complement", id, language)).join(", ") || t("common.none")}
-                    </p>
+                    {!o.cartItems?.length && (
+                      <>
+                        <p className={styles.line}>
+                          <strong>{t("common.complements")}:</strong>{" "}
+                          {(o.complements || []).map((id) => getItemLabel("complement", id, language)).join(", ") || t("common.none")}
+                        </p>
 
-                    <p className={styles.line}>
-                      <strong>{t("common.sauces")}:</strong> {(o.sauces || []).map((id) => getItemLabel("sauce", id, language)).join(", ") || t("common.none")}
-                    </p>
+                        <p className={styles.line}>
+                          <strong>{t("common.sauces")}:</strong> {(o.sauces || []).map((id) => getItemLabel("sauce", id, language)).join(", ") || t("common.none")}
+                        </p>
 
-                    <p className={styles.line}>
-                      <strong>{t("common.toppings")}:</strong>{" "}
-                      {(o.toppings || []).map((id) => getItemLabel("topping", id, language)).join(", ") || t("common.none")}
-                    </p>
+                        <p className={styles.line}>
+                          <strong>{t("common.toppings")}:</strong>{" "}
+                          {(o.toppings || []).map((id) => getItemLabel("topping", id, language)).join(", ") || t("common.none")}
+                        </p>
+                      </>
+                    )}
 
-                    {/* Reorder button — only for completed orders with a base */}
-                    {o.status === "completed" && o.base && (
+                    {/* Reorder button — only for completed orders with a bowl */}
+                    {o.status === "completed" && (o.base || o.cartItems?.length > 0) && (
                       <div style={{ marginTop: 10 }}>
                         <button
                           className={styles.primaryBtn}

@@ -127,7 +127,9 @@ export function orderConfirmationEmail(order) {
     <p style="font-size:14px;color:#555;margin:0 0 18px">Tu pedido <strong>#${num}</strong> está confirmado y la cocina ya lo tiene.</p>
     <table style="width:100%;font-size:14px;color:#333;border-collapse:collapse">
       <tr><td style="padding:6px 0;color:#888">Entrega</td><td style="text-align:right">${fulfillment}</td></tr>
-      <tr><td style="padding:6px 0;color:#888">Tamaño</td><td style="text-align:right">${order.bowlSize === "large" ? "Bowl grande" : "Bowl normal"}</td></tr>
+      ${order.cartItems?.length
+        ? `<tr><td style="padding:6px 0;color:#888">Artículos</td><td style="text-align:right">${order.cartItems.length}</td></tr>`
+        : `<tr><td style="padding:6px 0;color:#888">Tamaño</td><td style="text-align:right">${order.bowlSize === "large" ? "Bowl grande" : "Bowl normal"}</td></tr>`}
       ${order.total != null ? `<tr><td style="padding:6px 0;color:#888">Total</td><td style="text-align:right;font-weight:700">$${order.total} MXN</td></tr>` : ""}
     </table>
     <div style="text-align:center;margin:24px 0 8px">

@@ -18,6 +18,20 @@ const RANGES = [
 
 function itemBrief(order) {
   const parts = [];
+
+  if (order.cartItems?.length) {
+    for (const line of order.cartItems) {
+      if (line.kind === "item") {
+        parts.push(`${line.name} ×${line.qty}`);
+        continue;
+      }
+      const proteins = line.proteins?.map((id) => PROTEIN_LABELS[id] ?? id).join(", ") || "";
+      const baseText = line.bases?.length > 1 ? line.bases.join(" + ") : line.base;
+      parts.push(`Bowl ${line.bowlSize === "large" ? "Grande" : "Normal"}: ${proteins} en ${baseText}`);
+    }
+    return parts.join(" + ") || "Bowl personalizado";
+  }
+
   if (order.items?.length) parts.push(order.items.map((i) => `${i.name} ×${i.qty}`).join(", "));
   if (order.base) {
     const proteins = order.proteins?.map((id) => PROTEIN_LABELS[id] ?? id).join(", ") || order.protein || "";

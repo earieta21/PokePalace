@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  computePricing, computeExtrasSubtotal, BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE,
+  computePricing, computeCartPricing, computeExtrasSubtotal, BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE,
   EXTRA_SCOOP_PRICE, COMPLEMENT_FREE_LIMIT, EXTRA_COMPLEMENT_PRICE,
   PREMIUM_PROTEIN_PRICES,
 } from "../pricing.js";
@@ -83,6 +83,35 @@ test("el scoop extra solo se acepta de una proteina ya elegida", () => {
   assert.throws(() => sanitizeCustomerBowl({
     base: "white_rice", proteins: ["salmon", "tuna"], extraScoopProteins: ["shrimp"],
   }), TypeError);
+});
+
+test("un carrito con 2 bowls suma el subtotal de cada uno por separado", () => {
+  const cart = [
+    { kind: "bowl", bowlSize: "normal", proteins: ["salmon"], complements: [], extraScoopProteins: [] },
+    { kind: "bowl", bowlSize: "large", proteins: ["tuna", "salmon", "shrimp"], complements: [], extraScoopProteins: [] },
+  ];
+  const { subtotal, total } = computeCartPricing(cart, null);
+  assert.equal(subtotal, BOWL_BASE_PRICE + (BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE));
+  assert.equal(total, subtotal);
+});
+
+test("un carrito mixto suma bowls y artículos de catálogo con su cantidad", () => {
+  const cart = [
+    { kind: "bowl", bowlSize: "normal", proteins: ["salmon"], complements: [], extraScoopProteins: [] },
+    { kind: "item", price: 30, qty: 2 }, // 2 Coca-Zero
+  ];
+  const { subtotal } = computeCartPricing(cart, null);
+  assert.equal(subtotal, BOWL_BASE_PRICE + 60);
+});
+
+test("el descuento del carrito se aplica una sola vez sobre el total combinado", () => {
+  const cart = [
+    { kind: "bowl", bowlSize: "normal", proteins: ["salmon"], complements: [], extraScoopProteins: [] },
+    { kind: "item", price: 30, qty: 1 },
+  ];
+  const { discount, total } = computeCartPricing(cart, { discountType: "fixed", discountValue: 50 });
+  assert.equal(discount, 50);
+  assert.equal(total, BOWL_BASE_PRICE + 30 - 50);
 });
 
 /* ── Geocerca: el candado GPS de las checadas ── */

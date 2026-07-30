@@ -183,6 +183,23 @@ test("un bowl mitad y mitad reparte la porción de base entre las 2 elegidas", (
   assert.equal(demand.tuna, 1);
 });
 
+test("el carrito de cliente/kiosco suma la demanda de cada línea (bowls y artículos)", () => {
+  const demand = getPosInventoryDemand({
+    cartItems: [
+      { kind: "bowl", base: "white_rice", proteins: ["salmon"] },
+      { kind: "bowl", bases: ["quinoa", "spring_mix"], proteins: ["tuna"] },
+      { kind: "item", catalogId: "coca-zero", qty: 2 },
+    ],
+  });
+
+  assert.equal(demand.white_rice, 1);
+  assert.equal(demand.quinoa, 0.5);
+  assert.equal(demand.spring_mix, 0.5);
+  assert.equal(demand.salmon, 1);
+  assert.equal(demand.tuna, 1);
+  assert.equal(demand.coca_zero, 2);
+});
+
 test("el servidor detecta productos e ingredientes agotados aunque el POS esté desactualizado", () => {
   const items = resolvePosItems([
     { catalogId: "bowl-tropical-shrimp", qty: 1 },

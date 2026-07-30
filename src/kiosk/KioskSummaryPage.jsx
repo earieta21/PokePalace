@@ -27,20 +27,19 @@ export default function KioskSummaryPage() {
 
   useIdleTimeout(goToWelcome, IDLE_TIMEOUT_MS);
 
-  const onEditStep = (stepIndex) => {
-    navigate("/kiosk/order", { state: { initialStep: stepIndex } });
+  const onBuildBowl = () => {
+    navigate("/kiosk/order");
   };
 
   const onRestart = () => {
     clearOrderSubmission("kiosk");
     resetOrder();
-    navigate("/kiosk/order", { state: { initialStep: 0 }, replace: true });
+    navigate("/kiosk/menu", { replace: true });
   };
 
   const onConfirm = async () => {
-    const selectedProteins = Array.isArray(order?.proteins) ? order.proteins : [];
-    if (!order?.base || selectedProteins.length < 1) {
-      setSubmitError("Completa la base y selecciona al menos 1 proteína para confirmar.");
+    if (!Array.isArray(order?.cart) || order.cart.length === 0) {
+      setSubmitError("Tu carrito está vacío — agrega al menos un bowl o artículo.");
       return;
     }
 
@@ -69,8 +68,14 @@ export default function KioskSummaryPage() {
 
       let submission = getOrCreateOrderSubmission("kiosk");
       submission = keepOrderSubmissionPayload(submission, {
-        ...order,
-        updateCheckout: undefined,
+        cart: order.cart,
+        customer: order.customer,
+        phone: order.phone,
+        notes: order.notes,
+        fulfillment: order.fulfillment,
+        paymentMethod: order.paymentMethod,
+        promoCode: order.promoCode,
+        isScheduled: order.isScheduled,
         scheduledPickupTime: order.isScheduled && order.scheduledPickupTime
           ? new Date(order.scheduledPickupTime).toISOString()
           : undefined,
@@ -137,7 +142,8 @@ export default function KioskSummaryPage() {
         Cancelar pedido
       </button>
       <OrderSummary
-        onEditStep={onEditStep}
+        onBuildBowl={onBuildBowl}
+        onBrowseMenu={() => navigate("/kiosk/menu")}
         onRestart={onRestart}
         onConfirm={onConfirm}
         saving={saving}

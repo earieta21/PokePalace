@@ -47,3 +47,29 @@ export const computePricing = (bowlSize, promo, extras = {}) => {
   const total = round2(taxable + tax);
   return { subtotal: round2(subtotal), discount, tax, total };
 };
+
+const cartLineSubtotal = (line) => {
+  if (line.kind === "item") {
+    return (Number(line.price) || 0) * (Number(line.qty) || 0);
+  }
+  return computeBowlSubtotal(line.bowlSize) + computeExtrasSubtotal({
+    extraScoops: line.extraScoopProteins?.length || 0,
+    complementsCount: line.complements?.length || 0,
+    proteins: line.proteins,
+  });
+};
+
+// Igual que computePricing, pero suma el subtotal de cada línea del carrito
+// (bowls + artículos del catálogo) antes de aplicar el descuento/impuesto una
+// sola vez sobre el total combinado.
+export const computeCartPricing = (cart, promo) => {
+  const subtotal = (Array.isArray(cart) ? cart : []).reduce(
+    (sum, line) => sum + cartLineSubtotal(line),
+    0
+  );
+  const discount = round2(computeDiscount(subtotal, promo));
+  const taxable = Math.max(0, subtotal - discount);
+  const tax = round2(taxable * TAX_RATE);
+  const total = round2(taxable + tax);
+  return { subtotal: round2(subtotal), discount, tax, total };
+};

@@ -6,7 +6,7 @@ import { useOrder } from "../order/OrderContext";
 import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
 import { saveActiveOrder } from "../utils/orderAccess";
-import { computePricing } from "../order/pricing";
+import { computeCartPricing } from "../order/pricing";
 import {
   clearOrderSubmission,
   getOrCreateOrderSubmission,
@@ -42,12 +42,7 @@ export default function OrderSummaryPage() {
   const [usePoints, setUsePoints] = useState(false);
   const [validatedPromo, setValidatedPromo] = useState(null);
   const userPoints     = user?.points ?? 0;
-  const derivedBowlSize = order?.proteins?.length === 3 ? "large" : "normal";
-  const orderTotalAfterPromo = computePricing(derivedBowlSize, validatedPromo, {
-    extraScoops: Array.isArray(order?.extraScoopProteins) ? order.extraScoopProteins.length : 0,
-    complementsCount: Array.isArray(order?.complements) ? order.complements.length : 0,
-    proteins: Array.isArray(order?.proteins) ? order.proteins : [],
-  }).total;
+  const orderTotalAfterPromo = computeCartPricing(order?.cart || [], validatedPromo).total;
   const redeemableBlocks = Math.min(
     Math.floor(userPoints / POINTS_PER_REWARD),
     Math.floor(orderTotalAfterPromo / REWARD_VALUE_MXN)
@@ -104,8 +99,8 @@ export default function OrderSummaryPage() {
       .catch(() => {});
   }, []);
 
-  const onEditStep = (stepIndex) => {
-    navigate(`/order?step=${stepIndex}&edit=1`, { state: { guest: isGuest } });
+  const onBuildBowl = () => {
+    navigate("/order", { state: { guest: isGuest } });
   };
 
   const onRestart = () => {
@@ -118,8 +113,7 @@ export default function OrderSummaryPage() {
   };
 
   const onConfirm = async () => {
-    const selectedProteins = Array.isArray(order?.proteins) ? order.proteins : [];
-    if (!order?.base || selectedProteins.length < 1) {
+    if (!Array.isArray(order?.cart) || order.cart.length === 0) {
       setSubmitError(t("summary.missingBowl"));
       return;
     }
@@ -169,8 +163,14 @@ export default function OrderSummaryPage() {
       // exact same order instead of accidentally reusing its reservations for
       // an edited draft.
       submission = keepOrderSubmissionPayload(submission, {
-        ...order,
-        updateCheckout: undefined,
+        cart: order.cart,
+        customer: order.customer,
+        phone: order.phone,
+        notes: order.notes,
+        fulfillment: order.fulfillment,
+        paymentMethod: order.paymentMethod,
+        promoCode: order.promoCode,
+        isScheduled: order.isScheduled,
         scheduledPickupTime: order.isScheduled && order.scheduledPickupTime
           ? new Date(order.scheduledPickupTime).toISOString()
           : undefined,
@@ -281,7 +281,8 @@ export default function OrderSummaryPage() {
       )}
 
       <OrderSummary
-        onEditStep={onEditStep}
+        onBuildBowl={onBuildBowl}
+        onBrowseMenu={() => navigate("/menu")}
         onRestart={onRestart}
         onConfirm={onConfirm}
         onPromoChange={setValidatedPromo}
