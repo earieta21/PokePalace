@@ -1,0 +1,60 @@
+.screensaver {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  cursor: pointer;
+  background: #0a0a0a;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 1200ms ease;
+}
+
+.slideActive {
+  opacity: 1;
+}
+
+.screensaverOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 24px 64px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.1) 55%, rgba(0, 0, 0, 0.65) 100%);
+}
+
+.screensaverBrand {
+  margin: 0;
+  color: #fff;
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.screensaverHint {
+  margin: 0;
+  padding: 14px 30px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  animation: pulse 2200ms ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.035); opacity: 0.85; }
+}
