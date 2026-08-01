@@ -31,6 +31,7 @@ const MENU = [
   { id: 15, name: "Agua del día",              price:  35, category: "Bebidas", icon: "🥤", rewardDrink: true },
   { id: 16, name: "Cacao Rice Cake",          price:  30, category: "Extras", icon: "🍫" },
   { id: 17, name: "Choco Rice Cake",          price:  35, category: "Extras", icon: "🍫", rewardSnack: true },
+  { id: 22, name: "Atún Sellado Extra",       price:  20, category: "Extras", icon: "🍣" },
 ];
 
 const MENU_CATEGORIES = ["Todos", "Bowls", "Bebidas", "Extras"];

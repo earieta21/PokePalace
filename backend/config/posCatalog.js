@@ -67,6 +67,13 @@ export const POS_CATALOG = Object.freeze([
     catalogId: "choco-rice-cake", legacyId: 17, name: "Choco Rice Cake", price: 35, category: "extras", rewardSnack: true,
     inventoryRecipe: {},
   },
+  {
+    // Cobro rápido de una porción extra de atún sellado sin pasar por el
+    // armador completo — mismo upcharge que PREMIUM_PROTEIN_PRICES.seared_tuna
+    // en src/order/pricing.js.
+    catalogId: "seared-tuna-extra", legacyId: 22, name: "Atún Sellado Extra", price: 20, category: "extras",
+    inventoryRecipe: { seared_tuna: 1 },
+  },
 ]);
 
 const normalizeName = (value) => String(value || "").normalize("NFKC").trim().toLocaleLowerCase("es-MX");
