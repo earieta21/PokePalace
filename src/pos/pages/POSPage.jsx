@@ -1,5 +1,4 @@
 import { useState, useContext, useEffect, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import {
@@ -10,6 +9,7 @@ import {
   getQueuedOrders,
 } from "../offlineQueue";
 import CustomBowlBuilder from "../CustomBowlBuilder";
+import Receipt from "../Receipt.jsx";
 import { getRewardById } from "../../data/rewardsCatalog.js";
 import { TOPPING_LABELS } from "../../order/OrderLabels.jsx";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "../../order/pricing.js";
@@ -37,66 +37,6 @@ const MENU = [
 const MENU_CATEGORIES = ["Todos", "Bowls", "Bebidas", "Extras"];
 
 const IVA = 0; // IVA incluido en precio
-
-const PAYMENT_METHOD_LABELS = {
-  card_terminal: "Tarjeta",
-  cash: "Efectivo",
-  pay_at_pickup: "Pendiente de pago",
-};
-
-function Receipt({ order }) {
-  if (!order || typeof document === "undefined") return null;
-
-  const printedAt = new Date(order.createdAt || Date.now()).toLocaleString("es-MX", {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
-  const hasCustomBowl = Boolean(order.base);
-  const itemsSubtotal = (order.items || []).reduce((sum, item) => sum + item.price * item.qty, 0);
-  const bowlPrice = hasCustomBowl ? Math.max(0, (order.subtotal || 0) - itemsSubtotal) : 0;
-  const discount = order.discountAmount || 0;
-
-  return createPortal(
-    <section className={ui.receipt} aria-label="Ticket de venta">
-      <header className={ui.receiptHeader}>
-        <strong>POKE PALACE</strong>
-      </header>
-
-      <div className={ui.receiptMeta}>
-        <span>{printedAt}</span>
-        {order.customer && order.customer !== "Walk-in" && <span>Cliente: {order.customer}</span>}
-      </div>
-
-      <div className={ui.receiptLines}>
-        {(order.items || []).map((item) => (
-          <div className={ui.receiptLine} key={item.catalogId || item.name}>
-            <span>{item.qty} × {item.name}</span>
-            <span>${(item.price * item.qty).toLocaleString("es-MX")}</span>
-          </div>
-        ))}
-
-        {hasCustomBowl && (
-          <div className={ui.receiptLine}>
-            <span>1 × Bowl {order.bowlSize === "large" ? "grande" : "mediano"}</span>
-            <span>${bowlPrice.toLocaleString("es-MX")}</span>
-          </div>
-        )}
-      </div>
-
-      <div className={ui.receiptTotals}>
-        <div><span>Subtotal</span><span>${(order.subtotal ?? itemsSubtotal + bowlPrice).toLocaleString("es-MX")}</span></div>
-        {discount > 0 && <div><span>Premio aplicado</span><span>−${discount.toLocaleString("es-MX")}</span></div>}
-        <div><strong>Total</strong><strong>${(order.total ?? 0).toLocaleString("es-MX")}</strong></div>
-        <div><span>Pago</span><span>{PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}</span></div>
-      </div>
-
-      <div className={ui.receiptFooter}>
-        <span>¡Gracias por su compra!</span>
-      </div>
-    </section>,
-    document.body,
-  );
-}
 
 export default function POSPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);

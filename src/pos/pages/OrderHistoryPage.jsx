@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { PROTEIN_LABELS } from "../../order/OrderLabels";
+import Receipt from "../Receipt.jsx";
 
 const STATUS_CFG = {
   completed: { cls: "badgeGreen", label: "Completado" },
@@ -50,6 +51,22 @@ export default function OrderHistoryPage({ styles }) {
   const [error, setError]   = useState("");
   const [range, setRange]   = useState("today");
   const [search, setSearch] = useState("");
+  const [printOrder, setPrintOrder] = useState(null);
+  const [printRequested, setPrintRequested] = useState(false);
+
+  const handlePrint = (order) => {
+    setPrintOrder(order);
+    setPrintRequested(true);
+  };
+
+  useEffect(() => {
+    if (!printRequested || !printOrder) return;
+    const timer = window.setTimeout(() => {
+      window.print();
+      setPrintRequested(false);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [printRequested, printOrder]);
 
   useEffect(() => {
     setLoading(true);
@@ -140,18 +157,19 @@ export default function OrderHistoryPage({ styles }) {
               <th>Fuente</th>
               <th>Total</th>
               <th>Estado</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>
+                <td colSpan={8} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>
                   Cargando…
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>
+                <td colSpan={8} style={{ textAlign: "center", padding: 28, color: "var(--p-muted)" }}>
                   Sin órdenes en este período
                 </td>
               </tr>
@@ -186,6 +204,24 @@ export default function OrderHistoryPage({ styles }) {
                     <td>
                       <span className={`${styles.badge} ${styles[cls]}`}>{label}</span>
                     </td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => handlePrint(o)}
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: 6,
+                          border: "1px solid rgba(0,0,0,0.12)",
+                          background: "transparent",
+                          color: "var(--p-muted)",
+                          cursor: "pointer",
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                        }}
+                      >
+                        🖨️ Imprimir
+                      </button>
+                    </td>
                   </tr>
                 );
               })
@@ -193,6 +229,8 @@ export default function OrderHistoryPage({ styles }) {
           </tbody>
         </table>
       </div>
+
+      <Receipt order={printOrder} />
     </div>
   );
 }
