@@ -64,7 +64,7 @@ export default function KioskLayout() {
         </div>
       )}
     >
-      <div style={{ minHeight: "100vh", background: "#fff" }}>
+      <div data-theme="light" style={{ minHeight: "100vh", background: "#fff" }}>
         <Outlet />
       </div>
     </ErrorBoundary>

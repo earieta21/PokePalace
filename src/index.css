@@ -41,6 +41,38 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* El kiosco (KioskLayout.jsx) siempre pinta su fondo blanco a propósito,
+   sin importar el tema global guardado en localStorage/preferencia del
+   sistema -- si ese tema global queda en "dark" (tablet con modo oscuro
+   del sistema, por ejemplo), el texto tomaba los colores claros pensados
+   para fondo oscuro y quedaba casi ilegible sobre el fondo blanco del
+   kiosco. Este bloque fuerza los mismos valores de :root dentro de
+   cualquier sub-árbol marcado data-theme="light", que es lo que usa el
+   kiosco para no heredar el tema global. */
+[data-theme="light"] {
+  --bg:           #F5F3EE;
+  --bg-card:      #FFFFFF;
+  --bg-muted:     #EDEAE3;
+  --bg-subtle:    #F9F8F5;
+
+  --text:         #1A1917;
+  --text-2:       #5C5A56;
+  --text-3:       #9C9A96;
+
+  --accent:       #4A7A5A;
+  --accent-2:     #6B9E79;
+  --accent-bg:    rgba(74, 122, 90, 0.07);
+  --accent-border:rgba(74, 122, 90, 0.22);
+
+  --border:       rgba(0, 0, 0, 0.07);
+  --border-md:    rgba(0, 0, 0, 0.11);
+
+  --shadow-xs:    0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md:    0 4px 16px rgba(0, 0, 0, 0.07);
+  --shadow-lg:    0 8px 28px rgba(0, 0, 0, 0.08);
+}
+
 [data-theme="dark"] {
   --bg:           #111512;
   --bg-card:      #1B1F1C;
