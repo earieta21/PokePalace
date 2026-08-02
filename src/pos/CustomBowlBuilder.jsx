@@ -27,6 +27,7 @@ const SAUCE_IDS = [
 ];
 const TOPPING_IDS = [
   "black_olives", "toasted_peanuts", "sesame_seeds", "nori_strips", "masago", "croutons",
+  "crispy_onions",
 ];
 
 const MIN_PROTEINS = 1;

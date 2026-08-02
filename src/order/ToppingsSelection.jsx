@@ -10,6 +10,7 @@ import algaNori from "../assets/toppings/algaNori.webp";
 import blackOlives from "../assets/toppings/blackOlives.jpg";
 import croutons from "../assets/toppings/croutons.jpg";
 import masago from "../assets/toppings/masago.jpg";
+import onions from "../assets/toppings/onions.webp";
 import toastedPeanuts from "../assets/toppings/toastedPeanuts.jpg";
 
 const MAX_TOPPINGS = 5;
@@ -26,6 +27,7 @@ const ToppingsSelection = ({ onNext, onBack }) => {
     { id: "nori_strips",       image: algaNori },
     { id: "masago",            image: masago },
     { id: "croutons",          image: croutons },
+    { id: "crispy_onions",     image: onions },
   ];
 
   const [selectedToppings, setSelectedToppings] = useState(
