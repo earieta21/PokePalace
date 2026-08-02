@@ -15,7 +15,7 @@ const CATEGORY_ICONS = {
 // Pantalla compartida entre la app/sitio web (`src/pages/MenuPage.jsx`) y el
 // kiosco (`src/kiosk/KioskMenuPage.jsx`) — mismo carrito (OrderContext), solo
 // cambian los destinos de navegación.
-const MenuBrowser = ({ onBuildBowl, onGoToCart }) => {
+const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false }) => {
   const { order, addCatalogItem, updateCartItemQty, startNewBowl } = useOrder();
 
   const cartCount = order.cart.reduce((sum, line) => sum + line.qty, 0);
@@ -47,7 +47,7 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart }) => {
 
         <button
           type="button"
-          className={styles.buildBowlCard}
+          className={`${styles.buildBowlCard} ${isKiosk ? styles.buildBowlCardKiosk : ""}`}
           style={{ backgroundImage: `url(${buildBowlBg})` }}
           onClick={handleBuildBowl}
         >

@@ -41,6 +41,7 @@ export default function KioskMenuPage() {
         Cancelar pedido
       </button>
       <MenuBrowser
+        isKiosk
         onBuildBowl={() => navigate("/kiosk/order")}
         onGoToCart={() => navigate("/kiosk/summary")}
       />
