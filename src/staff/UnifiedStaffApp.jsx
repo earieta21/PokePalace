@@ -1368,13 +1368,37 @@ function RewardsRedeemTab({ token }) {
 /* ============================================================================
    DISPONIBILIDAD DE INGREDIENTES
    ========================================================================== */
+// Antes esta pantalla listaba TODOS los ids de OrderLabels.jsx, incluyendo
+// muchos que nunca aparecen en ningún paso real del armador (kiosco/app) --
+// por ejemplo salsas o marinados que solo existían en el diccionario de
+// traducciones pero ningún componente los ofrece para seleccionar. Cada
+// lista de abajo son exactamente los ids que BaseSelection/ProteinSelection/
+// MarinadeSelection/ComplementsSelection/SauceSelection/ToppingsSelection.jsx
+// (compartidos entre /order y /kiosk/order) muestran hoy -- si se agrega un
+// ingrediente nuevo al armador, hay que agregarlo aquí también para que se
+// pueda marcar como agotado.
+const AVAIL_IDS = {
+  Bases:        ["white_rice", "spring_mix", "quinoa", "brown_rice"],
+  Proteínas:    ["tuna", "salmon", "shrimp", "tofu", "seared_tuna"],
+  Marinados:    ["citrus_marinade", "spicy_marinade", "sweet_marinade"],
+  Complementos: [
+    "shredded_carrots", "seaweed", "edamame", "red_onion", "cucumber",
+    "mango", "pineapple", "beet", "surimi", "spicy_surimi", "avocado",
+  ],
+  Salsas:       ["spicy_mayo", "sriracha", "cilantro_dressing"],
+  Toppings:     [
+    "black_olives", "toasted_peanuts", "sesame_seeds", "nori_strips",
+    "masago", "croutons", "crispy_onions",
+  ],
+};
+
 const AVAIL_CATEGORIES = [
-  { label: "Bases",        items: Object.entries(BASE_LABELS).map(([id, label]) => ({ id, label })) },
-  { label: "Proteínas",    items: Object.entries(PROTEIN_LABELS).map(([id, label]) => ({ id, label })) },
-  { label: "Marinados",    items: Object.entries(MARINADE_LABELS).map(([id, label]) => ({ id, label })) },
-  { label: "Complementos", items: Object.entries(COMPLEMENT_LABELS).map(([id, label]) => ({ id, label })) },
-  { label: "Salsas",       items: Object.entries(SAUCE_LABELS).map(([id, label]) => ({ id, label })) },
-  { label: "Toppings",     items: Object.entries(TOPPING_LABELS).map(([id, label]) => ({ id, label })) },
+  { label: "Bases",        items: AVAIL_IDS.Bases.map((id) => ({ id, label: BASE_LABELS[id] })) },
+  { label: "Proteínas",    items: AVAIL_IDS.Proteínas.map((id) => ({ id, label: PROTEIN_LABELS[id] })) },
+  { label: "Marinados",    items: AVAIL_IDS.Marinados.map((id) => ({ id, label: MARINADE_LABELS[id] })) },
+  { label: "Complementos", items: AVAIL_IDS.Complementos.map((id) => ({ id, label: COMPLEMENT_LABELS[id] })) },
+  { label: "Salsas",       items: AVAIL_IDS.Salsas.map((id) => ({ id, label: SAUCE_LABELS[id] })) },
+  { label: "Toppings",     items: AVAIL_IDS.Toppings.map((id) => ({ id, label: TOPPING_LABELS[id] })) },
 ];
 
 function AvailabilityTab({ token, role }) {
