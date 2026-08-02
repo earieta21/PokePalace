@@ -9,6 +9,7 @@ import { COMPLEMENT_FREE_LIMIT, EXTRA_COMPLEMENT_PRICE } from "./pricing";
 import aguacate from "../assets/complements/aguacate.webp";
 import algas from "../assets/complements/algas.webp";
 import edamames from "../assets/complements/edamames.webp";
+import mango from "../assets/complements/mango.webp";
 import pepino from "../assets/complements/pepino.webp";
 import pina from "../assets/complements/pina.webp";
 import zanahoria from "../assets/complements/zanahoria.webp";
@@ -32,6 +33,7 @@ const ComplementsSelection = ({ onNext, onBack }) => {
     { id: "edamame", image: edamames },
     { id: "red_onion", image: redOnion },
     { id: "cucumber", image: pepino },
+    { id: "mango", image: mango },
     { id: "pineapple", image: pina },
     { id: "beet", image: beet },
     { id: "surimi", image: surimi },

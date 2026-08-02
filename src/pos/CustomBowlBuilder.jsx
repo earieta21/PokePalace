@@ -19,7 +19,7 @@ const BASE_IDS = ["white_rice", "spring_mix", "quinoa"];
 const PROTEIN_IDS = ["tuna", "salmon", "shrimp", "tofu", "seared_tuna"];
 const COMPLEMENT_IDS = [
   "shredded_carrots", "seaweed", "edamame", "red_onion", "cucumber",
-  "pineapple", "beet", "surimi", "spicy_surimi", "avocado",
+  "mango", "pineapple", "beet", "surimi", "spicy_surimi", "avocado",
 ];
 const SAUCE_IDS = [
   "spicy_mayo", "sweet_dressing", "citrus_dressing", "red_sauce",
