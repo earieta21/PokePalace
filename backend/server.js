@@ -21,6 +21,7 @@ import staffSummaryRoutes from "./routes/staffSummary.js";
 import monitorRoutes from "./routes/monitor.js";
 import staffAdminRoutes from "./routes/staffAdmin.js";
 import staffFiscalRoutes from "./routes/staffFiscal.js";
+import whatsappRoutes from "./routes/whatsapp.js";
 import { logServerError } from "./controllers/monitorController.js";
 import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
 
@@ -57,6 +58,15 @@ app.use(
   })
 );
 app.use(express.json());
+
+// Meta manda hub.mode / hub.verify_token / hub.challenge como query params
+// con puntos en el nombre al verificar el webhook -- sanitizeMongo los
+// borraría (por diseño, para bloquear inyección NoSQL), así que esta ruta
+// se monta antes de ese middleware. El controlador no usa nada del
+// query/body para construir consultas a Mongo, así que no necesita esa
+// protección.
+app.use("/api/whatsapp",       whatsappRoutes);
+
 app.use(sanitizeMongo);
 
 app.use("/api/auth",            authRoutes);
