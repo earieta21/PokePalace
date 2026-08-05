@@ -72,7 +72,11 @@ export const createItem = async (req, res) => {
   try {
     const { registerExpense } = req.body;
     const data = pickInventoryFields(req.body);
-    const item = await Inventory.create(data);
+    const item = await Inventory.create({
+      ...data,
+      lastRestockAt: new Date(),
+      lastRestockBy: req.staff?.name || req.staff?.email || "Staff",
+    });
     const expense = registerExpense
       ? await recordPurchaseExpense({ item, qty: item.qty, staff: req.staff })
       : null;
@@ -111,6 +115,7 @@ export const restockItem = async (req, res) => {
     const nextQty = Math.max(0, existing.qty + amount);
     existing.qty = nextQty;
     existing.lastRestockAt = new Date();
+    existing.lastRestockBy = req.staff?.name || req.staff?.email || "Staff";
     await existing.save();
 
     // Recibir mercancía es una compra: se anota sola en Finanzas
@@ -172,6 +177,7 @@ export const restockBatch = async (req, res) => {
           $inc: { qty: amount },
           $set: {
             lastRestockAt: new Date(),
+            lastRestockBy: req.staff?.name || req.staff?.email || "Staff",
             ...(hasNewCost ? { cost } : {}),
           },
           $addToSet: { restockRequestIds: requestId },

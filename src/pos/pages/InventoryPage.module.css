@@ -959,6 +959,11 @@
   font-size: 9.5px;
 }
 
+.restockMeta {
+  opacity: 0.75;
+  font-style: italic;
+}
+
 .itemEditMeta,
 .quantityEdit,
 .rowActions {

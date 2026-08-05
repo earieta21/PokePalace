@@ -81,6 +81,17 @@ function statusOf(item) {
   return "ok";
 }
 
+// Relativo para lo reciente (útil para detectar de un vistazo qué se
+// reabasteció hace poco), fecha corta para lo más viejo.
+function fmtRestock(iso) {
+  if (!iso) return "";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days <= 0) return "hoy";
+  if (days === 1) return "ayer";
+  if (days < 7) return `hace ${days} días`;
+  return new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+}
+
 // Los registros creados antes de agregar secciones pertenecen a Comida.
 const sectionOf = (item) => item.section || "Comida";
 const categoryOf = (item) => LEGACY_CATEGORY_LABELS[item.category] || item.category || "Otro";
@@ -1011,7 +1022,14 @@ export default function InventoryPage({ styles, role }) {
                         </select>
                       </div>
                     ) : (
-                      <small>{sectionOf(row)} · {categoryOf(row)}{(row.menuKeys || []).length > 0 ? " · Vinculado al menú" : ""}</small>
+                      <>
+                        <small>{sectionOf(row)} · {categoryOf(row)}{(row.menuKeys || []).length > 0 ? " · Vinculado al menú" : ""}</small>
+                        {row.lastRestockAt && (
+                          <small className={ui.restockMeta}>
+                            Agregado {fmtRestock(row.lastRestockAt)}{row.lastRestockBy ? ` · ${row.lastRestockBy}` : ""}
+                          </small>
+                        )}
+                      </>
                     )}
                   </td>
                   <td>

@@ -18,15 +18,16 @@ import ui from "./POSPage.module.css";
 const CUSTOM_BOWL_ID = "custom-bowl";
 
 const MENU = [
-  { id: 1,  name: "Bowl de salmón esmeralda",        price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍣" },
-  { id: 2,  name: "Bowl picante de atún crujiente",  price: BOWL_BASE_PRICE, category: "Bowls", icon: "🌶️" },
-  { id: 3,  name: "Bowl tropical de camarón",        price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍤" },
   // Venta rapida sin ingredientes especificos - para cuando no da tiempo de
   // capturar el bowl personalizado completo (ej. fila larga). needsProtein
   // hace que se pregunte la proteina antes de agregarlo, para poder
   // descontar al menos esa parte del inventario (ver confirmProteinPick).
+  // Van primero porque son los mas usados en hora pico.
   { id: 20, name: "Bowl mediano", price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗", needsProtein: true },
   { id: 21, name: "Bowl grande",  price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🥗", needsProtein: true },
+  { id: 1,  name: "Bowl de salmón esmeralda",        price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍣" },
+  { id: 2,  name: "Bowl picante de atún crujiente",  price: BOWL_BASE_PRICE, category: "Bowls", icon: "🌶️" },
+  { id: 3,  name: "Bowl tropical de camarón",        price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍤" },
   { id: 11, name: "Topochico",               price:  35, category: "Bebidas", icon: "🫧" },
   { id: 13, name: "Coca-Zero",               price:  30, category: "Bebidas", icon: "🥤" },
   { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },

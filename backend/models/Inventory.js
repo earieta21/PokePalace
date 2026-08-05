@@ -20,6 +20,7 @@ const inventorySchema = new mongoose.Schema(
     supplier: { type: String, default: "" },
     menuKeys: { type: [String], default: [] }, // e.g. ["salmon","citrus_marinade"] — matched on order pay
     lastRestockAt: { type: Date, default: null },
+    lastRestockBy: { type: String, default: null }, // nombre del staff que hizo la última recepción
     // Request IDs make shipment receiving permanently idempotent. Keeping the
     // marker on the same document as qty makes each increment atomic, even
     // when a batch is retried after only some lines reached the server.
