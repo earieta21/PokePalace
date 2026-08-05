@@ -131,13 +131,29 @@ export const resolvePosItems = (items) => {
       throw new PosOrderValidationError(`Cantidad inválida para ${catalogItem.name}`);
     }
 
-    const previous = resolved.get(catalogItem.catalogId);
+    // Bowls de venta rápida (mediano/grande) no traen receta fija -- si en
+    // caja se capturó la proteína, se guarda para poder descontar al menos
+    // esa parte del inventario (ver addItemDemand más abajo). Se acepta en
+    // cualquier producto, no solo esos dos, pero solo se usa cuando el
+    // catálogo no tiene inventoryRecipe.
+    let protein;
+    if (rawItem.protein !== undefined && rawItem.protein !== null && rawItem.protein !== "") {
+      if (typeof rawItem.protein !== "string" || !BOWL_RULES.proteins.allowed.has(rawItem.protein)) {
+        throw new PosOrderValidationError(`Proteína inválida para ${catalogItem.name}`);
+      }
+      protein = rawItem.protein;
+    }
+
+    // Dos líneas del mismo producto con distinta proteína no se combinan --
+    // se mantienen separadas para no perder de cuál proteína era cada una.
+    const mapKey = protein ? `${catalogItem.catalogId}::${protein}` : catalogItem.catalogId;
+    const previous = resolved.get(mapKey);
     const combinedQty = (previous?.qty || 0) + qty;
     if (combinedQty > 99) {
       throw new PosOrderValidationError(`Cantidad inválida para ${catalogItem.name}`);
     }
 
-    resolved.set(catalogItem.catalogId, {
+    resolved.set(mapKey, {
       catalogId: catalogItem.catalogId,
       name: catalogItem.name,
       price: catalogItem.price,
@@ -145,6 +161,7 @@ export const resolvePosItems = (items) => {
       category: catalogItem.category,
       rewardDrink: Boolean(catalogItem.rewardDrink),
       rewardSnack: Boolean(catalogItem.rewardSnack),
+      ...(protein ? { protein } : {}),
     });
   }
 
@@ -311,12 +328,21 @@ const addItemDemand = (demand, item) => {
   const catalogItem = catalogItemForStoredLine(item);
   const recipe = catalogItem?.inventoryRecipe;
   if (recipe && typeof recipe === "object") {
-    for (const [key, portions] of Object.entries(recipe)) {
-      addDemand(demand, key, portions * qty);
+    const entries = Object.entries(recipe);
+    if (entries.length > 0) {
+      for (const [key, portions] of entries) addDemand(demand, key, portions * qty);
+    } else if (typeof item?.protein === "string" && item.protein) {
+      // Venta rápida sin receta (bowl mediano/grande): se descuenta la
+      // proteína capturada en caja, aunque el resto del bowl (base,
+      // complementos, salsas) no se pueda rastrear. Sin proteína capturada
+      // no se descuenta nada -- comportamiento original: no se sabe qué
+      // llevó el bowl.
+      addDemand(demand, item.protein, qty);
     }
   } else {
     // Preserve stock matching for historical POS orders created before the
-    // canonical catalog carried recipes.
+    // canonical catalog carried recipes (producto sin inventoryRecipe en
+    // absoluto, no solo vacío).
     addDemand(demand, inventoryKeyFromName(item?.name), qty);
   }
 };
@@ -378,6 +404,7 @@ export const getUnavailablePosSelections = ({
     consider(catalogItem.legacyId);
     consider(inventoryKeyFromName(catalogItem.name));
     for (const key of Object.keys(catalogItem.inventoryRecipe || {})) consider(key);
+    consider(item.protein);
   }
 
   return [...selected].sort();

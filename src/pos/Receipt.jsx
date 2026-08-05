@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { PROTEIN_LABELS } from "../order/OrderLabels.jsx";
 import ui from "./Receipt.module.css";
 
 export const PAYMENT_METHOD_LABELS = {
@@ -35,8 +36,8 @@ export default function Receipt({ order }) {
 
       <div className={ui.receiptLines}>
         {(order.items || []).map((item) => (
-          <div className={ui.receiptLine} key={item.catalogId || item.name}>
-            <span>{item.qty} × {item.name}</span>
+          <div className={ui.receiptLine} key={item.protein ? `${item.catalogId}-${item.protein}` : (item.catalogId || item.name)}>
+            <span>{item.qty} × {item.name}{item.protein ? ` (${PROTEIN_LABELS[item.protein] || item.protein})` : ""}</span>
             <span>${(item.price * item.qty).toLocaleString("es-MX")}</span>
           </div>
         ))}

@@ -70,7 +70,12 @@ function orderLines(order) {
   }
 
   if (order.items?.length) {
-    lines.push(...order.items.map((i) => `${i.name} ×${i.qty}`));
+    // Los bowls rápidos (mediano/grande) no traen receta, pero desde que se
+    // captura la proteína en caja sí se sabe qué preparar.
+    lines.push(...order.items.map((i) => {
+      const proteinSuffix = i.protein ? ` — ${label(PROTEIN_LABELS, i.protein)}` : "";
+      return `${i.name}${proteinSuffix} ×${i.qty}`;
+    }));
   }
 
   if (order.base) {

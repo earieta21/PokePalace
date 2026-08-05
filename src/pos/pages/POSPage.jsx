@@ -11,7 +11,7 @@ import {
 import CustomBowlBuilder from "../CustomBowlBuilder";
 import Receipt from "../Receipt.jsx";
 import { getRewardById } from "../../data/rewardsCatalog.js";
-import { TOPPING_LABELS } from "../../order/OrderLabels.jsx";
+import { TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "../../order/pricing.js";
 import ui from "./POSPage.module.css";
 
@@ -22,9 +22,11 @@ const MENU = [
   { id: 2,  name: "Bowl picante de atún crujiente",  price: BOWL_BASE_PRICE, category: "Bowls", icon: "🌶️" },
   { id: 3,  name: "Bowl tropical de camarón",        price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍤" },
   // Venta rapida sin ingredientes especificos - para cuando no da tiempo de
-  // capturar el bowl personalizado completo (ej. fila larga).
-  { id: 20, name: "Bowl mediano", price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗" },
-  { id: 21, name: "Bowl grande",  price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🥗" },
+  // capturar el bowl personalizado completo (ej. fila larga). needsProtein
+  // hace que se pregunte la proteina antes de agregarlo, para poder
+  // descontar al menos esa parte del inventario (ver confirmProteinPick).
+  { id: 20, name: "Bowl mediano", price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗", needsProtein: true },
+  { id: 21, name: "Bowl grande",  price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🥗", needsProtein: true },
   { id: 11, name: "Topochico",               price:  35, category: "Bebidas", icon: "🫧" },
   { id: 13, name: "Coca-Zero",               price:  30, category: "Bebidas", icon: "🥤" },
   { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
@@ -35,6 +37,11 @@ const MENU = [
 ];
 
 const MENU_CATEGORIES = ["Todos", "Bowls", "Bebidas", "Extras"];
+
+// Opciones para el picker rapido de proteina (bowls sin receta fija).
+const QUICK_PROTEINS = ["tuna", "salmon", "shrimp", "tofu", "seared_tuna"].map((id) => ({
+  id, label: PROTEIN_LABELS[id],
+}));
 
 const IVA = 0; // IVA incluido en precio
 
@@ -107,23 +114,44 @@ export default function POSPage({ styles }) {
     };
   }, [tryFlushQueue]);
 
+  // Bowl mediano/grande con distinta proteína son la misma "id" de catálogo
+  // pero no se deben combinar en una sola línea -- cartKey los distingue;
+  // el resto de los productos sigue usando su id tal cual.
+  const cartKeyOf = (item) => item.cartKey ?? item.id;
+
   const addItem = (item) => {
+    const key = cartKeyOf(item);
     setCart((prev) => {
-      const ex = prev.find((i) => i.id === item.id);
-      if (ex) return prev.map((i) => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
+      const ex = prev.find((i) => cartKeyOf(i) === key);
+      if (ex) return prev.map((i) => cartKeyOf(i) === key ? { ...i, qty: i.qty + 1 } : i);
       return [...prev, { ...item, qty: 1 }];
     });
     setSuccess(""); setError("");
   };
 
-  const removeItem = (id) => setCart((prev) => prev.filter((i) => i.id !== id));
+  const removeItem = (key) => setCart((prev) => prev.filter((i) => cartKeyOf(i) !== key));
 
-  const changeQty = (id, delta) => {
+  const changeQty = (key, delta) => {
     setCart((previous) => previous
-      .map((item) => item.id === id ? { ...item, qty: item.qty + delta } : item)
+      .map((item) => cartKeyOf(item) === key ? { ...item, qty: item.qty + delta } : item)
       .filter((item) => item.qty > 0));
     setSuccess("");
     setError("");
+  };
+
+  const [proteinPickerItem, setProteinPickerItem] = useState(null);
+
+  const confirmProteinPick = (proteinId) => {
+    const item = proteinPickerItem;
+    setProteinPickerItem(null);
+    if (!item) return;
+    const proteinLabel = QUICK_PROTEINS.find((p) => p.id === proteinId)?.label || "";
+    addItem({
+      ...item,
+      protein: proteinId,
+      name: `${item.name} (${proteinLabel})`,
+      cartKey: `${item.id}-${proteinId}`,
+    });
   };
 
   const clearOrder = () => {
@@ -257,7 +285,7 @@ export default function POSPage({ styles }) {
 
     const nextPayload = {
       clientOrderId: createClientOrderId(),
-      items: regularItems.map(({ id, qty }) => ({ id, qty })),
+      items: regularItems.map(({ id, qty, protein }) => ({ id, qty, ...(protein ? { protein } : {}) })),
       customer: cliente.trim() || "Mostrador",
       phone: phone.trim(),
       notes: notes.trim(),
@@ -395,9 +423,13 @@ export default function POSPage({ styles }) {
             </div>
             <div className={ui.productGrid}>
               {visibleMenu.map((item) => {
-                const quantity = cart.find((cartItem) => cartItem.id === item.id)?.qty || 0;
+                // Un mismo producto puede tener varias líneas en el carrito
+                // si es un bowl rápido con distinta proteína cada vez.
+                const quantity = cart
+                  .filter((cartItem) => cartItem.id === item.id)
+                  .reduce((sum, cartItem) => sum + cartItem.qty, 0);
                 return (
-                <button key={item.id} className={ui.productCard} onClick={() => addItem(item)} type="button">
+                <button key={item.id} className={ui.productCard} onClick={() => item.needsProtein ? setProteinPickerItem(item) : addItem(item)} type="button">
                   {quantity > 0 && <span className={ui.inCartBadge}>{quantity}</span>}
                   <span className={ui.productIcon}>{item.icon}</span>
                   <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.category}</small></span>
@@ -441,15 +473,15 @@ export default function POSPage({ styles }) {
           {cart.length === 0 ? (
             <div className={ui.cartEmpty}><span>🛒</span><strong>La orden está vacía</strong><p>Selecciona un producto del menú para comenzar.</p></div>
           ) : cart.map((item) => (
-            <div key={item.id} className={ui.cartItem}>
+            <div key={cartKeyOf(item)} className={ui.cartItem}>
               <div className={ui.cartItemInfo}><strong>{item.name}</strong><small>${item.price} c/u</small></div>
               <div className={ui.qtyControl}>
-                <button type="button" onClick={() => changeQty(item.id, -1)} aria-label={`Reducir ${item.name}`}>−</button>
+                <button type="button" onClick={() => changeQty(cartKeyOf(item), -1)} aria-label={`Reducir ${item.name}`}>−</button>
                 <span>{item.qty}</span>
-                {item.id !== CUSTOM_BOWL_ID && <button type="button" onClick={() => changeQty(item.id, 1)} aria-label={`Agregar otro ${item.name}`}>+</button>}
+                {item.id !== CUSTOM_BOWL_ID && <button type="button" onClick={() => changeQty(cartKeyOf(item), 1)} aria-label={`Agregar otro ${item.name}`}>+</button>}
               </div>
               <strong className={ui.linePrice}>${(item.price * item.qty).toLocaleString("es-MX")}</strong>
-              <button className={ui.removeItem} onClick={() => removeItem(item.id)} type="button" aria-label={`Quitar ${item.name}`}>×</button>
+              <button className={ui.removeItem} onClick={() => removeItem(cartKeyOf(item))} type="button" aria-label={`Quitar ${item.name}`}>×</button>
             </div>
           ))}
         </div>
@@ -598,6 +630,63 @@ export default function POSPage({ styles }) {
         </div>
       </aside>
       </div>
+
+      {proteinPickerItem && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Proteína del ${proteinPickerItem.name}`}
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.5)", padding: 20,
+          }}
+          onClick={() => setProteinPickerItem(null)}
+        >
+          <div
+            style={{
+              background: "#fff", borderRadius: 16, padding: 22,
+              width: "min(420px, 100%)", boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: "0 0 4px", fontSize: 16.5, color: "#1a1a1a" }}>
+              ¿De qué proteína es el {proteinPickerItem.name.toLowerCase()}?
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: 12.5, color: "#777" }}>
+              Para poder descontarla del inventario.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+              {QUICK_PROTEINS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => confirmProteinPick(p.id)}
+                  style={{
+                    padding: "14px 10px", borderRadius: 10, border: "1.5px solid #e2e2e2",
+                    background: "#fafafa", color: "#1a1a1a", fontWeight: 700, fontSize: 13.5,
+                    cursor: "pointer",
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setProteinPickerItem(null)}
+              style={{
+                marginTop: 14, width: "100%", padding: 10, borderRadius: 8,
+                border: "none", background: "transparent", color: "#888",
+                fontSize: 12.5, cursor: "pointer",
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       <Receipt order={lastReceipt} />
     </div>
   );

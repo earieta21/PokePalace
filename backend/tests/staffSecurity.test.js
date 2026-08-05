@@ -102,6 +102,39 @@ test("el bowl mediano/grande de venta rapida cobra el precio correcto y no descu
 
   assert.deepEqual(getPosInventoryDemand({ items: [mediano, grande] }), {});
 });
+
+test("el bowl mediano/grande descuenta la proteina cuando se captura en caja", () => {
+  const [mediano, grande] = resolvePosItems([
+    { catalogId: "bowl-mediano-rapido", qty: 1, protein: "tuna" },
+    { catalogId: "bowl-grande-rapido", qty: 2, protein: "salmon" },
+  ]);
+
+  assert.equal(mediano.protein, "tuna");
+  assert.equal(grande.protein, "salmon");
+  assert.deepEqual(getPosInventoryDemand({ items: [mediano, grande] }), { salmon: 2, tuna: 1 });
+});
+
+test("dos bowls medianos con distinta proteina no se combinan en una sola linea", () => {
+  const items = resolvePosItems([
+    { catalogId: "bowl-mediano-rapido", qty: 1, protein: "tuna" },
+    { catalogId: "bowl-mediano-rapido", qty: 1, protein: "salmon" },
+    { catalogId: "bowl-mediano-rapido", qty: 1, protein: "tuna" },
+  ]);
+
+  assert.equal(items.length, 2);
+  const tunaLine = items.find((i) => i.protein === "tuna");
+  const salmonLine = items.find((i) => i.protein === "salmon");
+  assert.equal(tunaLine.qty, 2);
+  assert.equal(salmonLine.qty, 1);
+});
+
+test("el POS rechaza una proteina invalida en un bowl de venta rapida", () => {
+  assert.throws(
+    () => resolvePosItems([{ catalogId: "bowl-mediano-rapido", qty: 1, protein: "pollo" }]),
+    PosOrderValidationError
+  );
+});
+
 test("el POS mantiene compatibilidad por nombre exacto sin confiar en price", () => {
   const [item] = resolvePosItems([{ name: "Coca-Zero", price: 9999, qty: 1 }]);
   assert.equal(item.catalogId, "coca-zero");

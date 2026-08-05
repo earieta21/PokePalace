@@ -40,7 +40,10 @@ function itemSummary(order) {
   }
 
   if (order.items?.length) {
-    segments.push(order.items.map((i) => `${i.name} ×${i.qty}`).join(", "));
+    segments.push(order.items.map((i) => {
+      const proteinSuffix = i.protein ? ` (${PROTEIN_LABELS[i.protein] ?? i.protein})` : "";
+      return `${i.name}${proteinSuffix} ×${i.qty}`;
+    }).join(", "));
   }
 
   if (order.base) {

@@ -33,7 +33,10 @@ function itemBrief(order) {
     return parts.join(" + ") || "Bowl personalizado";
   }
 
-  if (order.items?.length) parts.push(order.items.map((i) => `${i.name} ×${i.qty}`).join(", "));
+  if (order.items?.length) parts.push(order.items.map((i) => {
+    const proteinSuffix = i.protein ? ` (${PROTEIN_LABELS[i.protein] ?? i.protein})` : "";
+    return `${i.name}${proteinSuffix} ×${i.qty}`;
+  }).join(", "));
   if (order.base) {
     const proteins = order.proteins?.map((id) => PROTEIN_LABELS[id] ?? id).join(", ") || order.protein || "";
     const baseText = order.bases?.length > 1 ? order.bases.join(" + ") : order.base;
