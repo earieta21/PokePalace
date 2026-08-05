@@ -5,7 +5,7 @@ import {
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
   ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard, Landmark,
-  Menu, X,
+  Menu, X, Wallet,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -23,6 +23,7 @@ import POSPage from "../pos/pages/POSPage";
 import KDSPage from "../pos/pages/KDSPage";
 import OrderHistoryPage from "../pos/pages/OrderHistoryPage";
 import FinancePage from "../pos/pages/FinancePage";
+import CashCutPage from "../pos/pages/CashCutPage";
 import FiscalPage from "../pos/pages/FiscalPage";
 import SalesDashboardPage from "../pos/pages/SalesDashboardPage";
 import SummaryPage from "../pos/pages/SummaryPage";
@@ -132,11 +133,11 @@ const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 // (ventas, fin, panel).
 const TABS_BY_ROLE = {
   employee: ["inicio", "tareas", "temp", "horario", "avisos"],
-  cashier:  ["pos", "premios", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
+  cashier:  ["pos", "premios", "inicio", "tareas", "temp", "hist", "corte", "horario", "avisos"],
   kitchen:  ["cocina", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
-  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
-  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "fiscal", "panel"],
-  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "horario", "avisos", "resumen", "ventas", "fin", "fiscal", "panel"],
+  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "fiscal", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "fiscal", "panel"],
 };
 
 const TAB_META = {
@@ -147,6 +148,7 @@ const TAB_META = {
   resumen: { label: "Resumen", title: "Resumen semanal", icon: LayoutDashboard },
   ventas:  { label: "Ventas", title: "Panel de ventas", icon: Activity },
   inv:     { label: "Inventario", title: "Inventario", icon: Package },
+  corte:   { label: "Corte", title: "Corte de caja", icon: Wallet },
   fin:     { label: "Finanzas", title: "Finanzas", icon: BarChart3 },
   fiscal:  { label: "Fiscal", title: "Asistente fiscal (SAT)", icon: Landmark },
   disponibilidad: { label: "Tienda", title: "Disponibilidad de la tienda", icon: ToggleRight },
@@ -161,7 +163,7 @@ const TAB_META = {
 const TAB_GROUPS = [
   { id: "operacion", label: "Operación", tabs: ["pos", "cocina", "premios"] },
   { id: "turno", label: "Mi turno", tabs: ["inicio", "tareas", "temp"] },
-  { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv"] },
+  { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv", "corte"] },
   { id: "equipo", label: "Equipo", tabs: ["horario", "avisos"] },
   { id: "gestion", label: "Administración", tabs: ["resumen", "ventas", "fin", "fiscal", "panel"] },
 ];
@@ -500,6 +502,7 @@ export default function UnifiedStaffApp() {
             {tab === "resumen" && <SummaryPage styles={posStyles} />}
             {tab === "ventas"  && <section className={shellStyles.portalSurface}><SalesDashboardPage styles={posStyles} /></section>}
             {tab === "inv"     && <InventoryPage styles={posStyles} role={me?.role} />}
+            {tab === "corte"   && <CashCutPage styles={posStyles} />}
             {tab === "fin"     && <FinancePage styles={posStyles} />}
             {tab === "fiscal"  && <FiscalPage styles={posStyles} />}
           </main>
