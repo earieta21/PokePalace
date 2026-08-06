@@ -14,6 +14,7 @@ import StaffUser from "../models/StaffUser.js";
 import Inventory from "../models/Inventory.js";
 import InventoryMovement from "../models/InventoryMovement.js";
 import AuditLog from "../models/AuditLog.js";
+import CashCut from "../models/CashCut.js";
 import Redemption from "../models/Redemption.js";
 import StoreSettings from "../models/StoreSettings.js";
 import { dateKeyInTimeZone, nextDateKey, zonedDateTimeToUtc } from "../utils/timeZone.js";
@@ -93,6 +94,9 @@ after(async () => {
   if (mongoose.connection.readyState === 1) {
     await Order.deleteMany({ clientOrderId: { $regex: "^ci-pos-security:" } });
     await Order.deleteMany({ clientOrderId: { $regex: "^ci-web:" } });
+    const ciCashCutIds = await CashCut.find({ employeeName: { $regex: "^CI " } }).distinct("_id");
+    await AuditLog.deleteMany({ entity: "CashCut", entityId: { $in: ciCashCutIds } });
+    await CashCut.deleteMany({ employeeName: { $regex: "^CI " } });
     const ciInventoryIds = await Inventory.find({ item: { $regex: "^CI Security" } }).distinct("_id");
     await InventoryMovement.deleteMany({ itemId: { $in: ciInventoryIds } });
     await AuditLog.deleteMany({ entity: "Inventory", entityId: { $in: ciInventoryIds } });
@@ -1303,4 +1307,112 @@ test("GET movimientos y audit-log filtran por articulo/entidad y protegen por ro
 
   const auditAsCashier = await staffRequest("cashier", "/api/staff/audit-log");
   assert.equal(auditAsCashier.status, 403);
+});
+
+test("cierre de caja: ciclo completo -- abrir, no duplicar, exigir motivo arriba de 1%, cerrar, y reabrir solo owner/admin con auditoria", async () => {
+  const openingFloat = 500;
+  const opened = await staffRequest("cashier", "/api/staff/cash-cuts", {
+    method: "POST", body: { openingFloat },
+  });
+  assert.equal(opened.status, 201);
+  const cashCut = (await opened.json()).cashCut;
+  assert.equal(cashCut.status, "open");
+  assert.equal(cashCut.openingFloat, openingFloat);
+  assert.equal(cashCut.employeeName, "CI cashier");
+
+  // No permite un segundo cierre el mismo dia/sucursal.
+  const dup = await staffRequest("manager", "/api/staff/cash-cuts", {
+    method: "POST", body: { openingFloat: 100 },
+  });
+  assert.equal(dup.status, 409);
+
+  // Solo se puede editar mientras esta abierto.
+  const updated = await staffRequest("cashier", `/api/staff/cash-cuts/${cashCut._id}`, {
+    method: "PATCH",
+    body: { withdrawals: 20, returns: 5, cardTerminalTotal: 100, notes: "prueba CI" },
+  });
+  assert.equal(updated.status, 200);
+  const updatedBody = (await updated.json()).cashCut;
+  assert.equal(updatedBody.withdrawals, 20);
+  assert.equal(updatedBody.returns, 5);
+
+  // Cerrar contando mucho menos que el fondo inicial -> diferencia > 1%, exige motivo.
+  const closeNoExplanation = await staffRequest("cashier", `/api/staff/cash-cuts/${cashCut._id}/close`, {
+    method: "PATCH", body: { countedCash: 0 },
+  });
+  assert.equal(closeNoExplanation.status, 400);
+  assert.equal((await closeNoExplanation.json()).requiresExplanation, true);
+  assert.equal((await CashCut.findById(cashCut._id)).status, "open"); // no se cerro
+
+  // Con explicacion si cierra.
+  const closed = await staffRequest("cashier", `/api/staff/cash-cuts/${cashCut._id}/close`, {
+    method: "PATCH", body: { countedCash: 0, differenceExplanation: "prueba CI: diferencia esperada" },
+  });
+  assert.equal(closed.status, 200);
+  const closedBody = (await closed.json()).cashCut;
+  assert.equal(closedBody.status, "closed");
+  assert.equal(closedBody.differenceExplanation, "prueba CI: diferencia esperada");
+  assert.ok(closedBody.percentDifference > 1);
+  assert.equal(typeof closedBody.cardDifference, "number"); // se capturo cardTerminalTotal
+
+  // Un cierre cerrado ya no se puede editar ni volver a cerrar.
+  assert.equal((await staffRequest("cashier", `/api/staff/cash-cuts/${cashCut._id}`, {
+    method: "PATCH", body: { notes: "no deberia aplicar" },
+  })).status, 409);
+  assert.equal((await staffRequest("cashier", `/api/staff/cash-cuts/${cashCut._id}/close`, {
+    method: "PATCH", body: { countedCash: 0, differenceExplanation: "otra vez" },
+  })).status, 409);
+
+  // Reapertura: cajero no puede.
+  assert.equal((await staffRequest("cashier", `/api/staff/cash-cuts/${cashCut._id}/reopen`, {
+    method: "PATCH", body: { reason: "correccion" },
+  })).status, 403);
+
+  // Reapertura: admin si puede, pero exige motivo.
+  assert.equal((await staffRequest("admin", `/api/staff/cash-cuts/${cashCut._id}/reopen`, {
+    method: "PATCH", body: {},
+  })).status, 400);
+
+  const reopened = await staffRequest("admin", `/api/staff/cash-cuts/${cashCut._id}/reopen`, {
+    method: "PATCH", body: { reason: "correccion de prueba CI" },
+  });
+  assert.equal(reopened.status, 200);
+  const reopenedBody = (await reopened.json()).cashCut;
+  assert.equal(reopenedBody.status, "open");
+  assert.equal(reopenedBody.reopenReason, "correccion de prueba CI");
+  assert.equal(reopenedBody.reopenedBy, "CI admin");
+
+  // La reapertura deja registro de auditoria (ademas de la apertura y el cierre).
+  const auditEntries = await AuditLog.find({ entity: "CashCut", entityId: cashCut._id }).sort({ createdAt: 1 });
+  assert.ok(auditEntries.length >= 3);
+  const reopenAudit = auditEntries.find((a) => a.reason === "correccion de prueba CI");
+  assert.ok(reopenAudit);
+  assert.equal(reopenAudit.actorName, "CI admin");
+
+  // Cerrar de nuevo tras reabrir, cuadrando exacto -> no exige motivo.
+  const closedAgain = await staffRequest("cashier", `/api/staff/cash-cuts/${cashCut._id}/close`, {
+    method: "PATCH", body: { countedCash: closedBody.expectedCash },
+  });
+  assert.equal(closedAgain.status, 200);
+  assert.equal((await closedAgain.json()).cashCut.difference, 0);
+});
+
+test("el historial de cierres de caja incluye cortes de turno anteriores a esta funcion sin romper", async () => {
+  const legacy = await CashCut.create({
+    employeeId: staffFixtures.cashier._id,
+    employeeName: "CI cashier",
+    locationId: "main",
+    from: new Date(),
+    to: new Date(),
+    openingFloat: 200, cashSales: 150, expectedCash: 350, countedCash: 350, difference: 0,
+  });
+  assert.equal(legacy.date, null);
+  assert.equal(legacy.status, null);
+
+  const history = await staffRequest("cashier", "/api/staff/cash-cuts");
+  assert.equal(history.status, 200);
+  const found = (await history.json()).cashCuts.find((c) => c._id === String(legacy._id));
+  assert.ok(found, "el corte legado debe aparecer en el historial");
+  assert.equal(found.status, null);
+  assert.equal(found.date, null);
 });
