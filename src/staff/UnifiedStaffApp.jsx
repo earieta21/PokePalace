@@ -5,7 +5,7 @@ import {
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
   ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard, Landmark,
-  Menu, X, Wallet,
+  Menu, X, Wallet, Calculator,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -24,6 +24,7 @@ import KDSPage from "../pos/pages/KDSPage";
 import OrderHistoryPage from "../pos/pages/OrderHistoryPage";
 import FinancePage from "../pos/pages/FinancePage";
 import CashCutPage from "../pos/pages/CashCutPage";
+import RecipeCostPage from "../pos/pages/RecipeCostPage";
 import FiscalPage from "../pos/pages/FiscalPage";
 import SalesDashboardPage from "../pos/pages/SalesDashboardPage";
 import SummaryPage from "../pos/pages/SummaryPage";
@@ -135,9 +136,9 @@ const TABS_BY_ROLE = {
   employee: ["inicio", "tareas", "temp", "horario", "avisos"],
   cashier:  ["pos", "premios", "inicio", "tareas", "temp", "hist", "corte", "horario", "avisos"],
   kitchen:  ["cocina", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
-  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
-  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "fiscal", "panel"],
-  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "fiscal", "panel"],
+  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "costo", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "costo", "fiscal", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "costo", "fiscal", "panel"],
 };
 
 const TAB_META = {
@@ -150,6 +151,7 @@ const TAB_META = {
   inv:     { label: "Inventario", title: "Inventario", icon: Package },
   corte:   { label: "Corte", title: "Corte de caja", icon: Wallet },
   fin:     { label: "Finanzas", title: "Finanzas", icon: BarChart3 },
+  costo:   { label: "Costo menú", title: "Costo del menú", icon: Calculator },
   fiscal:  { label: "Fiscal", title: "Asistente fiscal (SAT)", icon: Landmark },
   disponibilidad: { label: "Tienda", title: "Disponibilidad de la tienda", icon: ToggleRight },
   panel:   { label: "Equipo", title: "Administración del equipo", icon: TrendingUp },
@@ -165,7 +167,7 @@ const TAB_GROUPS = [
   { id: "turno", label: "Mi turno", tabs: ["inicio", "tareas", "temp"] },
   { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv", "corte"] },
   { id: "equipo", label: "Equipo", tabs: ["horario", "avisos"] },
-  { id: "gestion", label: "Administración", tabs: ["resumen", "ventas", "fin", "fiscal", "panel"] },
+  { id: "gestion", label: "Administración", tabs: ["resumen", "ventas", "fin", "costo", "fiscal", "panel"] },
 ];
 
 const MOBILE_PRIMARY_BY_ROLE = {
@@ -504,6 +506,7 @@ export default function UnifiedStaffApp() {
             {tab === "inv"     && <InventoryPage styles={posStyles} role={me?.role} />}
             {tab === "corte"   && <CashCutPage styles={posStyles} />}
             {tab === "fin"     && <FinancePage styles={posStyles} />}
+            {tab === "costo"   && <RecipeCostPage styles={posStyles} />}
             {tab === "fiscal"  && <FiscalPage styles={posStyles} />}
           </main>
         </div>

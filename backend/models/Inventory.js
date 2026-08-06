@@ -21,6 +21,20 @@ const inventorySchema = new mongoose.Schema(
     menuKeys: { type: [String], default: [] }, // e.g. ["salmon","citrus_marinade"] — matched on order pay
     lastRestockAt: { type: Date, default: null },
     lastRestockBy: { type: String, default: null }, // nombre del staff que hizo la última recepción
+
+    // Fase 2 (recetas y costo completo) -- cuánto representa "1 porción" de
+    // este artículo, en la misma unidad que `unit`. null = todavía no
+    // capturado (no se inventa un valor "razonable"; el semáforo de Costo
+    // del menú lo marca en amarillo/rojo hasta que alguien lo llene).
+    portionQty: { type: Number, default: null, min: 0 },
+    // % del artículo comprado que en realidad se aprovecha (mermas de
+    // limpieza/corte). 100 = todo se usa. null = sin capturar.
+    yieldPct:   { type: Number, default: null, min: 0, max: 100 },
+    // Informativos, para mostrar la conversión compra→uso en Costo del
+    // menú -- no cambian cómo se registra `qty` en la recepción (eso
+    // sigue siempre en `unit`, sin tocar el flujo ya probado).
+    purchaseUnit:             { type: String, default: null },
+    purchaseConversionFactor: { type: Number, default: null, min: 0 }, // cuántas `unit` hay en 1 `purchaseUnit`
     // Request IDs make shipment receiving permanently idempotent. Keeping the
     // marker on the same document as qty makes each increment atomic, even
     // when a batch is retried after only some lines reached the server.

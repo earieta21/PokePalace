@@ -36,6 +36,12 @@ const inventoryMovementSchema = new mongoose.Schema(
     reason:     { type: String, default: "", trim: true, maxlength: 500 },
     locationId: { type: String, default: null },
 
+    // Costo por unidad DESPUÉS de este movimiento (Fase 2) -- solo se llena
+    // en restock/restock_batch. Al quedar en cada movimiento, este ledger
+    // sirve como historial de costos sin necesitar un arreglo aparte en
+    // Inventory. null en movimientos que no cambian costo (ventas, ajustes).
+    cost: { type: Number, default: null, min: 0 },
+
     // Protege contra reintentos (pago/cancelación/lote) que dupliquen la
     // fila del ledger aunque la mutación de qty ya sea idempotente por su
     // cuenta. Opcional -- ajustes manuales sin token de reintento no la usan.

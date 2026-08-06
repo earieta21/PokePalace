@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import { dateKeyInTimeZone, normalizeRestockLines } from "../utils/inventoryRestock.js";
 import { recordAudit, diffFields, actorFromStaff } from "../utils/auditLog.js";
 import { recordInventoryMovement } from "../utils/inventoryLedger.js";
+import { computeWeightedAverageCost } from "../utils/inventoryCost.js";
 
 // Cada sección del inventario tiene su categoría contable en Finanzas.
 const EXPENSE_CATEGORY_BY_SECTION = {
@@ -18,6 +19,7 @@ const EXPENSE_CATEGORY_BY_SECTION = {
 const INVENTORY_EDITABLE_FIELDS = [
   "item", "section", "category", "unit", "qty", "minQty",
   "cost", "supplier", "menuKeys",
+  "portionQty", "yieldPct", "purchaseUnit", "purchaseConversionFactor",
 ];
 
 const pickInventoryFields = (body = {}) => Object.fromEntries(
@@ -155,24 +157,45 @@ export const restockItem = async (req, res) => {
     const existing = await Inventory.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Item not found" });
 
+    const rawCost = req.body.cost;
+    const hasNewCost = rawCost !== undefined && rawCost !== null && rawCost !== "" && Number.isFinite(Number(rawCost)) && Number(rawCost) >= 0;
+
     const qtyBefore = existing.qty;
+    const costBefore = existing.cost;
     const nextQty = Math.max(0, existing.qty + amount);
+    // Costo promedio ponderado -- nunca se sobreescribe con el precio más
+    // reciente sin más: se pondera contra lo que ya había en existencia.
+    const nextCost = hasNewCost
+      ? computeWeightedAverageCost({ qtyBefore, costBefore, qtyReceived: amount, costReceived: Number(rawCost) })
+      : existing.cost;
+
     existing.qty = nextQty;
+    if (hasNewCost) existing.cost = nextCost;
     existing.lastRestockAt = new Date();
     existing.lastRestockBy = req.staff?.name || req.staff?.email || "Staff";
     await existing.save();
 
-    // Recibir mercancía es una compra: se anota sola en Finanzas
-    // (salvo que el cliente lo desactive con registerExpense: false).
+    // Recibir mercancía es una compra: se anota sola en Finanzas, con el
+    // costo REAL de esta compra (no el promedio ponderado resultante).
     const expense = req.body.registerExpense === false
       ? null
-      : await recordPurchaseExpense({ item: existing, qty: amount, staff: req.staff });
+      : await recordPurchaseExpense({ item: existing, qty: amount, staff: req.staff, costOverride: hasNewCost ? Number(rawCost) : null });
 
+    const actor = actorFromStaff(req.staff);
     await recordInventoryMovement({
       itemId: existing._id, itemName: existing.item, type: "restock",
       delta: nextQty - qtyBefore, qtyBefore, qtyAfter: nextQty,
-      ...actorFromStaff(req.staff), referenceType: "manual",
+      cost: hasNewCost ? nextCost : null,
+      ...actor, referenceType: "manual",
     });
+
+    if (hasNewCost && nextCost !== costBefore) {
+      await recordAudit({
+        entity: "Inventory", entityId: existing._id, action: "update",
+        changes: [{ field: "cost", oldValue: costBefore, newValue: nextCost }],
+        ...actor, source: "manual", reason: "Costo promedio ponderado tras recepción",
+      });
+    }
 
     res.json({ item: existing, expense });
   } catch (err) {
@@ -184,9 +207,10 @@ export const restockItem = async (req, res) => {
    body: { requestId, lines: [{ itemId, amount, cost? }] }
 
    `cost` es opcional y es el costo unitario de ESTA compra. Si se manda,
-   se guarda como el nuevo costo del artículo (precio más reciente) y se
-   usa para calcular el gasto en Finanzas; si no, se conserva el costo
-   anterior del artículo.
+   el costo del artículo se recalcula como promedio ponderado contra lo
+   que ya había en existencia (ver computeWeightedAverageCost) y se usa
+   el costo real de la compra para el gasto en Finanzas; si no se manda,
+   se conserva el costo anterior del artículo.
 
    Each Inventory update records requestId atomically alongside the increment.
    A retry can therefore finish missing lines without adding successful ones a
@@ -222,6 +246,11 @@ export const restockBatch = async (req, res) => {
     const actor = actorFromStaff(req.staff);
     const results = await Promise.all(lines.map(async ({ itemId, amount, cost }) => {
       const hasNewCost = Number.isFinite(cost) && cost >= 0;
+      const before = existingById.get(itemId);
+      const weightedCost = hasNewCost && before
+        ? computeWeightedAverageCost({ qtyBefore: before.qty, costBefore: before.cost, qtyReceived: amount, costReceived: cost })
+        : null;
+
       let item = await Inventory.findOneAndUpdate(
         { _id: itemId, restockRequestIds: { $ne: requestId } },
         {
@@ -229,7 +258,7 @@ export const restockBatch = async (req, res) => {
           $set: {
             lastRestockAt: new Date(),
             lastRestockBy: req.staff?.name || req.staff?.email || "Staff",
-            ...(hasNewCost ? { cost } : {}),
+            ...(hasNewCost ? { cost: weightedCost } : {}),
           },
           $addToSet: { restockRequestIds: requestId },
         },
@@ -240,6 +269,8 @@ export const restockBatch = async (req, res) => {
       if (!item) item = await Inventory.findById(itemId);
       if (!item) throw new Error("Uno de los artículos ya no existe");
 
+      // Finanzas registra el costo REAL de esta compra, no el promedio
+      // ponderado resultante -- lo que de verdad se pagó por esta recepción.
       const expense = req.body.registerExpense === false
         ? null
         : await recordPurchaseExpense({
@@ -252,13 +283,22 @@ export const restockBatch = async (req, res) => {
           });
 
       if (!replayed) {
-        const qtyBefore = existingById.get(itemId)?.qty ?? Math.max(0, item.qty - amount);
+        const qtyBefore = before?.qty ?? Math.max(0, item.qty - amount);
         await recordInventoryMovement({
           itemId: item._id, itemName: item.item, type: "restock_batch",
           delta: item.qty - qtyBefore, qtyBefore, qtyAfter: item.qty,
+          cost: hasNewCost ? weightedCost : null,
           ...actor, reference: requestId, referenceType: "restockRequest",
           idempotencyKey: `batch:${requestId}:${itemId}`,
         });
+
+        if (hasNewCost && before && weightedCost !== before.cost) {
+          await recordAudit({
+            entity: "Inventory", entityId: item._id, action: "update",
+            changes: [{ field: "cost", oldValue: before.cost, newValue: weightedCost }],
+            ...actor, source: "manual", reason: "Costo promedio ponderado tras recepción por lote",
+          });
+        }
       }
 
       return { item, expense, replayed };

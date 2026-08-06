@@ -14,6 +14,7 @@ import StaffUser from "../models/StaffUser.js";
 import Inventory from "../models/Inventory.js";
 import InventoryMovement from "../models/InventoryMovement.js";
 import AuditLog from "../models/AuditLog.js";
+import Recipe from "../models/Recipe.js";
 import Redemption from "../models/Redemption.js";
 import StoreSettings from "../models/StoreSettings.js";
 import { dateKeyInTimeZone, nextDateKey, zonedDateTimeToUtc } from "../utils/timeZone.js";
@@ -93,6 +94,9 @@ after(async () => {
   if (mongoose.connection.readyState === 1) {
     await Order.deleteMany({ clientOrderId: { $regex: "^ci-pos-security:" } });
     await Order.deleteMany({ clientOrderId: { $regex: "^ci-web:" } });
+    const ciRecipeIds = await Recipe.find({ catalogId: "cacao-rice-cake" }).distinct("_id");
+    await AuditLog.deleteMany({ entity: "Recipe", entityId: { $in: ciRecipeIds } });
+    await Recipe.deleteMany({ catalogId: "cacao-rice-cake" });
     const ciInventoryIds = await Inventory.find({ item: { $regex: "^CI Security" } }).distinct("_id");
     await InventoryMovement.deleteMany({ itemId: { $in: ciInventoryIds } });
     await AuditLog.deleteMany({ entity: "Inventory", entityId: { $in: ciInventoryIds } });
@@ -1303,4 +1307,101 @@ test("GET movimientos y audit-log filtran por articulo/entidad y protegen por ro
 
   const auditAsCashier = await staffRequest("cashier", "/api/staff/audit-log");
   assert.equal(auditAsCashier.status, 403);
+});
+
+test("recibir mercancia con costo nuevo calcula el promedio ponderado, con auditoria, sin romper idempotencia", async () => {
+  const item = await Inventory.create({
+    item: `CI Security Costo Ponderado ${Date.now()}`, unit: "kg", qty: 10, cost: 20, minQty: 0,
+  });
+
+  const restocked = await staffRequest("manager", `/api/staff/inventory/${item._id}/restock`, {
+    method: "PATCH", body: { amount: 10, cost: 30, registerExpense: false },
+  });
+  assert.equal(restocked.status, 200);
+  const restockedBody = (await restocked.json()).item;
+  assert.equal(restockedBody.cost, 25); // (10*20 + 10*30) / 20
+
+  const movements = await InventoryMovement.find({ itemId: item._id });
+  assert.equal(movements.length, 1);
+  assert.equal(movements[0].cost, 25);
+
+  const costAudit = (await AuditLog.find({ entity: "Inventory", entityId: item._id, action: "update" }))
+    .find((a) => a.changes.some((c) => c.field === "cost"));
+  assert.ok(costAudit);
+  const costChange = costAudit.changes.find((c) => c.field === "cost");
+  assert.equal(costChange.oldValue, 20);
+  assert.equal(costChange.newValue, 25);
+
+  // Restock por lote con costo nuevo tambien pondera, y no duplica en reintento.
+  const requestId = `ci-security-weighted-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const batchBody = { requestId, lines: [{ itemId: String(item._id), amount: 20, cost: 40 }], registerExpense: false };
+  const batch = await staffRequest("manager", "/api/staff/inventory/restock-batch", { method: "POST", body: batchBody });
+  assert.equal(batch.status, 200);
+  // antes del lote: qty=20, cost=25 -> +20 a $40 => (20*25 + 20*40) / 40 = 32.5
+  const afterBatch = await Inventory.findById(item._id);
+  assert.equal(afterBatch.cost, 32.5);
+  assert.equal(afterBatch.qty, 40);
+
+  const replay = await staffRequest("manager", "/api/staff/inventory/restock-batch", { method: "POST", body: batchBody });
+  assert.equal(replay.status, 200);
+  assert.equal((await replay.json()).replayed, true);
+  const afterReplay = await Inventory.findById(item._id);
+  assert.equal(afterReplay.cost, 32.5);
+  assert.equal(afterReplay.qty, 40);
+  assert.equal((await InventoryMovement.find({ itemId: item._id, type: "restock_batch" })).length, 1);
+});
+
+test("recetas: semaforo rojo/amarillo/verde, versionado, y acceso restringido a gerencia+", async () => {
+  assert.equal((await staffRequest("cashier", "/api/staff/recipes")).status, 403);
+
+  const before = await staffRequest("manager", "/api/staff/recipes");
+  assert.equal(before.status, 200);
+  const beforeProduct = (await before.json()).products.find((p) => p.catalogId === "cacao-rice-cake");
+  assert.equal(beforeProduct.status, "red");
+
+  const ingredient = await Inventory.create({
+    item: `CI Security Cacao Polvo ${Date.now()}`, unit: "kg", qty: 5, cost: 100, minQty: 0,
+    menuKeys: [`ci_cacao_powder_${Date.now()}`],
+  });
+  const key = ingredient.menuKeys[0];
+
+  const saved = await staffRequest("manager", "/api/staff/recipes", {
+    method: "POST",
+    body: { catalogId: "cacao-rice-cake", ingredients: [{ key, portions: 1 }], packaging: [], commissionPct: 0 },
+  });
+  assert.equal(saved.status, 201);
+  const savedBody = await saved.json();
+  assert.equal(savedBody.recipe.version, 1);
+
+  const afterYellow = await staffRequest("manager", "/api/staff/recipes");
+  const yellowProduct = (await afterYellow.json()).products.find((p) => p.catalogId === "cacao-rice-cake");
+  assert.equal(yellowProduct.status, "yellow"); // falta portionQty/yieldPct del ingrediente
+
+  await staffRequest("manager", `/api/staff/inventory/${ingredient._id}`, {
+    method: "PATCH", body: { portionQty: 0.02, yieldPct: 100 },
+  });
+
+  const afterGreen = await staffRequest("manager", "/api/staff/recipes");
+  const greenProduct = (await afterGreen.json()).products.find((p) => p.catalogId === "cacao-rice-cake");
+  assert.equal(greenProduct.status, "green");
+  assert.equal(greenProduct.ingredientsCost, 2); // 0.02 kg * $100/kg
+
+  const savedAgain = await staffRequest("manager", "/api/staff/recipes", {
+    method: "POST",
+    body: { catalogId: "cacao-rice-cake", ingredients: [{ key, portions: 2 }], packaging: [], commissionPct: 0 },
+  });
+  assert.equal(savedAgain.status, 201);
+  const savedAgainBody = await savedAgain.json();
+  assert.equal(savedAgainBody.recipe.version, 2);
+
+  const v1 = await Recipe.findById(savedBody.recipe._id);
+  assert.equal(v1.active, false); // la version anterior queda desactivada, no borrada
+
+  const detail = await staffRequest("manager", "/api/staff/recipes/cacao-rice-cake");
+  const detailBody = await detail.json();
+  assert.equal(detailBody.recipe.version, 2);
+  assert.equal(detailBody.history.length, 2);
+
+  const recipeAudit = await AuditLog.find({ entity: "Recipe", entityId: savedAgainBody.recipe._id });
+  assert.ok(recipeAudit.length >= 1);
 });
