@@ -9,6 +9,7 @@ import {
   restockBatch,
   backfillInventoryExpenses,
   deleteItem,
+  getItemMovements,
 } from "../controllers/staffInventoryController.js";
 
 const router = express.Router();
@@ -25,5 +26,6 @@ router.post  ("/backfill-expenses", ownerOnly, backfillInventoryExpenses);
 router.patch ("/:id", seniorStaff, updateItem);
 router.patch ("/:id/restock", seniorStaff, restockItem);
 router.delete("/:id", seniorStaff, deleteItem);
+router.get   ("/:id/movements", anyStaff, getItemMovements);
 
 export default router;

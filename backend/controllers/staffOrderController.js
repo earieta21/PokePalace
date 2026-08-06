@@ -27,13 +27,15 @@ import {
   startOfDateKey,
   zonedParts,
 } from "../utils/timeZone.js";
+import { actorFromStaff } from "../utils/auditLog.js";
+import { recordInventoryMovement, restoreAmountForOrder } from "../utils/inventoryLedger.js";
 
 /* ── inventory auto-deduction ── */
-async function deductInventory(order) {
+async function deductInventory(order, actor = null) {
   try {
     const statusBefore = await Order.findById(order._id).select("status").lean();
     if (!statusBefore || statusBefore.status === "cancelled") {
-      if (statusBefore?.status === "cancelled") await restoreInventoryForOrder(order);
+      if (statusBefore?.status === "cancelled") await restoreInventoryForOrder(order, actor);
       return false;
     }
 
@@ -45,20 +47,20 @@ async function deductInventory(order) {
       order.ingredientsDeducted = true;
       const statusAfter = await Order.findById(order._id).select("status").lean();
       if (statusAfter?.status === "cancelled") {
-        await restoreInventoryForOrder(order);
+        await restoreInventoryForOrder(order, actor);
         return false;
       }
       return true;
     }
     const invItems = await Inventory.find({ menuKeys: { $in: keys } })
-      .select("menuKeys")
+      .select("menuKeys qty item processedOrderIds")
       .lean();
     if (invItems.length === 0) {
       await Order.updateOne({ _id: order._id }, { $set: { ingredientsDeducted: true } });
       order.ingredientsDeducted = true;
       const statusAfter = await Order.findById(order._id).select("status").lean();
       if (statusAfter?.status === "cancelled") {
-        await restoreInventoryForOrder(order);
+        await restoreInventoryForOrder(order, actor);
         return false;
       }
       return true;
@@ -68,10 +70,23 @@ async function deductInventory(order) {
     // example raw tuna shared by tuna and seared_tuna). Calculate its complete
     // demand, then atomically decrement and store the exact quantity removed.
     // processedOrderIds keeps partial/ambiguous retries exactly once.
+    // ledgerCandidates mirrors the same requested/qtyBefore math the pipeline
+    // below applies, so the movement ledger can be written from plain JS
+    // without a second read after bulkWrite — see backend/utils/inventoryLedger.js.
+    const ledgerCandidates = [];
     const operations = invItems.flatMap((item) => {
       const requested = [...new Set(item.menuKeys || [])]
         .reduce((sum, key) => sum + (Number(demand[key]) || 0), 0);
       if (requested <= 0) return [];
+
+      const alreadyProcessed = (item.processedOrderIds || []).some((id) => String(id) === String(order._id));
+      if (!alreadyProcessed) {
+        const qtyBefore = Number(item.qty) || 0;
+        ledgerCandidates.push({
+          itemId: item._id, itemName: item.item, qtyBefore,
+          qtyAfter: Math.max(0, qtyBefore - requested),
+        });
+      }
 
       return [{
         updateOne: {
@@ -119,6 +134,15 @@ async function deductInventory(order) {
 
     if (operations.length > 0) await Inventory.bulkWrite(operations, { ordered: false });
 
+    const ledgerActor = actorFromStaff(actor);
+    await Promise.all(ledgerCandidates.map((candidate) => recordInventoryMovement({
+      itemId: candidate.itemId, itemName: candidate.itemName, type: "sale_deduction",
+      delta: candidate.qtyAfter - candidate.qtyBefore,
+      qtyBefore: candidate.qtyBefore, qtyAfter: candidate.qtyAfter,
+      ...ledgerActor, reference: String(order._id), referenceType: "order",
+      idempotencyKey: `deduct:${order._id}:${candidate.itemId}`,
+    })));
+
     // This marker is a summary only; the per-item ledgers are authoritative.
     // A crash here is repaired by the next safe retry.
     await Order.updateOne({ _id: order._id }, { $set: { ingredientsDeducted: true } });
@@ -128,7 +152,7 @@ async function deductInventory(order) {
     // before the inventory update. Restoration uses the same durable ledgers.
     const statusAfter = await Order.findById(order._id).select("status").lean();
     if (statusAfter?.status === "cancelled") {
-      await restoreInventoryForOrder(order);
+      await restoreInventoryForOrder(order, actor);
       return false;
     }
     return true;
@@ -140,8 +164,16 @@ async function deductInventory(order) {
   }
 }
 
-async function restoreInventoryForOrder(order) {
+async function restoreInventoryForOrder(order, actor = null) {
   try {
+    // Leído ANTES de mutar, con el mismo filtro que usa el pipeline de abajo
+    // para decidir qué tocar -- un reintento de esta función para la misma
+    // orden encuentra `affected` vacío (ya no hay processedOrderIds que
+    // coincidan) y no vuelve a escribir en el ledger.
+    const affected = await Inventory.find({ processedOrderIds: order._id })
+      .select("item qty orderDeductions deductedOrderIds")
+      .lean();
+
     await Inventory.updateMany(
       { processedOrderIds: order._id },
       [{
@@ -219,6 +251,20 @@ async function restoreInventoryForOrder(order) {
     );
     order.ingredientsDeducted = false;
     order.inventoryRestoredAt = new Date();
+
+    const ledgerActor = actorFromStaff(actor);
+    await Promise.all(affected.map((doc) => {
+      const restoreAmount = restoreAmountForOrder(doc, order._id);
+      if (restoreAmount <= 0) return null;
+      const qtyBefore = Number(doc.qty) || 0;
+      return recordInventoryMovement({
+        itemId: doc._id, itemName: doc.item, type: "sale_reversal",
+        delta: restoreAmount, qtyBefore, qtyAfter: qtyBefore + restoreAmount,
+        ...ledgerActor, reference: String(order._id), referenceType: "order",
+        idempotencyKey: `restore:${order._id}:${doc._id}`,
+      });
+    }));
+
     return true;
   } catch (err) {
     console.error("restoreInventoryForOrder error:", err.message);
@@ -313,10 +359,10 @@ async function restoreRewardForPosCancellation(order) {
   );
 }
 
-async function reconcileCancelledPosOrder(order) {
+async function reconcileCancelledPosOrder(order, actor = null) {
   if (order.source !== "pos") return order;
 
-  if (!await restoreInventoryForOrder(order)) {
+  if (!await restoreInventoryForOrder(order, actor)) {
     throw new Error("No se pudo devolver el inventario de la venta cancelada");
   }
   let latest = await Order.findById(order._id).populate("user", "name email");
@@ -338,11 +384,11 @@ async function reconcileCancelledPosOrder(order) {
   ).populate("user", "name email");
 }
 
-async function reconcileCancelledStaffOrder(order) {
-  if (order.source === "pos") return reconcileCancelledPosOrder(order);
+async function reconcileCancelledStaffOrder(order, actor = null) {
+  if (order.source === "pos") return reconcileCancelledPosOrder(order, actor);
   if (order.source !== "online") return order;
 
-  if (!await restoreInventoryForOrder(order)) {
+  if (!await restoreInventoryForOrder(order, actor)) {
     throw new Error("No se pudo devolver el inventario de la orden cancelada");
   }
   let latest = await Order.findById(order._id).populate("user", "name email");
@@ -532,7 +578,7 @@ export const markAsPaid = async (req, res) => {
       });
     }
 
-    if (!await deductInventory(order)) {
+    if (!await deductInventory(order, req.staff)) {
       return res.status(503).json({
         message: "El pago fue guardado, pero el inventario sigue conciliándose. Reintenta.",
         retryable: true,
@@ -577,7 +623,7 @@ export const updateOrderStatus = async (req, res) => {
 
     if (status === prev.status) {
       if (status === "cancelled") {
-        const reconciled = await reconcileCancelledStaffOrder(prev);
+        const reconciled = await reconcileCancelledStaffOrder(prev, req.staff);
         return res.json({
           order: orderResponseForRole(reconciled, req.staff.role),
           loyalty: null,
@@ -586,7 +632,7 @@ export const updateOrderStatus = async (req, res) => {
       }
       let loyalty = null;
       if (status === "completed") {
-        if (!await deductInventory(prev)) {
+        if (!await deductInventory(prev, req.staff)) {
           return res.status(503).json({
             message: "La orden quedó completada, pero el inventario sigue conciliándose. Reintenta.",
             retryable: true,
@@ -619,10 +665,10 @@ export const updateOrderStatus = async (req, res) => {
     if (!order) {
       const latest = await Order.findById(req.params.id).populate("user", "name email");
       if (latest?.status === status) {
-        if (status === "cancelled") order = await reconcileCancelledStaffOrder(latest);
+        if (status === "cancelled") order = await reconcileCancelledStaffOrder(latest, req.staff);
         let loyalty = null;
         if (status === "completed") {
-          if (!await deductInventory(latest)) {
+          if (!await deductInventory(latest, req.staff)) {
             return res.status(503).json({
               message: "La orden quedó completada, pero el inventario sigue conciliándose. Reintenta.",
               retryable: true,
@@ -640,8 +686,8 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(409).json({ message: "La orden cambió de estado; actualiza e intenta de nuevo" });
     }
 
-    if (status === "cancelled") order = await reconcileCancelledStaffOrder(order);
-    if (status === "completed" && !await deductInventory(order)) {
+    if (status === "cancelled") order = await reconcileCancelledStaffOrder(order, req.staff);
+    if (status === "completed" && !await deductInventory(order, req.staff)) {
       return res.status(503).json({
         message: "La orden quedó completada, pero el inventario sigue conciliándose. Reintenta.",
         retryable: true,
@@ -723,7 +769,7 @@ export const createPosOrder = async (req, res) => {
           return res.status(409).json({ message: "clientOrderId ya pertenece a otra venta" });
         }
         if (existing.status === "cancelled") {
-          const reconciled = await reconcileCancelledPosOrder(existing);
+          const reconciled = await reconcileCancelledPosOrder(existing, req.staff);
           return res.status(200).json({ order: reconciled, loyalty: null, idempotent: true });
         }
         if (!await consumeRedemptionForOrder(existing, existing.staffId || req.staff.id)) {
@@ -732,7 +778,7 @@ export const createPosOrder = async (req, res) => {
             orderId: existing._id,
           });
         }
-        if (!await deductInventory(existing)) {
+        if (!await deductInventory(existing, req.staff)) {
           return res.status(503).json({
             message: "La venta existe, pero aún se está conciliando. Reintenta con el mismo clientOrderId.",
             retryable: true,
@@ -903,7 +949,7 @@ export const createPosOrder = async (req, res) => {
       if (!await consumeRedemptionForOrder(order, req.staff.id)) {
         const latest = await Order.findById(order._id).populate("user", "name email");
         if (latest?.status === "cancelled") {
-          const reconciled = await reconcileCancelledPosOrder(latest);
+          const reconciled = await reconcileCancelledPosOrder(latest, req.staff);
           return res.status(409).json({
             message: "La venta fue cancelada mientras se conciliaba",
             order: reconciled,
@@ -921,7 +967,7 @@ export const createPosOrder = async (req, res) => {
 
     // Paid POS sales credit Rewards immediately. Pending sales do it later
     // through /pay or when the order is completed.
-    if (!await deductInventory(order)) {
+    if (!await deductInventory(order, req.staff)) {
       return res.status(503).json({
         message: "La venta fue guardada, pero aún se está conciliando. Reintenta con el mismo clientOrderId.",
         retryable: Boolean(cleanClientOrderId),
@@ -937,7 +983,7 @@ export const createPosOrder = async (req, res) => {
           .populate("user", "name email");
         if (existing?.source === "pos") {
           if (existing.status === "cancelled") {
-            const reconciled = await reconcileCancelledPosOrder(existing);
+            const reconciled = await reconcileCancelledPosOrder(existing, req.staff);
             return res.status(200).json({ order: reconciled, loyalty: null, idempotent: true });
           }
           if (!await consumeRedemptionForOrder(existing, existing.staffId || req.staff.id)) {
@@ -946,7 +992,7 @@ export const createPosOrder = async (req, res) => {
               orderId: existing._id,
             });
           }
-          if (!await deductInventory(existing)) {
+          if (!await deductInventory(existing, req.staff)) {
             return res.status(503).json({
               message: "La venta existe, pero aún se está conciliando. Reintenta con el mismo clientOrderId.",
               retryable: true,

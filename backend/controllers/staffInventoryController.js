@@ -1,7 +1,10 @@
 import Inventory from "../models/Inventory.js";
 import Expense from "../models/Expense.js";
+import InventoryMovement from "../models/InventoryMovement.js";
 import mongoose from "mongoose";
 import { dateKeyInTimeZone, normalizeRestockLines } from "../utils/inventoryRestock.js";
+import { recordAudit, diffFields, actorFromStaff } from "../utils/auditLog.js";
+import { recordInventoryMovement } from "../utils/inventoryLedger.js";
 
 // Cada sección del inventario tiene su categoría contable en Finanzas.
 const EXPENSE_CATEGORY_BY_SECTION = {
@@ -80,6 +83,21 @@ export const createItem = async (req, res) => {
     const expense = registerExpense
       ? await recordPurchaseExpense({ item, qty: item.qty, staff: req.staff })
       : null;
+
+    const actor = actorFromStaff(req.staff);
+    if (item.qty > 0) {
+      await recordInventoryMovement({
+        itemId: item._id, itemName: item.item, type: "manual_adjustment",
+        delta: item.qty, qtyBefore: 0, qtyAfter: item.qty,
+        ...actor, referenceType: "manual",
+      });
+    }
+    await recordAudit({
+      entity: "Inventory", entityId: item._id, action: "create",
+      changes: Object.keys(data).map((field) => ({ field, oldValue: null, newValue: item[field] ?? null })),
+      ...actor, source: "manual",
+    });
+
     res.status(201).json({ item, expense });
   } catch (err) {
     res.status(400).json({ message: "Error creating item", err: err.message });
@@ -89,11 +107,36 @@ export const createItem = async (req, res) => {
 /* PATCH /api/staff/inventory/:id */
 export const updateItem = async (req, res) => {
   try {
-    const item = await Inventory.findByIdAndUpdate(req.params.id, pickInventoryFields(req.body), {
+    const updateData = pickInventoryFields(req.body);
+    const before = await Inventory.findById(req.params.id).lean();
+    if (!before) return res.status(404).json({ message: "Item not found" });
+
+    const item = await Inventory.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
     });
-    if (!item) return res.status(404).json({ message: "Item not found" });
+
+    const changedFields = diffFields(before, item.toObject(), Object.keys(updateData));
+    const actor = actorFromStaff(req.staff);
+
+    const qtyChange = changedFields.find((c) => c.field === "qty");
+    if (qtyChange) {
+      await recordInventoryMovement({
+        itemId: item._id, itemName: item.item, type: "manual_adjustment",
+        delta: qtyChange.newValue - qtyChange.oldValue,
+        qtyBefore: qtyChange.oldValue, qtyAfter: qtyChange.newValue,
+        ...actor, referenceType: "manual",
+      });
+    }
+
+    const otherChanges = changedFields.filter((c) => c.field !== "qty");
+    if (otherChanges.length > 0) {
+      await recordAudit({
+        entity: "Inventory", entityId: item._id, action: "update",
+        changes: otherChanges, ...actor, source: "manual",
+      });
+    }
+
     res.json({ item });
   } catch (err) {
     res.status(400).json({ message: "Error updating item", err: err.message });
@@ -112,6 +155,7 @@ export const restockItem = async (req, res) => {
     const existing = await Inventory.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Item not found" });
 
+    const qtyBefore = existing.qty;
     const nextQty = Math.max(0, existing.qty + amount);
     existing.qty = nextQty;
     existing.lastRestockAt = new Date();
@@ -123,6 +167,12 @@ export const restockItem = async (req, res) => {
     const expense = req.body.registerExpense === false
       ? null
       : await recordPurchaseExpense({ item: existing, qty: amount, staff: req.staff });
+
+    await recordInventoryMovement({
+      itemId: existing._id, itemName: existing.item, type: "restock",
+      delta: nextQty - qtyBefore, qtyBefore, qtyAfter: nextQty,
+      ...actorFromStaff(req.staff), referenceType: "manual",
+    });
 
     res.json({ item: existing, expense });
   } catch (err) {
@@ -169,6 +219,7 @@ export const restockBatch = async (req, res) => {
     }
 
     const existingById = new Map(existingItems.map((item) => [String(item._id), item]));
+    const actor = actorFromStaff(req.staff);
     const results = await Promise.all(lines.map(async ({ itemId, amount, cost }) => {
       const hasNewCost = Number.isFinite(cost) && cost >= 0;
       let item = await Inventory.findOneAndUpdate(
@@ -199,6 +250,16 @@ export const restockBatch = async (req, res) => {
             strict: true,
             costOverride: hasNewCost ? cost : null,
           });
+
+      if (!replayed) {
+        const qtyBefore = existingById.get(itemId)?.qty ?? Math.max(0, item.qty - amount);
+        await recordInventoryMovement({
+          itemId: item._id, itemName: item.item, type: "restock_batch",
+          delta: item.qty - qtyBefore, qtyBefore, qtyAfter: item.qty,
+          ...actor, reference: requestId, referenceType: "restockRequest",
+          idempotencyKey: `batch:${requestId}:${itemId}`,
+        });
+      }
 
       return { item, expense, replayed };
     }));
@@ -258,9 +319,31 @@ export const getLowStock = async (req, res) => {
 /* DELETE /api/staff/inventory/:id */
 export const deleteItem = async (req, res) => {
   try {
-    await Inventory.findByIdAndDelete(req.params.id);
+    const item = await Inventory.findByIdAndDelete(req.params.id).lean();
+    if (item) {
+      await recordAudit({
+        entity: "Inventory", entityId: item._id, action: "delete",
+        changes: INVENTORY_EDITABLE_FIELDS.map((field) => ({ field, oldValue: item[field] ?? null, newValue: null })),
+        ...actorFromStaff(req.staff), source: "manual",
+      });
+    }
     res.json({ message: "Deleted" });
   } catch (err) {
     res.status(500).json({ message: "Error deleting item", err: err.message });
+  }
+};
+
+/* GET /api/staff/inventory/:id/movements?limit=&skip= */
+export const getItemMovements = async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const skip = Number(req.query.skip) || 0;
+    const movements = await InventoryMovement.find({ itemId: req.params.id })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+    res.json({ movements });
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching movements", err: err.message });
   }
 };

@@ -12,6 +12,8 @@ import PromoCode from "../models/PromoCode.js";
 import Order from "../models/Order.js";
 import StaffUser from "../models/StaffUser.js";
 import Inventory from "../models/Inventory.js";
+import InventoryMovement from "../models/InventoryMovement.js";
+import AuditLog from "../models/AuditLog.js";
 import Redemption from "../models/Redemption.js";
 import StoreSettings from "../models/StoreSettings.js";
 import { dateKeyInTimeZone, nextDateKey, zonedDateTimeToUtc } from "../utils/timeZone.js";
@@ -91,6 +93,9 @@ after(async () => {
   if (mongoose.connection.readyState === 1) {
     await Order.deleteMany({ clientOrderId: { $regex: "^ci-pos-security:" } });
     await Order.deleteMany({ clientOrderId: { $regex: "^ci-web:" } });
+    const ciInventoryIds = await Inventory.find({ item: { $regex: "^CI Security" } }).distinct("_id");
+    await InventoryMovement.deleteMany({ itemId: { $in: ciInventoryIds } });
+    await AuditLog.deleteMany({ entity: "Inventory", entityId: { $in: ciInventoryIds } });
     await Inventory.deleteMany({ item: { $regex: "^CI Security" } });
     await Redemption.deleteMany({ code: { $regex: "^CIPOS" } });
     await Redemption.deleteMany({ clientRedemptionId: { $regex: "^reward:ci-" } });
@@ -1019,6 +1024,15 @@ test("cancelar una venta POS revierte inventario, puntos y premio una sola vez",
   assert.equal((await User.findById(customer._id)).points, 23);
   assert.equal((await Redemption.findById(redemption._id)).status, "used");
 
+  const movementsAfterSale = await InventoryMovement.find({ itemId: inventory._id }).sort({ createdAt: 1 });
+  assert.equal(movementsAfterSale.length, 1);
+  assert.equal(movementsAfterSale[0].type, "sale_deduction");
+  assert.equal(movementsAfterSale[0].delta, -1);
+  assert.equal(movementsAfterSale[0].qtyBefore, 2);
+  assert.equal(movementsAfterSale[0].qtyAfter, 1);
+  assert.equal(movementsAfterSale[0].reference, orderId);
+  assert.equal(movementsAfterSale[0].actorName, "CI cashier");
+
   const cancelled = await staffRequest("cashier", `/api/staff/orders/${orderId}/status`, {
     method: "PATCH",
     body: { status: "cancelled" },
@@ -1041,6 +1055,14 @@ test("cancelar una venta POS revierte inventario, puntos y premio una sola vez",
   assert.equal(rewardAfter.status, "active");
   assert.equal(rewardAfter.order, undefined);
 
+  const movementsAfterCancel = await InventoryMovement.find({ itemId: inventory._id }).sort({ createdAt: 1 });
+  assert.equal(movementsAfterCancel.length, 2);
+  assert.equal(movementsAfterCancel[1].type, "sale_reversal");
+  assert.equal(movementsAfterCancel[1].delta, 1);
+  assert.equal(movementsAfterCancel[1].qtyBefore, 1);
+  assert.equal(movementsAfterCancel[1].qtyAfter, 2);
+  assert.equal(movementsAfterCancel[1].reference, orderId);
+
   const retried = await staffRequest("cashier", `/api/staff/orders/${orderId}/status`, {
     method: "PATCH",
     body: { status: "cancelled" },
@@ -1059,6 +1081,10 @@ test("cancelar una venta POS revierte inventario, puntos y premio una sola vez",
   assert.equal(customerAfter.points, 0);
   assert.equal(customerAfter.lifetimePoints, 0);
   assert.equal(rewardAfter.status, "active");
+
+  // La cancelación repetida (idempotente) no debe duplicar el ledger.
+  const movementsFinal = await InventoryMovement.find({ itemId: inventory._id });
+  assert.equal(movementsFinal.length, 2);
 });
 
 test("el monitor de errores acepta reportes", async () => {
@@ -1138,4 +1164,143 @@ test("el dueno puede marcar entrada y salida sin GPS; un empleado sin coordenada
     body: { locationId: "main", lat: 32.5327, lng: -117.0182 },
   });
   assert.equal(employeeFar.status, 403);
+});
+
+test("el restock individual y por lote registran el movimiento correcto, sin duplicar en reintento", async () => {
+  const single = await Inventory.create({
+    item: `CI Security Restock Individual ${Date.now()}`,
+    unit: "kg", qty: 5, minQty: 0,
+  });
+  const batchItem = await Inventory.create({
+    item: `CI Security Restock Lote ${Date.now()}`,
+    unit: "kg", qty: 3, minQty: 0,
+  });
+
+  const restocked = await staffRequest("manager", `/api/staff/inventory/${single._id}/restock`, {
+    method: "PATCH",
+    body: { amount: 2, registerExpense: false },
+  });
+  assert.equal(restocked.status, 200);
+
+  const singleMovements = await InventoryMovement.find({ itemId: single._id });
+  assert.equal(singleMovements.length, 1);
+  assert.equal(singleMovements[0].type, "restock");
+  assert.equal(singleMovements[0].delta, 2);
+  assert.equal(singleMovements[0].qtyBefore, 5);
+  assert.equal(singleMovements[0].qtyAfter, 7);
+  assert.equal(singleMovements[0].actorName, "CI manager");
+
+  const requestId = `ci-security-batch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const batchBody = {
+    requestId,
+    lines: [{ itemId: String(batchItem._id), amount: 4 }],
+    registerExpense: false,
+  };
+  const batch = await staffRequest("manager", "/api/staff/inventory/restock-batch", {
+    method: "POST", body: batchBody,
+  });
+  assert.equal(batch.status, 200);
+  assert.equal((await batch.json()).replayed, false);
+
+  const batchMovements = await InventoryMovement.find({ itemId: batchItem._id });
+  assert.equal(batchMovements.length, 1);
+  assert.equal(batchMovements[0].type, "restock_batch");
+  assert.equal(batchMovements[0].delta, 4);
+  assert.equal(batchMovements[0].qtyBefore, 3);
+  assert.equal(batchMovements[0].qtyAfter, 7);
+  assert.equal(batchMovements[0].reference, requestId);
+  assert.equal(batchMovements[0].referenceType, "restockRequest");
+
+  // Reintentar el mismo folio no debe volver a sumar cantidad ni duplicar el ledger.
+  const replay = await staffRequest("manager", "/api/staff/inventory/restock-batch", {
+    method: "POST", body: batchBody,
+  });
+  assert.equal(replay.status, 200);
+  assert.equal((await replay.json()).replayed, true);
+  assert.equal((await Inventory.findById(batchItem._id)).qty, 7);
+  assert.equal((await InventoryMovement.find({ itemId: batchItem._id })).length, 1);
+});
+
+test("crear, editar y borrar un articulo separan AuditLog (campos) de InventoryMovement (cantidad)", async () => {
+  const created = await staffRequest("manager", "/api/staff/inventory", {
+    method: "POST",
+    body: { item: `CI Security Alta ${Date.now()}`, unit: "kg", qty: 3, minQty: 1, cost: 10 },
+  });
+  assert.equal(created.status, 201);
+  const item = (await created.json()).item;
+
+  const movementsOnCreate = await InventoryMovement.find({ itemId: item._id });
+  assert.equal(movementsOnCreate.length, 1);
+  assert.equal(movementsOnCreate[0].type, "manual_adjustment");
+  assert.equal(movementsOnCreate[0].qtyBefore, 0);
+  assert.equal(movementsOnCreate[0].qtyAfter, 3);
+
+  const auditOnCreate = await AuditLog.find({ entity: "Inventory", entityId: item._id, action: "create" });
+  assert.equal(auditOnCreate.length, 1);
+
+  // Editar un campo que no es qty: solo AuditLog, ningun movimiento nuevo.
+  const editedCost = await staffRequest("manager", `/api/staff/inventory/${item._id}`, {
+    method: "PATCH", body: { cost: 15 },
+  });
+  assert.equal(editedCost.status, 200);
+  assert.equal((await InventoryMovement.find({ itemId: item._id })).length, 1);
+  const auditOnCostUpdate = await AuditLog.find({ entity: "Inventory", entityId: item._id, action: "update" });
+  assert.equal(auditOnCostUpdate.length, 1);
+  assert.deepEqual(auditOnCostUpdate[0].changes.map((c) => c.field), ["cost"]);
+  assert.equal(auditOnCostUpdate[0].changes[0].oldValue, 10);
+  assert.equal(auditOnCostUpdate[0].changes[0].newValue, 15);
+
+  // Editar qty directo: solo InventoryMovement, ningun AuditLog nuevo (qty
+  // nunca aparece en los cambios de AuditLog, vive solo en el ledger).
+  const editedQty = await staffRequest("manager", `/api/staff/inventory/${item._id}`, {
+    method: "PATCH", body: { qty: 9 },
+  });
+  assert.equal(editedQty.status, 200);
+  const movementsAfterQtyEdit = await InventoryMovement.find({ itemId: item._id }).sort({ createdAt: 1 });
+  assert.equal(movementsAfterQtyEdit.length, 2);
+  assert.equal(movementsAfterQtyEdit[1].type, "manual_adjustment");
+  assert.equal(movementsAfterQtyEdit[1].delta, 6);
+  assert.equal((await AuditLog.find({ entity: "Inventory", entityId: item._id, action: "update" })).length, 1);
+
+  // Borrar: AuditLog captura el estado final, no queda huerfano sin rastro.
+  const deleted = await staffRequest("manager", `/api/staff/inventory/${item._id}`, { method: "DELETE" });
+  assert.equal(deleted.status, 200);
+  const auditOnDelete = await AuditLog.find({ entity: "Inventory", entityId: item._id, action: "delete" });
+  assert.equal(auditOnDelete.length, 1);
+  const qtyChange = auditOnDelete[0].changes.find((c) => c.field === "qty");
+  assert.equal(qtyChange.oldValue, 9);
+  assert.equal(qtyChange.newValue, null);
+
+  await AuditLog.deleteMany({ entity: "Inventory", entityId: item._id });
+  await InventoryMovement.deleteMany({ itemId: item._id });
+});
+
+test("GET movimientos y audit-log filtran por articulo/entidad y protegen por rol", async () => {
+  const touched = await Inventory.create({
+    item: `CI Security Movimientos ${Date.now()}`, unit: "kg", qty: 0, minQty: 0,
+  });
+  const untouched = await Inventory.create({
+    item: `CI Security Sin Tocar ${Date.now()}`, unit: "kg", qty: 0, minQty: 0,
+  });
+
+  await staffRequest("manager", `/api/staff/inventory/${touched._id}/restock`, {
+    method: "PATCH", body: { amount: 1, registerExpense: false },
+  });
+
+  const movementsForTouched = await staffRequest("cashier", `/api/staff/inventory/${touched._id}/movements`);
+  assert.equal(movementsForTouched.status, 200);
+  const touchedBody = await movementsForTouched.json();
+  assert.equal(touchedBody.movements.length, 1);
+  assert.equal(touchedBody.movements[0].itemId, String(touched._id));
+
+  // Un articulo que nunca se ha tocado no es un error, solo lista vacia.
+  const movementsForUntouched = await staffRequest("cashier", `/api/staff/inventory/${untouched._id}/movements`);
+  assert.equal(movementsForUntouched.status, 200);
+  assert.deepEqual((await movementsForUntouched.json()).movements, []);
+
+  const auditAsManager = await staffRequest("manager", `/api/staff/audit-log?entity=Inventory&entityId=${touched._id}`);
+  assert.equal(auditAsManager.status, 200);
+
+  const auditAsCashier = await staffRequest("cashier", "/api/staff/audit-log");
+  assert.equal(auditAsCashier.status, 403);
 });
