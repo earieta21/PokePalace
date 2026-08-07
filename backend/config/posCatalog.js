@@ -68,6 +68,10 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: {},
   },
   {
+    catalogId: "miel-rice-cake", legacyId: 23, name: "Miel Rice Cake", price: 35, category: "extras",
+    inventoryRecipe: {},
+  },
+  {
     // Cobro rápido de una porción extra de atún sellado sin pasar por el
     // armador completo — mismo upcharge que PREMIUM_PROTEIN_PRICES.seared_tuna
     // en src/order/pricing.js.
