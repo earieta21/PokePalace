@@ -5,7 +5,7 @@ import {
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
   ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard, Landmark,
-  Menu, X, Wallet,
+  Menu, X, Wallet, Pencil,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -55,6 +55,11 @@ const fmtTime = (d) => new Date(d).toLocaleTimeString("es-MX", { hour: "2-digit"
 const fmtHM = (mins) => `${Math.floor(mins / 60)}h ${String(Math.round(mins % 60)).padStart(2, "0")}m`;
 const initials = (name) => name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 const sid = (id) => String(id);
+const toDatetimeLocal = (d) => {
+  const dt = new Date(d);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+};
 
 const COLORS = {
   emerald: { bg: "bg-emerald-500", text: "text-emerald-400", light: "bg-emerald-500/20", ring: "ring-emerald-400" },
@@ -432,6 +437,17 @@ export default function UnifiedStaffApp() {
     setEmployees((p) => p.filter((e) => sid(e._id) !== sid(id)));
   }
 
+  async function updateTimeRecord(id, patch) {
+    const r = await fetch(`${API_URL}/api/kiosk/time/${id}`, {
+      method: "PATCH", headers: authHeaders,
+      body: JSON.stringify(patch),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.message || "No se pudo corregir el registro.");
+    if (data.record) setTime((p) => p.map((t) => sid(t._id) === sid(data.record._id) ? data.record : t));
+    return data.record;
+  }
+
   if (!me) return <PinLogin onLogin={handleLogin} />;
 
   const isWideTab = ["pos", "cocina", "hist", "resumen", "ventas", "inv", "fin", "panel"].includes(tab);
@@ -495,7 +511,7 @@ export default function UnifiedStaffApp() {
             {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
             {tab === "premios" && <RewardsRedeemTab token={token} />}
             {tab === "disponibilidad" && <AvailabilityTab token={token} role={me?.role} />}
-            {tab === "panel"   && <PanelTab actor={me} employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} />}
+            {tab === "panel"   && <PanelTab actor={me} employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} onUpdateTimeRecord={updateTimeRecord} />}
             {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
             {tab === "cocina"  && <section className={shellStyles.portalSurface}><KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} /></section>}
             {tab === "hist"    && <section className={shellStyles.portalSurface}><OrderHistoryPage styles={posStyles} /></section>}
@@ -1661,7 +1677,7 @@ function AvailabilityTab({ token, role }) {
 /* ============================================================================
    PANEL — ASISTENCIA + EQUIPO
    ========================================================================== */
-function PanelTab({ actor, employees, time, now, onAddEmployee, onRemoveEmployee, onUpdateEmployee }) {
+function PanelTab({ actor, employees, time, now, onAddEmployee, onRemoveEmployee, onUpdateEmployee, onUpdateTimeRecord }) {
   const [view, setView] = useState("hoy");
   const empById = (id) => employees.find((e) => sid(e._id) === sid(id));
   const weekAgo = Date.now() - 7 * 86400000;
@@ -1718,7 +1734,7 @@ function PanelTab({ actor, employees, time, now, onAddEmployee, onRemoveEmployee
       </div>
 
       <div className="flex gap-2">
-        {[["hoy","Ahora"],["semana","7 días"],["nomina","Nómina"],["equipo","Equipo"]].map(([id, label]) => (
+        {[["hoy","Ahora"],["semana","7 días"],["registros","Registros"],["nomina","Nómina"],["equipo","Equipo"]].map(([id, label]) => (
           <button key={id} onClick={() => setView(id)}
             className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border transition ${view===id?"bg-emerald-600 text-white border-emerald-500":"bg-slate-800 text-slate-400 border-white/5"}`}>
             {label}
@@ -1771,11 +1787,183 @@ function PanelTab({ actor, employees, time, now, onAddEmployee, onRemoveEmployee
         </div>
       )}
 
+      {view === "registros" && (
+        <TimeRecordsView actor={actor} employees={employees} entries={weekEntries} onUpdateTimeRecord={onUpdateTimeRecord} />
+      )}
+
       {view === "nomina" && (
         <PayrollView actor={actor} hoursByEmp={hoursByEmp} totalPayroll={totalPayroll} onUpdate={onUpdateEmployee} />
       )}
 
       {view === "equipo" && <TeamManager actor={actor} employees={employees} onAdd={onAddEmployee} onRemove={onRemoveEmployee} />}
+    </div>
+  );
+}
+
+function TimeRecordsView({ actor, employees, entries, onUpdateTimeRecord }) {
+  const empById = (id) => employees.find((e) => sid(e._id) === sid(id));
+  const [editingId, setEditingId] = useState(null);
+  const sorted = [...entries].sort((a, b) => new Date(b.clockIn).getTime() - new Date(a.clockIn).getTime());
+
+  if (sorted.length === 0) {
+    return (
+      <div className="text-center py-10 bg-slate-800 rounded-2xl border border-white/5">
+        <Clock className="w-8 h-8 mx-auto mb-2 text-slate-600" />
+        <p className="text-slate-500 text-sm">No hay registros en los últimos 7 días.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {sorted.map((t) => {
+        const emp = empById(t.employeeId);
+        const key = sid(t._id);
+        const isEditing = editingId === key;
+        return (
+          <div key={key} className="bg-slate-800 rounded-2xl border border-white/5 p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate">{emp?.name || "?"}</p>
+                <p className="text-xs text-slate-400 flex items-center gap-1 flex-wrap">
+                  <span>{t.date}</span>
+                  <span>·</span>
+                  <span className="flex items-center gap-1"><LogIn className="w-3 h-3 text-emerald-400" />{fmtTime(t.clockIn)}</span>
+                  {t.clockOut
+                    ? <span className="flex items-center gap-1"><LogOut className="w-3 h-3 text-rose-400" />{fmtTime(t.clockOut)}</span>
+                    : <span className="text-emerald-400">en curso</span>}
+                </p>
+                {(t.breaks || []).length > 0 && (
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {t.breaks.map((b, i) => `lonche ${fmtTime(b.start)}–${b.end ? fmtTime(b.end) : "en curso"}`).join(" · ")}
+                  </p>
+                )}
+              </div>
+              {actor.role === "owner" && (
+                <button
+                  type="button"
+                  onClick={() => setEditingId(isEditing ? null : key)}
+                  className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-semibold transition shrink-0"
+                >
+                  <Pencil className="w-3.5 h-3.5" /> {isEditing ? "Cerrar" : "Corregir"}
+                </button>
+              )}
+            </div>
+            {isEditing && (
+              <TimeRecordEditForm
+                record={t}
+                onSave={async (patch) => { await onUpdateTimeRecord(t._id, patch); setEditingId(null); }}
+                onCancel={() => setEditingId(null)}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TimeRecordEditForm({ record, onSave, onCancel }) {
+  const [clockIn, setClockIn] = useState(toDatetimeLocal(record.clockIn));
+  const [clockOut, setClockOut] = useState(record.clockOut ? toDatetimeLocal(record.clockOut) : "");
+  const [breaks, setBreaks] = useState(
+    (record.breaks || []).map((b) => ({ start: toDatetimeLocal(b.start), end: b.end ? toDatetimeLocal(b.end) : "" }))
+  );
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  function addBreak() {
+    setBreaks((p) => [...p, { start: clockIn, end: "" }]);
+  }
+  function removeBreak(i) {
+    setBreaks((p) => p.filter((_, idx) => idx !== i));
+  }
+  function updateBreak(i, field, value) {
+    setBreaks((p) => p.map((b, idx) => (idx === i ? { ...b, [field]: value } : b)));
+  }
+
+  async function submit() {
+    setError("");
+    if (!reason.trim()) { setError("Escribe el motivo de la corrección."); return; }
+    if (!clockIn) { setError("La hora de entrada es obligatoria."); return; }
+    setBusy(true);
+    try {
+      await onSave({
+        clockIn: new Date(clockIn).toISOString(),
+        clockOut: clockOut ? new Date(clockOut).toISOString() : null,
+        breaks: breaks.map((b) => ({
+          start: new Date(b.start).toISOString(),
+          end: b.end ? new Date(b.end).toISOString() : null,
+        })),
+        reason: reason.trim(),
+      });
+    } catch (err) {
+      setError(err.message || "No se pudo guardar la corrección.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs text-slate-400">
+          Entrada
+          <input type="datetime-local" value={clockIn} onChange={(e) => setClockIn(e.target.value)}
+            className="mt-1 w-full bg-slate-900 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white" />
+        </label>
+        <label className="text-xs text-slate-400">
+          Salida
+          <input type="datetime-local" value={clockOut} onChange={(e) => setClockOut(e.target.value)}
+            className="mt-1 w-full bg-slate-900 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white" />
+        </label>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-slate-400">Lonches</p>
+          <button type="button" onClick={addBreak} className="text-[11px] text-emerald-400 font-semibold">+ agregar</button>
+        </div>
+        {breaks.map((b, i) => (
+          <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+            <label className="text-[11px] text-slate-500">
+              Inicio
+              <input type="datetime-local" value={b.start} onChange={(e) => updateBreak(i, "start", e.target.value)}
+                className="mt-1 w-full bg-slate-900 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white" />
+            </label>
+            <label className="text-[11px] text-slate-500">
+              Fin
+              <input type="datetime-local" value={b.end} onChange={(e) => updateBreak(i, "end", e.target.value)}
+                className="mt-1 w-full bg-slate-900 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white" />
+            </label>
+            <button type="button" onClick={() => removeBreak(i)}
+              className="p-2 rounded-lg bg-slate-900 border border-white/10 text-rose-400 hover:bg-slate-800 transition">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <label className="block text-xs text-slate-400">
+        Motivo de la corrección (obligatorio)
+        <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2}
+          placeholder="Ej. se le olvidó marcar la salida, hora equivocada..."
+          className="mt-1 w-full bg-slate-900 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white" />
+      </label>
+
+      {error && <p className="text-xs text-rose-400">{error}</p>}
+
+      <div className="flex gap-2">
+        <button type="button" disabled={busy} onClick={submit}
+          className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50">
+          {busy ? "Guardando..." : "Guardar corrección"}
+        </button>
+        <button type="button" onClick={onCancel}
+          className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold transition">
+          Cancelar
+        </button>
+      </div>
     </div>
   );
 }
