@@ -502,7 +502,7 @@ export default function UnifiedStaffApp() {
             {tab === "resumen" && <SummaryPage styles={posStyles} />}
             {tab === "ventas"  && <section className={shellStyles.portalSurface}><SalesDashboardPage styles={posStyles} /></section>}
             {tab === "inv"     && <InventoryPage styles={posStyles} role={me?.role} />}
-            {tab === "corte"   && <CashCutPage styles={posStyles} />}
+            {tab === "corte"   && <CashCutPage styles={posStyles} role={me?.role} />}
             {tab === "fin"     && <FinancePage styles={posStyles} />}
             {tab === "fiscal"  && <FiscalPage styles={posStyles} />}
           </main>
