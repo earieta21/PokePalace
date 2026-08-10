@@ -14,6 +14,7 @@ import StaffUser from "../models/StaffUser.js";
 import Inventory from "../models/Inventory.js";
 import InventoryMovement from "../models/InventoryMovement.js";
 import AuditLog from "../models/AuditLog.js";
+import TimeRecord from "../models/TimeRecord.js";
 import Redemption from "../models/Redemption.js";
 import StoreSettings from "../models/StoreSettings.js";
 import { dateKeyInTimeZone, nextDateKey, zonedDateTimeToUtc } from "../utils/timeZone.js";
@@ -1303,4 +1304,118 @@ test("GET movimientos y audit-log filtran por articulo/entidad y protegen por ro
 
   const auditAsCashier = await staffRequest("cashier", "/api/staff/audit-log");
   assert.equal(auditAsCashier.status, 403);
+});
+
+test("solo el dueño puede corregir un registro de tiempo ya hecho", async () => {
+  const original = await TimeRecord.create({
+    employeeId: staffFixtures.employee._id,
+    clockIn: new Date("2026-01-05T17:00:00.000Z"),
+    clockOut: new Date("2026-01-05T23:00:00.000Z"),
+    breaks: [],
+    date: "2026-01-05",
+    locationId: "main",
+  });
+
+  const asManager = await staffRequest("manager", `/api/kiosk/time/${original._id}`, {
+    method: "PATCH",
+    body: { clockOut: new Date("2026-01-05T23:30:00.000Z").toISOString(), reason: "intento no autorizado" },
+  });
+  assert.equal(asManager.status, 403);
+
+  const unchanged = await TimeRecord.findById(original._id).lean();
+  assert.equal(new Date(unchanged.clockOut).toISOString(), "2026-01-05T23:00:00.000Z");
+
+  await TimeRecord.deleteOne({ _id: original._id });
+});
+
+test("el dueño no puede corregir un registro sin escribir el motivo", async () => {
+  const original = await TimeRecord.create({
+    employeeId: staffFixtures.employee._id,
+    clockIn: new Date("2026-01-06T17:00:00.000Z"),
+    clockOut: null,
+    breaks: [],
+    date: "2026-01-06",
+    locationId: "main",
+  });
+
+  const missingReason = await staffRequest("owner", `/api/kiosk/time/${original._id}`, {
+    method: "PATCH",
+    body: { clockOut: new Date("2026-01-06T23:00:00.000Z").toISOString() },
+  });
+  assert.equal(missingReason.status, 400);
+
+  const blankReason = await staffRequest("owner", `/api/kiosk/time/${original._id}`, {
+    method: "PATCH",
+    body: { clockOut: new Date("2026-01-06T23:00:00.000Z").toISOString(), reason: "   " },
+  });
+  assert.equal(blankReason.status, 400);
+
+  const unchanged = await TimeRecord.findById(original._id).lean();
+  assert.equal(unchanged.clockOut, null);
+
+  await TimeRecord.deleteOne({ _id: original._id });
+});
+
+test("el dueño corrige un registro de tiempo y queda en AuditLog con el valor anterior y el nuevo", async () => {
+  const original = await TimeRecord.create({
+    employeeId: staffFixtures.employee._id,
+    clockIn: new Date("2026-01-07T17:00:00.000Z"),
+    clockOut: new Date("2026-01-07T23:00:00.000Z"),
+    breaks: [{ start: new Date("2026-01-07T19:00:00.000Z"), end: new Date("2026-01-07T19:30:00.000Z") }],
+    date: "2026-01-07",
+    locationId: "main",
+  });
+
+  const newClockOut = new Date("2026-01-07T23:45:00.000Z");
+  const corrected = await staffRequest("owner", `/api/kiosk/time/${original._id}`, {
+    method: "PATCH",
+    body: {
+      clockOut: newClockOut.toISOString(),
+      reason: "se le olvidó marcar la salida a tiempo",
+    },
+  });
+  assert.equal(corrected.status, 200);
+  const correctedBody = await corrected.json();
+  assert.equal(new Date(correctedBody.record.clockOut).toISOString(), newClockOut.toISOString());
+
+  const stored = await TimeRecord.findById(original._id).lean();
+  assert.equal(new Date(stored.clockOut).toISOString(), newClockOut.toISOString());
+
+  const audit = await AuditLog.find({ entity: "TimeRecord", entityId: original._id });
+  assert.equal(audit.length, 1);
+  assert.equal(audit[0].action, "update");
+  assert.equal(audit[0].reason, "se le olvidó marcar la salida a tiempo");
+  assert.equal(audit[0].actorName, "CI owner");
+  const clockOutChange = audit[0].changes.find((c) => c.field === "clockOut");
+  assert.ok(clockOutChange, "debe registrar el cambio de clockOut");
+  assert.equal(new Date(clockOutChange.oldValue).toISOString(), "2026-01-07T23:00:00.000Z");
+  assert.equal(new Date(clockOutChange.newValue).toISOString(), newClockOut.toISOString());
+
+  await AuditLog.deleteMany({ entity: "TimeRecord", entityId: original._id });
+  await TimeRecord.deleteOne({ _id: original._id });
+});
+
+test("una corrección no puede dejar la salida en o antes de la entrada", async () => {
+  const original = await TimeRecord.create({
+    employeeId: staffFixtures.employee._id,
+    clockIn: new Date("2026-01-08T17:00:00.000Z"),
+    clockOut: new Date("2026-01-08T23:00:00.000Z"),
+    breaks: [],
+    date: "2026-01-08",
+    locationId: "main",
+  });
+
+  const invalid = await staffRequest("owner", `/api/kiosk/time/${original._id}`, {
+    method: "PATCH",
+    body: {
+      clockOut: new Date("2026-01-08T17:00:00.000Z").toISOString(),
+      reason: "prueba de validación",
+    },
+  });
+  assert.equal(invalid.status, 400);
+
+  const unchanged = await TimeRecord.findById(original._id).lean();
+  assert.equal(new Date(unchanged.clockOut).toISOString(), "2026-01-08T23:00:00.000Z");
+
+  await TimeRecord.deleteOne({ _id: original._id });
 });

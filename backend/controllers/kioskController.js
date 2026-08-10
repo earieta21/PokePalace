@@ -15,6 +15,7 @@ import {
   manageableRolesFor,
 } from "../utils/staffRoles.js";
 import { dateKeyInTimeZone } from "../utils/timeZone.js";
+import { recordAudit, diffFields, actorFromStaff } from "../utils/auditLog.js";
 
 const LOCATION_ERROR_MSG = `Debes estar en el restaurante para marcar tu entrada/salida (dentro de ${MAX_DISTANCE_METERS}m).`;
 
@@ -312,6 +313,86 @@ export const getTimeRecords = async (req, res) => {
     res.json({ records });
   } catch (err) {
     res.status(500).json({ message: "Error", err: err.message });
+  }
+};
+
+/* PATCH /api/kiosk/time/:id  { clockIn?, clockOut?, breaks?, reason }
+   Corrige un registro ya hecho -- cada quien sigue marcando su propia
+   entrada/salida normalmente con clockIn/clockOut de arriba; esto es solo
+   para arreglar un error (se les olvidó marcar, hora equivocada, etc.).
+   Restringido a dueño únicamente (ver requireStaffAuth(["owner"]) en
+   routes/kiosk.js). El motivo es obligatorio y la corrección completa
+   (valor anterior y nuevo) queda en AuditLog. */
+export const updateTimeRecord = async (req, res) => {
+  try {
+    const reason = String(req.body.reason || "").trim();
+    if (!reason) return res.status(400).json({ message: "Escribe el motivo de la corrección" });
+
+    const before = await TimeRecord.findById(req.params.id).lean();
+    if (!before) return res.status(404).json({ message: "Registro no encontrado" });
+
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(req.body, "clockIn")) {
+      const d = new Date(req.body.clockIn);
+      if (Number.isNaN(d.getTime())) return res.status(400).json({ message: "Hora de entrada inválida" });
+      updates.clockIn = d;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, "clockOut")) {
+      if (req.body.clockOut === null) {
+        updates.clockOut = null;
+      } else {
+        const d = new Date(req.body.clockOut);
+        if (Number.isNaN(d.getTime())) return res.status(400).json({ message: "Hora de salida inválida" });
+        updates.clockOut = d;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, "breaks")) {
+      if (!Array.isArray(req.body.breaks)) return res.status(400).json({ message: "Lonches inválidos" });
+      const cleanBreaks = [];
+      for (const b of req.body.breaks) {
+        const start = new Date(b?.start);
+        if (Number.isNaN(start.getTime())) return res.status(400).json({ message: "Un lonche tiene hora de inicio inválida" });
+        let end = null;
+        if (b?.end != null) {
+          end = new Date(b.end);
+          if (Number.isNaN(end.getTime())) return res.status(400).json({ message: "Un lonche tiene hora de fin inválida" });
+        }
+        cleanBreaks.push({ start, end });
+      }
+      updates.breaks = cleanBreaks;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "No hay ningún cambio que guardar" });
+    }
+
+    const finalClockIn = updates.clockIn ?? before.clockIn;
+    const finalClockOut = updates.clockOut !== undefined ? updates.clockOut : before.clockOut;
+    if (finalClockOut && new Date(finalClockOut) <= new Date(finalClockIn)) {
+      return res.status(400).json({ message: "La salida debe ser después de la entrada" });
+    }
+    const finalBreaks = updates.breaks ?? before.breaks;
+    for (const b of finalBreaks) {
+      if (b.end && new Date(b.end) <= new Date(b.start)) {
+        return res.status(400).json({ message: "Cada lonche debe terminar después de que empieza" });
+      }
+    }
+
+    const record = await TimeRecord.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
+
+    const changes = diffFields(
+      { clockIn: before.clockIn, clockOut: before.clockOut, breaks: before.breaks },
+      { clockIn: record.clockIn, clockOut: record.clockOut, breaks: record.breaks },
+      Object.keys(updates)
+    );
+    await recordAudit({
+      entity: "TimeRecord", entityId: record._id, action: "update",
+      changes, ...actorFromStaff(req.staff), source: "manual", reason,
+    });
+
+    res.json({ record });
+  } catch (err) {
+    res.status(400).json({ message: "Error al corregir el registro", err: err.message });
   }
 };
 

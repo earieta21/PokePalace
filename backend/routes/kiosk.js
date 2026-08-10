@@ -3,7 +3,7 @@ import { requireStaffAuth } from "../middleware/requireStaffAuth.js";
 import {
   getKioskEmployees, getManagedKioskEmployees,
   createKioskEmployee, updateKioskEmployee, removeKioskEmployee,
-  clockIn, clockOut, getTimeRecords, startBreak, endBreak,
+  clockIn, clockOut, getTimeRecords, updateTimeRecord, startBreak, endBreak,
   getChecklist, toggleChecklistItem,
   addTempRecord, getTempRecords,
   getAnnouncements, createAnnouncement, deleteAnnouncement,
@@ -14,6 +14,9 @@ const router = express.Router();
 
 const anyStaff   = requireStaffAuth([]);
 const managerOnly = requireStaffAuth(["owner", "manager", "admin"]);
+// Corregir una marcada ya hecha es más sensible que capturarla en tiempo
+// real -- el dueño pidió explícitamente que solo él pueda hacerlo.
+const ownerOnly = requireStaffAuth(["owner"]);
 
 // Employees — nunca exponer nombres antes de autenticar al personal.
 router.get   ("/employees",      anyStaff, getKioskEmployees);
@@ -27,7 +30,8 @@ router.post("/time/clock-in",  anyStaff, clockIn);
 router.post("/time/clock-out", anyStaff, clockOut);
 router.post("/time/break-start", anyStaff, startBreak);
 router.post("/time/break-end",   anyStaff, endBreak);
-router.get ("/time",           anyStaff, getTimeRecords);
+router.get  ("/time",           anyStaff, getTimeRecords);
+router.patch("/time/:id",       ownerOnly, updateTimeRecord);
 
 // Checklist
 router.get  ("/checklist",      anyStaff, getChecklist);
