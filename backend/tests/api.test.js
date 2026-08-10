@@ -121,6 +121,19 @@ function tomorrowAt15() {
   return zonedDateTimeToUtc({ year, month, day, hour: 15 }).toISOString();
 }
 
+// Igual que tomorrowAt15, pero regresa tanto el ISO como la clave de fecha
+// (para las pruebas de excepciones de horario por fecha, que necesitan
+// mandar esa clave a StoreSettings.openDayOverrides/closedDayOverrides).
+function nextWeekdayAt15(targetWeekday) {
+  let key = nextDateKey(dateKeyInTimeZone());
+  let [year, month, day] = key.split("-").map(Number);
+  while (new Date(Date.UTC(year, month - 1, day)).getUTCDay() !== targetWeekday) {
+    key = nextDateKey(key);
+    [year, month, day] = key.split("-").map(Number);
+  }
+  return { dateKey: key, iso: zonedDateTimeToUtc({ year, month, day, hour: 15 }).toISOString() };
+}
+
 const postJSON = (url, body, extraHeaders = {}) =>
   fetch(`${BASE}${url}`, {
     method: "POST",
@@ -1303,4 +1316,112 @@ test("GET movimientos y audit-log filtran por articulo/entidad y protegen por ro
 
   const auditAsCashier = await staffRequest("cashier", "/api/staff/audit-log");
   assert.equal(auditAsCashier.status, 403);
+});
+
+test("excepciones de horario: abrir un miercoles puntual permite programar un pedido ese dia", async () => {
+  const originalSettings = await StoreSettings.findOne({ key: "main" }).lean();
+  const wednesday = nextWeekdayAt15(3);
+  const attempt = customerAttempt("day-override-open");
+
+  try {
+    await StoreSettings.findOneAndUpdate(
+      { key: "main" },
+      { $set: { openDayOverrides: [wednesday.dateKey], closedDayOverrides: [] } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const response = await postJSON("/api/orders", {
+      cart: [{ base: "white_rice", proteins: ["salmon"] }],
+      customer: "Excepcion CI",
+      phone: "6630000098",
+      scheduledPickupTime: wednesday.iso,
+      clientOrderId: attempt.clientOrderId,
+    }, { "X-Order-Token": attempt.orderToken });
+
+    assert.equal(response.status, 201);
+    const { order } = await response.json();
+    assert.equal(order.isScheduled, true);
+  } finally {
+    await StoreSettings.findOneAndUpdate(
+      { key: "main" },
+      { $set: {
+        openDayOverrides: originalSettings?.openDayOverrides ?? [],
+        closedDayOverrides: originalSettings?.closedDayOverrides ?? [],
+      } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  }
+});
+
+test("excepciones de horario: cerrar un dia puntual rechaza un pedido programado ese dia", async () => {
+  const originalSettings = await StoreSettings.findOne({ key: "main" }).lean();
+  const thursday = nextWeekdayAt15(4);
+  const attempt = customerAttempt("day-override-closed");
+
+  try {
+    await StoreSettings.findOneAndUpdate(
+      { key: "main" },
+      { $set: { openDayOverrides: [], closedDayOverrides: [thursday.dateKey] } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const response = await postJSON("/api/orders", {
+      cart: [{ base: "white_rice", proteins: ["salmon"] }],
+      customer: "Excepcion Cierre CI",
+      phone: "6630000097",
+      scheduledPickupTime: thursday.iso,
+      clientOrderId: attempt.clientOrderId,
+    }, { "X-Order-Token": attempt.orderToken });
+
+    assert.equal(response.status, 400);
+    const order = await Order.findOne({ clientOrderId: attempt.clientOrderId });
+    assert.equal(order, null);
+  } finally {
+    await StoreSettings.findOneAndUpdate(
+      { key: "main" },
+      { $set: {
+        openDayOverrides: originalSettings?.openDayOverrides ?? [],
+        closedDayOverrides: originalSettings?.closedDayOverrides ?? [],
+      } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  }
+});
+
+test("solo gerencia+ puede guardar excepciones de horario, y valida fechas y traslapes", async () => {
+  assert.equal((await staffRequest("cashier", "/api/settings/day-overrides", {
+    method: "PUT", body: { openDayOverrides: ["2026-07-15"], closedDayOverrides: [] },
+  })).status, 403);
+
+  const invalid = await staffRequest("manager", "/api/settings/day-overrides", {
+    method: "PUT", body: { openDayOverrides: ["no-es-una-fecha"], closedDayOverrides: [] },
+  });
+  assert.equal(invalid.status, 400);
+
+  const overlap = await staffRequest("manager", "/api/settings/day-overrides", {
+    method: "PUT", body: { openDayOverrides: ["2026-07-15"], closedDayOverrides: ["2026-07-15"] },
+  });
+  assert.equal(overlap.status, 400);
+
+  const originalSettings = await StoreSettings.findOne({ key: "main" }).lean();
+  try {
+    const saved = await staffRequest("manager", "/api/settings/day-overrides", {
+      method: "PUT", body: { openDayOverrides: ["2026-08-19"], closedDayOverrides: [] },
+    });
+    assert.equal(saved.status, 200);
+    assert.deepEqual((await saved.json()).openDayOverrides, ["2026-08-19"]);
+
+    const publicRead = await fetch(`${BASE}/api/settings/day-overrides`);
+    assert.equal(publicRead.status, 200);
+    assert.deepEqual((await publicRead.json()).openDayOverrides, ["2026-08-19"]);
+  } finally {
+    await StoreSettings.findOneAndUpdate(
+      { key: "main" },
+      { $set: {
+        openDayOverrides: originalSettings?.openDayOverrides ?? [],
+        closedDayOverrides: originalSettings?.closedDayOverrides ?? [],
+      } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  }
 });

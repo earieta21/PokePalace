@@ -39,6 +39,24 @@ test("el restaurante permanece cerrado todo el miércoles sin importar la hora",
   assert.equal(isWithinRestaurantHours(new Date("2026-07-15T18:30:00Z")), false); // dentro de horario pero cerrado por día
 });
 
+test("una excepción por fecha abre un miércoles puntual sin tocar los demás miércoles", () => {
+  const overrides = { openDates: ["2026-07-15"], closedDates: [] };
+  assert.equal(isRestaurantClosedDay(new Date("2026-07-15T18:30:00Z"), overrides), false); // este miércoles sí
+  assert.equal(isRestaurantClosedDay(new Date("2026-07-22T18:30:00Z"), overrides), true);  // el siguiente miércoles, no
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-15T18:30:00Z"), 11, 21, overrides), true);
+});
+
+test("una excepción por fecha cierra un día puntual que normalmente abre", () => {
+  const overrides = { openDates: [], closedDates: ["2026-07-16"] };
+  assert.equal(isRestaurantClosedDay(new Date("2026-07-16T18:30:00Z"), overrides), true); // este jueves no
+  assert.equal(isRestaurantClosedDay(new Date("2026-07-23T18:30:00Z"), overrides), false); // el siguiente jueves, sí
+});
+
+test("sin excepciones, isRestaurantClosedDay se comporta exactamente igual que antes", () => {
+  assert.equal(isRestaurantClosedDay(new Date("2026-07-15T18:30:00Z"), null), true);
+  assert.equal(isRestaurantClosedDay(new Date("2026-07-15T18:30:00Z"), { openDates: [], closedDates: [] }), true);
+});
+
 test("el canje se limita a bloques completos que caben en el total", () => {
   assert.equal(usefulPointsToRedeem({ availablePoints: 2000, requestedPoints: 2000, orderTotal: 249 }), 900);
   assert.equal(usefulPointsToRedeem({ availablePoints: 500, requestedPoints: 500, orderTotal: 49 }), 100);
