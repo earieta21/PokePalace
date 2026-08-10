@@ -18,6 +18,7 @@ import {
   isRestaurantClosedDay,
   isWithinRestaurantHours,
   normalizeCustomerOrderId,
+  restaurantDateKey,
   sanitizeCustomerCart,
   usefulPointsToRedeem,
 } from "../utils/customerOrder.js";
@@ -51,11 +52,11 @@ const sendOrderNotFound = (res) => res.status(404).json({ msg: "Orden no encontr
 const OPEN_HOUR = 11;
 const CLOSE_HOUR = 21;
 
-const isWithinBusinessHours = (date) => {
-  return isWithinRestaurantHours(date, OPEN_HOUR, CLOSE_HOUR);
+const isWithinBusinessHours = (date, overrides) => {
+  return isWithinRestaurantHours(date, OPEN_HOUR, CLOSE_HOUR, overrides);
 };
 
-const validateScheduledTime = (scheduledPickupTime) => {
+const validateScheduledTime = (scheduledPickupTime, overrides) => {
   const scheduled = new Date(scheduledPickupTime);
   if (isNaN(scheduled.getTime())) return "Hora programada inválida";
 
@@ -63,11 +64,16 @@ const validateScheduledTime = (scheduledPickupTime) => {
   const minTime = new Date(now.getTime() + 15 * 60 * 1000);
   if (scheduled < minTime) return "La hora debe ser al menos 15 minutos desde ahora";
 
-  if (isRestaurantClosedDay(scheduled)) {
-    return "Cerramos los miércoles — elige otro día para tu pedido programado.";
+  if (isRestaurantClosedDay(scheduled, overrides)) {
+    // El mensaje distingue una excepción puntual (closedDayOverrides) del
+    // cierre fijo de los miércoles -- si no, un día cerrado por excepción
+    // que no es miércoles mostraría un motivo equivocado.
+    return overrides?.closedDates?.includes(restaurantDateKey(scheduled))
+      ? "Ese día no estamos aceptando pedidos programados — elige otra fecha."
+      : "Cerramos los miércoles — elige otro día para tu pedido programado.";
   }
 
-  if (!isWithinBusinessHours(scheduled)) {
+  if (!isWithinBusinessHours(scheduled, overrides)) {
     return `El restaurante acepta pedidos de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00`;
   }
 
@@ -259,12 +265,16 @@ export const createOrder = async (req, res) => {
     }
 
     const storeSettings = await StoreSettings.findOne({ key: "main" })
-      .select("ordersPaused pausedMessage unavailableItems");
+      .select("ordersPaused pausedMessage unavailableItems openDayOverrides closedDayOverrides");
     if (storeSettings?.ordersPaused) {
       return res.status(503).json({
         msg: storeSettings.pausedMessage?.trim() || "No estamos aceptando pedidos en línea en este momento. Intenta más tarde.",
       });
     }
+    const dayOverrides = {
+      openDates: storeSettings?.openDayOverrides || [],
+      closedDates: storeSettings?.closedDayOverrides || [],
+    };
 
     const {
       cart,
@@ -317,13 +327,13 @@ export const createOrder = async (req, res) => {
     let resolvedScheduledTime = null;
     let isScheduled = false;
     if (scheduledPickupTime) {
-      const timeError = validateScheduledTime(scheduledPickupTime);
+      const timeError = validateScheduledTime(scheduledPickupTime, dayOverrides);
       if (timeError) return res.status(400).json({ msg: timeError });
       resolvedScheduledTime = new Date(scheduledPickupTime);
       isScheduled = true;
-    } else if (!isWithinBusinessHours(new Date())) {
+    } else if (!isWithinBusinessHours(new Date(), dayOverrides)) {
       return res.status(400).json({
-        msg: isRestaurantClosedDay(new Date())
+        msg: isRestaurantClosedDay(new Date(), dayOverrides)
           ? "Hoy miércoles estamos cerrados. Puedes programar tu pedido para otro día, o pide de jueves a martes de 11:00 a 21:00."
           : `El restaurante está cerrado ahora. Aceptamos pedidos de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00 — puedes programar tu pedido para más tarde.`,
       });

@@ -229,16 +229,34 @@ export function normalizeCustomerOrderId(value) {
 // restaurante no abre ese día, sin importar la hora.
 const CLOSED_WEEKDAY = 3;
 
-export function isRestaurantClosedDay(date = new Date()) {
+// Clave "YYYY-MM-DD" de `date` en hora Tijuana -- la misma que se compara
+// contra StoreSettings.openDayOverrides/closedDayOverrides, para que
+// cualquier caller pueda saber a qué fecha exacta se refirió el chequeo
+// de día cerrado sin repetir la lógica de zona horaria.
+export function restaurantDateKey(date = new Date()) {
+  const { year, month, day } = zonedParts(date);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+// `overrides` es opcional -- { openDates, closedDates }, arreglos de
+// fechas "YYYY-MM-DD" (StoreSettings.openDayOverrides/closedDayOverrides).
+// Permiten excepciones puntuales (ej. probar abrir un miércoles concreto,
+// o cerrar un día que normalmente abre) sin tocar la regla general de
+// ningún otro día. Una fecha específica siempre gana sobre la regla fija
+// del día de la semana.
+export function isRestaurantClosedDay(date = new Date(), overrides = null) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return true;
+  const dateKey = restaurantDateKey(date);
+  if (overrides?.closedDates?.includes(dateKey)) return true;
+  if (overrides?.openDates?.includes(dateKey)) return false;
   const { year, month, day } = zonedParts(date);
   const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
   return weekday === CLOSED_WEEKDAY;
 }
 
-export function isWithinRestaurantHours(date = new Date(), openHour = 11, closeHour = 21) {
+export function isWithinRestaurantHours(date = new Date(), openHour = 11, closeHour = 21, overrides = null) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
-  if (isRestaurantClosedDay(date)) return false;
+  if (isRestaurantClosedDay(date, overrides)) return false;
   const { hour } = zonedParts(date);
   return hour >= openHour && hour < closeHour;
 }

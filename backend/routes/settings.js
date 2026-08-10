@@ -2,6 +2,7 @@ import express from "express";
 import {
   getAvailability, setAvailability,
   getStoreStatus, setStoreStatus,
+  getDayOverrides, setDayOverrides,
 } from "../controllers/settingsController.js";
 import { requireStaffAuth } from "../middleware/requireStaffAuth.js";
 
@@ -14,5 +15,8 @@ router.put("/availability", managerOnly, setAvailability);
 
 router.get("/store-status", getStoreStatus);
 router.put("/store-status", managerOnly, setStoreStatus);
+
+router.get("/day-overrides", getDayOverrides);
+router.put("/day-overrides", managerOnly, setDayOverrides);
 
 export default router;

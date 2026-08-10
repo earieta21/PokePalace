@@ -1413,6 +1413,13 @@ function AvailabilityTab({ token, role }) {
   const [pauseSaving, setPauseSaving] = useState(false);
   const [pauseMsgDraft, setPauseMsgDraft] = useState("");
 
+  // Excepciones puntuales a "cerrado los miércoles" (abrir un día
+  // normalmente cerrado, o cerrar uno normalmente abierto, solo esa fecha).
+  const [dayOverrides, setDayOverrides] = useState(null); // { openDayOverrides, closedDayOverrides }
+  const [overrideDate, setOverrideDate] = useState("");
+  const [overrideSaving, setOverrideSaving] = useState(false);
+  const [overrideError, setOverrideError] = useState("");
+
   // Respaldo de datos — solo dueño/admin
   const canBackup = role === "owner" || role === "admin";
   const [backupInfo, setBackupInfo]   = useState(null); // { lastBackupAt }
@@ -1429,6 +1436,11 @@ function AvailabilityTab({ token, role }) {
       .then((r) => r.json())
       .then((d) => { setStoreStatus(d); setPauseMsgDraft(d.pausedMessage || ""); })
       .catch(() => setStoreStatus({ ordersPaused: false, pausedMessage: "" }));
+
+    fetch(`${API_URL}/api/settings/day-overrides`)
+      .then((r) => r.json())
+      .then((d) => setDayOverrides({ openDayOverrides: d.openDayOverrides ?? [], closedDayOverrides: d.closedDayOverrides ?? [] }))
+      .catch(() => setDayOverrides({ openDayOverrides: [], closedDayOverrides: [] }));
   }, []);
 
   useEffect(() => {
@@ -1499,6 +1511,44 @@ function AvailabilityTab({ token, role }) {
     } finally {
       setPauseSaving(false);
     }
+  };
+
+  const saveDayOverrides = async (next) => {
+    setDayOverrides(next);
+    setOverrideSaving(true);
+    setOverrideError("");
+    try {
+      const r = await fetch(`${API_URL}/api/settings/day-overrides`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(next),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.msg || "Error al guardar");
+      setDayOverrides({ openDayOverrides: data.openDayOverrides, closedDayOverrides: data.closedDayOverrides });
+    } catch (e) {
+      setOverrideError(e.message);
+    } finally {
+      setOverrideSaving(false);
+    }
+  };
+
+  const addOverride = (kind) => {
+    if (!overrideDate) return setOverrideError("Elige una fecha primero");
+    const opens = kind === "open"
+      ? [...new Set([...dayOverrides.openDayOverrides, overrideDate])]
+      : dayOverrides.openDayOverrides.filter((d) => d !== overrideDate);
+    const closes = kind === "closed"
+      ? [...new Set([...dayOverrides.closedDayOverrides, overrideDate])]
+      : dayOverrides.closedDayOverrides.filter((d) => d !== overrideDate);
+    saveDayOverrides({ openDayOverrides: opens, closedDayOverrides: closes });
+    setOverrideDate("");
+  };
+
+  const removeOverride = (kind, date) => {
+    const opens = kind === "open" ? dayOverrides.openDayOverrides.filter((d) => d !== date) : dayOverrides.openDayOverrides;
+    const closes = kind === "closed" ? dayOverrides.closedDayOverrides.filter((d) => d !== date) : dayOverrides.closedDayOverrides;
+    saveDayOverrides({ openDayOverrides: opens, closedDayOverrides: closes });
   };
 
   const toggle = async (id) => {
@@ -1574,6 +1624,60 @@ function AvailabilityTab({ token, role }) {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Excepciones puntuales a "cerrado los miércoles" */}
+      <div className="mb-6 rounded-2xl border p-4 bg-slate-900 border-white/5">
+        <h2 className="text-lg font-bold text-white">Excepciones de horario por fecha</h2>
+        <p className="text-slate-400 text-sm mt-1">
+          Abre un día que normalmente está cerrado (ej. un miércoles), o cierra uno que normalmente abre —
+          solo esa fecha, sin cambiar la regla general.
+        </p>
+        {overrideError && <p className="text-rose-400 text-xs mt-2">{overrideError}</p>}
+
+        {dayOverrides && (
+          <>
+            <div className="flex gap-2 mt-3 flex-wrap items-center">
+              <input
+                type="date"
+                value={overrideDate}
+                onChange={(e) => { setOverrideDate(e.target.value); setOverrideError(""); }}
+                className="bg-slate-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50"
+              />
+              <button
+                onClick={() => addOverride("open")}
+                disabled={overrideSaving}
+                className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50"
+              >
+                Abrir este día
+              </button>
+              <button
+                onClick={() => addOverride("closed")}
+                disabled={overrideSaving}
+                className="px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition disabled:opacity-50"
+              >
+                Cerrar este día
+              </button>
+            </div>
+
+            {(dayOverrides.openDayOverrides.length > 0 || dayOverrides.closedDayOverrides.length > 0) && (
+              <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-1.5">
+                {dayOverrides.openDayOverrides.map((d) => (
+                  <div key={`open-${d}`} className="flex items-center justify-between text-sm">
+                    <span className="text-emerald-400">Abierto — {d}</span>
+                    <button onClick={() => removeOverride("open", d)} className="text-slate-500 hover:text-rose-400 transition text-xs">Quitar</button>
+                  </div>
+                ))}
+                {dayOverrides.closedDayOverrides.map((d) => (
+                  <div key={`closed-${d}`} className="flex items-center justify-between text-sm">
+                    <span className="text-rose-400">Cerrado — {d}</span>
+                    <button onClick={() => removeOverride("closed", d)} className="text-slate-500 hover:text-rose-400 transition text-xs">Quitar</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Respaldo de datos — solo dueño/admin */}

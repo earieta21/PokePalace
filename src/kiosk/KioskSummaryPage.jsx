@@ -53,15 +53,12 @@ export default function KioskSummaryPage() {
       return;
     }
 
-    if (
-      order?.isScheduled &&
-      order?.scheduledPickupTime &&
-      new Date(order.scheduledPickupTime).getDay() === 3
-    ) {
-      setSubmitError("Cerramos los miércoles — elige otro día para tu pedido programado.");
-      return;
-    }
-
+    // El día miércoles ya no se bloquea aquí a ciegas: el local puede tener
+    // una excepción para una fecha puntual (StoreSettings.openDayOverrides),
+    // y este componente no la conoce. El servidor SIEMPRE valida esto en su
+    // propia zona horaria antes de crear la orden -- ver isRestaurantClosedDay
+    // en backend/utils/customerOrder.js -- así que se deja que sea la única
+    // fuente de verdad; el mensaje de error de abajo ya lo muestra igual.
     try {
       setSaving(true);
       setSubmitError("");
