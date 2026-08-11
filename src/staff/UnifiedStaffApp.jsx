@@ -137,7 +137,7 @@ const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 // periódico (horario, avisos), y al final lo administrativo/menos frecuente
 // (ventas, fin, panel).
 const TABS_BY_ROLE = {
-  employee: ["inicio", "tareas", "temp", "horario", "avisos"],
+  employee: ["pos", "inicio", "tareas", "temp", "horario", "avisos"],
   cashier:  ["pos", "premios", "inicio", "tareas", "temp", "hist", "corte", "horario", "avisos"],
   kitchen:  ["cocina", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
   manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
@@ -174,7 +174,7 @@ const TAB_GROUPS = [
 ];
 
 const MOBILE_PRIMARY_BY_ROLE = {
-  employee: ["inicio", "tareas", "temp", "horario"],
+  employee: ["pos", "inicio", "tareas", "temp"],
   cashier: ["pos", "premios", "inicio", "tareas"],
   kitchen: ["cocina", "inicio", "tareas", "temp"],
   manager: ["pos", "cocina", "inicio", "inv"],
