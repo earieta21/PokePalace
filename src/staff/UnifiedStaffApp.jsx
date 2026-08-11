@@ -5,7 +5,7 @@ import {
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
   ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard, Landmark,
-  Menu, X, Wallet, Pencil,
+  Menu, X, Wallet, Pencil, Users,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -28,6 +28,7 @@ import FiscalPage from "../pos/pages/FiscalPage";
 import SalesDashboardPage from "../pos/pages/SalesDashboardPage";
 import SummaryPage from "../pos/pages/SummaryPage";
 import InventoryPage from "../pos/pages/InventoryPage";
+import CustomersPage from "../pos/pages/CustomersPage";
 import posStyles from "../pos/EmployeePortal.module.css";
 
 /* ============================================================================
@@ -140,9 +141,9 @@ const TABS_BY_ROLE = {
   employee: ["pos", "inicio", "tareas", "temp", "horario", "avisos"],
   cashier:  ["pos", "premios", "inicio", "tareas", "temp", "hist", "corte", "horario", "avisos"],
   kitchen:  ["cocina", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
-  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "panel"],
-  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "fiscal", "panel"],
-  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "ventas", "fin", "fiscal", "panel"],
+  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
 };
 
 const TAB_META = {
@@ -151,6 +152,7 @@ const TAB_META = {
   premios: { label: "Premios", title: "Premios y promociones", icon: Gift },
   hist:    { label: "Historial", title: "Historial de órdenes", icon: ClipboardList },
   resumen: { label: "Resumen", title: "Resumen semanal", icon: LayoutDashboard },
+  clientes:{ label: "Clientes", title: "Clientes registrados", icon: Users },
   ventas:  { label: "Ventas", title: "Panel de ventas", icon: Activity },
   inv:     { label: "Inventario", title: "Inventario", icon: Package },
   corte:   { label: "Corte", title: "Corte de caja", icon: Wallet },
@@ -170,7 +172,7 @@ const TAB_GROUPS = [
   { id: "turno", label: "Mi turno", tabs: ["inicio", "tareas", "temp"] },
   { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv", "corte"] },
   { id: "equipo", label: "Equipo", tabs: ["horario", "avisos"] },
-  { id: "gestion", label: "Administración", tabs: ["resumen", "ventas", "fin", "fiscal", "panel"] },
+  { id: "gestion", label: "Administración", tabs: ["resumen", "clientes", "ventas", "fin", "fiscal", "panel"] },
 ];
 
 const MOBILE_PRIMARY_BY_ROLE = {
@@ -516,6 +518,7 @@ export default function UnifiedStaffApp() {
             {tab === "cocina"  && <section className={shellStyles.portalSurface}><KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} /></section>}
             {tab === "hist"    && <section className={shellStyles.portalSurface}><OrderHistoryPage styles={posStyles} /></section>}
             {tab === "resumen" && <SummaryPage styles={posStyles} />}
+            {tab === "clientes"&& <CustomersPage styles={posStyles} />}
             {tab === "ventas"  && <section className={shellStyles.portalSurface}><SalesDashboardPage styles={posStyles} /></section>}
             {tab === "inv"     && <InventoryPage styles={posStyles} role={me?.role} />}
             {tab === "corte"   && <CashCutPage styles={posStyles} />}

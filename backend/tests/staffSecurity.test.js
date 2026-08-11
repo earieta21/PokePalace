@@ -111,7 +111,7 @@ test("el bowl mediano/grande descuenta la proteina cuando se captura en caja", (
 
   assert.equal(mediano.protein, "tuna");
   assert.equal(grande.protein, "salmon");
-  assert.deepEqual(getPosInventoryDemand({ items: [mediano, grande] }), { salmon: 2, tuna: 1 });
+  assert.deepEqual(getPosInventoryDemand({ items: [mediano, grande] }), { salmon: 0.24, tuna: 0.1 });
 });
 
 test("dos bowls medianos con distinta proteina no se combinan en una sola linea", () => {
@@ -179,7 +179,7 @@ test("el inventario POS multiplica qty y desglosa recetas de bowls predefinidos"
   const demand = getPosInventoryDemand({ items });
 
   assert.equal(demand.white_rice, 2);
-  assert.equal(demand.tuna, 2);
+  assert.equal(demand.tuna, 0.1);
   assert.equal(demand.cucumber, 2);
   assert.equal(demand.soy_sauce, 2);
   // El edamame viene solo de la receta del bowl (ya no hay producto edamame suelto).
@@ -199,8 +199,8 @@ test("el inventario POS suma ingredientes compartidos del bowl personalizado", (
   });
 
   assert.equal(demand.white_rice, 2);
-  assert.equal(demand.tuna, 2);
-  assert.equal(demand.seared_tuna, 1);
+  assert.equal(demand.tuna, 0.1);
+  assert.equal(demand.seared_tuna, 0.05);
   assert.equal(demand.cucumber, 2);
   assert.equal(demand.sesame_seeds, 3);
 });
@@ -213,7 +213,7 @@ test("un bowl mitad y mitad reparte la porción de base entre las 2 elegidas", (
 
   assert.equal(demand.white_rice, 0.5);
   assert.equal(demand.quinoa, 0.5);
-  assert.equal(demand.tuna, 1);
+  assert.equal(demand.tuna, 0.1);
 });
 
 test("el carrito de cliente/kiosco suma la demanda de cada línea (bowls y artículos)", () => {
@@ -228,8 +228,8 @@ test("el carrito de cliente/kiosco suma la demanda de cada línea (bowls y artí
   assert.equal(demand.white_rice, 1);
   assert.equal(demand.quinoa, 0.5);
   assert.equal(demand.spring_mix, 0.5);
-  assert.equal(demand.salmon, 1);
-  assert.equal(demand.tuna, 1);
+  assert.equal(demand.salmon, 0.1);
+  assert.equal(demand.tuna, 0.1);
   assert.equal(demand.coca_zero, 2);
 });
 

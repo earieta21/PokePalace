@@ -1,3 +1,9 @@
+// Protein stock is stored in kilograms. A medium bowl contains 100 g total,
+// a large bowl contains 120 g total, and every extra scoop adds 40 g.
+export const MEDIUM_BOWL_PROTEIN_KG = 0.1;
+export const LARGE_BOWL_PROTEIN_KG = 0.12;
+export const EXTRA_SCOOP_PROTEIN_KG = 0.04;
+
 // Source of truth for products sold through the POS. The browser may display
 // these prices, but only this server-side catalog is used to charge an order.
 export const POS_CATALOG = Object.freeze([
@@ -7,7 +13,7 @@ export const POS_CATALOG = Object.freeze([
   {
     catalogId: "bowl-emerald-salmon", legacyId: 1, name: "Bowl de salmón esmeralda", price: 230, category: "bowls",
     inventoryRecipe: {
-      white_rice: 1, salmon: 1, tuna: 1, shoyu_marinade: 1,
+      white_rice: 1, salmon: 0.05, tuna: 0.05, shoyu_marinade: 1,
       avocado: 1, cucumber: 1, edamame: 1,
       spicy_mayo: 1, soy_sauce: 1, sesame_seeds: 1, nori_strips: 1,
     },
@@ -15,7 +21,7 @@ export const POS_CATALOG = Object.freeze([
   {
     catalogId: "bowl-spicy-tuna", legacyId: 2, name: "Bowl picante de atún crujiente", price: 230, category: "bowls",
     inventoryRecipe: {
-      brown_rice: 1, tuna: 1, seared_tuna: 1, spicy_marinade: 1,
+      brown_rice: 1, tuna: 0.05, seared_tuna: 0.05, spicy_marinade: 1,
       cucumber: 1, edamame: 1, corn: 1,
       garlic_sriracha: 1, spicy_mayo: 1, red_pepper_flakes: 1, furikake: 1,
     },
@@ -23,7 +29,7 @@ export const POS_CATALOG = Object.freeze([
   {
     catalogId: "bowl-tropical-shrimp", legacyId: 3, name: "Bowl tropical de camarón", price: 230, category: "bowls",
     inventoryRecipe: {
-      spring_mix: 1, shrimp: 1, salmon: 1, citrus_marinade: 1,
+      spring_mix: 1, shrimp: 0.05, salmon: 0.05, citrus_marinade: 1,
       mango: 1, pineapple: 1, avocado: 1,
       sweet_chili: 1, avocado_lime: 1, sesame_seeds: 1, crispy_onions: 1,
     },
@@ -76,7 +82,7 @@ export const POS_CATALOG = Object.freeze([
     // armador completo — mismo upcharge que PREMIUM_PROTEIN_PRICES.seared_tuna
     // en src/order/pricing.js.
     catalogId: "seared-tuna-extra", legacyId: 22, name: "Atún Sellado Extra", price: 20, category: "extras",
-    inventoryRecipe: { seared_tuna: 1 },
+    inventoryRecipe: { seared_tuna: EXTRA_SCOOP_PROTEIN_KG },
   },
 ]);
 
@@ -307,7 +313,7 @@ const addDemand = (demand, key, amount = 1) => {
   const cleanKey = typeof key === "string" ? key.trim() : "";
   const cleanAmount = Number(amount);
   if (!cleanKey || !Number.isFinite(cleanAmount) || cleanAmount <= 0) return;
-  demand.set(cleanKey, (demand.get(cleanKey) || 0) + cleanAmount);
+  demand.set(cleanKey, Number(((demand.get(cleanKey) || 0) + cleanAmount).toFixed(6)));
 };
 
 // Suma la demanda de ingredientes de un bowl (ya sea los campos planos de
@@ -321,8 +327,16 @@ const addBowlDemand = (demand, bowlLike) => {
   } else if (bowlLike.base) {
     addDemand(demand, bowlLike.base);
   }
-  for (const field of ["proteins", "marinades", "complements", "sauces", "toppings", "extraScoopProteins"]) {
+  const proteins = Array.isArray(bowlLike.proteins) ? bowlLike.proteins : [];
+  const totalProteinKg = proteins.length === 3 ? LARGE_BOWL_PROTEIN_KG : MEDIUM_BOWL_PROTEIN_KG;
+  const proteinPortionKg = proteins.length > 0 ? totalProteinKg / proteins.length : 0;
+  for (const key of proteins) addDemand(demand, key, proteinPortionKg);
+
+  for (const field of ["marinades", "complements", "sauces", "toppings"]) {
     for (const key of Array.isArray(bowlLike[field]) ? bowlLike[field] : []) addDemand(demand, key);
+  }
+  for (const key of Array.isArray(bowlLike.extraScoopProteins) ? bowlLike.extraScoopProteins : []) {
+    addDemand(demand, key, EXTRA_SCOOP_PROTEIN_KG);
   }
 };
 
@@ -341,7 +355,10 @@ const addItemDemand = (demand, item) => {
       // complementos, salsas) no se pueda rastrear. Sin proteína capturada
       // no se descuenta nada -- comportamiento original: no se sabe qué
       // llevó el bowl.
-      addDemand(demand, item.protein, qty);
+      const proteinKg = catalogItem.catalogId === "bowl-grande-rapido"
+        ? LARGE_BOWL_PROTEIN_KG
+        : MEDIUM_BOWL_PROTEIN_KG;
+      addDemand(demand, item.protein, proteinKg * qty);
     }
   } else {
     // Preserve stock matching for historical POS orders created before the

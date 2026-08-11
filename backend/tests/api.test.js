@@ -170,6 +170,36 @@ test("el resumen protegido informa el total de clientes registrados", async () =
   assert.equal(cashierResponse.status, 403);
 });
 
+test("solo gerencia puede consultar clientes registrados y sus puntos", async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const customer = await User.create({
+    name: "Cliente Puntos CI",
+    email: `ci-pos-security-customer-${suffix}@example.test`,
+    password: await bcrypt.hash("prueba-segura-123", 10),
+    phone: "+52 664 123 4567",
+    points: 125,
+    lifetimePoints: 275,
+  });
+
+  try {
+    const ownerResponse = await staffRequest(
+      "owner",
+      `/api/staff/customers?q=${encodeURIComponent(customer.email)}`
+    );
+    assert.equal(ownerResponse.status, 200);
+    const body = await ownerResponse.json();
+    assert.equal(body.pagination.total, 1);
+    assert.equal(body.customers[0].points, 125);
+    assert.equal(body.customers[0].lifetimePoints, 275);
+    assert.equal("password" in body.customers[0], false);
+
+    const cashierResponse = await staffRequest("cashier", "/api/staff/customers");
+    assert.equal(cashierResponse.status, 403);
+  } finally {
+    await User.deleteOne({ _id: customer._id });
+  }
+});
+
 test("crear orden valida: el precio lo pone el servidor, no el cliente", async () => {
   const attempt = customerAttempt("price");
   const r = await postJSON("/api/orders", {
