@@ -15,7 +15,7 @@ const router = express.Router();
 
 const seniorStaff = requireStaffAuth(["manager", "admin", "owner"]);
 const orderReaders = requireStaffAuth(["cashier", "kitchen", "manager", "admin", "owner"]);
-const posSalesStaff = requireStaffAuth(["cashier", "manager", "admin", "owner"]);
+const posSalesStaff = requireStaffAuth(["employee", "cashier", "manager", "admin", "owner"]);
 
 router.get  ("/stats",         posSalesStaff, getOrderStats);
 router.get  ("/analytics",     seniorStaff, getAnalytics);

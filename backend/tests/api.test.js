@@ -724,6 +724,40 @@ test("la jerarquía protege owner/admin y conserva los flujos de caja/cocina", a
   })).status, 403);
 });
 
+test("un empleado puede vender en el POS aunque no pueda ver el historial completo de órdenes", async () => {
+  const clientOrderId = `ci-pos-security:employee:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+
+  const created = await staffRequest("employee", "/api/staff/orders", {
+    method: "POST",
+    body: {
+      clientOrderId,
+      items: [{ catalogId: "coca-zero", qty: 1 }],
+      customer: "Mostrador CI Empleado",
+      phone: "6630000099",
+      fulfillment: "pickup",
+      paymentMethod: "cash",
+    },
+  });
+  assert.equal(created.status, 201);
+  const order = (await created.json()).order;
+  assert.equal(order.staffId, String(staffFixtures.employee._id));
+
+  const customerSearch = await staffRequest("employee", "/api/staff/orders/customers/search?q=CI");
+  assert.equal(customerSearch.status, 200);
+
+  const rewardLookup = await staffRequest("employee", "/api/staff/rewards/codigo-que-no-existe");
+  assert.notEqual(rewardLookup.status, 403);
+
+  // Vender no es lo mismo que administrar campañas de premios ni ver el
+  // historial completo de órdenes -- ninguno de los dos se abre por vender.
+  const socialStory = await staffRequest("employee", "/api/staff/rewards/social-story", {
+    method: "POST",
+    body: {},
+  });
+  assert.equal(socialStory.status, 403);
+  assert.equal((await staffRequest("employee", "/api/staff/orders")).status, 403);
+});
+
 test("el POS calcula catálogo, deduplica reintentos y descuenta inventario una vez", async () => {
   const clientOrderId = `ci-pos-security:${Date.now()}:${Math.random().toString(16).slice(2)}`;
   const inventory = await Inventory.create({

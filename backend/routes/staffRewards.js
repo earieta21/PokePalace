@@ -5,8 +5,11 @@ import { createSocialStoryReward, lookupRedemption } from "../controllers/staffR
 const router = express.Router();
 
 const campaignStaff = requireStaffAuth(["cashier", "manager", "admin", "owner"]);
+// El POS también consulta un código de premio al armar una venta -- los
+// empleados ya pueden vender en el POS, así que necesitan poder buscarlo.
+const rewardLookupStaff = requireStaffAuth(["employee", "cashier", "manager", "admin", "owner"]);
 
 router.post ("/social-story", campaignStaff, createSocialStoryReward);
-router.get  ("/:code",        campaignStaff, lookupRedemption);
+router.get  ("/:code",        rewardLookupStaff, lookupRedemption);
 
 export default router;
