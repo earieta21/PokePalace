@@ -180,6 +180,42 @@ test("solo gerencia puede consultar clientes registrados y sus puntos", async ()
     points: 125,
     lifetimePoints: 275,
   });
+  const countedOrders = await Order.create([
+    {
+      user: customer._id,
+      customer: customer.name,
+      paymentStatus: "paid",
+      status: "completed",
+      total: 230,
+      source: "online",
+      createdAt: new Date("2026-01-01T12:00:00.000Z"),
+    },
+    {
+      user: customer._id,
+      customer: customer.name,
+      paymentStatus: "paid",
+      status: "ready",
+      total: 80,
+      source: "pos",
+      createdAt: new Date("2026-01-02T12:00:00.000Z"),
+    },
+    {
+      user: customer._id,
+      customer: customer.name,
+      paymentStatus: "paid",
+      status: "cancelled",
+      total: 999,
+      source: "pos",
+    },
+    {
+      user: customer._id,
+      customer: customer.name,
+      paymentStatus: "pending",
+      status: "pending",
+      total: 150,
+      source: "online",
+    },
+  ]);
 
   try {
     const ownerResponse = await staffRequest(
@@ -191,11 +227,18 @@ test("solo gerencia puede consultar clientes registrados y sus puntos", async ()
     assert.equal(body.pagination.total, 1);
     assert.equal(body.customers[0].points, 125);
     assert.equal(body.customers[0].lifetimePoints, 275);
+    assert.equal(body.customers[0].purchaseCount, 2);
+    assert.equal(body.customers[0].totalSpent, 310);
+    assert.equal(
+      new Date(body.customers[0].lastPurchaseAt).getTime(),
+      countedOrders[1].createdAt.getTime()
+    );
     assert.equal("password" in body.customers[0], false);
 
     const cashierResponse = await staffRequest("cashier", "/api/staff/customers");
     assert.equal(cashierResponse.status, 403);
   } finally {
+    await Order.deleteMany({ _id: { $in: countedOrders.map((order) => order._id) } });
     await User.deleteOne({ _id: customer._id });
   }
 });

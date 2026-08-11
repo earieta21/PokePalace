@@ -4,7 +4,7 @@ import { createStaffApi } from "../api";
 
 const PAGE_SIZE = 25;
 
-const registrationDate = (value) => value
+const dateTime = (value, emptyLabel = "—") => value
   ? new Date(value).toLocaleString("es-MX", {
       year: "numeric",
       month: "short",
@@ -12,7 +12,13 @@ const registrationDate = (value) => value
       hour: "2-digit",
       minute: "2-digit",
     })
-  : "—";
+  : emptyLabel;
+
+const money = new Intl.NumberFormat("es-MX", {
+  style: "currency",
+  currency: "MXN",
+  maximumFractionDigits: 2,
+});
 
 export default function CustomersPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
@@ -86,6 +92,9 @@ export default function CustomersPage({ styles }) {
               <th>Cliente</th>
               <th>Correo</th>
               <th>Teléfono</th>
+              <th>Compras realizadas</th>
+              <th>Total gastado</th>
+              <th>Última compra</th>
               <th>Puntos</th>
               <th>Puntos históricos</th>
               <th>Fecha de registro</th>
@@ -93,17 +102,20 @@ export default function CustomersPage({ styles }) {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ textAlign: "center", padding: 28 }}>Cargando…</td></tr>
+              <tr><td colSpan={9} style={{ textAlign: "center", padding: 28 }}>Cargando…</td></tr>
             ) : customers.length === 0 ? (
-              <tr><td colSpan={6} style={{ textAlign: "center", padding: 28 }}>No se encontraron clientes</td></tr>
+              <tr><td colSpan={9} style={{ textAlign: "center", padding: 28 }}>No se encontraron clientes</td></tr>
             ) : customers.map((customer) => (
               <tr key={customer._id}>
                 <td style={{ fontWeight: 600 }}>{customer.name}</td>
                 <td>{customer.email}</td>
                 <td className={styles.tdMono}>{customer.phone || "Sin teléfono"}</td>
+                <td className={styles.tdMono}>{Number(customer.purchaseCount || 0).toLocaleString("es-MX")}</td>
+                <td className={styles.tdMono}>{money.format(Number(customer.totalSpent || 0))}</td>
+                <td className={styles.tdMuted}>{dateTime(customer.lastPurchaseAt, "Sin compras")}</td>
                 <td className={styles.tdMono}>{Number(customer.points || 0).toLocaleString("es-MX")}</td>
                 <td className={styles.tdMono}>{Number(customer.lifetimePoints || 0).toLocaleString("es-MX")}</td>
-                <td className={styles.tdMuted}>{registrationDate(customer.createdAt)}</td>
+                <td className={styles.tdMuted}>{dateTime(customer.createdAt)}</td>
               </tr>
             ))}
           </tbody>

@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import Order from "../models/Order.js";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -34,8 +35,41 @@ export const getRegisteredCustomers = async (req, res) => {
         .lean(),
     ]);
 
+    const customerIds = customers.map((customer) => customer._id);
+    const purchaseStats = customerIds.length > 0
+      ? await Order.aggregate([
+          {
+            $match: {
+              user: { $in: customerIds },
+              paymentStatus: "paid",
+              status: { $ne: "cancelled" },
+            },
+          },
+          {
+            $group: {
+              _id: "$user",
+              purchaseCount: { $sum: 1 },
+              totalSpent: { $sum: { $ifNull: ["$total", 0] } },
+              lastPurchaseAt: { $max: "$createdAt" },
+            },
+          },
+        ])
+      : [];
+    const statsByCustomer = new Map(
+      purchaseStats.map((stats) => [String(stats._id), stats])
+    );
+    const customersWithPurchases = customers.map((customer) => {
+      const stats = statsByCustomer.get(String(customer._id));
+      return {
+        ...customer,
+        purchaseCount: stats?.purchaseCount || 0,
+        totalSpent: stats?.totalSpent || 0,
+        lastPurchaseAt: stats?.lastPurchaseAt || null,
+      };
+    });
+
     return res.json({
-      customers,
+      customers: customersWithPurchases,
       pagination: {
         page,
         limit,
