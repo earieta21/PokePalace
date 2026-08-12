@@ -298,6 +298,7 @@ export default function POSPage({ styles }) {
       customerUserId: rewardsCustomer?._id || null,
       ...(customBowl && {
         base: customBowl.bowl.base,
+        bases: customBowl.bowl.bases,
         proteins: customBowl.bowl.proteins,
         bowlSize: customBowl.bowl.bowlSize,
         marinades: customBowl.bowl.marinades,

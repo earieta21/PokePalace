@@ -295,6 +295,48 @@ test("el bowl personalizado rechaza duplicados, ingredientes falsos y excesos", 
   );
 });
 
+test("el POS acepta mitad y mitad (2 bases) y guarda la primera en `base` por compatibilidad", () => {
+  const bowl = sanitizePosBowl({
+    bases: ["white_rice", "spring_mix"],
+    proteins: ["salmon"],
+  });
+  assert.deepEqual(bowl.bases, ["white_rice", "spring_mix"]);
+  assert.equal(bowl.base, "white_rice");
+});
+
+test("el POS rechaza más de 2 bases, bases repetidas o ids inválidos en mitad y mitad", () => {
+  assert.throws(
+    () => sanitizePosBowl({ bases: ["white_rice", "quinoa", "spring_mix"], proteins: ["salmon"] }),
+    PosOrderValidationError
+  );
+  assert.throws(
+    () => sanitizePosBowl({ bases: ["white_rice", "white_rice"], proteins: ["salmon"] }),
+    PosOrderValidationError
+  );
+  assert.throws(
+    () => sanitizePosBowl({ bases: ["white_rice", "arroz"], proteins: ["salmon"] }),
+    PosOrderValidationError
+  );
+  assert.throws(
+    () => sanitizePosBowl({ bases: [], proteins: ["salmon"] }),
+    PosOrderValidationError
+  );
+});
+
+test("el POS revisa las 2 bases de un bowl mitad y mitad antes de aceptar la venta", () => {
+  const bowl = sanitizePosBowl({
+    bases: ["white_rice", "quinoa"],
+    proteins: ["salmon"],
+  });
+
+  assert.deepEqual(getUnavailablePosSelections({ bowl, unavailableItems: ["quinoa"] }), ["quinoa"]);
+  assert.deepEqual(
+    getUnavailablePosSelections({ bowl, unavailableItems: ["white_rice", "quinoa"] }).sort(),
+    ["quinoa", "white_rice"]
+  );
+  assert.deepEqual(getUnavailablePosSelections({ bowl, unavailableItems: ["spring_mix"] }), []);
+});
+
 test("el POS acepta un bowl de 1 sola proteína al mismo precio que uno de 2", () => {
   const bowl = sanitizePosBowl({ base: "white_rice", proteins: ["salmon"] });
   assert.equal(bowl.bowlSize, "normal");

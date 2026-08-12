@@ -1526,3 +1526,38 @@ test("una corrección no puede dejar la salida en o antes de la entrada", async 
 
   await TimeRecord.deleteOne({ _id: original._id });
 });
+
+test("el POS acepta mitad y mitad al vender un bowl personalizado", async () => {
+  const clientOrderId = `ci-pos-security:half-half:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+
+  const created = await staffRequest("cashier", "/api/staff/orders", {
+    method: "POST",
+    body: {
+      clientOrderId,
+      bases: ["white_rice", "spring_mix"],
+      proteins: ["salmon"],
+      customer: "Mostrador CI Mitad y Mitad",
+      phone: "6630000098",
+      fulfillment: "pickup",
+      paymentMethod: "cash",
+    },
+  });
+  assert.equal(created.status, 201);
+  const order = (await created.json()).order;
+  assert.deepEqual(order.bases, ["white_rice", "spring_mix"]);
+  assert.equal(order.base, "white_rice");
+
+  const rejected = await staffRequest("cashier", "/api/staff/orders", {
+    method: "POST",
+    body: {
+      clientOrderId: `ci-pos-security:half-half-invalido:${Date.now()}:${Math.random().toString(16).slice(2)}`,
+      bases: ["white_rice", "white_rice"],
+      proteins: ["salmon"],
+      customer: "Mostrador CI Mitad y Mitad Invalido",
+      phone: "6630000097",
+      fulfillment: "pickup",
+      paymentMethod: "cash",
+    },
+  });
+  assert.equal(rejected.status, 400);
+});

@@ -188,7 +188,7 @@ const BOWL_RULES = Object.freeze({
   base: {
     allowed: new Set(["white_rice", "brown_rice", "quinoa", "spring_mix"]),
     min: 1,
-    max: 1,
+    max: 2,
   },
   proteins: {
     allowed: new Set(["tuna", "salmon", "shrimp", "tofu", "octopus", "seared_tuna"]),
@@ -277,14 +277,28 @@ const sanitizeExtraScoops = (value, chosenProteins) => {
   return [...list];
 };
 
-export const sanitizePosBowl = ({ base, proteins, marinades, complements, sauces, toppings, extraScoopProteins }) => {
-  if (typeof base !== "string" || !BOWL_RULES.base.allowed.has(base)) {
+export const sanitizePosBowl = ({ base, bases, proteins, marinades, complements, sauces, toppings, extraScoopProteins }) => {
+  // "Mitad y mitad" manda 2 bases en `bases`; un bowl normal (o un llamador
+  // que solo mande `base`) sigue mandando 1 sola -- mismo patrón que
+  // sanitizeCustomerBowl en backend/utils/customerOrder.js.
+  const baseInput = Array.isArray(bases) && bases.length > 0
+    ? bases
+    : typeof base === "string" && base
+      ? [base]
+      : [];
+  if (
+    baseInput.length === 0 ||
+    baseInput.length > BOWL_RULES.base.max ||
+    new Set(baseInput).size !== baseInput.length ||
+    baseInput.some((id) => typeof id !== "string" || !BOWL_RULES.base.allowed.has(id))
+  ) {
     throw new PosOrderValidationError("Selecciona una base válida para el bowl");
   }
 
   const safeProteins = sanitizeChoiceList("proteins", proteins);
   return {
-    base,
+    base: baseInput[0],
+    bases: baseInput,
     proteins: safeProteins,
     // Size is derived from the validated protein count. A browser-provided
     // bowlSize can never lower the amount charged for three proteins.
@@ -411,7 +425,10 @@ export const getUnavailablePosSelections = ({
   };
 
   if (bowl) {
-    consider(bowl.base);
+    // "Mitad y mitad" trae 2 bases en `bowl.bases` -- revisar solo
+    // `bowl.base` (la primera) dejaría pasar la segunda si está agotada.
+    const bowlBases = Array.isArray(bowl.bases) && bowl.bases.length > 0 ? bowl.bases : [bowl.base];
+    for (const key of bowlBases) consider(key);
     for (const field of ["proteins", "marinades", "complements", "sauces", "toppings", "extraScoopProteins"]) {
       for (const key of Array.isArray(bowl[field]) ? bowl[field] : []) consider(key);
     }

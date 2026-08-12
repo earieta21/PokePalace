@@ -32,12 +32,13 @@ const TOPPING_IDS = [
 
 const MIN_PROTEINS = 1;
 const MAX_PROTEINS = 3;
+const MAX_BASES = 2;
 const MAX_COMPLEMENTS = COMPLEMENT_IDS.length;
 const MAX_SAUCES = 2;
 const MAX_TOPPINGS = 5;
 
 const emptyDraft = () => ({
-  base: null,
+  bases: [],
   proteins: [],
   marinades: [],
   complements: [],
@@ -106,11 +107,12 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
     });
 
   const handleAdd = () => {
-    if (!draft.base) return setError("Selecciona una base.");
+    if (draft.bases.length === 0) return setError("Selecciona una base.");
     if (draft.proteins.length < MIN_PROTEINS) return setError("Selecciona al menos 1 proteína.");
 
     onAdd({
-      base: draft.base,
+      base: draft.bases[0],
+      bases: draft.bases,
       proteins: draft.proteins,
       bowlSize: isLarge ? "large" : "normal",
       marinades: draft.marinades,
@@ -127,10 +129,12 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
     <div>
       <ChipGroup
         title="Base"
+        hint=" · 2 = mitad y mitad"
         ids={BASE_IDS}
         labels={BASE_LABELS}
-        selected={draft.base ? [draft.base] : []}
-        onToggle={(id) => { setDraft((d) => ({ ...d, base: d.base === id ? null : id })); setError(""); }}
+        selected={draft.bases}
+        max={MAX_BASES}
+        onToggle={(id) => { setDraft((d) => ({ ...d, bases: toggleInList(d.bases, id, MAX_BASES) })); setError(""); }}
       />
 
       <ChipGroup
