@@ -12,7 +12,7 @@ import mixedGreens from "../assets/base/mixedGreens.webp";
 
 const MAX_BASES = 2;
 
-const BaseSelection = ({ onNext, onBack }) => {
+const BaseSelection = ({ onNext, onBack, isKiosk = false }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
   const { unavailableItems } = useAvailability();
@@ -56,7 +56,7 @@ const BaseSelection = ({ onNext, onBack }) => {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${isKiosk ? styles.containerKiosk : ""}`}>
         <div className={styles.header}>
           <div className={styles.badge}>{t("order.step", { step: 1, total: 6 })}</div>
           <h2 className={styles.title}>{t("order.baseTitle")}</h2>

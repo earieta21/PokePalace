@@ -17,7 +17,7 @@ import shrimp from "../assets/protein/shrimp.webp";
 import tofu from "../assets/protein/tofu.jpg";
 import searedTuna from "../assets/protein/searedTuna.webp";
 
-const ProteinSelection = ({ onNext, onBack }) => {
+const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
   const { unavailableItems } = useAvailability();
@@ -100,7 +100,7 @@ const ProteinSelection = ({ onNext, onBack }) => {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${isKiosk ? styles.containerKiosk : ""}`}>
       <div className={styles.header}>
         <div className={styles.badge}>{t("order.step", { step: 2, total: 6 })}</div>
         <h2 className={styles.title}>{t("order.proteinTitle")}</h2>

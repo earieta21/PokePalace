@@ -44,12 +44,12 @@ export default function KioskOrderPage() {
   };
 
   const steps = [
-    <BaseSelection key="base" onNext={nextStep} onBack={prevStep} />,
-    <ProteinSelection key="protein" onNext={nextStep} onBack={prevStep} />,
-    <MarinadeSelection key="marinade" onNext={nextStep} onBack={prevStep} />,
-    <ComplementsSelection key="complements" onNext={nextStep} onBack={prevStep} />,
-    <SauceSelection key="sauce" onNext={nextStep} onBack={prevStep} />,
-    <ToppingsSelection key="toppings" onNext={finishBowl} onBack={prevStep} />,
+    <BaseSelection key="base" onNext={nextStep} onBack={prevStep} isKiosk />,
+    <ProteinSelection key="protein" onNext={nextStep} onBack={prevStep} isKiosk />,
+    <MarinadeSelection key="marinade" onNext={nextStep} onBack={prevStep} isKiosk />,
+    <ComplementsSelection key="complements" onNext={nextStep} onBack={prevStep} isKiosk />,
+    <SauceSelection key="sauce" onNext={nextStep} onBack={prevStep} isKiosk />,
+    <ToppingsSelection key="toppings" onNext={finishBowl} onBack={prevStep} isKiosk />,
   ];
 
   return (

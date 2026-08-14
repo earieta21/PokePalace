@@ -15,7 +15,7 @@ import toastedPeanuts from "../assets/toppings/toastedPeanuts.jpg";
 
 const MAX_TOPPINGS = 5;
 
-const ToppingsSelection = ({ onNext, onBack }) => {
+const ToppingsSelection = ({ onNext, onBack, isKiosk = false }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
   const { unavailableItems } = useAvailability();
@@ -61,7 +61,7 @@ const ToppingsSelection = ({ onNext, onBack }) => {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${isKiosk ? styles.containerKiosk : ""}`}>
       <div className={styles.header}>
         <div className={styles.badge}>{t("order.step", { step: 6, total: 6 })}</div>
         <h2 className={styles.title}>{t("order.toppingsTitle")}</h2>

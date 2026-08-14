@@ -11,7 +11,7 @@ import cilantroDressing from "../assets/dressings/cilantroDressing.jpg";
 
 const MAX_SAUCES = 2;
 
-const SauceSelection = ({ onNext, onBack }) => {
+const SauceSelection = ({ onNext, onBack, isKiosk = false }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
   const { unavailableItems } = useAvailability();
@@ -51,7 +51,7 @@ const SauceSelection = ({ onNext, onBack }) => {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${isKiosk ? styles.containerKiosk : ""}`}>
       <div className={styles.header}>
         <div className={styles.badge}>{t("order.step", { step: 5, total: 6 })}</div>
         <h2 className={styles.title}>{t("order.sauceTitle")}</h2>

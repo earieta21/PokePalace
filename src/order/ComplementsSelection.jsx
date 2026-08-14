@@ -22,7 +22,7 @@ import surimi from "../assets/complements/surimi.jpg";
 // de ahí en adelante cada complemento cuesta EXTRA_COMPLEMENT_PRICE. El
 // único tope real es el tamaño del catálogo visible (ver `complements` abajo).
 
-const ComplementsSelection = ({ onNext, onBack }) => {
+const ComplementsSelection = ({ onNext, onBack, isKiosk = false }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
   const { unavailableItems } = useAvailability();
@@ -74,7 +74,7 @@ const ComplementsSelection = ({ onNext, onBack }) => {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${isKiosk ? styles.containerKiosk : ""}`}>
       <div className={styles.header}>
         <div className={styles.badge}>{t("order.step", { step: 4, total: 6 })}</div>
         <h2 className={styles.title}>{t("order.complementsTitle")}</h2>

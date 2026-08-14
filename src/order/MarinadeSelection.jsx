@@ -11,7 +11,7 @@ import sweetChili from "../assets/dressings/sweetChili.webp";
 
 const MAX_MARINADES = 2;
 
-const MarinadeSelection = ({ onNext, onBack }) => {
+const MarinadeSelection = ({ onNext, onBack, isKiosk = false }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
   const { unavailableItems } = useAvailability();
@@ -53,7 +53,7 @@ const MarinadeSelection = ({ onNext, onBack }) => {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${isKiosk ? styles.containerKiosk : ""}`}>
       <div className={styles.header}>
         <div className={styles.badge}>{t("order.step", { step: 3, total: 6 })}</div>
         <h2 className={styles.title}>{t("order.marinadeTitle")}</h2>
