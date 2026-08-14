@@ -52,6 +52,7 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false }) => {
           onClick={handleBuildBowl}
         >
           <div className={styles.buildBowlOverlay} />
+          <span className={styles.buildBowlBadge}>¡Personalízalo!</span>
           <span className={styles.buildBowlIcon} aria-hidden="true">🍚</span>
           <span className={styles.buildBowlText}>
             <strong>Arma tu propio bowl</strong>
