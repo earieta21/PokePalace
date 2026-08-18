@@ -1706,6 +1706,44 @@ function PanelTab({ actor, employees, time, now, onAddEmployee, onRemoveEmployee
   const payFor = (emp, mins) => emp.payType === "weekly" ? (emp.weeklySalary || 0) : (mins / 60) * (emp.hourlyRate || 0);
   const totalPayroll = hoursByEmp.reduce((s, { emp, mins }) => s + payFor(emp, mins), 0);
 
+  // Últimos 7 días de calendario (más viejo primero), para desglosar la
+  // semana día por día en vez de solo un total -- así se nota de un vistazo
+  // en qué día falta algo, no solo que el total "se ve raro".
+  const last7Dates = Array.from({ length: 7 }, (_, i) => tijuanaDateKey(new Date(now - (6 - i) * 86400000)));
+  const weekdayOf = (dateKey) => {
+    const [y, m, d] = dateKey.split("-").map(Number);
+    const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=Dom..6=Sáb
+    return DAYS[dow === 0 ? 6 : dow - 1];
+  };
+
+  const dailyByEmp = employees.map((e) => {
+    const empEntries = weekEntries.filter((t) => sid(t.employeeId) === sid(e._id));
+    let incompleteCount = 0;
+    const days = last7Dates.map((dateKey) => {
+      const dayEntries = empEntries.filter((t) => t.date === dateKey);
+      const mins = dayEntries.reduce((acc, t) => {
+        const start = new Date(t.clockIn).getTime();
+        const grossMins = ((t.clockOut ? new Date(t.clockOut).getTime() : now) - start) / 60000;
+        return acc + Math.max(0, grossMins - breakMinsOf(t));
+      }, 0);
+      const isToday = dateKey === todayKey();
+      const hasOpenShift = dayEntries.some((t) => !t.clockOut);
+      const hasOpenBreak = dayEntries.some((t) => (t.breaks || []).some((b) => !b.end));
+      // Un turno o lonche abierto en un día que ya pasó significa que a
+      // alguien se le olvidó marcar -- eso es lo que se ve mal en la semana.
+      const isIncomplete = (hasOpenShift || hasOpenBreak) && !isToday;
+      if (isIncomplete) incompleteCount += 1;
+      return {
+        dateKey, mins, isIncomplete,
+        isOpenToday: (hasOpenShift || hasOpenBreak) && isToday,
+        hasEntries: dayEntries.length > 0,
+      };
+    });
+    const totalMins = days.reduce((s, d) => s + d.mins, 0);
+    return { emp: e, days, totalMins, incompleteCount };
+  });
+  const totalIncomplete = dailyByEmp.reduce((s, d) => s + d.incompleteCount, 0);
+
   function exportCSV() {
     const rows = [["Empleado","Rol","Fecha","Entrada","Salida","Minutos lonche","Minutos netos"]];
     time.forEach((t) => {
@@ -1768,25 +1806,57 @@ function PanelTab({ actor, employees, time, now, onAddEmployee, onRemoveEmployee
       )}
 
       {view === "semana" && (
-        <div className="bg-slate-800 rounded-2xl border border-white/5 divide-y divide-white/5">
-          {hoursByEmp.sort((a,b)=>b.mins-a.mins).map(({ emp, mins, open }) => {
-            const col = getColor(emp.color);
-            return (
-              <div key={sid(emp._id)} className="flex items-center gap-3 p-4">
-                <span className={`w-9 h-9 rounded-xl ${col.bg} flex items-center justify-center text-xs font-bold text-white shrink-0`}>{initials(emp.name)}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <p className="font-semibold text-sm truncate">{emp.name.split(" ")[0]}</p>
-                    {open && <span className="text-[10px] text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full">activo</span>}
-                  </div>
-                  <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                    <div className={`h-full ${col.bg} rounded-full`} style={{ width:`${Math.min(100,(mins/(40*60))*100)}%` }} />
-                  </div>
-                </div>
-                <p className="text-sm font-bold tabular-nums shrink-0">{fmtHM(mins)}</p>
-              </div>
-            );
-          })}
+        <div className="space-y-3">
+          {totalIncomplete > 0 && (
+            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <p className="text-xs text-amber-300">
+                {totalIncomplete} {totalIncomplete === 1 ? "registro" : "registros"} sin cerrar esta semana (se les olvidó marcar salida o lonche) — corrígelos en <span className="font-semibold">Registros</span>.
+              </p>
+            </div>
+          )}
+          <div className="bg-slate-800 rounded-2xl border border-white/5 overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-white/5">
+                  <th className="text-left font-semibold text-slate-400 px-4 py-3 sticky left-0 bg-slate-800">Empleado</th>
+                  {last7Dates.map((d) => (
+                    <th key={d} className="text-center font-semibold text-slate-400 px-2 py-3 whitespace-nowrap">
+                      {weekdayOf(d)}<br /><span className="text-[10px] text-slate-500 font-normal">{d.slice(5).replace("-", "/")}</span>
+                    </th>
+                  ))}
+                  <th className="text-right font-semibold text-slate-400 px-4 py-3">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {dailyByEmp.sort((a, b) => b.totalMins - a.totalMins).map(({ emp, days, totalMins }) => {
+                  const col = getColor(emp.color);
+                  return (
+                    <tr key={sid(emp._id)}>
+                      <td className="px-4 py-3 sticky left-0 bg-slate-800">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-7 h-7 rounded-lg ${col.bg} flex items-center justify-center text-[10px] font-bold text-white shrink-0`}>{initials(emp.name)}</span>
+                          <span className="font-semibold truncate">{emp.name.split(" ")[0]}</span>
+                        </div>
+                      </td>
+                      {days.map((d) => (
+                        <td key={d.dateKey} className="text-center px-2 py-3 tabular-nums">
+                          {!d.hasEntries
+                            ? <span className="text-slate-600">–</span>
+                            : d.isIncomplete
+                              ? <span className="inline-flex items-center gap-1 text-amber-400" title="Falta marcar salida o lonche"><AlertTriangle className="w-3 h-3" />{fmtHM(d.mins)}</span>
+                              : d.isOpenToday
+                                ? <span className="text-emerald-400">{fmtHM(d.mins)}<span className="block text-[9px]">activo</span></span>
+                                : <span>{fmtHM(d.mins)}</span>}
+                        </td>
+                      ))}
+                      <td className="text-right px-4 py-3 font-bold tabular-nums">{fmtHM(totalMins)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -1823,8 +1893,14 @@ function TimeRecordsView({ actor, employees, entries, onUpdateTimeRecord }) {
         const emp = empById(t.employeeId);
         const key = sid(t._id);
         const isEditing = editingId === key;
+        const isToday = t.date === todayKey();
+        const openBreak = (t.breaks || []).some((b) => !b.end);
+        // "en curso" solo tiene sentido para el turno de hoy -- si el
+        // registro es de un día ya pasado y sigue sin salida/lonche cerrado,
+        // es que a alguien se le olvidó marcar, no que siga trabajando.
+        const isPastIncomplete = !isToday && (!t.clockOut || openBreak);
         return (
-          <div key={key} className="bg-slate-800 rounded-2xl border border-white/5 p-4">
+          <div key={key} className={`bg-slate-800 rounded-2xl border p-4 ${isPastIncomplete ? "border-amber-500/40" : "border-white/5"}`}>
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm truncate">{emp?.name || "?"}</p>
@@ -1834,10 +1910,13 @@ function TimeRecordsView({ actor, employees, entries, onUpdateTimeRecord }) {
                   <span className="flex items-center gap-1"><LogIn className="w-3 h-3 text-emerald-400" />{fmtTime(t.clockIn)}</span>
                   {t.clockOut
                     ? <span className="flex items-center gap-1"><LogOut className="w-3 h-3 text-rose-400" />{fmtTime(t.clockOut)}</span>
-                    : <span className="text-emerald-400">en curso</span>}
+                    : isToday
+                      ? <span className="text-emerald-400">en curso</span>
+                      : <span className="flex items-center gap-1 text-amber-400"><AlertTriangle className="w-3 h-3" />sin marcar salida</span>}
                 </p>
                 {(t.breaks || []).length > 0 && (
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className={`text-[11px] mt-0.5 ${openBreak && !isToday ? "text-amber-400" : "text-slate-500"}`}>
+                    {openBreak && !isToday && <AlertTriangle className="w-3 h-3 inline mr-1" />}
                     {t.breaks.map((b, i) => `lonche ${fmtTime(b.start)}–${b.end ? fmtTime(b.end) : "en curso"}`).join(" · ")}
                   </p>
                 )}
