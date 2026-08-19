@@ -80,6 +80,39 @@ export async function sendWhatsApp(phone, templateName, params = []) {
   }
 }
 
+/* Mensaje de sesión libre (no plantilla) — solo válido dentro de la ventana
+   de 24h desde el último mensaje del cliente (regla de Meta). Se usa para
+   las respuestas conversacionales del agente de WhatsApp. */
+export async function sendWhatsAppText(phone, body) {
+  const token   = process.env.WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_ID;
+  if (!token || !phoneId || !phone || !body) return false;
+
+  try {
+    const res = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: normalizeMxPhone(phone),
+        type: "text",
+        text: { body: String(body).slice(0, 4096) },
+      }),
+    });
+    if (!res.ok) {
+      console.error("sendWhatsAppText failed:", res.status, await res.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("sendWhatsAppText error:", err.message);
+    return false;
+  }
+}
+
 /* ── SMS via Twilio (https://www.twilio.com — de pago, ~$1 MXN por SMS a MX) ──
    Env vars: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM (número Twilio) */
 export async function sendSMS(phone, body) {

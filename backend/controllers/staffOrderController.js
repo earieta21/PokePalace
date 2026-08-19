@@ -340,7 +340,7 @@ async function reconcileCancelledPosOrder(order) {
 
 async function reconcileCancelledStaffOrder(order) {
   if (order.source === "pos") return reconcileCancelledPosOrder(order);
-  if (order.source !== "online") return order;
+  if (order.source !== "online" && order.source !== "whatsapp") return order;
 
   if (!await restoreInventoryForOrder(order)) {
     throw new Error("No se pudo devolver el inventario de la orden cancelada");
@@ -652,9 +652,9 @@ export const updateOrderStatus = async (req, res) => {
 
     res.json({ order: orderResponseForRole(order, req.staff.role), loyalty });
 
-    // Aviso al cliente cuando su pedido pasa a "listo" (una sola vez, solo pedidos online).
+    // Aviso al cliente cuando su pedido pasa a "listo" (una sola vez, pedidos online o de WhatsApp).
     // Intenta WhatsApp primero; si no está configurado o falla, cae a SMS.
-    if (status === "ready" && prev.status !== "ready" && order.source === "online" && order.phone) {
+    if (status === "ready" && prev.status !== "ready" && (order.source === "online" || order.source === "whatsapp") && order.phone) {
       const num = String(order._id).slice(-5).toUpperCase();
       const template = process.env.WHATSAPP_TEMPLATE_READY || "pedido_listo";
       sendWhatsApp(order.phone, template, [num])

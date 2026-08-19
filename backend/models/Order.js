@@ -48,7 +48,7 @@ const orderSchema = new mongoose.Schema(
       enum: ["pending", "paid"],
       default: "pending",
     },
-    source:   { type: String, enum: ["online", "pos"], default: "online" },
+    source:   { type: String, enum: ["online", "pos", "whatsapp"], default: "online" },
     total:    { type: Number, default: null },  // in MXN
 
     // Pricing — always computed server-side, never trusted from the client

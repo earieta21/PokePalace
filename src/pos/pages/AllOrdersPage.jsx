@@ -10,7 +10,7 @@ const STATUS_CFG = {
   cancelled: { cls: "badgeRed",    label: "Cancelado" },
 };
 
-const SOURCE_LABEL = { online: "En línea", pos: "POS" };
+const SOURCE_LABEL = { online: "En línea", pos: "POS", whatsapp: "WhatsApp" };
 
 export default function AllOrdersPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);

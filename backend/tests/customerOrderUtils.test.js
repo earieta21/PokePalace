@@ -11,8 +11,9 @@ import {
 import { stableCustomerOrderObjectId } from "../utils/orderReservations.js";
 import { BOWL_BASE_PRICE, computePricing } from "../pricing.js";
 
-test("solo órdenes online entran a cancelación y reversión de cliente", () => {
+test("órdenes online y de WhatsApp entran a cancelación y reversión de cliente", () => {
   assert.equal(isCustomerManagedOrder({ source: "online" }), true);
+  assert.equal(isCustomerManagedOrder({ source: "whatsapp" }), true);
   assert.equal(isCustomerManagedOrder({ source: "pos" }), false);
   assert.equal(isCustomerManagedOrder(null), false);
 });

@@ -20,6 +20,7 @@ import staffBackupRoutes from "./routes/staffBackup.js";
 import staffSummaryRoutes from "./routes/staffSummary.js";
 import monitorRoutes from "./routes/monitor.js";
 import staffAdminRoutes from "./routes/staffAdmin.js";
+import whatsappRoutes from "./routes/whatsapp.js";
 import { logServerError } from "./controllers/monitorController.js";
 import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
 
@@ -55,7 +56,17 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+// El webhook de WhatsApp necesita el body crudo para verificar la firma de
+// Meta (X-Hub-Signature-256) — se captura aquí sin agregar un segundo parser.
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
+
+// Va antes de sanitizeMongo a propósito: el handshake de Meta manda query
+// params con puntos literales (hub.mode, hub.verify_token, hub.challenge)
+// que sanitizeMongo borraría; y el body del webhook nunca se usa para armar
+// queries de Mongo con sus propias llaves, así que no necesita ese filtro.
+// Su autenticidad ya la garantiza la verificación de firma, no el saneo genérico.
+app.use("/api/whatsapp", whatsappRoutes);
+
 app.use(sanitizeMongo);
 
 app.use("/api/auth",            authRoutes);

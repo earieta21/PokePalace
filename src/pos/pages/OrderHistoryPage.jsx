@@ -8,7 +8,7 @@ const STATUS_CFG = {
   cancelled: { cls: "badgeRed",   label: "Cancelado" },
 };
 
-const SOURCE_LABEL = { online: "En línea", pos: "POS" };
+const SOURCE_LABEL = { online: "En línea", pos: "POS", whatsapp: "WhatsApp" };
 
 const RANGES = [
   { id: "today", label: "Hoy" },
