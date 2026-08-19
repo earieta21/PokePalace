@@ -57,6 +57,10 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: { coca_zero: 1 },
   },
   {
+    catalogId: "coca-cola-regular", legacyId: 24, name: "Coca-Cola", price: 30, category: "drinks",
+    inventoryRecipe: { coca_cola: 1 },
+  },
+  {
     catalogId: "bottled-water", legacyId: 14, name: "Botella de Agua", price: 20, category: "drinks",
     inventoryRecipe: { botella_de_agua: 1 },
   },
