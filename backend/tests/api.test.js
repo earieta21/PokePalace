@@ -1052,7 +1052,7 @@ test("el premio de Choco Rice Cake exige un bowl y el producto en la orden, y re
       clientOrderId: `ci-pos-security:${suffix}:snack-missing`,
       rewardCode,
       paymentMethod: "cash",
-      items: [{ catalogId: "bowl-emerald-salmon", qty: 1 }],
+      items: [{ catalogId: "bowl-the-og", qty: 1 }],
     },
   });
   assert.equal(withoutSnack.status, 400);
@@ -1066,7 +1066,7 @@ test("el premio de Choco Rice Cake exige un bowl y el producto en la orden, y re
       rewardCode,
       paymentMethod: "cash",
       items: [
-        { catalogId: "bowl-emerald-salmon", qty: 1 },
+        { catalogId: "bowl-the-og", qty: 1 },
         { catalogId: "choco-rice-cake", qty: 1 },
       ],
     },
@@ -1119,7 +1119,7 @@ test("cancelar una venta POS revierte inventario, puntos y premio una sola vez",
       rewardCode,
       paymentMethod: "cash",
       items: [
-        { catalogId: "bowl-emerald-salmon", qty: 1 },
+        { catalogId: "bowl-the-og", qty: 1 },
         { catalogId: "agua-del-dia", qty: 1 },
       ],
     },

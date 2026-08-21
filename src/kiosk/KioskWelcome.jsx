@@ -4,15 +4,15 @@ import { useOrder } from "../order/OrderContext";
 import useIdleTimeout from "./useIdleTimeout";
 import styles from "./KioskWelcome.module.css";
 
-import emeraldSalmon from "../assets/menu/emeraldSalmon.webp";
-import spicyTuna from "../assets/menu/spicyTuna.webp";
-import tropicalShrimp from "../assets/menu/tropicalShrimp.webp";
+import theOg from "../assets/menu/theOg.webp";
+import skinnyBowl from "../assets/menu/skinnyBowl.webp";
+import quinoaBowl from "../assets/menu/quinoaBowl.webp";
 import citrusOctopus from "../assets/menu/citrusOctopus.webp";
 import pokeBowl from "../assets/poke.webp";
 
 const SCREENSAVER_IDLE_MS = 25000;
 const SLIDE_INTERVAL_MS = 5000;
-const SLIDES = [emeraldSalmon, spicyTuna, tropicalShrimp, citrusOctopus, pokeBowl];
+const SLIDES = [theOg, skinnyBowl, quinoaBowl, citrusOctopus, pokeBowl];
 
 export default function KioskWelcome() {
   const navigate = useNavigate();

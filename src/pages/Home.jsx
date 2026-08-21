@@ -7,9 +7,9 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { useOrder } from "../order/OrderContext";
 import styles from "./Home.module.css";
 
-import salmonBowl from "../assets/menu/emeraldSalmon.webp";
-import spicyTuna from "../assets/menu/spicyTuna.webp";
-import tropicalShrimp from "../assets/menu/tropicalShrimp.webp";
+import theOg from "../assets/menu/theOg.webp";
+import skinnyBowl from "../assets/menu/skinnyBowl.webp";
+import quinoaBowl from "../assets/menu/quinoaBowl.webp";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -22,24 +22,24 @@ const Home = () => {
   const menuItems = [
     {
       id: "signature_emerald",
-      catalogId: "bowl-emerald-salmon",
+      catalogId: "bowl-the-og",
       name: t("menu.emeraldSalmon"),
       price: computeBowlSubtotal("normal"),
-      image: salmonBowl,
+      image: theOg,
     },
     {
       id: "spicy_tuna_crunch",
-      catalogId: "bowl-spicy-tuna",
+      catalogId: "bowl-skinny",
       name: t("menu.spicyTuna"),
       price: computeBowlSubtotal("normal"),
-      image: spicyTuna,
+      image: skinnyBowl,
     },
     {
       id: "tropical_shrimp",
-      catalogId: "bowl-tropical-shrimp",
+      catalogId: "bowl-quinoa",
       name: t("menu.tropicalShrimp"),
       price: computeBowlSubtotal("normal"),
-      image: tropicalShrimp,
+      image: quinoaBowl,
     },
   ];
 

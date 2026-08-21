@@ -47,9 +47,9 @@ const TRANSLATIONS = {
     "home.buildBowl": "Arma tu bowl",
     "home.specialBowls": "Ver promociones",
 
-    "menu.emeraldSalmon": "Bowl de salmón esmeralda",
-    "menu.spicyTuna": "Bowl picante de atún crujiente",
-    "menu.tropicalShrimp": "Bowl tropical de camarón",
+    "menu.emeraldSalmon": "The OG",
+    "menu.spicyTuna": "Skinny Bowl",
+    "menu.tropicalShrimp": "Quinoa Bowl",
 
     "order.next": "Siguiente",
     "order.selected": "Seleccionados",
@@ -368,9 +368,9 @@ const TRANSLATIONS = {
     "home.buildBowl": "Build your bowl",
     "home.specialBowls": "View deals",
 
-    "menu.emeraldSalmon": "Emerald Salmon Bowl",
-    "menu.spicyTuna": "Spicy Tuna Crunch",
-    "menu.tropicalShrimp": "Tropical Shrimp Bowl",
+    "menu.emeraldSalmon": "The OG",
+    "menu.spicyTuna": "Skinny Bowl",
+    "menu.tropicalShrimp": "Quinoa Bowl",
 
     "order.next": "Next",
     "order.selected": "Selected",

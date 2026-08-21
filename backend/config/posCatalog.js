@@ -8,30 +8,30 @@ export const EXTRA_SCOOP_PROTEIN_KG = 0.04;
 // these prices, but only this server-side catalog is used to charge an order.
 export const POS_CATALOG = Object.freeze([
   // Los bowls de la casa — mismos nombres y recetas que los presets del
-  // inicio del sitio (src/order/OrderPage.jsx PRESETS), todos a precio de
+  // inicio del sitio (src/pages/Home.jsx menuItems), todos a precio de
   // bowl normal.
   {
-    catalogId: "bowl-emerald-salmon", legacyId: 1, name: "Bowl de salmón esmeralda", price: 230, category: "bowls",
+    catalogId: "bowl-the-og", legacyId: 1, name: "The OG", price: 230, category: "bowls",
     inventoryRecipe: {
-      white_rice: 1, salmon: 0.05, tuna: 0.05, shoyu_marinade: 1,
-      avocado: 1, cucumber: 1, edamame: 1,
-      spicy_mayo: 1, soy_sauce: 1, sesame_seeds: 1, nori_strips: 1,
+      white_rice: 1, tuna: 0.05, salmon: 0.05, citrus_marinade: 1,
+      shredded_carrots: 1, surimi: 1, seaweed: 1, edamame: 1, pineapple: 1, cucumber: 1,
+      spicy_mayo: 1, crispy_onions: 1, sesame_seeds: 1, nori_strips: 1,
     },
   },
   {
-    catalogId: "bowl-spicy-tuna", legacyId: 2, name: "Bowl picante de atún crujiente", price: 230, category: "bowls",
+    catalogId: "bowl-skinny", legacyId: 2, name: "Skinny Bowl", price: 230, category: "bowls",
     inventoryRecipe: {
-      brown_rice: 1, tuna: 0.05, seared_tuna: 0.05, spicy_marinade: 1,
-      cucumber: 1, edamame: 1, corn: 1,
-      garlic_sriracha: 1, spicy_mayo: 1, red_pepper_flakes: 1, furikake: 1,
+      white_rice: 0.5, spring_mix: 0.5, shrimp: 0.05, tuna: 0.05, sweet_marinade: 1,
+      cucumber: 1, shredded_carrots: 1, mango: 1, red_onion: 1, avocado: 1,
+      cilantro_dressing: 1, sesame_seeds: 1, nori_strips: 1, croutons: 1,
     },
   },
   {
-    catalogId: "bowl-tropical-shrimp", legacyId: 3, name: "Bowl tropical de camarón", price: 230, category: "bowls",
+    catalogId: "bowl-quinoa", legacyId: 3, name: "Quinoa Bowl", price: 230, category: "bowls",
     inventoryRecipe: {
-      spring_mix: 1, shrimp: 0.05, salmon: 0.05, citrus_marinade: 1,
-      mango: 1, pineapple: 1, avocado: 1,
-      sweet_chili: 1, avocado_lime: 1, sesame_seeds: 1, crispy_onions: 1,
+      quinoa: 1, tuna: 0.05, shrimp: 0.05, citrus_marinade: 1,
+      seaweed: 1, shredded_carrots: 1, spicy_surimi: 1, edamame: 1, red_onion: 1,
+      cilantro_dressing: 1, crispy_onions: 1, nori_strips: 1, sesame_seeds: 1,
     },
   },
   // Venta rápida sin ingredientes específicos — para cobrar de una vez

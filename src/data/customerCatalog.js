@@ -1,6 +1,6 @@
-import emeraldSalmon from "../assets/menu/emeraldSalmon.webp";
-import spicyTuna from "../assets/menu/spicyTuna.webp";
-import tropicalShrimp from "../assets/menu/tropicalShrimp.webp";
+import theOg from "../assets/menu/theOg.webp";
+import skinnyBowl from "../assets/menu/skinnyBowl.webp";
+import quinoaBowl from "../assets/menu/quinoaBowl.webp";
 
 // Catálogo de artículos que un cliente puede agregar directo al carrito sin
 // pasar por el armador: bowls de la casa (receta fija), bebidas y extras.
@@ -14,31 +14,31 @@ import tropicalShrimp from "../assets/menu/tropicalShrimp.webp";
 // CUSTOMER_EXCLUDED_CATALOG_IDS en backend/utils/customerOrder.js).
 export const CUSTOMER_CATALOG = Object.freeze([
   {
-    catalogId: "bowl-emerald-salmon",
-    name: "Bowl de salmón esmeralda",
+    catalogId: "bowl-the-og",
+    name: "The OG",
     price: 230,
     category: "Bowls",
     categoryKey: "bowls",
     icon: "🍣",
-    image: emeraldSalmon,
+    image: theOg,
   },
   {
-    catalogId: "bowl-spicy-tuna",
-    name: "Bowl picante de atún crujiente",
+    catalogId: "bowl-skinny",
+    name: "Skinny Bowl",
     price: 230,
     category: "Bowls",
     categoryKey: "bowls",
-    icon: "🌶️",
-    image: spicyTuna,
+    icon: "🥗",
+    image: skinnyBowl,
   },
   {
-    catalogId: "bowl-tropical-shrimp",
-    name: "Bowl tropical de camarón",
+    catalogId: "bowl-quinoa",
+    name: "Quinoa Bowl",
     price: 230,
     category: "Bowls",
     categoryKey: "bowls",
     icon: "🍤",
-    image: tropicalShrimp,
+    image: quinoaBowl,
   },
   {
     catalogId: "mineral-water",
