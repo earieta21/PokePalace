@@ -175,12 +175,64 @@ export default function OrderTracking() {
 
   useEffect(() => { fetchOrder(); }, [fetchOrder]);
 
-  // Poll every 3 seconds while order is active
+  const orderStatus = order?.status;
+  const orderActive = Boolean(order) && orderStatus !== "completed" && orderStatus !== "cancelled";
+
+  // Respaldo de sondeo — la vía principal es la conexión en tiempo real de
+  // abajo, esto solo cubre el rato en que esa conexión se esté reconectando.
   useEffect(() => {
-    if (!order || order.status === "completed" || order.status === "cancelled") return;
-    const id = setInterval(fetchOrder, 3000);
+    if (!orderActive) return undefined;
+    const id = setInterval(fetchOrder, 10000);
     return () => clearInterval(id);
-  }, [fetchOrder, order]);
+  }, [fetchOrder, orderActive]);
+
+  // Conexión en tiempo real: el servidor avisa por esta vía en cuanto el
+  // pedido cambia de estado (creación/actualización de cualquier orden),
+  // así el cliente ve "listo" al instante en vez de esperar al siguiente
+  // sondeo. Sin header de autorización: el evento no lleva datos del
+  // pedido, solo avisa "algo cambió" — el pedido real se sigue pidiendo
+  // con GET /api/orders/:id, que sí valida el acceso de este cliente.
+  useEffect(() => {
+    if (!orderActive) return undefined;
+    let cancelled = false;
+    let retryTimer = null;
+    const controller = new AbortController();
+
+    const connect = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/orders/events`, { signal: controller.signal });
+        if (!res.ok || !res.body) throw new Error(`SSE HTTP ${res.status}`);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (!cancelled) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let sep;
+          while ((sep = buffer.indexOf("\n\n")) !== -1) {
+            const chunk = buffer.slice(0, sep);
+            buffer = buffer.slice(sep + 2);
+            if (chunk.includes("orders_changed")) fetchOrder();
+          }
+        }
+      } catch {
+        // red caída, servidor reiniciando, etc. — se reintenta solo.
+      }
+      if (!cancelled) retryTimer = setTimeout(connect, 3000);
+    };
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimer);
+      controller.abort();
+    };
+  }, [fetchOrder, orderActive]);
 
   // Ask for notification permission once when order is active
   useEffect(() => {
