@@ -25,6 +25,7 @@ import staffCustomerRoutes from "./routes/staffCustomers.js";
 import whatsappRoutes from "./routes/whatsapp.js";
 import { logServerError } from "./controllers/monitorController.js";
 import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
+import { startOrderChangeStream } from "./utils/orderEvents.js";
 
 dotenv.config();
 
@@ -132,6 +133,7 @@ const start = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ MongoDB conectado");
+    startOrderChangeStream();
 
     app.listen(PORT, () => {
       console.log(`✅ Server running on ${PORT}`);
