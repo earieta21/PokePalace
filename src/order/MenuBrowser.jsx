@@ -79,7 +79,12 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false }) => {
                     >
                       {item.image ? (
                         <div className={styles.cardPhotoWrap}>
-                          <img src={item.image} alt="" className={styles.cardPhoto} loading="lazy" />
+                          <img
+                            src={item.image}
+                            alt=""
+                            className={`${styles.cardPhoto} ${item.imageFit === "contain" ? styles.cardPhotoContain : ""}`}
+                            loading="lazy"
+                          />
                           <div className={styles.cardPhotoOverlay} />
                         </div>
                       ) : (

@@ -1,6 +1,12 @@
 import theOg from "../assets/menu/theOg.webp";
 import skinnyBowl from "../assets/menu/skinnyBowl.webp";
 import quinoaBowl from "../assets/menu/quinoaBowl.webp";
+import topoChico from "../assets/menu/products/topo-chico.jpg";
+import cocaZero from "../assets/menu/products/coca-zero.jpg";
+import bottledWater from "../assets/menu/products/bottled-water.jpg";
+import aguaDelDia from "../assets/menu/products/agua-del-dia.jpg";
+import cacaoRiceCake from "../assets/menu/products/cacao-rice-cake.jpg";
+import chocoRiceCake from "../assets/menu/products/choco-rice-cake.jpg";
 
 // Catálogo de artículos que un cliente puede agregar directo al carrito sin
 // pasar por el armador: bowls de la casa (receta fija), bebidas y extras.
@@ -47,6 +53,8 @@ export const CUSTOMER_CATALOG = Object.freeze([
     category: "Bebidas",
     categoryKey: "drinks",
     icon: "🫧",
+    image: topoChico,
+    imageFit: "contain",
   },
   {
     catalogId: "coca-zero",
@@ -55,6 +63,8 @@ export const CUSTOMER_CATALOG = Object.freeze([
     category: "Bebidas",
     categoryKey: "drinks",
     icon: "🥤",
+    image: cocaZero,
+    imageFit: "contain",
   },
   {
     catalogId: "bottled-water",
@@ -63,6 +73,8 @@ export const CUSTOMER_CATALOG = Object.freeze([
     category: "Bebidas",
     categoryKey: "drinks",
     icon: "💧",
+    image: bottledWater,
+    imageFit: "contain",
   },
   {
     catalogId: "agua-del-dia",
@@ -71,6 +83,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
     category: "Bebidas",
     categoryKey: "drinks",
     icon: "🥤",
+    image: aguaDelDia,
   },
   {
     catalogId: "cacao-rice-cake",
@@ -79,6 +92,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
     category: "Extras",
     categoryKey: "extras",
     icon: "🍫",
+    image: cacaoRiceCake,
   },
   {
     catalogId: "choco-rice-cake",
@@ -87,6 +101,18 @@ export const CUSTOMER_CATALOG = Object.freeze([
     category: "Extras",
     categoryKey: "extras",
     icon: "🍫",
+    image: chocoRiceCake,
+  },
+  {
+    catalogId: "miel-rice-cake",
+    name: "Miel Rice Cake",
+    price: 35,
+    category: "Extras",
+    categoryKey: "extras",
+    icon: "🍯",
+    // Sin foto todavía — se ve bien con solo el ícono (MenuBrowser.jsx
+    // cae a la tarjeta "solo ícono" cuando no hay `image`). Agregar aquí
+    // cuando haya una foto con licencia verificada, como las demás.
   },
 ]);
 
