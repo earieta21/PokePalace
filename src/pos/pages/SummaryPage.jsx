@@ -108,6 +108,23 @@ export default function SummaryPage({ styles }) {
       {error && <p style={{ color: "red", fontSize: 13, marginBottom: 12 }}>{error}</p>}
       {loading && <p className={ui.loadingText}>Cargando tu resumen…</p>}
 
+      {data && !loading && (
+        <section className={ui.customerSection}>
+          <div className={ui.customerCard}>
+            <div>
+              <small>Comunidad</small>
+              <strong>Clientes registrados</strong>
+              <p>Cuentas creadas en la página de Poke Palace</p>
+            </div>
+            <b>
+              {Number.isFinite(data.registeredCustomers)
+                ? data.registeredCustomers.toLocaleString("es-MX")
+                : "—"}
+            </b>
+          </div>
+        </section>
+      )}
+
       {noData && (
         <div className={ui.emptyHero}>
           <span>🌊</span>

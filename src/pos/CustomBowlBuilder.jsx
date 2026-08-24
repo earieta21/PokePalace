@@ -2,33 +2,41 @@ import { useState } from "react";
 import {
   BASE_LABELS,
   PROTEIN_LABELS,
-  MARINADE_LABELS,
   COMPLEMENT_LABELS,
   SAUCE_LABELS,
   TOPPING_LABELS,
 } from "../order/OrderLabels";
+import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, computeExtrasSubtotal } from "../order/pricing";
+import { useAvailability } from "../context/AvailabilityContext";
+import {
+  getUnavailableBowlSelections,
+  MAX_POS_PROTEINS,
+  MIN_POS_PROTEINS,
+} from "./posRules.js";
 
 // Real base ids only — BASE_LABELS has a legacy "mixed_greens" alias pointing
 // at the same label as "spring_mix", which would render as a duplicate chip.
-const BASE_IDS = ["white_rice", "brown_rice", "quinoa", "spring_mix"];
-const PROTEIN_IDS = Object.keys(PROTEIN_LABELS);
-const MARINADE_IDS = Object.keys(MARINADE_LABELS);
-const COMPLEMENT_IDS = Object.keys(COMPLEMENT_LABELS);
-const SAUCE_IDS = Object.keys(SAUCE_LABELS);
-const TOPPING_IDS = Object.keys(TOPPING_LABELS);
+const BASE_IDS = ["white_rice", "spring_mix", "quinoa"];
+const PROTEIN_IDS = ["tuna", "salmon", "shrimp", "tofu"];
+const COMPLEMENT_IDS = [
+  "shredded_carrots", "seaweed", "edamame", "red_onion", "cucumber",
+  "pineapple", "beet", "surimi", "spicy_surimi", "avocado",
+];
+const SAUCE_IDS = [
+  "spicy_mayo", "sweet_dressing", "citrus_dressing", "red_sauce",
+  "sriracha", "cilantro_dressing",
+];
+const TOPPING_IDS = [
+  "black_olives", "toasted_peanuts", "sesame_seeds", "nori_strips", "masago", "croutons",
+];
 
-const MIN_PROTEINS = 1;
-const MAX_PROTEINS = 3;
-const MAX_MARINADES = 2;
-const MAX_COMPLEMENTS = 6;
+const MAX_COMPLEMENTS = COMPLEMENT_IDS.length;
+const MAX_BASES = 2;
 const MAX_SAUCES = 2;
 const MAX_TOPPINGS = 5;
 
-export const BOWL_BASE_PRICE = 249;
-export const LARGE_BOWL_UPCHARGE = 40;
-
 const emptyDraft = () => ({
-  base: null,
+  bases: [],
   proteins: [],
   marinades: [],
   complements: [],
@@ -42,7 +50,9 @@ function toggleInList(list, id, max) {
   return [...list, id];
 }
 
-function ChipGroup({ title, hint, ids, labels, selected, max, onToggle }) {
+function ChipGroup({ title, hint, ids, labels, selected, max, onToggle, unavailableItems = [] }) {
+  const unavailable = new Set(unavailableItems);
+
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
@@ -56,25 +66,29 @@ function ChipGroup({ title, hint, ids, labels, selected, max, onToggle }) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {ids.map((id) => {
           const active = selected.includes(id);
+          const isUnavailable = unavailable.has(id);
           return (
             <button
               key={id}
               type="button"
               onClick={() => onToggle(id)}
+              disabled={isUnavailable && !active}
+              aria-label={`${labels[id] || id}${isUnavailable ? " (agotado)" : ""}`}
               style={{
                 padding: "8px 14px",
                 borderRadius: 999,
                 fontSize: 13,
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: isUnavailable && !active ? "not-allowed" : "pointer",
                 border: active ? "2px solid #52b788" : "1.5px solid rgba(82,183,136,0.35)",
-                background: active ? "#52b788" : "rgba(82,183,136,0.08)",
-                color: active ? "#fff" : "inherit",
+                background: active ? "#52b788" : isUnavailable ? "#f1f3f1" : "rgba(82,183,136,0.08)",
+                color: active ? "#fff" : isUnavailable ? "#8a958d" : "inherit",
+                opacity: isUnavailable ? 0.72 : 1,
                 transition: "all 120ms ease",
                 transform: active ? "scale(1.04)" : "scale(1)",
               }}
             >
-              {active ? "✓ " : ""}{labels[id] || id}
+              {active ? "✓ " : ""}{labels[id] || id}{isUnavailable ? " · Agotado" : ""}
             </button>
           );
         })}
@@ -84,18 +98,27 @@ function ChipGroup({ title, hint, ids, labels, selected, max, onToggle }) {
 }
 
 export default function CustomBowlBuilder({ onAdd, onCancel }) {
+  const { unavailableItems } = useAvailability();
   const [draft, setDraft] = useState(emptyDraft);
   const [error, setError] = useState("");
 
-  const isLarge = draft.proteins.length === MAX_PROTEINS;
-  const price = BOWL_BASE_PRICE + (isLarge ? LARGE_BOWL_UPCHARGE : 0);
+  const isLarge = draft.proteins.length === MAX_POS_PROTEINS;
+  const price = BOWL_BASE_PRICE
+    + (isLarge ? LARGE_BOWL_UPCHARGE : 0)
+    + computeExtrasSubtotal({ complementsCount: draft.complements.length });
 
   const handleAdd = () => {
-    if (!draft.base) return setError("Selecciona una base.");
-    if (draft.proteins.length < MIN_PROTEINS) return setError("Selecciona al menos 1 proteína.");
+    if (draft.bases.length === 0) return setError("Selecciona al menos una base.");
+    if (draft.proteins.length < MIN_POS_PROTEINS) return setError("Selecciona al menos 1 proteína.");
+    if (getUnavailableBowlSelections(draft, unavailableItems).length > 0) {
+      return setError("Quita los ingredientes agotados antes de agregar el bowl.");
+    }
 
     onAdd({
-      base: draft.base,
+      // Keep the first base in the legacy singular field while the full list
+      // carries a possible half-and-half selection through the POS pipeline.
+      base: draft.bases[0],
+      bases: draft.bases,
       proteins: draft.proteins,
       bowlSize: isLarge ? "large" : "normal",
       marinades: draft.marinades,
@@ -112,46 +135,47 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
     <div>
       <ChipGroup
         title="Base"
+        hint=" · elige 2 para mitad y mitad"
         ids={BASE_IDS}
         labels={BASE_LABELS}
-        selected={draft.base ? [draft.base] : []}
-        onToggle={(id) => { setDraft((d) => ({ ...d, base: d.base === id ? null : id })); setError(""); }}
+        selected={draft.bases}
+        max={MAX_BASES}
+        unavailableItems={unavailableItems}
+        onToggle={(id) => {
+          setDraft((d) => ({ ...d, bases: toggleInList(d.bases, id, MAX_BASES) }));
+          setError("");
+        }}
       />
 
       <ChipGroup
         title="Proteínas"
-        hint=" · 3 = bowl grande (+$40 MXN)"
+        hint={` · 1-2 = mediano · 3 = grande (+$${LARGE_BOWL_UPCHARGE} MXN)`}
         ids={PROTEIN_IDS}
         labels={PROTEIN_LABELS}
         selected={draft.proteins}
-        max={MAX_PROTEINS}
-        onToggle={(id) => { setDraft((d) => ({ ...d, proteins: toggleInList(d.proteins, id, MAX_PROTEINS) })); setError(""); }}
-      />
-
-      <ChipGroup
-        title="Marinados"
-        ids={MARINADE_IDS}
-        labels={MARINADE_LABELS}
-        selected={draft.marinades}
-        max={MAX_MARINADES}
-        onToggle={(id) => setDraft((d) => ({ ...d, marinades: toggleInList(d.marinades, id, MAX_MARINADES) }))}
+        max={MAX_POS_PROTEINS}
+        unavailableItems={unavailableItems}
+        onToggle={(id) => { setDraft((d) => ({ ...d, proteins: toggleInList(d.proteins, id, MAX_POS_PROTEINS) })); setError(""); }}
       />
 
       <ChipGroup
         title="Complementos"
+        hint=" · más de 6 cuestan $15 c/u"
         ids={COMPLEMENT_IDS}
         labels={COMPLEMENT_LABELS}
         selected={draft.complements}
         max={MAX_COMPLEMENTS}
+        unavailableItems={unavailableItems}
         onToggle={(id) => setDraft((d) => ({ ...d, complements: toggleInList(d.complements, id, MAX_COMPLEMENTS) }))}
       />
 
       <ChipGroup
-        title="Salsas"
+        title="Aderezos"
         ids={SAUCE_IDS}
         labels={SAUCE_LABELS}
         selected={draft.sauces}
         max={MAX_SAUCES}
+        unavailableItems={unavailableItems}
         onToggle={(id) => setDraft((d) => ({ ...d, sauces: toggleInList(d.sauces, id, MAX_SAUCES) }))}
       />
 
@@ -161,6 +185,7 @@ export default function CustomBowlBuilder({ onAdd, onCancel }) {
         labels={TOPPING_LABELS}
         selected={draft.toppings}
         max={MAX_TOPPINGS}
+        unavailableItems={unavailableItems}
         onToggle={(id) => setDraft((d) => ({ ...d, toppings: toggleInList(d.toppings, id, MAX_TOPPINGS) }))}
       />
 

@@ -17,6 +17,10 @@ const orderSchema = new mongoose.Schema(
 
     // Bowl-builder fields (customer orders)
     base:        { type: String, default: null },
+    // Cuando el cliente pide "mitad y mitad", trae las 2 bases elegidas —
+    // `base` sigue guardando la primera para no romper a quien solo lea ese
+    // campo (KDS viejo, reportes, etc.).
+    bases:       { type: [String], default: [] },
     protein:     { type: String, default: null },
     proteins:    { type: [String], default: [] },
     bowlSize:    { type: String, enum: ["normal", "large"], default: "normal" },
@@ -25,6 +29,9 @@ const orderSchema = new mongoose.Schema(
     complements: { type: [String], default: [] },
     sauces:      { type: [String], default: [] },
     toppings:    { type: [String], default: [] },
+    // Porciones extra (40 g, $40 c/u) de una proteína ya elegida — puede
+    // repetir el mismo id (dos scoops extra de salmón = ["salmon","salmon"]).
+    extraScoopProteins: { type: [String], default: [] },
 
     // POS orders: flat item list [{name, price, qty}]
     items: { type: Array, default: [] },

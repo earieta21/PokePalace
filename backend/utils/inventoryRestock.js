@@ -9,6 +9,10 @@ export function normalizeRestockLines(lines) {
     throw new Error(`Una recepción admite máximo ${MAX_BATCH_LINES} artículos`);
   }
 
+  // cost es opcional — si no se captura, se conserva el costo unitario que
+  // ya tenía el artículo (misma cantidad de la compra anterior). Si se
+  // repite un artículo dentro del mismo lote, se suman las cantidades y se
+  // conserva el último costo capturado para ese artículo.
   const totals = new Map();
   for (const line of lines) {
     const itemId = String(line?.itemId || "").trim();
@@ -16,8 +20,19 @@ export function normalizeRestockLines(lines) {
     if (!itemId || !Number.isFinite(amount) || amount <= 0) {
       throw new Error("Cada artículo necesita una cantidad mayor que cero");
     }
-    totals.set(itemId, (totals.get(itemId) || 0) + amount);
+    const rawCost = line?.cost;
+    const cost = rawCost === undefined || rawCost === null || rawCost === ""
+      ? undefined
+      : Number(rawCost);
+    if (cost !== undefined && (!Number.isFinite(cost) || cost < 0)) {
+      throw new Error("El costo capturado no es válido");
+    }
+    const previous = totals.get(itemId);
+    totals.set(itemId, {
+      amount: (previous?.amount || 0) + amount,
+      cost: cost !== undefined ? cost : previous?.cost,
+    });
   }
 
-  return [...totals.entries()].map(([itemId, amount]) => ({ itemId, amount }));
+  return [...totals.entries()].map(([itemId, { amount, cost }]) => ({ itemId, amount, cost }));
 }

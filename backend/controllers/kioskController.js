@@ -20,7 +20,9 @@ const LOCATION_ERROR_MSG = `Debes estar en el restaurante para marcar tu entrada
 
 // Valida que el body traiga coordenadas y que estén dentro del radio del
 // local. Devuelve un mensaje de error si algo falla, o null si está bien.
+// El dueño queda exento: puede operar sin estar físicamente en el local.
 function checkStaffLocation(req) {
+  if (req.staff?.role === "owner") return null;
   const { lat, lng } = req.body || {};
   if (typeof lat !== "number" || typeof lng !== "number") {
     return "No se pudo obtener tu ubicación. Activa el permiso de ubicación e intenta de nuevo.";

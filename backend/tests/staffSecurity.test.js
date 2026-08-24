@@ -64,9 +64,16 @@ test("el POS ignora precio y nombre manipulados cuando recibe un id de catálogo
     price: 0.01,
     qty: 2,
   }]);
-  assert.equal(item.name, "Agua natural del día");
-  assert.equal(item.price, 30);
+  assert.equal(item.name, "Agua del día");
+  assert.equal(item.price, 35);
   assert.equal(item.qty, 2);
+});
+
+test("el agua del día cuesta 35 pesos", () => {
+  const [item] = resolvePosItems([{ catalogId: "agua-del-dia", qty: 1 }]);
+
+  assert.equal(item.name, "Agua del día");
+  assert.equal(item.price, 35);
 });
 
 test("el POS mantiene compatibilidad por nombre exacto sin confiar en price", () => {
@@ -107,15 +114,15 @@ test("el POS agrupa productos repetidos y limita su cantidad total", () => {
 
 test("el inventario POS multiplica qty y desglosa recetas de bowls predefinidos", () => {
   const items = resolvePosItems([
-    { catalogId: "bowl-tuna-classic", qty: 2 },
+    { catalogId: "bowl-emerald-salmon", qty: 2 },
     { catalogId: "edamame", qty: 3 },
   ]);
   const demand = getPosInventoryDemand({ items });
 
   assert.equal(demand.white_rice, 2);
-  assert.equal(demand.tuna, 2);
+  assert.equal(demand.tuna, 0.1);
   assert.equal(demand.cucumber, 2);
-  assert.equal(demand.soy_sauce, 2);
+  assert.equal(demand.citrus_dressing, 2);
   // Dos porciones dentro de los bowls, más tres entradas independientes.
   assert.equal(demand.edamame, 5);
 });
@@ -127,43 +134,96 @@ test("el inventario POS suma ingredientes compartidos del bowl personalizado", (
     complements: ["cucumber"],
     toppings: ["sesame_seeds"],
     rewardExtraTopping: "sesame_seeds",
-    items: [{ catalogId: "bowl-tuna-classic", name: "Bowl Clásico de Atún", qty: 1 }],
+    items: [{ catalogId: "bowl-emerald-salmon", name: "Bowl de salmón esmeralda", qty: 1 }],
   });
 
   assert.equal(demand.white_rice, 2);
-  assert.equal(demand.tuna, 2);
-  assert.equal(demand.seared_tuna, 1);
+  assert.equal(demand.tuna, 0.1);
+  assert.equal(demand.seared_tuna, 0.05);
   assert.equal(demand.cucumber, 2);
   assert.equal(demand.sesame_seeds, 3);
 });
 
+test("un bowl mitad y mitad reparte la porción de base entre las 2 elegidas", () => {
+  const demand = getPosInventoryDemand({
+    bases: ["white_rice", "quinoa"],
+    proteins: ["tuna"],
+  });
+
+  assert.equal(demand.white_rice, 0.5);
+  assert.equal(demand.quinoa, 0.5);
+  assert.equal(demand.tuna, 0.1);
+});
+
+test("el POS acepta arroz y ensalada como bowl mitad y mitad", () => {
+  const bowl = sanitizePosBowl({
+    base: "white_rice",
+    bases: ["white_rice", "spring_mix"],
+    proteins: ["salmon"],
+  });
+
+  assert.equal(bowl.base, "white_rice");
+  assert.deepEqual(bowl.bases, ["white_rice", "spring_mix"]);
+  assert.deepEqual(
+    getUnavailablePosSelections({ bowl, unavailableItems: ["spring_mix"] }),
+    ["spring_mix"]
+  );
+});
+
+test("el POS rechaza más de dos bases, duplicados o base principal inconsistente", () => {
+  assert.throws(
+    () => sanitizePosBowl({
+      base: "white_rice",
+      bases: ["white_rice", "spring_mix", "quinoa"],
+      proteins: ["salmon"],
+    }),
+    PosOrderValidationError
+  );
+  assert.throws(
+    () => sanitizePosBowl({
+      base: "white_rice",
+      bases: ["white_rice", "white_rice"],
+      proteins: ["salmon"],
+    }),
+    PosOrderValidationError
+  );
+  assert.throws(
+    () => sanitizePosBowl({
+      base: "spring_mix",
+      bases: ["white_rice", "spring_mix"],
+      proteins: ["salmon"],
+    }),
+    PosOrderValidationError
+  );
+});
+
 test("el servidor detecta productos e ingredientes agotados aunque el POS esté desactualizado", () => {
   const items = resolvePosItems([
-    { catalogId: "bowl-salmon-avocado", qty: 1 },
+    { catalogId: "bowl-tropical-shrimp", qty: 1 },
     { catalogId: "agua-del-dia", qty: 1 },
   ]);
   const bowl = sanitizePosBowl({
     base: "white_rice",
     proteins: ["tuna", "shrimp"],
-    toppings: ["furikake"],
+    toppings: ["masago"],
   });
 
   assert.deepEqual(
     getUnavailablePosSelections({
       items,
       bowl,
-      unavailableItems: ["salmon", "agua-del-dia", "furikake", "not-selected"],
+      unavailableItems: ["tofu", "agua-del-dia", "masago", "not-selected"],
     }),
-    ["agua-del-dia", "furikake", "salmon"]
+    ["agua-del-dia", "masago", "tofu"]
   );
 });
 
 test("el topping Rewards se limita al catálogo operativo", () => {
-  assert.equal(sanitizePosRewardTopping("furikake"), "furikake");
+  assert.equal(sanitizePosRewardTopping("masago"), "masago");
   assert.throws(() => sanitizePosRewardTopping("topping_inventado"), PosOrderValidationError);
   assert.deepEqual(
-    getUnavailablePosSelections({ rewardTopping: "furikake", unavailableItems: ["furikake"] }),
-    ["furikake"]
+    getUnavailablePosSelections({ rewardTopping: "masago", unavailableItems: ["masago"] }),
+    ["masago"]
   );
 });
 
@@ -171,13 +231,12 @@ test("el tamaño y precio del bowl se derivan de proteínas validadas", () => {
   const bowl = sanitizePosBowl({
     base: "white_rice",
     proteins: ["salmon", "tuna", "shrimp"],
-    marinades: ["ponzu_marinade"],
     complements: ["avocado"],
     sauces: ["spicy_mayo"],
-    toppings: ["furikake"],
+    toppings: ["masago"],
   });
   assert.equal(bowl.bowlSize, "large");
-  assert.equal(computeBowlSubtotal(bowl.bowlSize), 289);
+  assert.equal(computeBowlSubtotal(bowl.bowlSize), 250);
 });
 
 test("el bowl personalizado rechaza duplicados, ingredientes falsos y excesos", () => {
@@ -197,4 +256,24 @@ test("el bowl personalizado rechaza duplicados, ingredientes falsos y excesos", 
     }),
     PosOrderValidationError
   );
+});
+
+test("el POS acepta un bowl de 1 sola proteína al mismo precio que uno de 2", () => {
+  const bowl = sanitizePosBowl({ base: "white_rice", proteins: ["salmon"] });
+  assert.equal(bowl.bowlSize, "normal");
+  assert.deepEqual(bowl.proteins, ["salmon"]);
+  assert.equal(computeBowlSubtotal(bowl.bowlSize), 230);
+});
+
+test("el POS acepta los ingredientes vigentes del bowl", () => {
+  const bowl = sanitizePosBowl({
+    base: "quinoa",
+    proteins: ["tuna", "tofu"],
+    complements: ["seaweed", "red_onion", "beet", "surimi", "spicy_surimi"],
+    sauces: ["red_sauce", "sriracha"],
+    toppings: ["black_olives", "toasted_peanuts", "masago", "croutons"],
+  });
+
+  assert.equal(bowl.bowlSize, "normal");
+  assert.deepEqual(bowl.proteins, ["tuna", "tofu"]);
 });

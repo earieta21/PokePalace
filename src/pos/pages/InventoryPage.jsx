@@ -11,12 +11,13 @@ import {
 
 const INVENTORY_SECTIONS = [
   { name: "Comida", icon: "🍣", categories: ["Proteínas", "Granos", "Verduras", "Salsas", "Extras", "Otro"] },
+  { name: "Bebidas", icon: "🥤", categories: ["Refrescos", "Aguas", "Otro"] },
   { name: "Limpieza", icon: "🧼", categories: ["Químicos", "Higiene", "Utensilios", "Desechables", "Otro"] },
   { name: "Empaque", icon: "🥡", categories: ["Contenedores", "Cubiertos", "Bolsas", "Servilletas", "Otro"] },
   { name: "Otros", icon: "📦", categories: ["Equipo", "Oficina", "Otro"] },
 ];
 const SECTION_NAMES = INVENTORY_SECTIONS.map((section) => section.name);
-const UNITS = ["kg", "pz", "L", "paq", "botellas", "manojos", "bolsas", "latas", "cajas", "rollos", "gal"];
+const UNITS = ["kg", "g", "pz", "L", "ml", "paq", "botellas", "manojos", "bolsas", "latas", "cajas", "rollos", "gal"];
 const LEGACY_CATEGORY_LABELS = {
   Grains: "Granos",
   Proteins: "Proteínas",
@@ -39,10 +40,24 @@ const CLEANING_PRODUCTS = [
   { name: "Esponjas o fibras", category: "Utensilios", unit: "pz" },
 ];
 
+// menuKeys idénticas a inventoryRecipe en backend/config/posCatalog.js —
+// vincularlas aquí hace que vender la bebida en el POS descuente el
+// inventario solo, igual que con los ingredientes de los bowls.
+const BEVERAGE_PRODUCTS = [
+  { name: "Topochico", category: "Aguas", unit: "botellas", key: "topochico" },
+  { name: "Coca-Zero", category: "Refrescos", unit: "latas", key: "coca_zero" },
+  { name: "Botella de Agua", category: "Aguas", unit: "botellas", key: "botella_de_agua" },
+  { name: "Agua del día", category: "Aguas", unit: "L", key: "agua_natural" },
+];
+
 const EMPTY_FORM = {
   item: "", section: "Comida", category: "Proteínas", unit: "kg",
   qty: "", minQty: "", cost: "", supplier: "", menuKeys: [],
   registerExpense: true,
+  // "unit": el costo capturado es por kg/pieza/etc. "total": se capturó lo
+  // que costó toda la compra y la app calcula el costo por unidad sola —
+  // evita el error de anotar el total pagado en el campo de costo unitario.
+  costMode: "unit", totalPaid: "",
 };
 
 // Ingredientes reales del builder — se usan para autocompletar nombre/categoría/unidad
@@ -81,7 +96,7 @@ const STATUS_CFG = {
 const parseKeys = (str) =>
   str.split(",").map((k) => k.trim().toLowerCase()).filter(Boolean);
 
-export default function InventoryPage({ styles }) {
+export default function InventoryPage({ styles, role }) {
   const { staffToken } = useContext(StaffAuthContext);
   const api = createStaffApi(staffToken);
 
@@ -94,6 +109,11 @@ export default function InventoryPage({ styles }) {
   const [stockFilter, setStockFilter] = useState("Todos");
   const [search, setSearch]   = useState("");
   const [showGuide, setShowGuide] = useState(true);
+
+  // Registrar en Finanzas el valor de existencias que ya estaban cargadas
+  // (nunca pasaron por "Recibir mercancía") — solo dueño/admin.
+  const canBackfillExpenses = role === "owner" || role === "admin";
+  const [backfilling, setBackfilling] = useState(false);
 
   // Add-item form
   const [showForm, setShowForm] = useState(false);
@@ -119,6 +139,7 @@ export default function InventoryPage({ styles }) {
   const [receiving, setReceiving]         = useState(false);
   const [receiveSearch, setReceiveSearch] = useState("");
   const [receiveQty, setReceiveQty]       = useState({}); // { itemId: "3.5" }
+  const [receiveCost, setReceiveCost]     = useState({}); // { itemId: "42.00" } — costo de ESTA compra, opcional
   const [receiveSaving, setReceiveSaving] = useState(false);
   const [receiveRequestId, setReceiveRequestId] = useState("");
 
@@ -131,6 +152,24 @@ export default function InventoryPage({ styles }) {
   };
 
   useEffect(() => { load(); }, [staffToken]);
+
+  const backfillExpenses = async () => {
+    if (backfilling) return;
+    setBackfilling(true);
+    setError("");
+    try {
+      const r = await api.post("/api/staff/inventory/backfill-expenses", {});
+      setNotice(
+        r.gastosRegistrados > 0
+          ? `Se registraron $${r.total.toLocaleString("es-MX")} en Finanzas por ${r.gastosRegistrados} artículo${r.gastosRegistrados !== 1 ? "s" : ""} con existencia.`
+          : "No había artículos pendientes de registrar — Finanzas ya está al día."
+      );
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBackfilling(false);
+    }
+  };
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -184,6 +223,17 @@ export default function InventoryPage({ styles }) {
     }));
   };
 
+  const pickBeverageProduct = (product) => {
+    setForm((previous) => ({
+      ...previous,
+      item: product.name,
+      section: "Bebidas",
+      category: product.category,
+      unit: product.unit,
+      menuKeys: [product.key],
+    }));
+  };
+
   const closeAddForm = () => {
     setShowForm(false);
     setForm(EMPTY_FORM);
@@ -195,6 +245,7 @@ export default function InventoryPage({ styles }) {
   const closeReceiving = () => {
     setReceiving(false);
     setReceiveQty({});
+    setReceiveCost({});
     setReceiveSearch("");
     setReceiveRequestId("");
   };
@@ -229,6 +280,15 @@ export default function InventoryPage({ styles }) {
   const removeMenuKey = (key) =>
     setForm((p) => ({ ...p, menuKeys: p.menuKeys.filter((k) => k !== key) }));
 
+  // Cuando se captura "lo que pagué en total", el costo por unidad se
+  // calcula solo (total ÷ cantidad) — nadie tiene que dividir a mano ni
+  // confundir "precio por kilo" con "lo que costó toda la compra".
+  const formQtyNum = parseFloat(form.qty) || 0;
+  const formTotalPaidNum = parseFloat(form.totalPaid) || 0;
+  const effectiveUnitCost = form.costMode === "total"
+    ? (formQtyNum > 0 ? formTotalPaidNum / formQtyNum : 0)
+    : (parseFloat(form.cost) || 0);
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!form.item || !form.qty) return;
@@ -241,7 +301,7 @@ export default function InventoryPage({ styles }) {
         unit:     form.unit,
         qty:      parseFloat(form.qty),
         minQty:   form.minQty ? parseFloat(form.minQty) : 0,
-        cost:     form.cost   ? parseFloat(form.cost)   : 0,
+        cost:     effectiveUnitCost,
         supplier: form.supplier,
         menuKeys: form.menuKeys,
         registerExpense: form.registerExpense,
@@ -338,6 +398,11 @@ export default function InventoryPage({ styles }) {
     }));
   };
 
+  const updateReceiveCost = (id, value) => {
+    setReceiveRequestId("");
+    setReceiveCost((previous) => ({ ...previous, [id]: value }));
+  };
+
   const submitReceiving = async () => {
     const entries = Object.entries(receiveQty).filter(([, v]) => parseFloat(v) > 0);
     if (entries.length === 0) return;
@@ -348,7 +413,14 @@ export default function InventoryPage({ styles }) {
       if (!receiveRequestId) setReceiveRequestId(requestId);
       const result = await api.post("/api/staff/inventory/restock-batch", {
         requestId,
-        lines: entries.map(([itemId, value]) => ({ itemId, amount: parseFloat(value) })),
+        lines: entries.map(([itemId, value]) => {
+          const costValue = parseFloat(receiveCost[itemId]);
+          return {
+            itemId,
+            amount: parseFloat(value),
+            ...(costValue > 0 ? { cost: costValue } : {}),
+          };
+        }),
       });
       setItems((prev) => {
         const map = new Map(prev.map((i) => [i._id, i]));
@@ -357,6 +429,7 @@ export default function InventoryPage({ styles }) {
       });
       const spent = result.expenses.reduce((sum, expense) => sum + (expense?.amount || 0), 0);
       setReceiveQty({});
+      setReceiveCost({});
       setReceiveSearch("");
       setReceiveRequestId("");
       setReceiving(false);
@@ -398,6 +471,16 @@ export default function InventoryPage({ styles }) {
           <button className={styles.btnGhost} onClick={exportCSV} disabled={loading || visible.length === 0} title="Descargar la vista actual">
             ↓ Exportar
           </button>
+          {canBackfillExpenses && (
+            <button
+              className={styles.btnGhost}
+              onClick={backfillExpenses}
+              disabled={backfilling}
+              title="Registra en Finanzas el valor de existencias que nunca pasaron por Recibir mercancía"
+            >
+              {backfilling ? "Registrando…" : "$ Registrar existencias en Finanzas"}
+            </button>
+          )}
           <button
             className={receiving ? styles.btnGhost : `${styles.btnPrimary} ${ui.receiveButton}`}
             onClick={() => {
@@ -429,7 +512,7 @@ export default function InventoryPage({ styles }) {
             <button type="button" onClick={() => setShowGuide(false)} aria-label="Ocultar guía">×</button>
           </div>
           <div className={ui.guideSteps}>
-            <div className={ui.guideStep}><span>1</span><p><strong>Elige una sección</strong>Separa comida, limpieza y empaques.</p></div>
+            <div className={ui.guideStep}><span>1</span><p><strong>Elige una sección</strong>Separa comida, bebidas, limpieza y empaques.</p></div>
             <div className={ui.guideStep}><span>2</span><p><strong>Busca o filtra</strong>Encuentra rápido el artículo que necesitas.</p></div>
             <div className={ui.guideStep}><span>3</span><p><strong>Actualiza existencias</strong>Edita una cantidad o registra una entrega.</p></div>
           </div>
@@ -508,6 +591,20 @@ export default function InventoryPage({ styles }) {
                               aria-label={`Cantidad recibida de ${row.item}`}
                             />
                             <span style={{ fontSize: 11, color: "var(--p-muted)", width: 34 }}>{row.unit}</span>
+                            {hasValue && (
+                              <label className={ui.receiveCostField}>
+                                <span>$</span>
+                                <input
+                                  type="number" min="0" step="0.01"
+                                  placeholder={row.cost > 0 ? row.cost.toFixed(2) : "costo"}
+                                  value={receiveCost[row._id] ?? ""}
+                                  onChange={(e) => updateReceiveCost(row._id, e.target.value)}
+                                  className={ui.receiveCostInput}
+                                  aria-label={`Costo por ${row.unit} de esta compra de ${row.item}`}
+                                />
+                                <span>/{row.unit}</span>
+                              </label>
+                            )}
                           </div>
                         );
                       })}
@@ -519,7 +616,7 @@ export default function InventoryPage({ styles }) {
           )}
 
           <div className={ui.receiveFooter}>
-            <span>2. Revisa las cantidades y guarda la recepción. Si el artículo tiene costo por unidad, el gasto se anota solo en Finanzas.</span>
+            <span>2. Si el precio cambió, captura el costo de esta compra (si lo dejas en blanco se usa el costo anterior). Revisa las cantidades y guarda la recepción — el gasto se anota solo en Finanzas.</span>
             <button className={styles.btnPrimary} disabled={pendingReceiveCount === 0 || receiveSaving} onClick={submitReceiving}>
               {receiveSaving ? "Guardando…" : `Guardar recepción${pendingReceiveCount > 0 ? ` (${pendingReceiveCount})` : ""}`}
             </button>
@@ -581,6 +678,28 @@ export default function InventoryPage({ styles }) {
               </div>
             )}
 
+            {form.section === "Bebidas" && (
+              <div className={ui.cleaningQuickPick}>
+                <div>
+                  <span>Bebidas del menú</span>
+                  <strong>Selecciona una para llenar los datos y vincularla automáticamente</strong>
+                </div>
+                <div className={ui.cleaningProductGrid}>
+                  {BEVERAGE_PRODUCTS.map((product) => (
+                    <button
+                      key={product.name}
+                      type="button"
+                      className={form.item === product.name ? ui.cleaningProductActive : ""}
+                      onClick={() => pickBeverageProduct(product)}
+                    >
+                      <span>🥤</span>
+                      <span><strong>{product.name}</strong><small>{product.category} · {product.unit}</small></span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className={ui.formStep}>
               <div className={ui.stepHeading}>
                 <span>2</span>
@@ -589,7 +708,7 @@ export default function InventoryPage({ styles }) {
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Nombre del artículo *</label>
-                  <input className={styles.input} placeholder={form.section === "Limpieza" ? "ej. Detergente" : "ej. Salmón"} value={form.item} onChange={f("item")} required />
+                  <input className={styles.input} placeholder={form.section === "Limpieza" ? "ej. Detergente" : form.section === "Bebidas" ? "ej. Topochico" : "ej. Salmón"} value={form.item} onChange={f("item")} required />
                 </div>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Categoría</label>
@@ -676,15 +795,46 @@ export default function InventoryPage({ styles }) {
                     <input className={styles.input} type="number" min="0" step="0.01" placeholder="0" value={form.minQty} onChange={f("minQty")} />
                   </div>
                   <div className={styles.formGroup}>
-                    <label className={styles.label}>Costo por unidad ($)</label>
-                    <input className={styles.input} type="number" min="0" step="0.01" placeholder="0.00" value={form.cost} onChange={f("cost")} />
+                    <label className={styles.label}>Costo</label>
+                    <div className={ui.categoryPicker} style={{ marginBottom: 6 }}>
+                      <button
+                        type="button"
+                        aria-pressed={form.costMode !== "total"}
+                        onClick={() => setForm((previous) => ({ ...previous, costMode: "unit" }))}
+                      >
+                        Sé el costo por unidad
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={form.costMode === "total"}
+                        onClick={() => setForm((previous) => ({ ...previous, costMode: "total" }))}
+                      >
+                        Sé lo que pagué en total
+                      </button>
+                    </div>
+                    {form.costMode === "total" ? (
+                      <>
+                        <input
+                          className={styles.input} type="number" min="0" step="0.01"
+                          placeholder="0.00 — total de la compra"
+                          value={form.totalPaid} onChange={f("totalPaid")}
+                        />
+                        <small style={{ display: "block", marginTop: 4, color: "var(--p-muted)", fontSize: 11 }}>
+                          {formQtyNum > 0
+                            ? `= $${effectiveUnitCost.toLocaleString("es-MX", { maximumFractionDigits: 2 })} por ${form.unit}`
+                            : "Captura la cantidad actual arriba para calcular el costo por unidad."}
+                        </small>
+                      </>
+                    ) : (
+                      <input className={styles.input} type="number" min="0" step="0.01" placeholder="0.00" value={form.cost} onChange={f("cost")} />
+                    )}
                   </div>
                 </div>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Proveedor</label>
                   <input className={styles.input} placeholder="ej. Ocean Fresh" value={form.supplier} onChange={f("supplier")} />
                 </div>
-                {parseFloat(form.cost) > 0 && parseFloat(form.qty) > 0 && (
+                {effectiveUnitCost > 0 && formQtyNum > 0 && (
                   <label className={ui.expenseToggle}>
                     <input
                       type="checkbox"
@@ -692,7 +842,7 @@ export default function InventoryPage({ styles }) {
                       onChange={(e) => setForm((previous) => ({ ...previous, registerExpense: e.target.checked }))}
                     />
                     <span>
-                      Registrar la compra en <strong>Finanzas</strong> — ${(parseFloat(form.qty) * parseFloat(form.cost)).toLocaleString("es-MX", { maximumFractionDigits: 2 })}
+                      Registrar la compra en <strong>Finanzas</strong> — ${(formQtyNum * effectiveUnitCost).toLocaleString("es-MX", { maximumFractionDigits: 2 })}
                     </span>
                   </label>
                 )}
@@ -881,7 +1031,7 @@ export default function InventoryPage({ styles }) {
                   </td>
                   <td>
                     {isEditing ? (
-                      <div className={ui.moneyEdit}><span>$</span><input type="number" min="0" step="0.01" aria-label="Costo por unidad" value={editForm.cost} onChange={(e) => setEditForm((p) => ({ ...p, cost: e.target.value }))} /></div>
+                      <div className={ui.moneyEdit}><span>$</span><input type="number" min="0" step="0.01" aria-label="Costo por unidad" title="Precio de UNA unidad (kg, pieza, litro…) — no el total pagado por toda la compra" placeholder="por unidad" value={editForm.cost} onChange={(e) => setEditForm((p) => ({ ...p, cost: e.target.value }))} /></div>
                     ) : row.cost > 0 ? `$${Number(row.cost).toFixed(2)}` : <span className={ui.mutedValue}>—</span>}
                   </td>
                   <td><span className={`${styles.badge} ${styles[cls]}`}>{label}</span></td>

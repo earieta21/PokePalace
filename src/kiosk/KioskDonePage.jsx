@@ -1,13 +1,21 @@
 import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import RewardQrCode from "../components/RewardQrCode";
 
-const AUTO_RESET_MS = 8000;
+// Con QR se deja más tiempo en pantalla para que la persona alcance a
+// sacar su celular y escanear antes de que el kiosco vuelva al inicio.
+const AUTO_RESET_MS = 25000;
 
 export default function KioskDonePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const shortCode = location.state?.shortCode;
   const total = location.state?.total;
+  const orderId = location.state?.orderId;
+  const orderToken = location.state?.orderToken;
+  const trackingUrl = orderId && orderToken
+    ? `${window.location.origin}/seguimiento/${orderId}?ot=${orderToken}`
+    : null;
 
   useEffect(() => {
     const id = setTimeout(() => navigate("/kiosk", { replace: true }), AUTO_RESET_MS);
@@ -63,6 +71,34 @@ export default function KioskDonePage() {
       <p style={{ margin: 0, fontSize: 16, color: "#555", maxWidth: 320 }}>
         Pasa a caja para pagar. Te avisaremos cuando esté listo.
       </p>
+
+      {trackingUrl && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 6,
+            padding: "16px 20px",
+            borderRadius: 16,
+            background: "#fff",
+            border: "1px solid #e5e5e5",
+          }}
+        >
+          <RewardQrCode
+            value={trackingUrl}
+            size={150}
+            ariaLabel="Código QR para seguir tu pedido desde tu celular"
+          />
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
+            Escanéalo con tu celular
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: "#777", maxWidth: 220 }}>
+            Así te avisamos ahí mismo, con vibración, en cuanto esté listo.
+          </p>
+        </div>
+      )}
 
       <button
         type="button"

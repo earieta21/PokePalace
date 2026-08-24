@@ -145,6 +145,90 @@ test("el servidor responde", async () => {
   assert.equal(r.status, 200);
 });
 
+test("el resumen protegido informa el total de clientes registrados", async () => {
+  const expectedCustomers = await User.countDocuments({ role: "user" });
+  const managerResponse = await staffRequest("manager", "/api/staff/summary");
+
+  assert.equal(managerResponse.status, 200);
+  const summary = await managerResponse.json();
+  assert.equal(summary.registeredCustomers, expectedCustomers);
+
+  const cashierResponse = await staffRequest("cashier", "/api/staff/summary");
+  assert.equal(cashierResponse.status, 403);
+});
+
+test("la lista de clientes muestra registros sin exponer contraseñas", async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const email = `ci-pos-security-customer-${suffix}@example.test`;
+  const customer = await User.create({
+    name: "Cliente visible CI",
+    email,
+    password: "hash-que-no-debe-salir",
+    phone: "6630000044",
+    points: 25,
+    lifetimePoints: 50,
+  });
+  const countedOrders = await Order.create([
+    {
+      user: customer._id,
+      customer: customer.name,
+      paymentStatus: "paid",
+      status: "completed",
+      total: 230,
+      source: "online",
+      createdAt: new Date("2026-01-01T12:00:00.000Z"),
+    },
+    {
+      user: customer._id,
+      customer: customer.name,
+      paymentStatus: "paid",
+      status: "ready",
+      total: 80,
+      source: "pos",
+      createdAt: new Date("2026-01-02T12:00:00.000Z"),
+    },
+    {
+      user: customer._id,
+      customer: customer.name,
+      paymentStatus: "paid",
+      status: "cancelled",
+      total: 999,
+      source: "pos",
+    },
+    {
+      user: customer._id,
+      customer: customer.name,
+      paymentStatus: "pending",
+      status: "pending",
+      total: 150,
+      source: "online",
+    },
+  ]);
+
+  try {
+    const ownerResponse = await staffRequest(
+      "owner",
+      `/api/staff/customers?q=${encodeURIComponent(email)}&limit=10`
+    );
+    assert.equal(ownerResponse.status, 200);
+    const body = await ownerResponse.json();
+    const listed = body.customers.find((entry) => entry._id === String(customer._id));
+    assert.ok(listed);
+    assert.equal(listed.email, email);
+    assert.equal(listed.password, undefined);
+    assert.equal(listed.purchaseCount, 2);
+    assert.equal(listed.totalSpent, 310);
+    assert.equal(new Date(listed.lastPurchaseAt).getTime(), countedOrders[1].createdAt.getTime());
+    assert.equal(body.pagination.total, 1);
+
+    const cashierResponse = await staffRequest("cashier", "/api/staff/customers");
+    assert.equal(cashierResponse.status, 403);
+  } finally {
+    await Order.deleteMany({ _id: { $in: countedOrders.map((order) => order._id) } });
+    await User.findByIdAndDelete(customer._id);
+  }
+});
+
 test("crear orden valida: el precio lo pone el servidor, no el cliente", async () => {
   const attempt = customerAttempt("price");
   const r = await postJSON("/api/orders", {
@@ -158,7 +242,7 @@ test("crear orden valida: el precio lo pone el servidor, no el cliente", async (
   }, { "X-Order-Token": attempt.orderToken });
   assert.equal(r.status, 201);
   const { order } = await r.json();
-  assert.equal(order.total, 249); // precio real del bowl normal
+  assert.equal(order.total, 230); // precio real del bowl mediano
   assert.equal(order.paymentStatus, "pending");
   assert.equal(order.source, "online");
 });
@@ -282,6 +366,34 @@ test("una orden invitada exige su token secreto para consultar y cancelar", asyn
     headers: { "X-Order-Token": payload.orderToken },
   });
   assert.equal(retried.status, 200);
+});
+
+test("el QR de seguimiento del kiosco puede autenticarse con ?ot= en vez del header", async () => {
+  const attempt = customerAttempt("kiosk-qr");
+  const created = await postJSON("/api/orders", {
+    base: "white_rice",
+    proteins: ["salmon"],
+    customer: "Cliente de kiosco",
+    phone: "6630000002",
+    scheduledPickupTime: tomorrowAt15(),
+    clientOrderId: attempt.clientOrderId,
+  }, { "X-Order-Token": attempt.orderToken });
+  assert.equal(created.status, 201);
+  const { order, orderToken } = await created.json();
+
+  // Sin token: no autorizado (simula abrir el link sin el query param).
+  const withoutToken = await fetch(`${BASE}/api/orders/${order._id}`);
+  assert.equal(withoutToken.status, 404);
+
+  // Token equivocado por query param: tampoco autorizado.
+  const wrongQueryToken = await fetch(`${BASE}/api/orders/${order._id}?ot=token-equivocado`);
+  assert.equal(wrongQueryToken.status, 404);
+
+  // Token correcto por query param (así llega desde el QR del kiosco, en un
+  // celular que nunca tuvo el header X-Order-Token guardado localmente).
+  const viaQuery = await fetch(`${BASE}/api/orders/${order._id}?ot=${orderToken}`);
+  assert.equal(viaQuery.status, 200);
+  assert.equal((await viaQuery.json()).order.customer, "Cliente de kiosco");
 });
 
 test("solo el dueño ve su orden y cancelar revierte puntos/promo exactamente una vez", async () => {
@@ -832,6 +944,7 @@ test("el POS calcula catálogo, deduplica reintentos y descuenta inventario una 
   const recoveredInventory = await Inventory.findById(recoveryInventory._id).select("+deductedOrderIds");
   assert.equal(recoveredInventory.qty, 0);
   assert.deepEqual(recoveredInventory.deductedOrderIds.map(String), [String(stagedOrder._id)]);
+  await Inventory.deleteMany({ _id: { $in: [inventory._id, recoveryInventory._id] } });
 
   const unknownProduct = await staffRequest("cashier", "/api/staff/orders", {
     method: "POST",
@@ -882,11 +995,11 @@ test("el premio de topping extra deja una instrucción verificable para cocina",
     expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
   const toppingInventory = await Inventory.create({
-    item: `CI Security Furikake ${suffix}`,
+    item: `CI Security Masago ${suffix}`,
     unit: "porción",
     qty: 3,
     minQty: 0,
-    menuKeys: ["furikake"],
+    menuKeys: ["masago"],
   });
 
   const withoutBowl = await staffRequest("cashier", "/api/staff/orders", {
@@ -894,7 +1007,7 @@ test("el premio de topping extra deja una instrucción verificable para cocina",
     body: {
       clientOrderId: `ci-pos-security:${suffix}:topping-no-bowl`,
       rewardCode,
-      rewardTopping: "furikake",
+      rewardTopping: "masago",
       paymentMethod: "cash",
       items: [{ catalogId: "edamame", qty: 1 }],
     },
@@ -921,20 +1034,20 @@ test("el premio de topping extra deja una instrucción verificable para cocina",
     body: {
       clientOrderId: `ci-pos-security:${suffix}:topping-ok`,
       rewardCode,
-      rewardTopping: "furikake",
+      rewardTopping: "masago",
       paymentMethod: "cash",
       notes: "Sin cebolla",
       base: "white_rice",
       proteins: ["tuna", "salmon"],
-      toppings: ["furikake"],
+      toppings: ["masago"],
     },
   });
   assert.equal(created.status, 201);
   const body = await created.json();
   assert.equal(body.order.discountAmount, 0);
-  assert.equal(body.order.rewardExtraTopping, "furikake");
+  assert.equal(body.order.rewardExtraTopping, "masago");
   assert.match(body.order.notes, /Sin cebolla/);
-  assert.match(body.order.notes, /PREMIO REWARDS: agregar 1 porción extra de Furikake/);
+  assert.match(body.order.notes, /PREMIO REWARDS: agregar 1 porción extra de Masago/);
   assert.equal((await Redemption.findById(redemption._id)).status, "used");
   assert.equal((await Inventory.findById(toppingInventory._id)).qty, 1);
 
@@ -950,6 +1063,227 @@ test("el premio de topping extra deja una instrucción verificable para cocina",
   assert.deepEqual(restoredInventory.processedOrderIds, []);
   assert.deepEqual(restoredInventory.orderDeductions, []);
   assert.equal((await Redemption.findById(redemption._id)).status, "active");
+});
+
+test("los pedidos programados entran a KDS y al tiempo de espera solo 30 minutos antes", async () => {
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const baselineResponse = await fetch(`${BASE}/api/orders/wait-time`);
+  assert.equal(baselineResponse.status, 200);
+  const baseline = await baselineResponse.json();
+
+  const farOrder = await Order.create({
+    clientOrderId: `ci-web:schedule-far:${suffix}`,
+    customer: `CI Programada Lejana ${suffix}`,
+    source: "online",
+    status: "pending",
+    isScheduled: true,
+    scheduledPickupTime: new Date(Date.now() + 31 * 60 * 1000),
+    subtotal: 230,
+    total: 230,
+  });
+
+  const afterFarResponse = await fetch(`${BASE}/api/orders/wait-time`);
+  assert.equal(afterFarResponse.status, 200);
+  assert.equal((await afterFarResponse.json()).activeOrders, baseline.activeOrders);
+
+  const kitchenBefore = await staffRequest(
+    "kitchen",
+    "/api/staff/orders?status=pending,preparing,ready"
+  );
+  assert.equal(kitchenBefore.status, 200);
+  assert.equal(
+    (await kitchenBefore.json()).orders.some((order) => order._id === String(farOrder._id)),
+    false
+  );
+
+  const nearOrder = await Order.create({
+    clientOrderId: `ci-web:schedule-near:${suffix}`,
+    customer: `CI Programada Cercana ${suffix}`,
+    source: "online",
+    status: "pending",
+    isScheduled: true,
+    scheduledPickupTime: new Date(Date.now() + 29 * 60 * 1000),
+    subtotal: 230,
+    total: 230,
+  });
+
+  const afterNearResponse = await fetch(`${BASE}/api/orders/wait-time`);
+  assert.equal(afterNearResponse.status, 200);
+  assert.equal((await afterNearResponse.json()).activeOrders, baseline.activeOrders + 1);
+
+  for (const role of ["kitchen", "manager"]) {
+    const activeOrders = await staffRequest(
+      role,
+      "/api/staff/orders?status=pending,preparing,ready"
+    );
+    assert.equal(activeOrders.status, 200);
+    const visibleIds = (await activeOrders.json()).orders.map((order) => order._id);
+    assert.equal(visibleIds.includes(String(farOrder._id)), false);
+    assert.equal(visibleIds.includes(String(nearOrder._id)), true);
+  }
+});
+
+test("el cobro con stock insuficiente conserva la orden sin pagar y no recorta existencias", async () => {
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const itemName = `CIShortage${suffix}`;
+  const inventory = await Inventory.create({
+    item: `CI Security Shortage ${suffix}`,
+    unit: "porción",
+    qty: 1,
+    minQty: 0,
+    menuKeys: [itemName.toLowerCase()],
+  });
+  const order = await Order.create({
+    clientOrderId: `ci-pos-security:${suffix}:shortage-pay`,
+    items: [{ name: itemName, price: 10, qty: 2 }],
+    customer: "Stock insuficiente CI",
+    source: "pos",
+    status: "pending",
+    paymentMethod: "pay_at_pickup",
+    paymentStatus: "pending",
+    subtotal: 20,
+    total: 20,
+  });
+
+  const paid = await staffRequest("cashier", `/api/staff/orders/${order._id}/pay`, {
+    method: "PATCH",
+    body: { method: "cash" },
+  });
+  assert.equal(paid.status, 409);
+  const body = await paid.json();
+  assert.equal(body.code, "INSUFFICIENT_STOCK");
+  assert.deepEqual(body.shortages.map(({ required, available }) => ({ required, available })), [
+    { required: 2, available: 1 },
+  ]);
+
+  const [orderAfter, inventoryAfter] = await Promise.all([
+    Order.findById(order._id),
+    Inventory.findById(inventory._id).select("+processedOrderIds +orderDeductions"),
+  ]);
+  assert.equal(orderAfter.paymentStatus, "pending");
+  assert.equal(orderAfter.paymentMethod, "pay_at_pickup");
+  assert.equal(inventoryAfter.qty, 1);
+  assert.deepEqual(inventoryAfter.processedOrderIds, []);
+  assert.deepEqual(inventoryAfter.orderDeductions, []);
+
+  await Order.updateOne({ _id: order._id }, { $set: { status: "ready" } });
+  const completed = await staffRequest("cashier", `/api/staff/orders/${order._id}/status`, {
+    method: "PATCH",
+    body: { status: "completed" },
+  });
+  assert.equal(completed.status, 409);
+  const afterCompletionAttempt = await Order.findById(order._id);
+  assert.equal(afterCompletionAttempt.status, "ready");
+  assert.equal(afterCompletionAttempt.paymentStatus, "pending");
+  assert.equal((await Inventory.findById(inventory._id)).qty, 1);
+});
+
+test("el POS no conserva una venta provisional cuando un producto rastreado está agotado", async () => {
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const clientOrderId = `ci-pos-security:${suffix}:sold-out`;
+  const inventory = await Inventory.create({
+    item: `CI Security Bottled Water ${suffix}`,
+    unit: "unidad",
+    qty: 0,
+    minQty: 0,
+    menuKeys: ["botella_de_agua"],
+  });
+
+  const created = await staffRequest("cashier", "/api/staff/orders", {
+    method: "POST",
+    body: {
+      clientOrderId,
+      paymentMethod: "cash",
+      items: [{ catalogId: "bottled-water", qty: 1 }],
+    },
+  });
+  assert.equal(created.status, 409);
+  assert.equal((await created.json()).code, "INSUFFICIENT_STOCK");
+  assert.equal(await Order.exists({ clientOrderId }), null);
+
+  const inventoryAfter = await Inventory.findById(inventory._id)
+    .select("+processedOrderIds +deductedOrderIds +orderDeductions");
+  assert.equal(inventoryAfter.qty, 0);
+  assert.deepEqual(inventoryAfter.processedOrderIds, []);
+  assert.deepEqual(inventoryAfter.deductedOrderIds, []);
+  assert.deepEqual(inventoryAfter.orderDeductions, []);
+});
+
+test("proteína doble cobra y descuenta una porción real y la deja visible para cocina", async () => {
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const rewardCode = `CIPOSDOUBLE${suffix}`;
+  const redemption = await Redemption.create({
+    rewardId: 4,
+    rewardName: "Proteína doble",
+    pointsCost: 200,
+    code: rewardCode,
+    status: "active",
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  });
+
+  const missingScoop = await staffRequest("cashier", "/api/staff/orders", {
+    method: "POST",
+    body: {
+      clientOrderId: `ci-pos-security:${suffix}:double-missing`,
+      rewardCode,
+      paymentMethod: "cash",
+      base: "white_rice",
+      proteins: ["tuna", "salmon", "tofu"],
+    },
+  });
+  assert.equal(missingScoop.status, 400);
+  assert.equal((await Redemption.findById(redemption._id)).status, "active");
+
+  const created = await staffRequest("cashier", "/api/staff/orders", {
+    method: "POST",
+    body: {
+      clientOrderId: `ci-pos-security:${suffix}:double-ok`,
+      rewardCode,
+      paymentMethod: "cash",
+      base: "white_rice",
+      proteins: ["tuna", "salmon", "tofu"],
+      extraScoopProteins: ["salmon"],
+    },
+  });
+  assert.equal(created.status, 201);
+  const body = await created.json();
+  assert.equal(body.order.bowlSize, "large");
+  assert.equal(body.order.subtotal, 290);
+  assert.equal(body.order.discountAmount, 40);
+  assert.equal(body.order.total, 250);
+  assert.deepEqual(body.order.extraScoopProteins, ["salmon"]);
+  assert.match(body.order.notes, /PREMIO REWARDS: agregar 1 porción extra de Salmón/);
+  assert.equal((await Redemption.findById(redemption._id)).status, "used");
+});
+
+test("bowl gratis usa la categoría del catálogo aunque el producto no incluya Bowl en el nombre", async () => {
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const rewardCode = `CIPOSFREEBOWL${suffix}`;
+  await Redemption.create({
+    rewardId: 3,
+    rewardName: "Bowl gratis",
+    pointsCost: 300,
+    code: rewardCode,
+    status: "active",
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  });
+
+  // legacyId 4 remains the fourth house bowl even if its display name changes.
+  const created = await staffRequest("cashier", "/api/staff/orders", {
+    method: "POST",
+    body: {
+      clientOrderId: `ci-pos-security:${suffix}:free-bowl-category`,
+      rewardCode,
+      paymentMethod: "cash",
+      items: [{ id: 4, qty: 1 }],
+    },
+  });
+  assert.equal(created.status, 201);
+  const body = await created.json();
+  assert.equal(body.order.items[0].category, "bowls");
+  assert.doesNotMatch(body.order.items[0].name, /bowl/i);
+  assert.equal(body.order.discountAmount, 230);
+  assert.equal(body.order.total, 0);
 });
 
 test("cancelar una venta POS revierte inventario, puntos y premio una sola vez", async () => {
@@ -986,7 +1320,7 @@ test("cancelar una venta POS revierte inventario, puntos y premio una sola vez",
       rewardCode,
       paymentMethod: "cash",
       items: [
-        { catalogId: "bowl-tuna-classic", qty: 1 },
+        { catalogId: "bowl-emerald-salmon", qty: 1 },
         { catalogId: "agua-del-dia", qty: 1 },
       ],
     },
@@ -994,9 +1328,9 @@ test("cancelar una venta POS revierte inventario, puntos y premio una sola vez",
   assert.equal(created.status, 201);
   const createdBody = await created.json();
   const orderId = createdBody.order._id;
-  assert.equal(createdBody.order.total, 249);
+  assert.equal(createdBody.order.total, 230);
   assert.equal((await Inventory.findById(inventory._id)).qty, 1);
-  assert.equal((await User.findById(customer._id)).points, 24);
+  assert.equal((await User.findById(customer._id)).points, 23);
   assert.equal((await Redemption.findById(redemption._id)).status, "used");
 
   const cancelled = await staffRequest("cashier", `/api/staff/orders/${orderId}/status`, {
@@ -1094,4 +1428,30 @@ test("cobrar registra el metodo de pago y rechaza metodos desconocidos", async (
   const weirdBody = await weird.json();
   assert.equal(weirdBody.order.paymentStatus, "paid");
   assert.equal(weirdBody.order.paymentMethod, "pay_at_pickup");
+});
+
+test("el dueno puede marcar entrada y salida sin GPS; un empleado sin coordenadas no", async () => {
+  const ownerIn = await staffRequest("owner", "/api/kiosk/time/clock-in", {
+    method: "POST",
+    body: { locationId: "main" },
+  });
+  assert.equal(ownerIn.status, 201);
+
+  const ownerOut = await staffRequest("owner", "/api/kiosk/time/clock-out", {
+    method: "POST",
+    body: {},
+  });
+  assert.equal(ownerOut.status, 200);
+
+  const employeeIn = await staffRequest("employee", "/api/kiosk/time/clock-in", {
+    method: "POST",
+    body: { locationId: "main" },
+  });
+  assert.equal(employeeIn.status, 403);
+
+  const employeeFar = await staffRequest("employee", "/api/kiosk/time/clock-in", {
+    method: "POST",
+    body: { locationId: "main", lat: 32.5327, lng: -117.0182 },
+  });
+  assert.equal(employeeFar.status, 403);
 });

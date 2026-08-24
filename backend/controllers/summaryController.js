@@ -3,6 +3,7 @@ import Expense from "../models/Expense.js";
 import Inventory from "../models/Inventory.js";
 import WasteLog from "../models/WasteLog.js";
 import ErrorLog from "../models/ErrorLog.js";
+import User from "../models/User.js";
 import {
   dateKeyInTimeZone,
   zonedDateTimeToUtc,
@@ -62,12 +63,13 @@ export const getWeeklySummary = async (req, res) => {
     const weekFrom = mondayOf(now);
     const prevFrom = mondayOf(new Date(weekFrom.getTime() - 86400000));
 
-    const [orders, expenses, inventory, waste, errorLogs] = await Promise.all([
+    const [orders, expenses, inventory, waste, errorLogs, registeredCustomers] = await Promise.all([
       Order.find({ createdAt: { $gte: prevFrom } }).lean(),
       Expense.find({ date: { $gte: dateStr(prevFrom) } }).lean(),
       Inventory.find().lean(),
       WasteLog.find({ createdAt: { $gte: prevFrom } }).lean(),
       ErrorLog.find({ lastSeenAt: { $gte: weekFrom } }).lean(),
+      User.countDocuments({ role: "user" }),
     ]);
 
     const thisOrders = orders.filter((o) => o.createdAt >= weekFrom);
@@ -144,6 +146,7 @@ export const getWeeklySummary = async (req, res) => {
       topProtein: top(proteinCounts),
       topPosItem: top(itemCounts),
       returningCustomers: returning,
+      registeredCustomers,
       inventory: { lowCount, totalValue: parseFloat(totalValue.toFixed(2)) },
       waste: {
         count: wasteThis.length,

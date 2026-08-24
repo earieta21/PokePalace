@@ -7,12 +7,10 @@ import { useAvailability } from "../context/AvailabilityContext";
 
 import ajonjoli from "../assets/toppings/ajonjoli.webp";
 import algaNori from "../assets/toppings/algaNori.webp";
-import cocoTostado from "../assets/toppings/cocoTostado.webp";
-import furikake from "../assets/toppings/furikake.webp";
-import onions from "../assets/toppings/onions.webp";
-import pimientaRoja from "../assets/toppings/pimientaRoja.webp";
-import pumpkingSeeds from "../assets/toppings/pumpkingSeeds.webp";
-import rabanos from "../assets/toppings/rabanos.webp";
+import blackOlives from "../assets/toppings/blackOlives.jpg";
+import croutons from "../assets/toppings/croutons.jpg";
+import masago from "../assets/toppings/masago.jpg";
+import toastedPeanuts from "../assets/toppings/toastedPeanuts.jpg";
 
 const MAX_TOPPINGS = 5;
 
@@ -22,14 +20,12 @@ const ToppingsSelection = ({ onNext, onBack }) => {
   const { unavailableItems } = useAvailability();
 
   const toppings = [
+    { id: "black_olives",      image: blackOlives },
+    { id: "toasted_peanuts",   image: toastedPeanuts },
     { id: "sesame_seeds",      image: ajonjoli },
-    { id: "crispy_onions",     image: onions },
     { id: "nori_strips",       image: algaNori },
-    { id: "red_pepper_flakes", image: pimientaRoja },
-    { id: "pickled_radish",    image: rabanos },
-    { id: "toasted_coconut",   image: cocoTostado },
-    { id: "pumpkin_seeds",     image: pumpkingSeeds },
-    { id: "furikake",          image: furikake },
+    { id: "masago",            image: masago },
+    { id: "croutons",          image: croutons },
   ];
 
   const [selectedToppings, setSelectedToppings] = useState(
@@ -65,7 +61,7 @@ const ToppingsSelection = ({ onNext, onBack }) => {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.badge}>{t("order.step", { step: 6, total: 6 })}</div>
+        <div className={styles.badge}>{t("order.step", { step: 5, total: 5 })}</div>
         <h2 className={styles.title}>{t("order.toppingsTitle")}</h2>
         <p className={styles.subtitle}>
           {t("order.toppingsSubtitle", { max: MAX_TOPPINGS })}

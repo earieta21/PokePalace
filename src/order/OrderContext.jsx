@@ -1,10 +1,18 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useAvailability } from "../context/AvailabilityContext";
 
 const OrderContext = createContext();
 const ORDER_STORAGE_KEY = "pokePalaceOrderDraft";
 
+// Quita del bowl cargado (favorito, quick bowl o repetir pedido) cualquier
+// ingrediente que hoy esté marcado como no disponible, para que nunca se
+// cargue en el borrador algo que el cliente no podría seleccionar a mano.
+const filterAvailable = (list, unavailableSet) =>
+  (Array.isArray(list) ? list : []).filter((id) => !unavailableSet.has(id));
+
 const blankOrder = () => ({
   base: "",
+  bases: [],
   protein: "",
   proteins: [],
   bowlSize: "normal",
@@ -13,6 +21,7 @@ const blankOrder = () => ({
   sauces: [],
   complements: [],
   toppings: [],
+  extraScoopProteins: [],
   customer: "",
   phone: "",
   notes: "",
@@ -36,6 +45,7 @@ const loadSavedOrder = () => {
 
 export const OrderProvider = ({ children }) => {
   const [order, setOrder] = useState(loadSavedOrder);
+  const { unavailableItems } = useAvailability();
 
   useEffect(() => {
     localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(order));
@@ -56,30 +66,53 @@ export const OrderProvider = ({ children }) => {
   }, []);
 
   const loadFavorite = useCallback((favorite) => {
+    const unavailable = new Set(unavailableItems);
+    const proteins = filterAvailable(favorite.proteins, unavailable);
+    // Los favoritos guardados antes de "mitad y mitad" solo traen `base`
+    // (string) — se envuelve en un arreglo de 1 para tratarlo igual.
+    const favoriteBases = Array.isArray(favorite.bases) && favorite.bases.length > 0
+      ? favorite.bases
+      : favorite.base ? [favorite.base] : [];
+    const bases = filterAvailable(favoriteBases, unavailable);
     setOrder((prevOrder) => ({
       ...prevOrder,
-      base: favorite.base || "",
-      proteins: favorite.proteins || [],
-      protein: (favorite.proteins || []).join(", "),
-      bowlSize: favorite.bowlSize || "normal",
-      marinades: favorite.marinades || [],
-      complements: favorite.complements || [],
-      sauces: favorite.sauces || [],
-      toppings: favorite.toppings || [],
+      base: bases[0] || "",
+      bases,
+      proteins,
+      protein: proteins.join(", "),
+      // Se recalcula a partir de las proteínas que sobrevivieron el filtro
+      // de disponibilidad — no del bowlSize guardado, que puede haber
+      // quedado obsoleto si se quitó una proteína no disponible.
+      bowlSize: proteins.length === 3 ? "large" : "normal",
+      // Los marinados ya no forman parte del armador — se ignoran aunque el
+      // favorito o pedido guardado los traiga de antes.
+      marinades: [],
+      complements: filterAvailable(favorite.complements, unavailable),
+      sauces: filterAvailable(favorite.sauces, unavailable),
+      toppings: filterAvailable(favorite.toppings, unavailable),
+      extraScoopProteins: [],
     }));
-  }, []);
+  }, [unavailableItems]);
 
   const reorder = useCallback((pastOrder) => {
+    const unavailable = new Set(unavailableItems);
+    const proteins = filterAvailable(pastOrder.proteins, unavailable);
+    const pastBases = Array.isArray(pastOrder.bases) && pastOrder.bases.length > 0
+      ? pastOrder.bases
+      : pastOrder.base ? [pastOrder.base] : [];
+    const bases = filterAvailable(pastBases, unavailable);
     setOrder((prev) => ({
       ...prev,
-      base: pastOrder.base || "",
-      proteins: pastOrder.proteins || [],
-      protein: (pastOrder.proteins || []).join(", "),
-      bowlSize: pastOrder.bowlSize || "normal",
-      marinades: pastOrder.marinades || [],
-      complements: pastOrder.complements || [],
-      sauces: pastOrder.sauces || [],
-      toppings: pastOrder.toppings || [],
+      base: bases[0] || "",
+      bases,
+      proteins,
+      protein: proteins.join(", "),
+      bowlSize: proteins.length === 3 ? "large" : "normal",
+      marinades: [],
+      complements: filterAvailable(pastOrder.complements, unavailable),
+      sauces: filterAvailable(pastOrder.sauces, unavailable),
+      toppings: filterAvailable(pastOrder.toppings, unavailable),
+      extraScoopProteins: [],
       customer: pastOrder.customer || prev.customer,
       phone: pastOrder.phone || prev.phone,
       fulfillment: pastOrder.fulfillment || "pickup",
@@ -88,7 +121,7 @@ export const OrderProvider = ({ children }) => {
       notes: "",
       draftStep: 0,
     }));
-  }, []);
+  }, [unavailableItems]);
 
   // Used by the self-service kiosk to wipe a session clean between customers.
   const resetOrder = useCallback(() => {

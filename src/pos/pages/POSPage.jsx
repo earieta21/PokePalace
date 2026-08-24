@@ -10,30 +10,24 @@ import {
 } from "../offlineQueue";
 import CustomBowlBuilder from "../CustomBowlBuilder";
 import { getRewardById } from "../../data/rewardsCatalog.js";
-import { TOPPING_LABELS } from "../../order/OrderLabels.jsx";
+import { PROTEIN_LABELS, TOPPING_LABELS } from "../../order/OrderLabels.jsx";
+import { BOWL_BASE_PRICE, EXTRA_SCOOP_PRICE } from "../../order/pricing.js";
+import { useAvailability } from "../../context/AvailabilityContext.jsx";
+import { POS_MENU, POS_MENU_CATEGORIES, POS_REWARD_TOPPING_IDS } from "../posMenu.js";
+import {
+  CUSTOM_BOWL_ID,
+  getDoubleProteinExtraScoops,
+  getUnavailableBowlSelections,
+  isBowlMenuItem,
+  isMenuItemUnavailable,
+} from "../posRules.js";
 import ui from "./POSPage.module.css";
-
-const CUSTOM_BOWL_ID = "custom-bowl";
-
-const MENU = [
-  { id: 1,  name: "Bowl Clásico de Atún",    price: 249, category: "Bowls", icon: "🍣" },
-  { id: 2,  name: "Bowl Salmón y Aguacate",  price: 289, category: "Bowls", icon: "🥑" },
-  { id: 3,  name: "Bowl Camarón Picante",    price: 249, category: "Bowls", icon: "🍤" },
-  { id: 4,  name: "Bowl Vegano",             price: 229, category: "Bowls", icon: "🥬" },
-  { id: 6,  name: "Edamame",                 price:  69, category: "Entradas", icon: "🫛" },
-  { id: 8,  name: "Ensalada de Algas",       price:  79, category: "Entradas", icon: "🥗" },
-  { id: 11, name: "Topochico",               price:  30, category: "Bebidas", icon: "🫧" },
-  { id: 13, name: "Coca-Zero",               price:  35, category: "Bebidas", icon: "🥤" },
-  { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
-  { id: 15, name: "Agua natural del día",    price:  30, category: "Bebidas", icon: "🍹" },
-];
-
-const MENU_CATEGORIES = ["Todos", "Bowls", "Entradas", "Bebidas"];
 
 const IVA = 0; // IVA incluido en precio
 
 export default function POSPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
+  const { unavailableItems, refetch: refetchAvailability } = useAvailability();
   const api = createStaffApi(staffToken);
   const pendingSaleRef = useRef(null);
 
@@ -51,11 +45,13 @@ export default function POSPage({ styles }) {
   const [rewardCode, setRewardCode] = useState("");
   const [reward, setReward] = useState(null);
   const [rewardTopping, setRewardTopping] = useState("");
+  const [rewardProtein, setRewardProtein] = useState("");
   const [rewardLoading, setRewardLoading] = useState(false);
   const [menuCategory, setMenuCategory] = useState("Todos");
   const [menuSearch, setMenuSearch] = useState("");
   const [showCustomerDetails, setShowCustomerDetails] = useState(false);
   const [showReward, setShowReward] = useState(false);
+  const [showLoyalty, setShowLoyalty] = useState(false);
   const [rewardsCustomer, setRewardsCustomer] = useState(null);
   const [customerLookup, setCustomerLookup] = useState("");
   const [customerMatches, setCustomerMatches] = useState([]);
@@ -84,7 +80,23 @@ export default function POSPage({ styles }) {
     };
   }, [tryFlushQueue]);
 
+  // Availability is operational data at the register, so refresh it much
+  // faster than the public ordering pages and whenever the cashier returns.
+  useEffect(() => {
+    refetchAvailability();
+    const interval = setInterval(refetchAvailability, 30000);
+    window.addEventListener("focus", refetchAvailability);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refetchAvailability);
+    };
+  }, [refetchAvailability]);
+
   const addItem = (item) => {
+    if (isMenuItemUnavailable(item, unavailableItems)) {
+      setError(`${item.name} está agotado por el momento.`);
+      return;
+    }
     setCart((prev) => {
       const ex = prev.find((i) => i.id === item.id);
       if (ex) return prev.map((i) => i.id === item.id ? { ...i, qty: i.qty + 1 } : i);
@@ -93,9 +105,17 @@ export default function POSPage({ styles }) {
     setSuccess(""); setError("");
   };
 
-  const removeItem = (id) => setCart((prev) => prev.filter((i) => i.id !== id));
+  const removeItem = (id) => {
+    setCart((prev) => prev.filter((i) => i.id !== id));
+    if (id === CUSTOM_BOWL_ID) setRewardProtein("");
+  };
 
   const changeQty = (id, delta) => {
+    const item = cart.find((candidate) => candidate.id === id);
+    if (delta > 0 && item && isMenuItemUnavailable(item, unavailableItems)) {
+      setError(`${item.name} está agotado por el momento.`);
+      return;
+    }
     setCart((previous) => previous
       .map((item) => item.id === id ? { ...item, qty: item.qty + delta } : item)
       .filter((item) => item.qty > 0));
@@ -114,8 +134,10 @@ export default function POSPage({ styles }) {
     setRewardCode("");
     setReward(null);
     setRewardTopping("");
+    setRewardProtein("");
     setShowCustomerDetails(false);
     setShowReward(false);
+    setShowLoyalty(false);
     setRewardsCustomer(null);
     setCustomerLookup("");
     setCustomerMatches([]);
@@ -132,34 +154,57 @@ export default function POSPage({ styles }) {
       ...prev.filter((i) => i.id !== CUSTOM_BOWL_ID),
       {
         id: CUSTOM_BOWL_ID,
-        name: `Bowl Personalizado${bowl.bowlSize === "large" ? " (Grande)" : ""}`,
+        name: `Bowl personalizado (${bowl.bowlSize === "large" ? "Grande" : "Mediano"})`,
         price: bowl.price,
         qty: 1,
+        category: "Bowls",
+        categoryKey: "bowls",
         bowl,
       },
     ]);
+    setRewardProtein("");
     setSuccess(""); setError("");
     setMode("menu");
   };
 
-  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.qty, 0);
-  const visibleMenu = MENU.filter((item) => {
+  const visibleMenu = POS_MENU.filter((item) => {
     const matchesCategory = menuCategory === "Todos" || item.category === menuCategory;
     const matchesSearch = item.name.toLowerCase().includes(menuSearch.trim().toLowerCase());
     return matchesCategory && matchesSearch;
   });
-  const iva      = subtotal * IVA;
   const customRewardBowl = cart.find((i) => i.id === CUSTOM_BOWL_ID);
-  const bowlLines = cart.filter((i) => /bowl|pollo teriyaki/i.test(i.name));
-  const drinkLines = cart.filter((i) => /agua de coco|limonada de matcha/i.test(i.name));
+  const rewardExtraScoopProteins = getDoubleProteinExtraScoops(
+    reward,
+    customRewardBowl?.bowl,
+    rewardProtein,
+  );
+  const extraScoopCharge = rewardExtraScoopProteins.length * EXTRA_SCOOP_PRICE;
+  const itemsSubtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const subtotal = itemsSubtotal + extraScoopCharge;
+  const iva = subtotal * IVA;
+  const bowlLines = cart.filter(isBowlMenuItem);
+  const drinkLines = cart.filter((item) => item.rewardDrink);
+  const unavailableCartItems = cart.filter((item) => (
+    item.id === CUSTOM_BOWL_ID
+      ? getUnavailableBowlSelections(item.bowl, unavailableItems).length > 0
+      : isMenuItemUnavailable(item, unavailableItems)
+  ));
+  const rewardToppingUnavailable = Boolean(
+    rewardTopping && unavailableItems.includes(rewardTopping),
+  );
+  const doubleProteinBowlEligible = customRewardBowl?.bowl?.bowlSize === "large"
+    && customRewardBowl.bowl.proteins?.length === 3;
+  const doubleProteinReady = reward?.type !== "double_protein"
+    || rewardExtraScoopProteins.length === 1;
+  const checkoutHasUnavailableItem = unavailableCartItems.length > 0 || rewardToppingUnavailable;
   let rewardDiscount = 0;
   if (reward?.type === "free_drink" && bowlLines.length && drinkLines.length) {
     rewardDiscount = Math.min(...drinkLines.map((item) => item.price));
-  } else if (reward?.type === "double_protein" && customRewardBowl?.bowl?.proteins?.length >= 3) {
-    rewardDiscount = 40;
+  } else if (reward?.type === "double_protein" && rewardExtraScoopProteins.length === 1) {
+    rewardDiscount = EXTRA_SCOOP_PRICE;
   } else if (reward?.type === "free_bowl" && bowlLines.length) {
-    rewardDiscount = Math.min(249, Math.min(...bowlLines.map((item) => item.price)));
+    rewardDiscount = Math.min(BOWL_BASE_PRICE, Math.min(...bowlLines.map((item) => item.price)));
   }
   const total = Math.max(0, subtotal + iva - rewardDiscount);
   const rewardsMultiplier = (rewardsCustomer?.lifetimePoints ?? 0) >= 300 ? 2 : 1;
@@ -203,7 +248,7 @@ export default function POSPage({ styles }) {
   const lookupReward = async () => {
     const clean = rewardCode.trim().toUpperCase();
     if (!clean || rewardLoading) return;
-    setRewardLoading(true); setError(""); setReward(null); setRewardTopping("");
+    setRewardLoading(true); setError(""); setReward(null); setRewardTopping(""); setRewardProtein("");
     try {
       const data = await api.get(`/api/staff/rewards/${clean}`);
       if (data.redemption?.status !== "active") throw new Error("El código no está activo");
@@ -219,8 +264,20 @@ export default function POSPage({ styles }) {
 
   const handleCobrar = async () => {
     if (cart.length === 0 || saving) return;
+    if (checkoutHasUnavailableItem) {
+      setError("Quita los productos o ingredientes agotados antes de cobrar.");
+      return;
+    }
     if (reward?.type === "extra_topping" && !rewardTopping) {
       setError("Selecciona el topping extra elegido por el cliente.");
+      return;
+    }
+    if (reward?.type === "double_protein" && !doubleProteinBowlEligible) {
+      setError("Proteína doble requiere un bowl personalizado grande.");
+      return;
+    }
+    if (reward?.type === "double_protein" && !doubleProteinReady) {
+      setError("Selecciona cuál proteína llevará el scoop extra.");
       return;
     }
     setSaving(true); setError("");
@@ -241,8 +298,10 @@ export default function POSPage({ styles }) {
       customerUserId: rewardsCustomer?._id || null,
       ...(customBowl && {
         base: customBowl.bowl.base,
+        bases: customBowl.bowl.bases,
         proteins: customBowl.bowl.proteins,
         bowlSize: customBowl.bowl.bowlSize,
+        extraScoopProteins: rewardExtraScoopProteins,
         marinades: customBowl.bowl.marinades,
         complements: customBowl.bowl.complements,
         sauces: customBowl.bowl.sauces,
@@ -285,8 +344,10 @@ export default function POSPage({ styles }) {
     setRewardCode("");
     setReward(null);
     setRewardTopping("");
+    setRewardProtein("");
     setShowCustomerDetails(false);
     setShowReward(false);
+    setShowLoyalty(false);
     setRewardsCustomer(null);
     setCustomerLookup("");
     setCustomerMatches([]);
@@ -344,20 +405,33 @@ export default function POSPage({ styles }) {
               </label>
             </div>
             <div className={ui.categoryTabs} aria-label="Categorías del menú">
-              {MENU_CATEGORIES.map((category) => (
+              {POS_MENU_CATEGORIES.map((category) => (
                 <button key={category} type="button" aria-pressed={menuCategory === category} onClick={() => setMenuCategory(category)}>{category}</button>
               ))}
             </div>
             <div className={ui.productGrid}>
               {visibleMenu.map((item) => {
                 const quantity = cart.find((cartItem) => cartItem.id === item.id)?.qty || 0;
+                const isUnavailable = isMenuItemUnavailable(item, unavailableItems);
                 return (
-                <button key={item.id} className={ui.productCard} onClick={() => addItem(item)} type="button">
+                <button
+                  key={item.id}
+                  className={ui.productCard}
+                  onClick={() => addItem(item)}
+                  type="button"
+                  disabled={isUnavailable}
+                  aria-label={`${item.name}, $${item.price}${isUnavailable ? ", agotado" : ""}`}
+                >
                   {quantity > 0 && <span className={ui.inCartBadge}>{quantity}</span>}
                   <span className={ui.productIcon}>{item.icon}</span>
-                  <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.category}</small></span>
+                  <span className={ui.productInfo}>
+                    <strong>{item.name}</strong>
+                    <small className={isUnavailable ? ui.productUnavailable : ""}>
+                      {isUnavailable ? "Agotado" : item.category}
+                    </small>
+                  </span>
                   <span className={ui.productPrice}>${item.price}</span>
-                  <span className={ui.addProduct}>+</span>
+                  <span className={ui.addProduct}>{isUnavailable ? "×" : "+"}</span>
                 </button>
                 );
               })}
@@ -366,7 +440,7 @@ export default function POSPage({ styles }) {
           </>
         ) : (
           <div className={ui.bowlPanel}>
-            <div className={ui.menuIntro}><div><span>Paso 1</span><h2>Arma un bowl</h2><p>Selecciona una base, proteína y complementos.</p></div></div>
+            <div className={ui.menuIntro}><div><span>Paso 1</span><h2>Arma un bowl</h2><p>Selecciona una o dos bases, proteína y complementos.</p></div></div>
             <CustomBowlBuilder onAdd={handleAddBowl} onCancel={() => setMode("menu")} />
           </div>
         )}
@@ -395,9 +469,18 @@ export default function POSPage({ styles }) {
         <div className={ui.cartItems}>
           {cart.length === 0 ? (
             <div className={ui.cartEmpty}><span>🛒</span><strong>La orden está vacía</strong><p>Selecciona un producto del menú para comenzar.</p></div>
-          ) : cart.map((item) => (
+          ) : cart.map((item) => {
+            const isUnavailable = item.id === CUSTOM_BOWL_ID
+              ? getUnavailableBowlSelections(item.bowl, unavailableItems).length > 0
+              : isMenuItemUnavailable(item, unavailableItems);
+            return (
             <div key={item.id} className={ui.cartItem}>
-              <div className={ui.cartItemInfo}><strong>{item.name}</strong><small>${item.price} c/u</small></div>
+              <div className={ui.cartItemInfo}>
+                <strong>{item.name}</strong>
+                <small className={isUnavailable ? ui.unavailableLabel : ""}>
+                  {isUnavailable ? "Agotado · quítalo para cobrar" : `$${item.price} c/u`}
+                </small>
+              </div>
               <div className={ui.qtyControl}>
                 <button type="button" onClick={() => changeQty(item.id, -1)} aria-label={`Reducir ${item.name}`}>−</button>
                 <span>{item.qty}</span>
@@ -406,7 +489,8 @@ export default function POSPage({ styles }) {
               <strong className={ui.linePrice}>${(item.price * item.qty).toLocaleString("es-MX")}</strong>
               <button className={ui.removeItem} onClick={() => removeItem(item.id)} type="button" aria-label={`Quitar ${item.name}`}>×</button>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className={ui.orderOptions}>
@@ -431,15 +515,20 @@ export default function POSPage({ styles }) {
             </div>
           </div>
 
+          <button
+            type="button"
+            className={ui.detailsToggle}
+            aria-expanded={showLoyalty || Boolean(rewardsCustomer)}
+            onClick={() => setShowLoyalty((visible) => !visible)}
+          >
+            <span>
+              <span className={ui.loyaltyIcon} aria-hidden="true">★</span>{" "}
+              {rewardsCustomer ? rewardsCustomer.name : "Cliente Rewards"} <small>Opcional · suma puntos</small>
+            </span>
+            <span>{(showLoyalty || rewardsCustomer) ? "−" : "+"}</span>
+          </button>
+          {(showLoyalty || rewardsCustomer) && (
           <section className={ui.loyaltyPanel} aria-label="Cliente Rewards">
-            <div className={ui.loyaltyHeading}>
-              <span className={ui.loyaltyIcon}>★</span>
-              <div>
-                <strong>Cliente Rewards</strong>
-                <small>Opcional · vincula la compra para sumar puntos</small>
-              </div>
-            </div>
-
             {rewardsCustomer ? (
               <div className={ui.loyaltySelected}>
                 <div>
@@ -490,6 +579,7 @@ export default function POSPage({ styles }) {
               </>
             )}
           </section>
+          )}
 
           <button type="button" className={ui.detailsToggle} aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails((visible) => !visible)}>
             <span>Cliente y notas <small>Opcional</small></span><span>{showCustomerDetails ? "−" : "+"}</span>
@@ -510,7 +600,7 @@ export default function POSPage({ styles }) {
           {showReward && (
             <div className={ui.rewardArea}>
               <div>
-                <input className={styles.input} value={rewardCode} onChange={(e) => { setRewardCode(e.target.value.toUpperCase()); setReward(null); setRewardTopping(""); }} placeholder="Código" maxLength={6} />
+                <input className={styles.input} value={rewardCode} onChange={(e) => { setRewardCode(e.target.value.toUpperCase()); setReward(null); setRewardTopping(""); setRewardProtein(""); }} placeholder="Código" maxLength={6} />
                 <button type="button" className={styles.btnGhost} onClick={lookupReward} disabled={!rewardCode.trim() || rewardLoading}>{rewardLoading ? "Buscando…" : "Aplicar"}</button>
               </div>
               {reward && <div className={ui.rewardSuccess}><strong>{reward.name.es}</strong><span>{reward.terms.es}</span></div>}
@@ -524,24 +614,62 @@ export default function POSPage({ styles }) {
                     required
                   >
                     <option value="">Seleccionar topping…</option>
-                    {Object.entries(TOPPING_LABELS).map(([id, label]) => (
-                      <option key={id} value={id}>{label}</option>
+                    {POS_REWARD_TOPPING_IDS.map((id) => (
+                      <option key={id} value={id} disabled={unavailableItems.includes(id)}>
+                        {TOPPING_LABELS[id] || id}{unavailableItems.includes(id) ? " · Agotado" : ""}
+                      </option>
                     ))}
                   </select>
                 </label>
+              )}
+              {reward?.type === "double_protein" && (
+                doubleProteinBowlEligible ? (
+                  <label>
+                    <span>Elige cuál proteína llevará el scoop extra</span>
+                    <select
+                      className={styles.input}
+                      value={rewardProtein}
+                      onChange={(event) => { setRewardProtein(event.target.value); setError(""); }}
+                      required
+                    >
+                      <option value="">Seleccionar proteína…</option>
+                      {customRewardBowl.bowl.proteins.map((id) => (
+                        <option key={id} value={id}>{PROTEIN_LABELS[id] || id}</option>
+                      ))}
+                    </select>
+                    <small>Se agrega un scoop de 40 g (+${EXTRA_SCOOP_PRICE}) y el premio descuenta ese cargo.</small>
+                  </label>
+                ) : (
+                  <p className={ui.rewardRequirement}>
+                    Agrega un bowl personalizado grande (3 proteínas) para usar este premio.
+                  </p>
+                )
               )}
             </div>
           )}
 
           <div className={ui.totalBreakdown}>
-            <div><span>Subtotal</span><span>${subtotal.toLocaleString("es-MX")}</span></div>
+            <div><span>Productos</span><span>${itemsSubtotal.toLocaleString("es-MX")}</span></div>
+            {extraScoopCharge > 0 && <div><span>Scoop extra de proteína</span><span>+${extraScoopCharge.toLocaleString("es-MX")}</span></div>}
             {rewardDiscount > 0 && <div className={ui.discountRow}><span>Premio aplicado</span><strong>−${rewardDiscount.toLocaleString("es-MX")}</strong></div>}
             <div className={ui.totalFinal}><span>Total</span><strong>${total.toLocaleString("es-MX")} MXN</strong></div>
             <small>IVA incluido</small>
           </div>
 
+          {checkoutHasUnavailableItem && (
+            <p className={ui.checkoutWarning}>Quita los productos o ingredientes agotados antes de cobrar.</p>
+          )}
           <div className={ui.checkoutStep}><span>Paso 3</span><strong>Confirma y cobra</strong></div>
-          <button className={ui.chargeButton} onClick={handleCobrar} disabled={cart.length === 0 || saving || (reward?.type === "extra_topping" && !rewardTopping)} type="button">
+          <button
+            className={ui.chargeButton}
+            onClick={handleCobrar}
+            disabled={cart.length === 0
+              || saving
+              || checkoutHasUnavailableItem
+              || (reward?.type === "extra_topping" && !rewardTopping)
+              || !doubleProteinReady}
+            type="button"
+          >
             {saving ? "Enviando orden…" : cart.length === 0 ? "Agrega productos para cobrar" : `Cobrar $${total.toLocaleString("es-MX")} MXN`}
           </button>
         </div>
@@ -550,4 +678,3 @@ export default function POSPage({ styles }) {
     </div>
   );
 }
-

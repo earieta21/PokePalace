@@ -46,8 +46,9 @@ export default function Register() {
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}>
-            <label className={styles.label}>{t("auth.name")}</label>
+            <label className={styles.label} htmlFor="register-name">{t("auth.name")}</label>
             <input
+              id="register-name"
               className={styles.input}
               name="name"
               placeholder={t("auth.name")}
@@ -59,8 +60,9 @@ export default function Register() {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>{t("auth.email")}</label>
+            <label className={styles.label} htmlFor="register-email">{t("auth.email")}</label>
             <input
+              id="register-email"
               className={styles.input}
               name="email"
               type="email"
@@ -73,8 +75,9 @@ export default function Register() {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>{t("auth.password")}</label>
+            <label className={styles.label} htmlFor="register-password">{t("auth.password")}</label>
             <input
+              id="register-password"
               className={styles.input}
               name="password"
               type="password"

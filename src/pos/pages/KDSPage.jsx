@@ -9,6 +9,8 @@ import {
   SAUCE_LABELS,
   TOPPING_LABELS,
 } from "../../order/OrderLabels";
+import { orderTimingLabel } from "../orderTiming.js";
+import { orderBowlSize, sortKitchenOrders } from "../kitchenOrder.js";
 
 const STATUS_CFG = {
   pending:   { cls: "badgeYellow", label: "Nuevo" },
@@ -18,7 +20,7 @@ const STATUS_CFG = {
 
 const FULFILLMENT_LABEL = {
   pickup: "Recoger",
-  dine_in: "Comer aqui",
+  dine_in: "Comer aquí",
   delivery: "Delivery",
 };
 
@@ -43,7 +45,10 @@ function orderLines(order) {
   const label = (map, id) => map[id] ?? id;
 
   if (order.base) {
-    lines.push({ label: "Base", value: label(BASE_LABELS, order.base) });
+    const baseValue = order.bases?.length > 1
+      ? `${order.bases.map((id) => label(BASE_LABELS, id)).join(" + ")} (mitad y mitad)`
+      : label(BASE_LABELS, order.base);
+    lines.push({ label: "Base", value: baseValue });
     if (order.proteins?.length) {
       lines.push({
         label: "Proteínas",
@@ -52,10 +57,6 @@ function orderLines(order) {
     } else if (order.protein) {
       lines.push({ label: "Proteína", value: order.protein });
     }
-    lines.push({
-      label: "Tamaño",
-      value: order.bowlSize === "large" ? "Bowl grande" : "Bowl normal",
-    });
     if (order.marinades?.length)
       lines.push({
         label: "Marinados",
@@ -79,13 +80,6 @@ function orderLines(order) {
   }
 
   return lines.length ? lines : [{ label: "Producto", value: "Bowl personalizado" }];
-}
-
-function elapsed(createdAt) {
-  const secs = Math.floor((Date.now() - new Date(createdAt)) / 1000);
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function playNewOrderBeep() {
@@ -130,6 +124,7 @@ export default function KDSPage({ styles, role }) {
     api.get("/api/staff/orders?status=pending,preparing,ready&limit=30")
       .then((d) => {
         const incoming = d.orders ?? [];
+        setError("");
         setOrders(incoming);
 
         if (firstLoad.current) {
@@ -161,7 +156,23 @@ export default function KDSPage({ styles, role }) {
   useEffect(() => {
     load();
     const id = setInterval(load, 15000);
-    return () => clearInterval(id);
+
+    // iOS pausa los timers de una pestaña en segundo plano (pantalla
+    // apagada/bloqueada) para ahorrar batería — el poll de 15s no corre
+    // mientras tanto. Al volver a estar visible, se refresca de inmediato
+    // en vez de esperar al siguiente tick, para no quedarse con órdenes
+    // viejas hasta que alguien haga un refresh manual.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, [load]);
 
   const advance = async (order) => {
@@ -195,9 +206,23 @@ export default function KDSPage({ styles, role }) {
   const isKitchenOnly = role === "kitchen";
 
   const pending = orders.filter((o) => o.status !== "ready").length;
+  const displayOrders = useMemo(() => sortKitchenOrders(orders), [orders]);
 
   return (
-    <div>
+    <div className={styles.kdsPage}>
+      {/* Error de conexión/sesión — banner fijo y visible, para que el
+          personal note de inmediato si el auto-refresco dejó de funcionar
+          en vez de asumir que solo no hay pedidos nuevos. */}
+      {error && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 9997,
+          background: "#dc2626", color: "#fff", textAlign: "center",
+          padding: "10px 16px", fontWeight: 700, fontSize: 13,
+        }}>
+          ⚠️ No se pudo actualizar la cocina: {error} — toca &quot;Actualizar&quot; o vuelve a entrar con tu PIN si sigue.
+        </div>
+      )}
+
       {/* Screen flash on new order — visible even if not looking at the toast */}
       {screenFlash && (
         <div style={{
@@ -236,7 +261,6 @@ export default function KDSPage({ styles, role }) {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {error && <span style={{ color: "red", fontSize: 12 }}>{error}</span>}
           <button className={styles.btnGhost} onClick={load}>Actualizar</button>
         </div>
       </div>
@@ -250,10 +274,14 @@ export default function KDSPage({ styles, role }) {
         </div>
       ) : (
         <div className={styles.kdsGrid}>
-          {orders.map((order) => {
+          {displayOrders.map((order) => {
             const cfg = STATUS_CFG[order.status] ?? STATUS_CFG.pending;
             const isReady = order.status === "ready";
             const lines = orderLines(order);
+            const bowlSize = orderBowlSize(order);
+            const extraScoops = order.extraScoopProteins?.map(
+              (id) => PROTEIN_LABELS[id] ?? id
+            ) ?? [];
             const cliente =
               order.customer ||
               order.user?.name ||
@@ -273,7 +301,7 @@ export default function KDSPage({ styles, role }) {
                 <div className={styles.kdsHeader}>
                   <span className={styles.kdsNum}>#{order._id.slice(-5).toUpperCase()}</span>
                   <span className={`${styles.badge} ${styles[cfg.cls]}`}>{cfg.label}</span>
-                  <span className={styles.kdsTimer}>{elapsed(order.createdAt)}</span>
+                  <span className={styles.kdsTimer}>{orderTimingLabel(order)}</span>
                 </div>
                 <div className={styles.kdsBody}>
                   <span className={styles.kdsCustomerLabel}>Cliente</span>
@@ -285,10 +313,27 @@ export default function KDSPage({ styles, role }) {
                       <span>{PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod}</span>
                     )}
                   </div>
+                  {bowlSize && (
+                    <div
+                      className={`${styles.kdsSizeBanner} ${
+                        bowlSize.tone === "large" ? styles.kdsSizeLarge : styles.kdsSizeMedium
+                      }`}
+                    >
+                      <span>{bowlSize.title}</span>
+                      <strong>{bowlSize.label}</strong>
+                      <small>{bowlSize.detail}</small>
+                    </div>
+                  )}
                   {order.notes && (
                     <div className={styles.kdsCriticalNote}>
                       <span>Indicaciones especiales</span>
                       <strong>{order.notes}</strong>
+                    </div>
+                  )}
+                  {extraScoops.length > 0 && (
+                    <div className={styles.kdsExtraScoop}>
+                      <span>Scoop extra</span>
+                      <strong>{extraScoops.join(", ")}</strong>
                     </div>
                   )}
                   <div className={styles.kdsItems}>

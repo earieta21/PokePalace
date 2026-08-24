@@ -23,6 +23,7 @@ const OrderTracking    = lazy(() => import("./pages/OrderTracking"));
 const LocationPage     = lazy(() => import("./pages/LocationPage"));
 const QrCodePage       = lazy(() => import("./pages/QrCodePage"));
 const ClaimRewardPage  = lazy(() => import("./pages/ClaimRewardPage"));
+const PrivacyPolicy    = lazy(() => import("./pages/PrivacyPolicy"));
 
 // Kiosk & staff — lazy loaded (never used by regular customers)
 const KioskLayout      = lazy(() => import("./kiosk/KioskLayout"));
@@ -85,6 +86,7 @@ const App = () => {
               <Route path="/more-options" element={<MoreOptions />} />
               <Route path="/ubicaciones" element={<LocationPage />} />
               <Route path="/qr" element={<QrCodePage />} />
+              <Route path="/aviso-de-privacidad" element={<PrivacyPolicy />} />
 
               <Route path="/order" element={<OrderPage />} />
               <Route path="/summary" element={<OrderSummaryPage />} />

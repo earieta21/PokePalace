@@ -20,15 +20,22 @@ import {
   usefulPointsToRedeem,
 } from "../utils/customerOrder.js";
 import { stableCustomerOrderObjectId } from "../utils/orderReservations.js";
+import { scheduledOrderVisibilityFilter } from "../utils/orderVisibility.js";
 
 // 100 puntos = $25 MXN
 const POINTS_PER_REWARD = 100;
 const REWARD_VALUE_MXN  = 25;
 const ORDER_TOKEN_HEADER = "x-order-token";
 
+// El header es el camino normal (mismo dispositivo que hizo el pedido). El
+// query param ?ot= solo se usa para el link/QR de seguimiento del kiosco,
+// donde el cliente abre la orden desde OTRO dispositivo (su celular) que
+// nunca tuvo el token guardado en su localStorage.
 const requestOrderToken = (req) => {
-  const value = req.get(ORDER_TOKEN_HEADER);
-  return typeof value === "string" && value.length <= 256 ? value.trim() : "";
+  const header = req.get(ORDER_TOKEN_HEADER);
+  if (typeof header === "string" && header.length <= 256) return header.trim();
+  const query = req.query?.ot;
+  return typeof query === "string" && query.length <= 256 ? query.trim() : "";
 };
 
 const customerCanAccessOrder = (req, order) => {
@@ -56,7 +63,7 @@ const validateScheduledTime = (scheduledPickupTime) => {
   if (scheduled < minTime) return "La hora debe ser al menos 15 minutos desde ahora";
 
   if (!isWithinBusinessHours(scheduled)) {
-    return `El restaurante acepta pedidos de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00`;
+    return `El restaurante acepta pedidos de jueves a martes, de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00; los miércoles permanece cerrado`;
   }
 
   return null;
@@ -255,12 +262,14 @@ export const createOrder = async (req, res) => {
 
     const {
       base,
+      bases,
       protein,
       proteins,
       marinades,
       complements,
       sauces,
       toppings,
+      extraScoopProteins,
       customer,
       phone,
       notes,
@@ -273,12 +282,14 @@ export const createOrder = async (req, res) => {
     try {
       safeBowl = sanitizeCustomerBowl({
         base,
+        bases,
         protein,
         proteins,
         marinades,
         complements,
         sauces,
         toppings,
+        extraScoopProteins,
       });
     } catch (validationError) {
       return res.status(400).json({ msg: validationError.message });
@@ -316,7 +327,7 @@ export const createOrder = async (req, res) => {
       isScheduled = true;
     } else if (!isWithinBusinessHours(new Date())) {
       return res.status(400).json({
-        msg: `El restaurante está cerrado ahora. Aceptamos pedidos de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00 — puedes programar tu pedido para más tarde.`,
+        msg: `El restaurante está cerrado ahora. Aceptamos pedidos de jueves a martes, de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00.`,
       });
     }
 
@@ -329,7 +340,11 @@ export const createOrder = async (req, res) => {
       : null;
 
     const resolvedBowlSize = safeBowl.bowlSize;
-    const { subtotal, discount: promoDiscount, tax, total: baseTotal } = computePricing(resolvedBowlSize, resolvedPromo);
+    const { subtotal, discount: promoDiscount, tax, total: baseTotal } = computePricing(
+      resolvedBowlSize,
+      resolvedPromo,
+      { extraScoops: safeBowl.extraScoopProteins.length, complementsCount: safeBowl.complements.length }
+    );
 
     // The balance decrement and order marker are also one atomic write. A
     // concurrent/reloaded retry reads the durable amount from that marker.
@@ -364,6 +379,7 @@ export const createOrder = async (req, res) => {
       paymentStatus: "pending",
       source: "online",
       base: safeBowl.base,
+      bases: safeBowl.bases,
       protein: selectedProteins.join(", "),
       proteins: selectedProteins,
       bowlSize: resolvedBowlSize,
@@ -372,6 +388,7 @@ export const createOrder = async (req, res) => {
       complements: safeBowl.complements,
       sauces: safeBowl.sauces,
       toppings: safeBowl.toppings,
+      extraScoopProteins: safeBowl.extraScoopProteins,
       promoCode:      promoDoc?.code || null,
       subtotal,
       discountAmount: totalDiscount,
@@ -661,6 +678,7 @@ export const getWaitTime = async (req, res) => {
   try {
     const activeOrders = await Order.countDocuments({
       status: { $in: ["pending", "preparing"] },
+      ...scheduledOrderVisibilityFilter(),
     });
     const waitMinutes = Math.max(8, 8 + activeOrders * 3);
     res.json({ activeOrders, waitMinutes });

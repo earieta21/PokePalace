@@ -21,17 +21,14 @@ const Menu = ({ items = [], onSelect }) => {
           className={styles.menuCard}
           type="button"
           onClick={() => onSelect?.(item)}
-          aria-label={item.name}
+          aria-label={`${item.name} — ${formatMenuPrice(item.price)}`}
         >
           <div className={styles.imageWrap}>
             <img
               src={item.image}
-              alt={item.name}
+              alt=""
               className={styles.menuImage}
               loading="lazy"
-              width="900"
-              height="675"
-              decoding="async"
             />
             <div className={styles.imageOverlay} />
           </div>

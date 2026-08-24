@@ -31,15 +31,26 @@ export default function KioskSummaryPage() {
     navigate("/kiosk/order", { state: { initialStep: stepIndex } });
   };
 
+  const onRestart = () => {
+    clearOrderSubmission("kiosk");
+    resetOrder();
+    navigate("/kiosk/order", { state: { initialStep: 0 }, replace: true });
+  };
+
   const onConfirm = async () => {
     const selectedProteins = Array.isArray(order?.proteins) ? order.proteins : [];
-    if (!order?.base || selectedProteins.length < 2) {
-      setSubmitError("Completa la base y selecciona 2 proteínas para confirmar.");
+    if (!order?.base || selectedProteins.length < 1) {
+      setSubmitError("Completa la base y selecciona al menos 1 proteína para confirmar.");
       return;
     }
 
     if (!order?.customer?.trim() || !order?.phone?.trim()) {
       setSubmitError("Agrega tu nombre y teléfono para confirmar el pedido.");
+      return;
+    }
+
+    if (order?.isScheduled && !order?.scheduledPickupTime) {
+      setSubmitError("Elige la fecha y hora para tu pedido programado.");
       return;
     }
 
@@ -77,7 +88,15 @@ export default function KioskSummaryPage() {
       const shortCode = data.order._id.slice(-6).toUpperCase();
       clearOrderSubmission("kiosk", submission.clientOrderId);
       resetOrder();
-      navigate("/kiosk/done", { replace: true, state: { shortCode, total: data.order.total } });
+      navigate("/kiosk/done", {
+        replace: true,
+        state: {
+          shortCode,
+          total: data.order.total,
+          orderId: data.order._id,
+          orderToken: submission.orderToken,
+        },
+      });
     } catch (e) {
       setSubmitError(e.message);
     } finally {
@@ -110,6 +129,7 @@ export default function KioskSummaryPage() {
       </button>
       <OrderSummary
         onEditStep={onEditStep}
+        onRestart={onRestart}
         onConfirm={onConfirm}
         saving={saving}
         submitError={submitError}

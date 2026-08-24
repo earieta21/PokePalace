@@ -27,7 +27,7 @@ const SECTIONS = [
     items: [
       { icon: "💬", labelKey: "more.contact", path: null },
       { icon: "❓", labelKey: "more.faq", path: null },
-      { icon: "⚖️", labelKey: "more.privacy", path: null },
+      { icon: "⚖️", labelKey: "more.privacy", path: "/aviso-de-privacidad" },
     ],
   },
 ];

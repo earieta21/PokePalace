@@ -3,9 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
 import { GOOGLE_REVIEW_URL } from "../config";
-import { getItemLabel } from "../order/OrderLabels";
+import { getItemLabel, getBaseLabel } from "../order/OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
-import { clearActiveOrder, getOrderAccessToken } from "../utils/orderAccess";
+import { clearActiveOrder, getOrderAccessToken, saveActiveOrder } from "../utils/orderAccess";
 import styles from "./OrderTracking.module.css";
 
 const STEP_CONFIG = [
@@ -110,6 +110,21 @@ export default function OrderTracking() {
 
   const prevStatusRef  = useRef(null);
   const notifAskedRef  = useRef(false);
+
+  // Puente para el QR del kiosco: el pedido se creó en OTRO dispositivo
+  // (el kiosco), así que este celular nunca guardó el token de acceso en su
+  // localStorage. Si llega en la URL (?ot=), se guarda aquí una sola vez y
+  // se quita de la URL visible para que no quede en el historial ni viaje
+  // como referrer si el cliente toca un link externo (ej. reseña de Google).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get("ot");
+    if (!urlToken) return;
+    if (!getOrderAccessToken(orderId)) saveActiveOrder(orderId, urlToken);
+    params.delete("ot");
+    const rest = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+  }, [orderId]);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -471,7 +486,7 @@ export default function OrderTracking() {
       <section className={styles.section}>
         <p className={styles.sectionTitle}>{t("tracking.yourBowl")}</p>
         <div className={styles.detailCard}>
-          {order.base && <DetailRow label={t("common.base")} value={getItemLabel("base", order.base, language)} />}
+          {order.base && <DetailRow label={t("common.base")} value={getBaseLabel(order.bases, order.base, language)} />}
           {getProteinsText(order, language) && <DetailRow label={t("common.proteins")} value={getProteinsText(order, language)} />}
           <DetailRow label={t("tracking.size")} value={order.bowlSize === "large" ? t("summary.large") : t("summary.normal")} />
           {order.marinades?.length > 0 && <DetailRow label={t("summary.marinades")} value={order.marinades.map((id) => getItemLabel("marinade", id, language)).join(", ")} />}

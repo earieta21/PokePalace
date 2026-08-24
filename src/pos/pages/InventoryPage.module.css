@@ -202,7 +202,7 @@
 
 .formSectionPicker {
   display: grid;
-  grid-template-columns: repeat(4, minmax(100px, 1fr));
+  grid-template-columns: repeat(5, minmax(100px, 1fr));
   gap: 8px;
 }
 
@@ -548,6 +548,25 @@
   text-align: center;
 }
 
+.receiveCostField {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--p-muted);
+  font-size: 12px;
+}
+
+.receiveCostInput {
+  width: 68px;
+  padding: 6px;
+  border: 1px solid var(--p-g3);
+  border-radius: 6px;
+  outline: 0;
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  text-align: center;
+}
+
 .receiveFooter {
   display: flex;
   align-items: center;
@@ -676,7 +695,7 @@
 
 .sectionGrid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
   gap: 9px;
 }
 

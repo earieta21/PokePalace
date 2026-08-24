@@ -8,10 +8,12 @@ import styles from "./OrderSummary.module.css";
 
 import {
   ITEM_LABELS,
+  getBaseLabel,
 } from "./OrderLabels";
 
 const OrderSummary = ({
   onEditStep,
+  onRestart,
   onConfirm,
   onPromoChange,
   pointsDiscount = 0,
@@ -25,12 +27,14 @@ const OrderSummary = ({
 
   const {
     base = "",
+    bases = [],
     protein = "",
     proteins = [],
     marinades = [],
     sauces = [],
     complements = [],
     toppings = [],
+    extraScoopProteins = [],
     fulfillment = "pickup",
     updateCheckout,
   } = order || {};
@@ -56,16 +60,46 @@ const OrderSummary = ({
     }
   }, [fulfillment, updateCheckout]);
 
-  const finalMarinades = marinades;
+  // Restaura el código promocional guardado en el pedido (localStorage) al
+  // recargar la página o al volver del flujo de "editar" — sin esto,
+  // promoApplied nace en null y el total mostrado no incluye el descuento
+  // aunque el pedido sí lo tenga guardado.
+  const savedPromoCode = order?.promoCode || "";
+  useEffect(() => {
+    const code = savedPromoCode.trim();
+    if (!code) return undefined;
+    if (promoApplied?.code === code.toUpperCase()) return undefined;
+
+    let cancelled = false;
+    setPromoInput(code);
+    fetch(`${API_URL}/api/promo-codes/validate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.code === code.toUpperCase()) {
+          setPromoApplied(data);
+          onPromoChange?.(data);
+        } else {
+          // El código guardado ya no es válido — se limpia para que el
+          // total mostrado siempre coincida con lo que de verdad cobrará
+          // el servidor.
+          updateCheckout("promoCode", "");
+          onPromoChange?.(null);
+        }
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedPromoCode]);
 
   const prettifyId = (value) => {
     if (!value || typeof value !== "string") return t("summary.empty");
     return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  };
-
-  const getLabel = (map, value) => {
-    if (!value) return t("summary.empty");
-    return map?.[value] || prettifyId(value);
   };
 
   const getListLabels = (map, values = []) => {
@@ -73,20 +107,31 @@ const OrderSummary = ({
     return values.map((v) => map?.[v] || prettifyId(v));
   };
 
-  const marinadesLabels = getListLabels(labels.marinade, finalMarinades);
   const proteinLabels = getListLabels(
     labels.protein,
     Array.isArray(proteins) && proteins.length > 0 ? proteins : protein ? [protein] : []
   );
+  const extraScoopChips = (() => {
+    if (!Array.isArray(extraScoopProteins) || extraScoopProteins.length === 0) return [];
+    const counts = new Map();
+    extraScoopProteins.forEach((id) => counts.set(id, (counts.get(id) || 0) + 1));
+    return [...counts.entries()].map(([id, count]) => {
+      const label = labels.protein?.[id] || prettifyId(id);
+      return count > 1 ? `${label} ×${count}` : label;
+    });
+  })();
   const complementsLabels = getListLabels(labels.complement, complements);
   const saucesLabels = getListLabels(labels.sauce, sauces);
   const toppingsLabels = getListLabels(labels.topping, toppings);
 
   const pricedBowlSize = proteinLabels.length === 3 ? "large" : "normal";
-  const pricing = computePricing(pricedBowlSize, promoApplied);
+  const extraScoopsCount = Array.isArray(extraScoopProteins) ? extraScoopProteins.length : 0;
+  const pricing = computePricing(pricedBowlSize, promoApplied, {
+    extraScoops: extraScoopsCount,
+    complementsCount: complements.length,
+  });
   const appliedPointsDiscount = Math.min(Math.max(0, pointsDiscount), pricing.total);
   const finalTotal = Math.max(0, pricing.total - appliedPointsDiscount);
-
   // Time picker helpers — mantiene el rango en línea con lo que de verdad
   // acepta el backend (11:00–21:00), para no dejar elegir una hora que
   // luego se va a rechazar al confirmar. Usa la hora LOCAL del navegador
@@ -99,22 +144,32 @@ const OrderSummary = ({
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   };
 
+  const advanceToNextOpenDay = (date) => {
+    do {
+      date.setDate(date.getDate() + 1);
+    } while (date.getDay() === 3);
+    date.setHours(OPEN_HOUR, 0, 0, 0);
+  };
+
   const getMinTime = () => {
     const now = new Date();
     now.setMinutes(now.getMinutes() + 15);
-    if (now.getHours() < OPEN_HOUR) {
+    if (now.getDay() === 3) {
+      advanceToNextOpenDay(now);
+    } else if (now.getHours() < OPEN_HOUR) {
       now.setHours(OPEN_HOUR, 0, 0, 0);
     } else if (now.getHours() >= CLOSE_HOUR) {
-      now.setDate(now.getDate() + 1);
-      now.setHours(OPEN_HOUR, 0, 0, 0);
+      advanceToNextOpenDay(now);
     }
     return toLocalDatetimeValue(now);
   };
 
   const getMaxTime = () => {
     const now = new Date();
+    if (now.getDay() === 3 || now.getHours() >= CLOSE_HOUR) {
+      advanceToNextOpenDay(now);
+    }
     now.setHours(CLOSE_HOUR - 1, 45, 0, 0);
-    if (now < new Date()) now.setDate(now.getDate() + 1);
     return toLocalDatetimeValue(now);
   };
 
@@ -149,6 +204,12 @@ const OrderSummary = ({
     order.updateCheckout("promoCode", "");
   };
 
+  const handleRestart = () => {
+    if (window.confirm(t("summary.restartConfirm"))) {
+      onRestart?.();
+    }
+  };
+
   const handleSaveFavorite = async () => {
     if (!favoriteName.trim()) return;
     setSavingFavorite(true);
@@ -164,12 +225,14 @@ const OrderSummary = ({
         body: JSON.stringify({
           name: favoriteName.trim(),
           base,
+          bases: Array.isArray(bases) && bases.length > 0 ? bases : base ? [base] : [],
           proteins: Array.isArray(proteins) && proteins.length > 0 ? proteins : protein ? [protein] : [],
           bowlSize: pricedBowlSize,
           marinades,
           complements,
           sauces,
           toppings,
+          extraScoopProteins,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -229,7 +292,7 @@ const OrderSummary = ({
         <Section
           icon="🍚"
           title={t("summary.base")}
-          value={getLabel(labels.base, base)}
+          value={getBaseLabel(bases, base, language) || t("summary.empty")}
           onEdit={() => onEditStep(0)}
         />
 
@@ -249,20 +312,21 @@ const OrderSummary = ({
           </p>
         </div>
 
-        <Section
-          icon="✨"
-          title={t("summary.marinades")}
-          chips={marinadesLabels}
-          emptyText={t("summary.noMarinades")}
-          onEdit={() => onEditStep(2)}
-        />
+        {extraScoopChips.length > 0 && (
+          <Section
+            icon="➕"
+            title={t("summary.extraScoops")}
+            chips={extraScoopChips}
+            onEdit={() => onEditStep(1)}
+          />
+        )}
 
         <Section
           icon="🥗"
           title={t("summary.complements")}
           chips={complementsLabels}
           emptyText={t("summary.noComplements")}
-          onEdit={() => onEditStep(3)}
+          onEdit={() => onEditStep(2)}
         />
 
         <Section
@@ -270,7 +334,7 @@ const OrderSummary = ({
           title={t("summary.sauces")}
           chips={saucesLabels}
           emptyText={t("summary.noSauces")}
-          onEdit={() => onEditStep(4)}
+          onEdit={() => onEditStep(3)}
         />
 
         <Section
@@ -278,7 +342,7 @@ const OrderSummary = ({
           title={t("summary.toppings")}
           chips={toppingsLabels}
           emptyText={t("summary.noToppings")}
-          onEdit={() => onEditStep(5)}
+          onEdit={() => onEditStep(4)}
         />
 
         {/* Save as favorite */}
@@ -367,7 +431,17 @@ const OrderSummary = ({
               <select
                 name="fulfillment"
                 value={order.fulfillment === "dine_in" ? "dine_in" : "pickup"}
-                onChange={(e) => order.updateCheckout("fulfillment", e.target.value)}
+                onChange={(e) => {
+                  const nextFulfillment = e.target.value;
+                  order.updateCheckout("fulfillment", nextFulfillment);
+                  // La programación de hora solo aplica a "para llevar" — si
+                  // el cliente cambia a "comer aquí", se descarta para que no
+                  // quede una hora programada obsoleta pegada al pedido.
+                  if (nextFulfillment === "dine_in") {
+                    order.updateCheckout("isScheduled", false);
+                    order.updateCheckout("scheduledPickupTime", "");
+                  }
+                }}
               >
                 <option value="pickup">{t("summary.pickup")}</option>
                 <option value="dine_in">{t("summary.dineIn")}</option>
@@ -412,6 +486,8 @@ const OrderSummary = ({
                     onChange={(e) => order.updateCheckout("scheduledPickupTime", e.target.value)}
                     min={getMinTime()}
                     max={getMaxTime()}
+                    required
+                    aria-required="true"
                   />
                 </label>
               )}
@@ -506,15 +582,25 @@ const OrderSummary = ({
           {submitError && (
             <p className={styles.submitError} role="alert">{submitError}</p>
           )}
-          <button
-            className={styles.confirmButton}
-            onClick={onConfirm}
-            type="button"
-            disabled={saving}
-            aria-busy={saving}
-          >
-            {saving ? t("summary.sending") : `${t("summary.confirm")} — $${finalTotal.toFixed(2)}`}
-          </button>
+          <div className={styles.actionButtons}>
+            <button
+              className={styles.restartButton}
+              onClick={handleRestart}
+              type="button"
+              disabled={saving}
+            >
+              {t("summary.restart")}
+            </button>
+            <button
+              className={styles.confirmButton}
+              onClick={onConfirm}
+              type="button"
+              disabled={saving}
+              aria-busy={saving}
+            >
+              {saving ? t("summary.sending") : `${t("summary.confirm")} — $${finalTotal.toFixed(2)}`}
+            </button>
+          </div>
         </div>
       </div>
     </div>

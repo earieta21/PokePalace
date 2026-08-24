@@ -1,33 +1,61 @@
+// Protein stock is stored in kilograms. A medium bowl contains 100 g total,
+// a large bowl contains 120 g total, and every extra scoop adds 40 g.
+export const MEDIUM_BOWL_PROTEIN_KG = 0.1;
+export const LARGE_BOWL_PROTEIN_KG = 0.12;
+export const EXTRA_SCOOP_PROTEIN_KG = 0.04;
+
 // Source of truth for products sold through the POS. The browser may display
 // these prices, but only this server-side catalog is used to charge an order.
 export const POS_CATALOG = Object.freeze([
+  // Los 4 bowls de la casa — mismas combinaciones que los presets del inicio
+  // del sitio (src/order/OrderPage.jsx PRESETS), todos a precio de bowl normal.
   {
-    catalogId: "bowl-tuna-classic", legacyId: 1, name: "Bowl Clásico de Atún", price: 249, category: "bowls",
+    catalogId: "bowl-emerald-salmon", legacyId: 1, name: "Bowl de salmón esmeralda", price: 230, category: "bowls",
     inventoryRecipe: {
-      white_rice: 1, tuna: 1, cucumber: 1, edamame: 1,
-      soy_sauce: 1, sesame_seeds: 1,
+      white_rice: 1, salmon: 0.05, tuna: 0.05,
+      avocado: 1, cucumber: 1, edamame: 1,
+      spicy_mayo: 1, citrus_dressing: 1,
+      sesame_seeds: 1, nori_strips: 1,
     },
   },
   {
-    catalogId: "bowl-salmon-avocado", legacyId: 2, name: "Bowl Salmón y Aguacate", price: 289, category: "bowls",
+    catalogId: "bowl-spicy-tuna", legacyId: 2, name: "Bowl picante de atún crujiente", price: 230, category: "bowls",
     inventoryRecipe: {
-      white_rice: 1, salmon: 1, avocado: 1, cucumber: 1,
-      ponzu_sauce: 1, sesame_seeds: 1,
+      quinoa: 1, tuna: 0.05, salmon: 0.05,
+      cucumber: 1, edamame: 1, spicy_surimi: 1,
+      sriracha: 1, spicy_mayo: 1,
+      masago: 1, nori_strips: 1,
     },
   },
   {
-    catalogId: "bowl-spicy-shrimp", legacyId: 3, name: "Bowl Camarón Picante", price: 249, category: "bowls",
+    catalogId: "bowl-tropical-shrimp", legacyId: 3, name: "Bowl tropical de camarón", price: 230, category: "bowls",
     inventoryRecipe: {
-      brown_rice: 1, shrimp: 1, cucumber: 1, spicy_mayo: 1,
-      crispy_onions: 1, red_pepper_flakes: 1,
+      spring_mix: 1, shrimp: 0.05, tofu: 0.05,
+      pineapple: 1, avocado: 1, cucumber: 1,
+      sweet_dressing: 1, cilantro_dressing: 1,
+      sesame_seeds: 1, masago: 1,
     },
   },
   {
-    catalogId: "bowl-vegan", legacyId: 4, name: "Bowl Vegano", price: 229, category: "bowls",
+    catalogId: "bowl-citrus-tofu", legacyId: 4, name: "Tofu Cítrico", price: 230, category: "bowls",
     inventoryRecipe: {
-      quinoa: 1, avocado: 1, cucumber: 1, mango: 1,
-      edamame: 1, sesame_seeds: 1,
+      spring_mix: 1, tofu: 0.05, shrimp: 0.05,
+      cucumber: 1, beet: 1, avocado: 1,
+      citrus_dressing: 1, cilantro_dressing: 1,
+      sesame_seeds: 1, nori_strips: 1,
     },
+  },
+  // Venta rápida sin ingredientes específicos — para cobrar de una vez
+  // cuando no da tiempo de capturar el bowl personalizado completo (ej.
+  // fila larga). No trae inventoryRecipe a propósito: no se sabe qué
+  // llevó el bowl, así que no se descuenta inventario por esta venta.
+  {
+    catalogId: "bowl-mediano-rapido", legacyId: 20, name: "Bowl mediano", price: 230, category: "bowls",
+    inventoryRecipe: {},
+  },
+  {
+    catalogId: "bowl-grande-rapido", legacyId: 21, name: "Bowl grande", price: 250, category: "bowls",
+    inventoryRecipe: {},
   },
   {
     catalogId: "edamame", legacyId: 6, name: "Edamame", price: 69, category: "starters",
@@ -40,11 +68,11 @@ export const POS_CATALOG = Object.freeze([
   {
     // Mantiene catalogId/legacyId de "Agua Mineral" para que las órdenes
     // históricas y colas offline sigan resolviendo al mismo producto.
-    catalogId: "mineral-water", legacyId: 11, name: "Topochico", price: 30, category: "drinks",
+    catalogId: "mineral-water", legacyId: 11, name: "Topochico", price: 35, category: "drinks",
     inventoryRecipe: { topochico: 1 },
   },
   {
-    catalogId: "coca-zero", legacyId: 13, name: "Coca-Zero", price: 35, category: "drinks",
+    catalogId: "coca-zero", legacyId: 13, name: "Coca-Zero", price: 30, category: "drinks",
     inventoryRecipe: { coca_zero: 1 },
   },
   {
@@ -52,7 +80,8 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: { botella_de_agua: 1 },
   },
   {
-    catalogId: "agua-del-dia", legacyId: 15, name: "Agua natural del día", price: 30, category: "drinks", rewardDrink: true,
+    // Conserva el catalogId anterior para que ventas pendientes del POS sigan resolviendo.
+    catalogId: "agua-del-dia", legacyId: 15, name: "Agua del día", price: 35, category: "drinks", rewardDrink: true,
     inventoryRecipe: { agua_natural: 1 },
   },
 ]);
@@ -131,56 +160,58 @@ export const resolvePosItems = (items) => {
   return [...resolved.values()];
 };
 
+const COMPLEMENTS_CATALOG = new Set([
+  "shredded_carrots", "seaweed", "edamame", "red_onion", "cucumber",
+  "pineapple", "beet", "surimi", "spicy_surimi", "avocado",
+]);
+
 const BOWL_RULES = Object.freeze({
   base: {
-    allowed: new Set(["white_rice", "brown_rice", "quinoa", "spring_mix"]),
+    allowed: new Set(["white_rice", "spring_mix", "quinoa"]),
     min: 1,
-    max: 1,
+    max: 2,
   },
   proteins: {
-    allowed: new Set(["tuna", "salmon", "shrimp", "octopus", "seared_tuna"]),
-    min: 2,
+    allowed: new Set(["tuna", "salmon", "shrimp", "tofu"]),
+    // Minimo 1: hay clientes que piden bowls con una sola proteina. El
+    // precio es el mismo ($230) que con 2 — ver BOWL_BASE_PRICE.
+    min: 1,
     max: 3,
   },
   marinades: {
-    allowed: new Set([
-      "citrus_marinade", "shoyu_marinade", "ponzu_marinade", "spicy_marinade",
-      "sesame_marinade", "wasabi_marinade", "miso_marinade", "garlic_ginger_marinade",
-    ]),
-    max: 2,
+    allowed: new Set(),
+    max: 0,
   },
+  // Sin tope artificial: los primeros COMPLEMENT_FREE_LIMIT van gratis y cada
+  // uno extra cuesta EXTRA_COMPLEMENT_PRICE (ver pricing.js) — el único
+  // límite real es el tamaño del catálogo mismo.
   complements: {
-    allowed: new Set([
-      "shredded_carrots", "cucumber", "mango", "jicama", "seaweed", "avocado",
-      "edamame", "kale", "peas", "corn", "pineapple", "chia_seeds",
-    ]),
-    max: 6,
+    allowed: COMPLEMENTS_CATALOG,
+    max: COMPLEMENTS_CATALOG.size,
   },
   sauces: {
     allowed: new Set([
-      "spicy_mayo", "soy_sauce", "ponzu_sauce", "sesame_ginger", "wasabi_vinaigrette",
-      "sweet_chili", "garlic_sriracha", "avocado_lime", "miso_dressing", "yuzu_kosho",
+      "spicy_mayo", "sweet_dressing", "citrus_dressing",
+      "red_sauce", "sriracha", "cilantro_dressing",
     ]),
     max: 2,
   },
   toppings: {
     allowed: new Set([
-      "sesame_seeds", "crispy_onions", "nori_strips", "red_pepper_flakes",
-      "pickled_radish", "toasted_coconut", "pumpkin_seeds", "furikake",
+      "black_olives", "toasted_peanuts", "sesame_seeds",
+      "nori_strips", "masago", "croutons",
     ]),
     max: 5,
   },
 });
 
 export const POS_TOPPING_LABELS = Object.freeze({
+  black_olives: "Aceitunas Negras",
+  toasted_peanuts: "Cacahuate Tostado",
   sesame_seeds: "Ajonjolí",
-  crispy_onions: "Cebolla Crujiente",
   nori_strips: "Tiras de Alga Nori",
-  red_pepper_flakes: "Pimienta Roja en Hojuelas",
-  pickled_radish: "Rábano Encurtido",
-  toasted_coconut: "Copos de Coco Tostado",
-  pumpkin_seeds: "Pepitas",
-  furikake: "Furikake",
+  masago: "Masago",
+  croutons: "Crotones",
 });
 
 export const sanitizePosRewardTopping = (value) => {
@@ -203,14 +234,33 @@ const sanitizeChoiceList = (name, value) => {
   return [...list];
 };
 
-export const sanitizePosBowl = ({ base, proteins, marinades, complements, sauces, toppings }) => {
-  if (typeof base !== "string" || !BOWL_RULES.base.allowed.has(base)) {
-    throw new PosOrderValidationError("Selecciona una base válida para el bowl");
+// Un "scoop extra" es una porción adicional (40 g, $40) de una proteína ya
+// elegida — admite repetidos (dos scoops extra de salmón es válido) pero
+// cada entrada debe corresponder a una proteína ya presente en `proteins`.
+const EXTRA_SCOOP_MAX = 3;
+const sanitizeExtraScoops = (value, chosenProteins) => {
+  const list = value === undefined ? [] : value;
+  if (!Array.isArray(list) || list.length > EXTRA_SCOOP_MAX) {
+    throw new PosOrderValidationError("Cantidad de scoops extra no permitida");
+  }
+  if (list.some((id) => typeof id !== "string" || !chosenProteins.includes(id))) {
+    throw new PosOrderValidationError("El scoop extra debe ser de una proteína ya elegida");
+  }
+  return [...list];
+};
+
+export const sanitizePosBowl = ({ base, bases, proteins, marinades, complements, sauces, toppings, extraScoopProteins }) => {
+  // Legacy POS clients send only `base`; newer clients send `bases` and keep
+  // `base` equal to the first selection for compatibility with old readers.
+  const safeBases = sanitizeChoiceList("base", bases === undefined ? [base] : bases);
+  if (base !== undefined && base !== safeBases[0]) {
+    throw new PosOrderValidationError("La base principal no coincide con la selección de bases");
   }
 
   const safeProteins = sanitizeChoiceList("proteins", proteins);
   return {
-    base,
+    base: safeBases[0],
+    bases: safeBases,
     proteins: safeProteins,
     // Size is derived from the validated protein count. A browser-provided
     // bowlSize can never lower the amount charged for three proteins.
@@ -219,6 +269,7 @@ export const sanitizePosBowl = ({ base, proteins, marinades, complements, sauces
     complements: sanitizeChoiceList("complements", complements),
     sauces: sanitizeChoiceList("sauces", sauces),
     toppings: sanitizeChoiceList("toppings", toppings),
+    extraScoopProteins: sanitizeExtraScoops(extraScoopProteins, safeProteins),
   };
 };
 
@@ -238,19 +289,42 @@ const addDemand = (demand, key, amount = 1) => {
   const cleanKey = typeof key === "string" ? key.trim() : "";
   const cleanAmount = Number(amount);
   if (!cleanKey || !Number.isFinite(cleanAmount) || cleanAmount <= 0) return;
-  demand.set(cleanKey, (demand.get(cleanKey) || 0) + cleanAmount);
+  // Keep decimal kilograms stable across repeated additions (for example,
+  // 0.05 kg from a preset plus two 0.04 kg extra scoops).
+  const nextAmount = (demand.get(cleanKey) || 0) + cleanAmount;
+  demand.set(cleanKey, Number(nextAmount.toFixed(6)));
 };
 
-// Converts a complete order into ingredient portions. Flat POS products use
-// their canonical recipe and multiply every ingredient by item.qty; a custom
-// bowl contributes each selected ingredient once. The resulting object is
-// deterministic, which also makes retries safe to reconcile.
+// Converts a complete order into inventory quantities. Flat POS products use
+// their canonical recipe and multiply every ingredient by item.qty. A custom
+// bowl distributes its total protein weight equally among the selected
+// proteins; extra scoops add 40 g each. The resulting object is deterministic,
+// which also makes retries safe to reconcile.
 export const getPosInventoryDemand = (order = {}) => {
   const demand = new Map();
 
-  if (order.base) addDemand(demand, order.base);
-  for (const field of ["proteins", "marinades", "complements", "sauces", "toppings"]) {
+  // "Mitad y mitad" reparte la porción normal de base entre las 2 elegidas
+  // (0.5 c/u) en vez de sumar una porción completa de cada una.
+  if (Array.isArray(order.bases) && order.bases.length > 0) {
+    const portion = 1 / order.bases.length;
+    for (const key of order.bases) addDemand(demand, key, portion);
+  } else if (order.base) {
+    addDemand(demand, order.base);
+  }
+  const selectedProteins = Array.isArray(order.proteins) ? order.proteins : [];
+  if (selectedProteins.length > 0) {
+    const totalProteinKg = order.bowlSize === "large" || selectedProteins.length === 3
+      ? LARGE_BOWL_PROTEIN_KG
+      : MEDIUM_BOWL_PROTEIN_KG;
+    const kgPerProtein = totalProteinKg / selectedProteins.length;
+    for (const key of selectedProteins) addDemand(demand, key, kgPerProtein);
+  }
+
+  for (const field of ["marinades", "complements", "sauces", "toppings"]) {
     for (const key of Array.isArray(order[field]) ? order[field] : []) addDemand(demand, key);
+  }
+  for (const key of Array.isArray(order.extraScoopProteins) ? order.extraScoopProteins : []) {
+    addDemand(demand, key, EXTRA_SCOOP_PROTEIN_KG);
   }
   if (order.rewardExtraTopping) addDemand(demand, order.rewardExtraTopping);
 
@@ -293,8 +367,11 @@ export const getUnavailablePosSelections = ({
   };
 
   if (bowl) {
-    consider(bowl.base);
-    for (const field of ["proteins", "marinades", "complements", "sauces", "toppings"]) {
+    const selectedBases = Array.isArray(bowl.bases) && bowl.bases.length > 0
+      ? bowl.bases
+      : [bowl.base];
+    for (const key of selectedBases) consider(key);
+    for (const field of ["proteins", "marinades", "complements", "sauces", "toppings", "extraScoopProteins"]) {
       for (const key of Array.isArray(bowl[field]) ? bowl[field] : []) consider(key);
     }
   }

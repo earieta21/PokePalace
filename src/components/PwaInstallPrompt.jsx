@@ -141,7 +141,7 @@ export default function PwaInstallPrompt() {
       }}
     >
       <img
-        src="/icon.svg"
+        src="/icons/icon-192.png"
         alt=""
         aria-hidden="true"
         style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0 }}

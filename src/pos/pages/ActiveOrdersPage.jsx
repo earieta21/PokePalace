@@ -2,6 +2,7 @@ import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { PROTEIN_LABELS } from "../../order/OrderLabels";
+import { orderTimingLabel } from "../orderTiming.js";
 
 const STATUS_CFG = {
   pending:   { cls: "badgeYellow", label: "Nuevo" },
@@ -15,13 +16,6 @@ const FULFILLMENT_LABEL = {
   delivery: "Delivery",
 };
 
-function elapsed(createdAt) {
-  const secs = Math.floor((Date.now() - new Date(createdAt)) / 1000);
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
 function itemSummary(order) {
   const segments = [];
 
@@ -33,8 +27,9 @@ function itemSummary(order) {
     const parts = [];
     if (order.proteins?.length) parts.push(order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", "));
     else if (order.protein) parts.push(order.protein);
-    parts.push(`en ${order.base}`);
-    const size = order.bowlSize === "large" ? "Bowl grande" : "Bowl normal";
+    const baseText = order.bases?.length > 1 ? order.bases.join(" + ") : order.base;
+    parts.push(`en ${baseText}`);
+    const size = order.bowlSize === "large" ? "Bowl grande" : "Bowl mediano";
     segments.push(`${size}: ${parts.join(" ")}`);
   }
 
@@ -134,7 +129,7 @@ export default function ActiveOrdersPage({ styles }) {
                 <div className={styles.orderCardTop}>
                   <span className={styles.orderCardId}>#{order._id.slice(-5).toUpperCase()}</span>
                   <span className={`${styles.badge} ${styles[cls]}`}>{label}</span>
-                  <span className={styles.orderCardTimer}>{elapsed(order.createdAt)}</span>
+                  <span className={styles.orderCardTimer}>{orderTimingLabel(order)}</span>
                 </div>
                 <div className={styles.orderCardBody}>
                   <p className={styles.orderCardCustomer}>{cliente}</p>

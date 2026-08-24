@@ -13,3 +13,7 @@ dist
 
 # Local Netlify folder
 .netlify
+
+# Salida de trabajo/marketing generada localmente (fotos, videos, drafts) —
+# nunca debe versionarse, infla el repo de forma permanente.
+output/

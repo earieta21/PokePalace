@@ -3,7 +3,7 @@ import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useOrder } from "../order/OrderContext";
 import { API_URL } from "../config";
-import { getItemLabel } from "../order/OrderLabels";
+import { getItemLabel, getBaseLabel } from "../order/OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./MiCuenta.module.css";
 
@@ -263,7 +263,7 @@ export default function MiCuenta() {
                     </div>
 
                     <p className={styles.line}>
-                      <strong>{t("common.base")}:</strong> {o.base ? getItemLabel("base", o.base, language) : t("common.none")}{" "}
+                      <strong>{t("common.base")}:</strong> {o.base ? getBaseLabel(o.bases, o.base, language) : t("common.none")}{" "}
                       <span className={styles.muted}>•</span>{" "}
                       <strong>{t("common.proteins")}:</strong> {getProteinsText(o, language)}
                     </p>

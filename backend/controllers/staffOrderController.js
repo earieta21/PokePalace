@@ -8,7 +8,12 @@ import { sendSMS, sendWhatsApp } from "../utils/notify.js";
 import { awardLoyaltyPoints } from "../utils/loyalty.js";
 import { reconcileOnlineOrderCancellation } from "./orderController.js";
 import { getRewardById } from "../config/rewardsCatalog.js";
-import { computeBowlSubtotal } from "../pricing.js";
+import {
+  BOWL_BASE_PRICE,
+  EXTRA_SCOOP_PRICE,
+  computeBowlSubtotal,
+  computeExtrasSubtotal,
+} from "../pricing.js";
 import {
   getPosInventoryDemand,
   getUnavailablePosSelections,
@@ -27,6 +32,24 @@ import {
   startOfDateKey,
   zonedParts,
 } from "../utils/timeZone.js";
+import { scheduledOrderVisibilityFilter } from "../utils/orderVisibility.js";
+import {
+  insufficientInventoryItems,
+  trackedInventoryRequirements,
+} from "../utils/inventoryStock.js";
+import {
+  isPosBowlItem,
+  isValidDoubleProteinRewardBowl,
+} from "../utils/posRewards.js";
+
+const POS_PROTEIN_LABELS = Object.freeze({
+  tuna: "Atún",
+  salmon: "Salmón",
+  shrimp: "Camarón cocido",
+  tofu: "Tofu",
+  octopus: "Pulpo",
+  seared_tuna: "Atún sellado",
+});
 
 /* ── inventory auto-deduction ── */
 async function deductInventory(order) {
@@ -34,109 +57,137 @@ async function deductInventory(order) {
     const statusBefore = await Order.findById(order._id).select("status").lean();
     if (!statusBefore || statusBefore.status === "cancelled") {
       if (statusBefore?.status === "cancelled") await restoreInventoryForOrder(order);
-      return false;
+      return { ok: false, reason: statusBefore ? "cancelled" : "reconciliation" };
     }
 
     const demand = getPosInventoryDemand(order);
     const keys = Object.keys(demand);
 
     if (keys.length === 0) {
-      await Order.updateOne({ _id: order._id }, { $set: { ingredientsDeducted: true } });
+      await Order.updateOne(
+        { _id: order._id, status: { $ne: "cancelled" } },
+        { $set: { ingredientsDeducted: true } }
+      );
       order.ingredientsDeducted = true;
       const statusAfter = await Order.findById(order._id).select("status").lean();
-      if (statusAfter?.status === "cancelled") {
+      if (!statusAfter || statusAfter.status === "cancelled") {
         await restoreInventoryForOrder(order);
-        return false;
+        return { ok: false, reason: statusAfter ? "cancelled" : "reconciliation" };
       }
-      return true;
+      return { ok: true };
     }
     const invItems = await Inventory.find({ menuKeys: { $in: keys } })
-      .select("menuKeys")
+      .select("item qty menuKeys +processedOrderIds +deductedOrderIds +orderDeductions")
       .lean();
     if (invItems.length === 0) {
-      await Order.updateOne({ _id: order._id }, { $set: { ingredientsDeducted: true } });
+      // Existing stores may intentionally track only selected ingredients.
+      // A missing mapping remains an untracked item, not an artificial outage.
+      await Order.updateOne(
+        { _id: order._id, status: { $ne: "cancelled" } },
+        { $set: { ingredientsDeducted: true } }
+      );
       order.ingredientsDeducted = true;
       const statusAfter = await Order.findById(order._id).select("status").lean();
-      if (statusAfter?.status === "cancelled") {
+      if (!statusAfter || statusAfter.status === "cancelled") {
         await restoreInventoryForOrder(order);
-        return false;
+        return { ok: false, reason: statusAfter ? "cancelled" : "reconciliation" };
       }
-      return true;
+      return { ok: true };
     }
 
-    // Each inventory document may represent more than one menu key (for
-    // example raw tuna shared by tuna and seared_tuna). Calculate its complete
-    // demand, then atomically decrement and store the exact quantity removed.
-    // processedOrderIds keeps partial/ambiguous retries exactly once.
-    const operations = invItems.flatMap((item) => {
-      const requested = [...new Set(item.menuKeys || [])]
-        .reduce((sum, key) => sum + (Number(demand[key]) || 0), 0);
-      if (requested <= 0) return [];
+    const requirements = trackedInventoryRequirements(demand, invItems, order._id);
+    const ledgerMismatch = requirements.find((entry) => entry.ledgerMismatch);
+    if (ledgerMismatch) {
+      await restoreInventoryForOrder(order);
+      return {
+        ok: false,
+        reason: "reconciliation",
+        message: `El registro de inventario para ${ledgerMismatch.item} requiere revisión`,
+      };
+    }
 
-      return [{
-        updateOne: {
-          filter: { _id: item._id, processedOrderIds: { $ne: order._id } },
-          update: [{
-            $set: {
-              qty: {
-                $max: [0, { $subtract: [{ $ifNull: ["$qty", 0] }, requested] }],
-              },
-              orderDeductions: {
-                $cond: [
-                  { $gt: [{ $ifNull: ["$qty", 0] }, 0] },
-                  {
-                    $concatArrays: [
-                      { $ifNull: ["$orderDeductions", []] },
-                      [{
-                        orderId: order._id,
-                        quantity: {
-                          $min: [
-                            { $max: [0, { $ifNull: ["$qty", 0] }] },
-                            requested,
-                          ],
-                        },
-                      }],
-                    ],
-                  },
-                  { $ifNull: ["$orderDeductions", []] },
-                ],
-              },
-              deductedOrderIds: {
-                $cond: [
-                  { $gt: [{ $ifNull: ["$qty", 0] }, 0] },
-                  { $setUnion: [{ $ifNull: ["$deductedOrderIds", []] }, [order._id]] },
-                  { $ifNull: ["$deductedOrderIds", []] },
-                ],
-              },
-              processedOrderIds: {
-                $setUnion: [{ $ifNull: ["$processedOrderIds", []] }, [order._id]],
-              },
-            },
-          }],
+    const shortages = insufficientInventoryItems(requirements);
+    if (shortages.length > 0) {
+      if (requirements.some((entry) => entry.alreadyDeducted)) {
+        await restoreInventoryForOrder(order);
+      }
+      return { ok: false, reason: "insufficient", shortages };
+    }
+
+    // Each tracked document is claimed atomically with a quantity guard. This
+    // never clamps stock to zero: the full request succeeds, or prior claims
+    // for this order are restored.
+    for (const requirement of requirements) {
+      if (requirement.alreadyDeducted) continue;
+
+      const claimed = await Inventory.findOneAndUpdate(
+        {
+          _id: requirement._id,
+          processedOrderIds: { $ne: order._id },
+          qty: { $gte: requirement.requested },
         },
-      }];
-    });
+        {
+          $inc: { qty: -requirement.requested },
+          $addToSet: {
+            deductedOrderIds: order._id,
+            processedOrderIds: order._id,
+          },
+          $push: {
+            orderDeductions: {
+              orderId: order._id,
+              quantity: requirement.requested,
+            },
+          },
+        },
+        { new: true }
+      ).select("_id");
 
-    if (operations.length > 0) await Inventory.bulkWrite(operations, { ordered: false });
+      if (claimed) continue;
+
+      // A concurrent retry for this same order may have won the update.
+      const current = await Inventory.findById(requirement._id)
+        .select("item qty menuKeys +processedOrderIds +deductedOrderIds +orderDeductions")
+        .lean();
+      const [currentRequirement] = trackedInventoryRequirements(
+        demand,
+        current ? [current] : [],
+        order._id
+      );
+      if (currentRequirement?.alreadyDeducted) continue;
+
+      await restoreInventoryForOrder(order);
+      if (currentRequirement && !currentRequirement.wasProcessed
+          && currentRequirement.available < currentRequirement.requested) {
+        return {
+          ok: false,
+          reason: "insufficient",
+          shortages: insufficientInventoryItems([currentRequirement]),
+        };
+      }
+      return { ok: false, reason: "reconciliation" };
+    }
 
     // This marker is a summary only; the per-item ledgers are authoritative.
     // A crash here is repaired by the next safe retry.
-    await Order.updateOne({ _id: order._id }, { $set: { ingredientsDeducted: true } });
+    await Order.updateOne(
+      { _id: order._id, status: { $ne: "cancelled" } },
+      { $set: { ingredientsDeducted: true } }
+    );
     order.ingredientsDeducted = true;
 
     // Close the race where cancellation wins after our first status read but
     // before the inventory update. Restoration uses the same durable ledgers.
     const statusAfter = await Order.findById(order._id).select("status").lean();
-    if (statusAfter?.status === "cancelled") {
+    if (!statusAfter || statusAfter.status === "cancelled") {
       await restoreInventoryForOrder(order);
-      return false;
+      return { ok: false, reason: statusAfter ? "cancelled" : "reconciliation" };
     }
-    return true;
+    return { ok: true };
   } catch (err) {
     // Never roll the ledger back: the inventory command may have succeeded
     // despite a network error. Retrying is safe and completes only missing docs.
     console.error("deductInventory error:", err.message);
-    return false;
+    return { ok: false, reason: "reconciliation" };
   }
 }
 
@@ -225,6 +276,31 @@ async function restoreInventoryForOrder(order) {
     return false;
   }
 }
+
+const sendInventoryFailure = (res, result, {
+  orderId,
+  retryMessage = "El inventario sigue conciliándose. Reintenta.",
+} = {}) => {
+  if (result?.reason === "insufficient") {
+    return res.status(409).json({
+      code: "INSUFFICIENT_STOCK",
+      message: "No hay inventario suficiente para completar la orden",
+      shortages: result.shortages || [],
+      ...(orderId ? { orderId } : {}),
+    });
+  }
+  if (result?.reason === "cancelled") {
+    return res.status(409).json({
+      message: "Una orden cancelada no puede confirmarse ni cobrarse",
+      ...(orderId ? { orderId } : {}),
+    });
+  }
+  return res.status(503).json({
+    message: result?.message || retryMessage,
+    retryable: true,
+    ...(orderId ? { orderId } : {}),
+  });
+};
 
 async function reverseLoyaltyForPosCancellation(order) {
   const earned = Math.max(0, Number(order.loyaltyPointsEarned) || 0);
@@ -481,14 +557,18 @@ export const getAllOrders = async (req, res) => {
       ? requestedSkip
       : 0;
     const filter = {};
+    const operationalStatuses = new Set(["pending", "preparing", "ready"]);
     if (isKitchen) {
-      const kitchenStatuses = new Set(["pending", "preparing", "ready"]);
-      const allowedRequested = requestedStatuses.filter((value) => kitchenStatuses.has(value));
+      const allowedRequested = requestedStatuses.filter((value) => operationalStatuses.has(value));
       filter.status = {
-        $in: requestedStatuses.length > 0 ? allowedRequested : [...kitchenStatuses],
+        $in: requestedStatuses.length > 0 ? allowedRequested : [...operationalStatuses],
       };
+      Object.assign(filter, scheduledOrderVisibilityFilter());
     } else if (requestedStatuses.length > 0) {
       filter.status = { $in: requestedStatuses };
+      if (requestedStatuses.every((value) => operationalStatuses.has(value))) {
+        Object.assign(filter, scheduledOrderVisibilityFilter());
+      }
     }
     if (source) filter.source = source;
 
@@ -520,24 +600,30 @@ export const markAsPaid = async (req, res) => {
     const PAY_METHODS = ["cash", "card_terminal"];
     const method = PAY_METHODS.includes(req.body?.method) ? req.body.method : null;
 
+    const pendingOrder = await Order.findById(req.params.id).populate("user", "name email");
+    if (!pendingOrder) return res.status(404).json({ message: "Orden no encontrada" });
+    if (pendingOrder.status === "cancelled") {
+      return res.status(409).json({ message: "Una orden cancelada no puede cobrarse" });
+    }
+
+    // Reserve every tracked ingredient before recording the payment. If stock
+    // is insufficient the order remains unpaid.
+    const inventoryResult = await deductInventory(pendingOrder);
+    if (!inventoryResult.ok) {
+      return sendInventoryFailure(res, inventoryResult, {
+        orderId: pendingOrder._id,
+        retryMessage: "No se pudo conciliar el inventario antes de cobrar. Reintenta.",
+      });
+    }
+
     const order = await Order.findOneAndUpdate(
-      { _id: req.params.id, status: { $ne: "cancelled" } },
+      { _id: pendingOrder._id, status: { $ne: "cancelled" } },
       { paymentStatus: "paid", ...(method ? { paymentMethod: method } : {}) },
       { new: true }
     ).populate("user", "name email");
     if (!order) {
-      const exists = await Order.exists({ _id: req.params.id });
-      return res.status(exists ? 409 : 404).json({
-        message: exists ? "Una orden cancelada no puede cobrarse" : "Orden no encontrada",
-      });
-    }
-
-    if (!await deductInventory(order)) {
-      return res.status(503).json({
-        message: "El pago fue guardado, pero el inventario sigue conciliándose. Reintenta.",
-        retryable: true,
-        orderId: order._id,
-      });
+      await restoreInventoryForOrder(pendingOrder);
+      return res.status(409).json({ message: "Una orden cancelada no puede cobrarse" });
     }
     const loyalty = await awardLoyaltyPoints(order);
 
@@ -586,11 +672,11 @@ export const updateOrderStatus = async (req, res) => {
       }
       let loyalty = null;
       if (status === "completed") {
-        if (!await deductInventory(prev)) {
-          return res.status(503).json({
-            message: "La orden quedó completada, pero el inventario sigue conciliándose. Reintenta.",
-            retryable: true,
+        const inventoryResult = await deductInventory(prev);
+        if (!inventoryResult.ok) {
+          return sendInventoryFailure(res, inventoryResult, {
             orderId: prev._id,
+            retryMessage: "La orden está completada, pero el inventario requiere conciliación. Reintenta.",
           });
         }
         loyalty = await awardLoyaltyPoints(prev);
@@ -604,6 +690,18 @@ export const updateOrderStatus = async (req, res) => {
 
     if (!transitions[prev.status]?.includes(status)) {
       return res.status(409).json({ message: "La orden no puede cambiar a ese estado" });
+    }
+
+    if (status === "completed") {
+      // A ready order is only confirmed as completed after all tracked stock
+      // has been claimed. An outage leaves it in ready state.
+      const inventoryResult = await deductInventory(prev);
+      if (!inventoryResult.ok) {
+        return sendInventoryFailure(res, inventoryResult, {
+          orderId: prev._id,
+          retryMessage: "No se pudo conciliar el inventario antes de completar. Reintenta.",
+        });
+      }
     }
 
     let order = await Order.findOneAndUpdate(
@@ -622,13 +720,6 @@ export const updateOrderStatus = async (req, res) => {
         if (status === "cancelled") order = await reconcileCancelledStaffOrder(latest);
         let loyalty = null;
         if (status === "completed") {
-          if (!await deductInventory(latest)) {
-            return res.status(503).json({
-              message: "La orden quedó completada, pero el inventario sigue conciliándose. Reintenta.",
-              retryable: true,
-              orderId: latest._id,
-            });
-          }
           loyalty = await awardLoyaltyPoints(latest);
         }
         return res.json({
@@ -641,13 +732,6 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     if (status === "cancelled") order = await reconcileCancelledStaffOrder(order);
-    if (status === "completed" && !await deductInventory(order)) {
-      return res.status(503).json({
-        message: "La orden quedó completada, pero el inventario sigue conciliándose. Reintenta.",
-        retryable: true,
-        orderId: order._id,
-      });
-    }
     const loyalty = status === "completed" ? await awardLoyaltyPoints(order) : null;
 
     res.json({ order: orderResponseForRole(order, req.staff.role), loyalty });
@@ -705,7 +789,8 @@ export const createPosOrder = async (req, res) => {
   try {
     const {
       items, customer, phone, notes, fulfillment, paymentMethod, rewardCode, customerUserId,
-      base, proteins, marinades, complements, sauces, toppings, clientOrderId, rewardTopping,
+      base, bases, proteins, marinades, complements, sauces, toppings, extraScoopProteins,
+      clientOrderId, rewardTopping,
     } = req.body;
 
     try {
@@ -725,16 +810,18 @@ export const createPosOrder = async (req, res) => {
           const reconciled = await reconcileCancelledPosOrder(existing);
           return res.status(200).json({ order: reconciled, loyalty: null, idempotent: true });
         }
+        const inventoryResult = await deductInventory(existing);
+        if (!inventoryResult.ok) {
+          return sendInventoryFailure(res, inventoryResult, {
+            orderId: existing._id,
+            retryMessage: "La venta existe, pero aún se está conciliando. Reintenta con el mismo clientOrderId.",
+          });
+        }
         if (!await consumeRedemptionForOrder(existing, existing.staffId || req.staff.id)) {
+          await restoreInventoryForOrder(existing);
           return res.status(409).json({
             message: "No se pudo conciliar el premio de esta venta; requiere revisión",
             orderId: existing._id,
-          });
-        }
-        if (!await deductInventory(existing)) {
-          return res.status(503).json({
-            message: "La venta existe, pero aún se está conciliando. Reintenta con el mismo clientOrderId.",
-            retryable: true,
           });
         }
         const loyalty = await awardLoyaltyPoints(existing);
@@ -747,9 +834,9 @@ export const createPosOrder = async (req, res) => {
     let safeRewardTopping = null;
     try {
       safeItems = resolvePosItems(items === undefined ? [] : items);
-      const wantsCustomBowl = base !== undefined || proteins !== undefined;
+      const wantsCustomBowl = base !== undefined || bases !== undefined || proteins !== undefined;
       if (wantsCustomBowl) {
-        safeBowl = sanitizePosBowl({ base, proteins, marinades, complements, sauces, toppings });
+        safeBowl = sanitizePosBowl({ base, bases, proteins, marinades, complements, sauces, toppings, extraScoopProteins });
       }
       if (rewardTopping !== undefined && rewardTopping !== null && rewardTopping !== "") {
         safeRewardTopping = sanitizePosRewardTopping(rewardTopping);
@@ -785,7 +872,10 @@ export const createPosOrder = async (req, res) => {
 
     const itemsSubtotal = safeItems.reduce((sum, item) => sum + item.price * item.qty, 0);
     const customBowlPrice = hasBowl
-      ? computeBowlSubtotal(safeBowl.bowlSize)
+      ? computeBowlSubtotal(safeBowl.bowlSize) + computeExtrasSubtotal({
+          extraScoops: safeBowl.extraScoopProteins.length,
+          complementsCount: safeBowl.complements.length,
+        })
       : 0;
     const subtotal = itemsSubtotal + customBowlPrice;
 
@@ -804,7 +894,7 @@ export const createPosOrder = async (req, res) => {
         return res.status(400).json({ message: "El topping seleccionado no corresponde a este premio" });
       }
 
-      const bowlItems = safeItems.filter((item) => item.category === "bowls");
+      const bowlItems = safeItems.filter(isPosBowlItem);
       const orderHasBowl = hasBowl || bowlItems.length > 0;
       if (!orderHasBowl) {
         return res.status(400).json({ message: "Este premio requiere un bowl en la orden" });
@@ -813,7 +903,7 @@ export const createPosOrder = async (req, res) => {
       if (reward.type === "free_drink") {
         const drinks = safeItems.filter((item) => item.rewardDrink);
         if (!drinks.length) {
-          return res.status(400).json({ message: "Agrega el Agua natural del día a la orden" });
+          return res.status(400).json({ message: "Agrega el Agua del día a la orden" });
         }
         rewardDiscount = Math.min(...drinks.map((item) => item.price));
       } else if (reward.type === "extra_topping") {
@@ -826,13 +916,17 @@ export const createPosOrder = async (req, res) => {
         // discount to apply. Persist the exact choice for KDS and inventory.
         rewardInstruction = `PREMIO REWARDS: agregar 1 porción extra de ${POS_TOPPING_LABELS[safeRewardTopping]}.`;
       } else if (reward.type === "double_protein") {
-        if (!hasBowl || safeBowl.proteins.length < 3) {
-          return res.status(400).json({ message: "Proteína doble requiere un bowl personalizado grande" });
+        if (!hasBowl || !isValidDoubleProteinRewardBowl(safeBowl)) {
+          return res.status(400).json({
+            message: "Proteína doble requiere un bowl personalizado grande y una porción extra seleccionada",
+          });
         }
-        rewardDiscount = 40;
+        const rewardedProtein = safeBowl.extraScoopProteins[0];
+        rewardDiscount = EXTRA_SCOOP_PRICE;
+        rewardInstruction = `PREMIO REWARDS: agregar 1 porción extra de ${POS_PROTEIN_LABELS[rewardedProtein] || rewardedProtein}.`;
       } else if (reward.type === "free_bowl") {
         const eligibleBowlPrice = hasBowl ? customBowlPrice : Math.min(...bowlItems.map((item) => item.price));
-        rewardDiscount = Math.min(249, eligibleBowlPrice);
+        rewardDiscount = Math.min(BOWL_BASE_PRICE, eligibleBowlPrice);
       }
       rewardDiscount = Math.min(rewardDiscount, subtotal);
     }
@@ -876,6 +970,7 @@ export const createPosOrder = async (req, res) => {
       status: "pending",
       ...(hasBowl && {
         base: safeBowl.base,
+        bases: safeBowl.bases,
         protein: safeBowl.proteins.join(", "),
         proteins: safeBowl.proteins,
         bowlSize: safeBowl.bowlSize,
@@ -884,37 +979,48 @@ export const createPosOrder = async (req, res) => {
         complements: safeBowl.complements,
         sauces: safeBowl.sauces,
         toppings: safeBowl.toppings,
+        extraScoopProteins: safeBowl.extraScoopProteins,
       }),
     });
 
-    if (redemption) {
-      if (!await consumeRedemptionForOrder(order, req.staff.id)) {
-        const latest = await Order.findById(order._id).populate("user", "name email");
-        if (latest?.status === "cancelled") {
-          const reconciled = await reconcileCancelledPosOrder(latest);
-          return res.status(409).json({
-            message: "La venta fue cancelada mientras se conciliaba",
-            order: reconciled,
-          });
-        }
+    const inventoryResult = await deductInventory(order);
+    if (!inventoryResult.ok) {
+      if (inventoryResult.reason === "insufficient") {
+        // Nothing was charged or redeemed yet. Remove the provisional ticket
+        // so the cashier can adjust it and reuse the reward code.
         await Order.findOneAndDelete({
           _id: order._id,
           status: "pending",
           ingredientsDeducted: false,
           loyaltyPointsEarned: 0,
         });
-        return res.status(409).json({ message: "Este premio ya fue usado en otra orden" });
       }
+      return sendInventoryFailure(res, inventoryResult, {
+        retryMessage: "La venta fue guardada, pero aún se está conciliando. Reintenta con el mismo clientOrderId.",
+      });
+    }
+
+    if (redemption && !await consumeRedemptionForOrder(order, req.staff.id)) {
+      const latest = await Order.findById(order._id).populate("user", "name email");
+      if (latest?.status === "cancelled") {
+        const reconciled = await reconcileCancelledPosOrder(latest);
+        return res.status(409).json({
+          message: "La venta fue cancelada mientras se conciliaba",
+          order: reconciled,
+        });
+      }
+      await restoreInventoryForOrder(order);
+      await Order.findOneAndDelete({
+        _id: order._id,
+        status: "pending",
+        ingredientsDeducted: false,
+        loyaltyPointsEarned: 0,
+      });
+      return res.status(409).json({ message: "Este premio ya fue usado en otra orden" });
     }
 
     // Paid POS sales credit Rewards immediately. Pending sales do it later
     // through /pay or when the order is completed.
-    if (!await deductInventory(order)) {
-      return res.status(503).json({
-        message: "La venta fue guardada, pero aún se está conciliando. Reintenta con el mismo clientOrderId.",
-        retryable: Boolean(cleanClientOrderId),
-      });
-    }
     const loyalty = await awardLoyaltyPoints(order);
 
     res.status(201).json({ order, loyalty });
@@ -928,16 +1034,18 @@ export const createPosOrder = async (req, res) => {
             const reconciled = await reconcileCancelledPosOrder(existing);
             return res.status(200).json({ order: reconciled, loyalty: null, idempotent: true });
           }
+          const inventoryResult = await deductInventory(existing);
+          if (!inventoryResult.ok) {
+            return sendInventoryFailure(res, inventoryResult, {
+              orderId: existing._id,
+              retryMessage: "La venta existe, pero aún se está conciliando. Reintenta con el mismo clientOrderId.",
+            });
+          }
           if (!await consumeRedemptionForOrder(existing, existing.staffId || req.staff.id)) {
+            await restoreInventoryForOrder(existing);
             return res.status(409).json({
               message: "No se pudo conciliar el premio de esta venta; requiere revisión",
               orderId: existing._id,
-            });
-          }
-          if (!await deductInventory(existing)) {
-            return res.status(503).json({
-              message: "La venta existe, pero aún se está conciliando. Reintenta con el mismo clientOrderId.",
-              retryable: true,
             });
           }
           const loyalty = await awardLoyaltyPoints(existing);

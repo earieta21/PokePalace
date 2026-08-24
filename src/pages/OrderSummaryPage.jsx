@@ -43,7 +43,10 @@ export default function OrderSummaryPage() {
   const [validatedPromo, setValidatedPromo] = useState(null);
   const userPoints     = user?.points ?? 0;
   const derivedBowlSize = order?.proteins?.length === 3 ? "large" : "normal";
-  const orderTotalAfterPromo = computePricing(derivedBowlSize, validatedPromo).total;
+  const orderTotalAfterPromo = computePricing(derivedBowlSize, validatedPromo, {
+    extraScoops: Array.isArray(order?.extraScoopProteins) ? order.extraScoopProteins.length : 0,
+    complementsCount: Array.isArray(order?.complements) ? order.complements.length : 0,
+  }).total;
   const redeemableBlocks = Math.min(
     Math.floor(userPoints / POINTS_PER_REWARD),
     Math.floor(orderTotalAfterPromo / REWARD_VALUE_MXN)
@@ -104,6 +107,15 @@ export default function OrderSummaryPage() {
     navigate(`/order?step=${stepIndex}&edit=1`, { state: { guest: isGuest } });
   };
 
+  const onRestart = () => {
+    const actor = isLoggedIn
+      ? `user:${user?._id || user?.id || "authenticated"}`
+      : "guest";
+    clearOrderSubmission(actor);
+    resetOrder();
+    navigate("/order?step=0", { state: { guest: isGuest }, replace: true });
+  };
+
   const onConfirm = async () => {
     const selectedProteins = Array.isArray(order?.proteins) ? order.proteins : [];
     if (!order?.base || selectedProteins.length < 1) {
@@ -113,6 +125,11 @@ export default function OrderSummaryPage() {
 
     if (!order?.customer?.trim() || !order?.phone?.trim()) {
       setSubmitError(t("summary.missingContact"));
+      return;
+    }
+
+    if (order?.isScheduled && !order?.scheduledPickupTime) {
+      setSubmitError(t("summary.missingSchedule"));
       return;
     }
 
@@ -246,6 +263,7 @@ export default function OrderSummaryPage() {
 
       <OrderSummary
         onEditStep={onEditStep}
+        onRestart={onRestart}
         onConfirm={onConfirm}
         onPromoChange={setValidatedPromo}
         pointsDiscount={usePoints ? pointsDiscount : 0}

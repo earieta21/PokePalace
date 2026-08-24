@@ -9,6 +9,7 @@ export function zonedParts(date = new Date(), timeZone = RESTAURANT_TIME_ZONE) {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
+    weekday: "short",
     hourCycle: "h23",
   }).formatToParts(date);
   const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
@@ -19,6 +20,7 @@ export function zonedParts(date = new Date(), timeZone = RESTAURANT_TIME_ZONE) {
     hour: Number(value.hour),
     minute: Number(value.minute),
     second: Number(value.second),
+    weekday: value.weekday,
   };
 }
 

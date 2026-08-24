@@ -6,6 +6,7 @@ import { dateKeyInTimeZone, normalizeRestockLines } from "../utils/inventoryRest
 // Cada sección del inventario tiene su categoría contable en Finanzas.
 const EXPENSE_CATEGORY_BY_SECTION = {
   Comida:   "Ingredientes",
+  Bebidas:  "Bebidas",
   Limpieza: "Limpieza",
   Empaque:  "Empaque",
   Otros:    "Otros",
@@ -25,8 +26,8 @@ const pickInventoryFields = (body = {}) => Object.fromEntries(
 /* Registra la compra como gasto en Finanzas (costo unitario × cantidad).
    Devuelve null si el artículo no tiene costo registrado; un fallo aquí
    no debe tumbar la operación de inventario. */
-async function recordPurchaseExpense({ item, qty, staff, sourceRef = null, strict = false }) {
-  const cost = Number(item.cost) || 0;
+async function recordPurchaseExpense({ item, qty, staff, sourceRef = null, strict = false, costOverride = null }) {
+  const cost = costOverride != null ? Number(costOverride) || 0 : Number(item.cost) || 0;
   if (cost <= 0 || !(qty > 0)) return null;
   try {
     const payload = {
@@ -125,7 +126,12 @@ export const restockItem = async (req, res) => {
 };
 
 /* POST /api/staff/inventory/restock-batch
-   body: { requestId, lines: [{ itemId, amount }] }
+   body: { requestId, lines: [{ itemId, amount, cost? }] }
+
+   `cost` es opcional y es el costo unitario de ESTA compra. Si se manda,
+   se guarda como el nuevo costo del artículo (precio más reciente) y se
+   usa para calcular el gasto en Finanzas; si no, se conserva el costo
+   anterior del artículo.
 
    Each Inventory update records requestId atomically alongside the increment.
    A retry can therefore finish missing lines without adding successful ones a
@@ -158,12 +164,16 @@ export const restockBatch = async (req, res) => {
     }
 
     const existingById = new Map(existingItems.map((item) => [String(item._id), item]));
-    const results = await Promise.all(lines.map(async ({ itemId, amount }) => {
+    const results = await Promise.all(lines.map(async ({ itemId, amount, cost }) => {
+      const hasNewCost = Number.isFinite(cost) && cost >= 0;
       let item = await Inventory.findOneAndUpdate(
         { _id: itemId, restockRequestIds: { $ne: requestId } },
         {
           $inc: { qty: amount },
-          $set: { lastRestockAt: new Date() },
+          $set: {
+            lastRestockAt: new Date(),
+            ...(hasNewCost ? { cost } : {}),
+          },
           $addToSet: { restockRequestIds: requestId },
         },
         { new: true, runValidators: true }
@@ -181,6 +191,7 @@ export const restockBatch = async (req, res) => {
             staff: req.staff,
             sourceRef: `inventory-receipt:${requestId}:${itemId}`,
             strict: true,
+            costOverride: hasNewCost ? cost : null,
           });
 
       return { item, expense, replayed };
@@ -197,6 +208,34 @@ export const restockBatch = async (req, res) => {
       message: "La recepción quedó pendiente de completar; reintenta con el mismo folio",
       err: err.message,
     });
+  }
+};
+
+/* POST /api/staff/inventory/backfill-expenses
+   Registra en Finanzas el valor de las existencias que YA estaban cargadas
+   en el inventario (p. ej. la carga inicial antes de abrir), que nunca
+   pasaron por "Recibir mercancía" y por eso no generaron gasto. Idempotente
+   vía sourceRef — correrlo varias veces no duplica nada. */
+export const backfillInventoryExpenses = async (req, res) => {
+  try {
+    const items = await Inventory.find({ qty: { $gt: 0 }, cost: { $gt: 0 } });
+    const results = await Promise.all(items.map((item) =>
+      recordPurchaseExpense({
+        item,
+        qty: item.qty,
+        staff: req.staff,
+        sourceRef: `inventory-initial:${item._id}`,
+      })
+    ));
+    const created = results.filter(Boolean);
+    const total = created.reduce((sum, expense) => sum + expense.amount, 0);
+    res.json({
+      itemsConsiderados: items.length,
+      gastosRegistrados: created.length,
+      total: parseFloat(total.toFixed(2)),
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error al registrar existencias iniciales", err: err.message });
   }
 };
 

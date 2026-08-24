@@ -6,10 +6,10 @@ import { computeBowlSubtotal } from "../order/pricing";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./Home.module.css";
 
-import salmonBowl from "../assets/menu-emerald-salmon-v2.webp";
-import spicyTuna from "../assets/menu-spicy-tuna-v2.webp";
-import tropicalShrimp from "../assets/menu-tropical-shrimp-v2.webp";
-import citrusOctopus from "../assets/menu-citrus-octopus-v2.webp";
+import salmonBowl from "../assets/menu/emeraldSalmon.webp";
+import spicyTuna from "../assets/menu/spicyTuna.webp";
+import tropicalShrimp from "../assets/menu/tropicalShrimp.webp";
+import citrusTofu from "../assets/protein/tofu.jpg";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -41,7 +41,7 @@ const Home = () => {
       id: "citrus_octopus",
       name: t("menu.citrusOctopus"),
       price: computeBowlSubtotal("normal"),
-      image: citrusOctopus,
+      image: citrusTofu,
       orderUrl: "/order?preset=citrus_octopus",
     },
   ];

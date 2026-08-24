@@ -4,12 +4,14 @@ const favoriteBowlSchema = new mongoose.Schema(
   {
     name:        { type: String, required: true, trim: true },
     base:        { type: String, default: null },
+    bases:       { type: [String], default: [] },
     proteins:    { type: [String], default: [] },
     bowlSize:    { type: String, enum: ["normal", "large"], default: "normal" },
     marinades:   { type: [String], default: [] },
     complements: { type: [String], default: [] },
     sauces:      { type: [String], default: [] },
     toppings:    { type: [String], default: [] },
+    extraScoopProteins: { type: [String], default: [] },
   },
   { timestamps: true }
 );

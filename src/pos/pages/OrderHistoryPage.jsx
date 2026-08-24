@@ -21,7 +21,8 @@ function itemBrief(order) {
   if (order.items?.length) parts.push(order.items.map((i) => `${i.name} ×${i.qty}`).join(", "));
   if (order.base) {
     const proteins = order.proteins?.map((id) => PROTEIN_LABELS[id] ?? id).join(", ") || order.protein || "";
-    parts.push(`Bowl ${order.bowlSize === "large" ? "Grande" : "Normal"}: ${proteins} en ${order.base}`);
+    const baseText = order.bases?.length > 1 ? order.bases.join(" + ") : order.base;
+    parts.push(`Bowl ${order.bowlSize === "large" ? "Grande" : "Mediano"}: ${proteins} en ${baseText}`);
   }
   return parts.join(" + ") || "Bowl personalizado";
 }
