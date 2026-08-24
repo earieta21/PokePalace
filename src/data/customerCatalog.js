@@ -7,6 +7,7 @@ import bottledWater from "../assets/menu/products/bottled-water.jpg";
 import aguaDelDia from "../assets/menu/products/agua-del-dia.jpg";
 import cacaoRiceCake from "../assets/menu/products/cacao-rice-cake.jpg";
 import chocoRiceCake from "../assets/menu/products/choco-rice-cake.jpg";
+import honeyRiceCake from "../assets/menu/products/honey-rice-cake.jpg";
 
 // Catálogo de artículos que un cliente puede agregar directo al carrito sin
 // pasar por el armador: bowls de la casa (receta fija), bebidas y extras.
@@ -67,6 +68,16 @@ export const CUSTOMER_CATALOG = Object.freeze([
     imageFit: "contain",
   },
   {
+    catalogId: "coca-cola-regular",
+    name: "Coca-Cola",
+    price: 30,
+    category: "Bebidas",
+    categoryKey: "drinks",
+    icon: "🥤",
+    // Sin foto todavía — MenuBrowser.jsx cae a la tarjeta "solo ícono"
+    // cuando no hay `image`, se ve bien así.
+  },
+  {
     catalogId: "bottled-water",
     name: "Botella de Agua",
     price: 20,
@@ -93,6 +104,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
     categoryKey: "extras",
     icon: "🍫",
     image: cacaoRiceCake,
+    imageFit: "contain",
   },
   {
     catalogId: "choco-rice-cake",
@@ -102,6 +114,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
     categoryKey: "extras",
     icon: "🍫",
     image: chocoRiceCake,
+    imageFit: "contain",
   },
   {
     catalogId: "miel-rice-cake",
@@ -110,9 +123,8 @@ export const CUSTOMER_CATALOG = Object.freeze([
     category: "Extras",
     categoryKey: "extras",
     icon: "🍯",
-    // Sin foto todavía — se ve bien con solo el ícono (MenuBrowser.jsx
-    // cae a la tarjeta "solo ícono" cuando no hay `image`). Agregar aquí
-    // cuando haya una foto con licencia verificada, como las demás.
+    image: honeyRiceCake,
+    imageFit: "contain",
   },
 ]);
 
