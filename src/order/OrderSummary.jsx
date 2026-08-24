@@ -218,6 +218,7 @@ const OrderSummary = ({
           complements: soleBowlLine.complements,
           sauces: soleBowlLine.sauces,
           toppings: soleBowlLine.toppings,
+          extraScoopProteins: soleBowlLine.extraScoopProteins,
         }),
       });
       const data = await res.json().catch(() => ({}));

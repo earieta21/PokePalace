@@ -28,6 +28,7 @@ import FiscalPage from "../pos/pages/FiscalPage";
 import SalesDashboardPage from "../pos/pages/SalesDashboardPage";
 import SummaryPage from "../pos/pages/SummaryPage";
 import InventoryPage from "../pos/pages/InventoryPage";
+import WastePage from "../pos/pages/WastePage";
 import CustomersPage from "../pos/pages/CustomersPage";
 import posStyles from "../pos/EmployeePortal.module.css";
 
@@ -140,10 +141,10 @@ const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const TABS_BY_ROLE = {
   employee: ["pos", "inicio", "tareas", "temp", "horario", "avisos"],
   cashier:  ["pos", "premios", "inicio", "tareas", "temp", "hist", "corte", "horario", "avisos"],
-  kitchen:  ["cocina", "inicio", "tareas", "temp", "hist", "horario", "avisos"],
-  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "panel"],
-  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
-  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
+  kitchen:  ["cocina", "inicio", "tareas", "temp", "hist", "mermas", "horario", "avisos"],
+  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
 };
 
 const TAB_META = {
@@ -155,6 +156,7 @@ const TAB_META = {
   clientes:{ label: "Clientes", title: "Clientes registrados", icon: Users },
   ventas:  { label: "Ventas", title: "Panel de ventas", icon: Activity },
   inv:     { label: "Inventario", title: "Inventario", icon: Package },
+  mermas:  { label: "Mermas", title: "Registro de merma", icon: Trash2 },
   corte:   { label: "Corte", title: "Corte de caja", icon: Wallet },
   fin:     { label: "Finanzas", title: "Finanzas", icon: BarChart3 },
   fiscal:  { label: "Fiscal", title: "Asistente fiscal (SAT)", icon: Landmark },
@@ -170,7 +172,7 @@ const TAB_META = {
 const TAB_GROUPS = [
   { id: "operacion", label: "Operación", tabs: ["pos", "cocina", "premios"] },
   { id: "turno", label: "Mi turno", tabs: ["inicio", "tareas", "temp"] },
-  { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv", "corte"] },
+  { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv", "mermas", "corte"] },
   { id: "equipo", label: "Equipo", tabs: ["horario", "avisos"] },
   { id: "gestion", label: "Administración", tabs: ["resumen", "clientes", "ventas", "fin", "fiscal", "panel"] },
 ];
@@ -521,6 +523,7 @@ export default function UnifiedStaffApp() {
             {tab === "clientes"&& <CustomersPage styles={posStyles} />}
             {tab === "ventas"  && <section className={shellStyles.portalSurface}><SalesDashboardPage styles={posStyles} /></section>}
             {tab === "inv"     && <InventoryPage styles={posStyles} role={me?.role} />}
+            {tab === "mermas"  && <WastePage styles={posStyles} />}
             {tab === "corte"   && <CashCutPage styles={posStyles} />}
             {tab === "fin"     && <FinancePage styles={posStyles} />}
             {tab === "fiscal"  && <FiscalPage styles={posStyles} />}

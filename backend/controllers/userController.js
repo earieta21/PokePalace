@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import { sanitizeCustomerBowl } from "../utils/customerOrder.js";
 
 /* GET /api/users/me — returns fresh user profile (including updated points) */
 export const getMe = async (req, res) => {
@@ -23,10 +24,14 @@ export const getFavorites = async (req, res) => {
 
 export const saveFavorite = async (req, res) => {
   try {
-    const { name, base, proteins, bowlSize, marinades, complements, sauces, toppings } = req.body;
+    const { name, base, bases, protein, proteins, marinades, complements, sauces, toppings, extraScoopProteins } = req.body;
     if (!name?.trim()) return res.status(400).json({ msg: "El nombre del favorito es requerido" });
-    if (!base || !Array.isArray(proteins) || proteins.length < 2) {
-      return res.status(400).json({ msg: "El bowl debe tener base y al menos 2 proteínas" });
+
+    let bowl;
+    try {
+      bowl = sanitizeCustomerBowl({ base, bases, protein, proteins, marinades, complements, sauces, toppings, extraScoopProteins });
+    } catch (err) {
+      return res.status(400).json({ msg: err.message || "El bowl no es válido" });
     }
 
     const user = await User.findById(req.userId);
@@ -38,13 +43,15 @@ export const saveFavorite = async (req, res) => {
 
     user.favoriteBowls.push({
       name: name.trim(),
-      base,
-      proteins,
-      bowlSize: bowlSize || (proteins.length === 3 ? "large" : "normal"),
-      marinades: marinades || [],
-      complements: complements || [],
-      sauces: sauces || [],
-      toppings: toppings || [],
+      base: bowl.base,
+      bases: bowl.bases,
+      proteins: bowl.proteins,
+      bowlSize: bowl.bowlSize,
+      marinades: bowl.marinades,
+      complements: bowl.complements,
+      sauces: bowl.sauces,
+      toppings: bowl.toppings,
+      extraScoopProteins: bowl.extraScoopProteins,
     });
 
     await user.save();

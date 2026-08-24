@@ -9,6 +9,11 @@ import {
 import { distanceMeters, isWithinRestaurant, RESTAURANT_LOCATION } from "../utils/geo.js";
 import { isValidPin, hashPin, comparePin } from "../utils/staffPin.js";
 import { sanitizeCustomerBowl } from "../utils/customerOrder.js";
+import {
+  subscribeToOrderEvents,
+  unsubscribeFromOrderEvents,
+  broadcastOrdersChanged,
+} from "../utils/orderEvents.js";
 
 /* ── Precios: la fuente de verdad de lo que se le cobra al cliente ── */
 
@@ -153,4 +158,51 @@ test("un PIN hasheado se verifica y uno incorrecto se rechaza", async () => {
   assert.notEqual(hash, "4821");
   assert.equal(await comparePin("4821", hash), true);
   assert.equal(await comparePin("0000", hash), false);
+});
+
+/* ── Aviso en tiempo real de pedidos (SSE) ── */
+
+function fakeRes() {
+  const written = [];
+  return { written, write: (chunk) => written.push(chunk) };
+}
+
+test("broadcastOrdersChanged escribe el evento a cada suscriptor conectado", () => {
+  const a = fakeRes();
+  const b = fakeRes();
+  subscribeToOrderEvents(a);
+  subscribeToOrderEvents(b);
+  try {
+    broadcastOrdersChanged();
+    assert.equal(a.written.length, 1);
+    assert.match(a.written[0], /event: orders_changed/);
+    assert.equal(b.written.length, 1);
+  } finally {
+    unsubscribeFromOrderEvents(a);
+    unsubscribeFromOrderEvents(b);
+  }
+});
+
+test("un suscriptor removido ya no recibe avisos", () => {
+  const a = fakeRes();
+  subscribeToOrderEvents(a);
+  unsubscribeFromOrderEvents(a);
+  broadcastOrdersChanged();
+  assert.equal(a.written.length, 0);
+});
+
+test("un suscriptor cuyo write() truena se quita solo sin tumbar el broadcast", () => {
+  const broken = { write: () => { throw new Error("conexion cerrada"); } };
+  const ok = fakeRes();
+  subscribeToOrderEvents(broken);
+  subscribeToOrderEvents(ok);
+  try {
+    assert.doesNotThrow(() => broadcastOrdersChanged());
+    assert.equal(ok.written.length, 1);
+    ok.written.length = 0;
+    broadcastOrdersChanged(); // broken ya se quitó solo, no debe volver a intentarse
+    assert.equal(ok.written.length, 1);
+  } finally {
+    unsubscribeFromOrderEvents(ok);
+  }
 });

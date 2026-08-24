@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext, useCallback, useMemo, useRef } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
+import { API_URL } from "../../config";
 import {
   PROTEIN_LABELS,
   BASE_LABELS,
@@ -177,13 +178,14 @@ export default function KDSPage({ styles, role }) {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 15000);
+    // Respaldo de sondeo — la vía principal es la conexión en tiempo real de
+    // abajo, esto solo cubre el rato en que esa conexión se esté reconectando.
+    const id = setInterval(load, 5000);
 
     // iOS pausa los timers de una pestaña en segundo plano (pantalla
-    // apagada/bloqueada) para ahorrar batería — el poll de 15s no corre
-    // mientras tanto. Al volver a estar visible, se refresca de inmediato
-    // en vez de esperar al siguiente tick, para no quedarse con órdenes
-    // viejas hasta que alguien haga un refresh manual.
+    // apagada/bloqueada) para ahorrar batería — el poll no corre mientras
+    // tanto. Al volver a estar visible, se refresca de inmediato en vez de
+    // esperar al siguiente tick.
     const onVisible = () => {
       if (document.visibilityState === "visible") load();
     };
@@ -196,6 +198,57 @@ export default function KDSPage({ styles, role }) {
       window.removeEventListener("focus", onVisible);
     };
   }, [load]);
+
+  // Conexión en tiempo real: el servidor avisa por esta vía en cuanto un
+  // pedido cambia, sin depender de que un setInterval sobreviva al ahorro
+  // de batería de iOS en una pantalla que casi nadie toca (la iPad de
+  // cocina en acceso guiado nunca dispara visibilitychange porque nunca
+  // deja de estar "visible"). Se usa fetch en vez de EventSource porque
+  // EventSource no permite mandar el header de autorización.
+  useEffect(() => {
+    if (!staffToken) return;
+    let cancelled = false;
+    let retryTimer = null;
+    const controller = new AbortController();
+
+    const connect = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/staff/orders/events`, {
+          headers: { Authorization: `Bearer ${staffToken}` },
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body) throw new Error(`SSE HTTP ${res.status}`);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (!cancelled) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let sep;
+          while ((sep = buffer.indexOf("\n\n")) !== -1) {
+            const chunk = buffer.slice(0, sep);
+            buffer = buffer.slice(sep + 2);
+            if (chunk.includes("orders_changed")) load();
+          }
+        }
+      } catch {
+        // red caída, servidor reiniciando, etc. — se reintenta solo.
+      }
+      if (!cancelled) retryTimer = setTimeout(connect, 3000);
+    };
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimer);
+      controller.abort();
+    };
+  }, [staffToken, load]);
 
   const advance = async (order) => {
     const next =

@@ -244,7 +244,7 @@ export function isWithinRestaurantHours(date = new Date(), openHour = 11, closeH
 }
 
 export function isCustomerManagedOrder(order) {
-  return order?.source === "online";
+  return order?.source === "online" || order?.source === "whatsapp";
 }
 
 export function usefulPointsToRedeem({

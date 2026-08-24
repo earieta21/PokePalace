@@ -10,6 +10,7 @@ import {
   getFinance,
   searchRewardCustomers,
 } from "../controllers/staffOrderController.js";
+import { streamOrderEvents } from "../utils/orderEvents.js";
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ const seniorStaff = requireStaffAuth(["manager", "admin", "owner"]);
 const orderReaders = requireStaffAuth(["cashier", "kitchen", "manager", "admin", "owner"]);
 const posSalesStaff = requireStaffAuth(["employee", "cashier", "manager", "admin", "owner"]);
 
+router.get  ("/events",        orderReaders, streamOrderEvents);
 router.get  ("/stats",         posSalesStaff, getOrderStats);
 router.get  ("/analytics",     seniorStaff, getAnalytics);
 router.get  ("/finance",       seniorStaff, getFinance);

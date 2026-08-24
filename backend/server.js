@@ -27,6 +27,7 @@ import staffCustomersRoutes from "./routes/staffCustomers.js";
 import whatsappRoutes from "./routes/whatsapp.js";
 import { logServerError } from "./controllers/monitorController.js";
 import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
+import { startOrderChangeStream } from "./utils/orderEvents.js";
 
 dotenv.config();
 
@@ -60,7 +61,9 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+// El webhook de WhatsApp necesita el body crudo para verificar la firma de
+// Meta (X-Hub-Signature-256) — se captura aquí sin agregar un segundo parser.
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 
 // Meta manda hub.mode / hub.verify_token / hub.challenge como query params
 // con puntos en el nombre al verificar el webhook -- sanitizeMongo los
@@ -135,6 +138,7 @@ const start = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ MongoDB conectado");
+    startOrderChangeStream();
 
     app.listen(PORT, () => {
       console.log(`✅ Server running on ${PORT}`);

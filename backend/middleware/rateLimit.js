@@ -13,9 +13,9 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000).unref?.();
 
-export const rateLimit = ({ windowMs, max, message }) => {
+export const rateLimit = ({ windowMs, max, message, keyFn }) => {
   return (req, res, next) => {
-    const key = `${req.ip}:${req.baseUrl}${req.path}`;
+    const key = keyFn ? `${keyFn(req)}:${req.baseUrl}${req.path}` : `${req.ip}:${req.baseUrl}${req.path}`;
     const now = Date.now();
     let bucket = buckets.get(key);
 

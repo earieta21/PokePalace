@@ -212,7 +212,11 @@ export const OrderProvider = ({ children }) => {
       complements: filterAvailable(favorite.complements, unavailable),
       sauces: filterAvailable(favorite.sauces, unavailable),
       toppings: filterAvailable(favorite.toppings, unavailable),
-      extraScoopProteins: [],
+      // Un scoop extra solo tiene sentido si su proteína sobrevivió el
+      // filtro de disponibilidad — igual que valida normalizeExtraScoops
+      // en el backend.
+      extraScoopProteins: (Array.isArray(favorite.extraScoopProteins) ? favorite.extraScoopProteins : [])
+        .filter((id) => proteins.includes(id)),
       editingCartId: null,
       draftStep: 0,
     }));
