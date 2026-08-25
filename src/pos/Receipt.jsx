@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { PROTEIN_LABELS } from "../order/OrderLabels.jsx";
+import { comboPalaceSelectionSummary } from "../data/comboPalace.js";
 import ui from "./Receipt.module.css";
 
 export const PAYMENT_METHOD_LABELS = {
@@ -36,8 +37,15 @@ export default function Receipt({ order }) {
 
       <div className={ui.receiptLines}>
         {(order.items || []).map((item) => (
-          <div className={ui.receiptLine} key={item.protein ? `${item.catalogId}-${item.protein}` : (item.catalogId || item.name)}>
-            <span>{item.qty} × {item.name}{item.protein ? ` (${PROTEIN_LABELS[item.protein] || item.protein})` : ""}</span>
+          <div
+            className={ui.receiptLine}
+            key={item.cartKey || [item.catalogId, item.protein, item.comboBowlId, item.comboDrinkId, item.comboRiceCakeId].filter(Boolean).join("-") || item.name}
+          >
+            <span>
+              {item.qty} × {item.name}
+              {item.protein ? ` (${PROTEIN_LABELS[item.protein] || item.protein})` : ""}
+              {item.catalogId === "combo-palace" ? ` — ${comboPalaceSelectionSummary(item)}` : ""}
+            </span>
             <span>${(item.price * item.qty).toLocaleString("es-MX")}</span>
           </div>
         ))}

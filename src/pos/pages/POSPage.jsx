@@ -13,11 +13,17 @@ import Receipt from "../Receipt.jsx";
 import { getRewardById } from "../../data/rewardsCatalog.js";
 import { TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "../../order/pricing.js";
+import {
+  COMBO_PALACE_OPTIONS,
+  COMBO_PALACE_PRICE,
+  comboPalaceSelectionSummary,
+} from "../../data/comboPalace.js";
 import ui from "./POSPage.module.css";
 
 const CUSTOM_BOWL_ID = "custom-bowl";
 
 const MENU = [
+  { id: 25, name: "Combo Palace", price: COMBO_PALACE_PRICE, category: "Combos", icon: "👑", needsCombo: true },
   // Venta rapida sin ingredientes especificos - para cuando no da tiempo de
   // capturar el bowl personalizado completo (ej. fila larga). needsProtein
   // hace que se pregunte la proteina antes de agregarlo, para poder
@@ -39,7 +45,7 @@ const MENU = [
   { id: 22, name: "Atún Sellado Extra",       price:  20, category: "Extras", icon: "🍣" },
 ];
 
-const MENU_CATEGORIES = ["Todos", "Bowls", "Bebidas", "Extras"];
+const MENU_CATEGORIES = ["Todos", "Combos", "Bowls", "Bebidas", "Extras"];
 
 // Opciones para el picker rapido de proteina (bowls sin receta fija).
 const QUICK_PROTEINS = ["tuna", "salmon", "shrimp", "tofu", "seared_tuna"].map((id) => ({
@@ -143,6 +149,12 @@ export default function POSPage({ styles }) {
   };
 
   const [proteinPickerItem, setProteinPickerItem] = useState(null);
+  const [comboPickerItem, setComboPickerItem] = useState(null);
+  const [comboSelection, setComboSelection] = useState({
+    comboBowlId: "",
+    comboDrinkId: "",
+    comboRiceCakeId: "",
+  });
 
   const confirmProteinPick = (proteinId) => {
     const item = proteinPickerItem;
@@ -157,6 +169,26 @@ export default function POSPage({ styles }) {
     });
   };
 
+  const openComboPicker = (item) => {
+    setComboPickerItem(item);
+    setComboSelection({
+      comboBowlId: COMBO_PALACE_OPTIONS.bowls[0].id,
+      comboDrinkId: COMBO_PALACE_OPTIONS.drinks[0].id,
+      comboRiceCakeId: COMBO_PALACE_OPTIONS.riceCakes[0].id,
+    });
+  };
+
+  const confirmComboPick = () => {
+    const item = comboPickerItem;
+    if (!item || !comboSelection.comboBowlId || !comboSelection.comboDrinkId || !comboSelection.comboRiceCakeId) return;
+    addItem({
+      ...item,
+      ...comboSelection,
+      cartKey: `${item.id}-${comboSelection.comboBowlId}-${comboSelection.comboDrinkId}-${comboSelection.comboRiceCakeId}`,
+    });
+    setComboPickerItem(null);
+  };
+
   const clearOrder = () => {
     pendingSaleRef.current = null;
     setCart([]);
@@ -168,6 +200,8 @@ export default function POSPage({ styles }) {
     setRewardCode("");
     setReward(null);
     setRewardTopping("");
+    setProteinPickerItem(null);
+    setComboPickerItem(null);
     setShowCustomerDetails(false);
     setShowReward(false);
     setShowLoyalty(false);
@@ -288,7 +322,14 @@ export default function POSPage({ styles }) {
 
     const nextPayload = {
       clientOrderId: createClientOrderId(),
-      items: regularItems.map(({ id, qty, protein }) => ({ id, qty, ...(protein ? { protein } : {}) })),
+      items: regularItems.map(({
+        id, qty, protein, comboBowlId, comboDrinkId, comboRiceCakeId,
+      }) => ({
+        id,
+        qty,
+        ...(protein ? { protein } : {}),
+        ...(comboBowlId ? { comboBowlId, comboDrinkId, comboRiceCakeId } : {}),
+      })),
       customer: cliente.trim() || "Mostrador",
       phone: phone.trim(),
       notes: notes.trim(),
@@ -432,7 +473,14 @@ export default function POSPage({ styles }) {
                   .filter((cartItem) => cartItem.id === item.id)
                   .reduce((sum, cartItem) => sum + cartItem.qty, 0);
                 return (
-                <button key={item.id} className={ui.productCard} onClick={() => item.needsProtein ? setProteinPickerItem(item) : addItem(item)} type="button">
+                <button
+                  key={item.id}
+                  className={ui.productCard}
+                  onClick={() => item.needsProtein
+                    ? setProteinPickerItem(item)
+                    : item.needsCombo ? openComboPicker(item) : addItem(item)}
+                  type="button"
+                >
                   {quantity > 0 && <span className={ui.inCartBadge}>{quantity}</span>}
                   <span className={ui.productIcon}>{item.icon}</span>
                   <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.category}</small></span>
@@ -477,7 +525,11 @@ export default function POSPage({ styles }) {
             <div className={ui.cartEmpty}><span>🛒</span><strong>La orden está vacía</strong><p>Selecciona un producto del menú para comenzar.</p></div>
           ) : cart.map((item) => (
             <div key={cartKeyOf(item)} className={ui.cartItem}>
-              <div className={ui.cartItemInfo}><strong>{item.name}</strong><small>${item.price} c/u</small></div>
+              <div className={ui.cartItemInfo}>
+                <strong>{item.name}</strong>
+                {item.comboBowlId && <span className={ui.cartItemMeta}>{comboPalaceSelectionSummary(item)}</span>}
+                <small>${item.price} c/u</small>
+              </div>
               <div className={ui.qtyControl}>
                 <button type="button" onClick={() => changeQty(cartKeyOf(item), -1)} aria-label={`Reducir ${item.name}`}>−</button>
                 <span>{item.qty}</span>
@@ -685,6 +737,61 @@ export default function POSPage({ styles }) {
               }}
             >
               Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {comboPickerItem && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pos-combo-title"
+          className={ui.comboPickerBackdrop}
+          onClick={() => setComboPickerItem(null)}
+        >
+          <div className={ui.comboPickerModal} onClick={(event) => event.stopPropagation()}>
+            <div className={ui.comboPickerHeader}>
+              <div>
+                <span>Combo · ${COMBO_PALACE_PRICE} MXN</span>
+                <h3 id="pos-combo-title">Arma el Combo Palace</h3>
+                <p>Selecciona lo que pidió el cliente.</p>
+              </div>
+              <button type="button" onClick={() => setComboPickerItem(null)} aria-label="Cerrar">×</button>
+            </div>
+
+            {[
+              { key: "comboBowlId", title: "1. Bowl", options: COMBO_PALACE_OPTIONS.bowls },
+              { key: "comboDrinkId", title: "2. Bebida", options: COMBO_PALACE_OPTIONS.drinks },
+              { key: "comboRiceCakeId", title: "3. Rice Cake", options: COMBO_PALACE_OPTIONS.riceCakes },
+            ].map((group) => (
+              <fieldset key={group.key} className={ui.comboPickerGroup}>
+                <legend>{group.title}</legend>
+                <div>
+                  {group.options.map((option) => {
+                    const selected = comboSelection[group.key] === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setComboSelection((current) => ({ ...current, [group.key]: option.id }))}
+                      >
+                        <span>{selected ? "✓" : ""}</span>
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ))}
+
+            <div className={ui.comboPickerSummary}>
+              <span>Selección</span>
+              <strong>{comboPalaceSelectionSummary(comboSelection)}</strong>
+            </div>
+            <button type="button" className={ui.comboPickerConfirm} onClick={confirmComboPick}>
+              Agregar Combo Palace · ${COMBO_PALACE_PRICE}
             </button>
           </div>
         </div>

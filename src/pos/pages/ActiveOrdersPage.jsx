@@ -44,7 +44,8 @@ function itemSummary(order) {
   if (order.items?.length) {
     segments.push(order.items.map((i) => {
       const proteinSuffix = i.protein ? ` (${PROTEIN_LABELS[i.protein] ?? i.protein})` : "";
-      return `${i.name}${proteinSuffix} ×${i.qty}`;
+      const comboSuffix = i.catalogId === "combo-palace" ? ` (${comboPalaceSelectionSummary(i)})` : "";
+      return `${i.name}${proteinSuffix}${comboSuffix} ×${i.qty}`;
     }).join(", "));
   }
 

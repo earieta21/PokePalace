@@ -79,7 +79,8 @@ function orderLines(order) {
     // captura la proteína en caja sí se sabe qué preparar.
     lines.push(...order.items.map((i) => {
       const proteinSuffix = i.protein ? ` — ${label(PROTEIN_LABELS, i.protein)}` : "";
-      return `${i.name}${proteinSuffix} ×${i.qty}`;
+      const comboSuffix = i.catalogId === "combo-palace" ? ` — ${comboPalaceSelectionSummary(i)}` : "";
+      return `${i.name}${proteinSuffix}${comboSuffix} ×${i.qty}`;
     }));
   }
 
