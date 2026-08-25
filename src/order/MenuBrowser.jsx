@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useOrder } from "./OrderContext";
+import { useAvailability } from "../context/AvailabilityContext";
 import {
   CUSTOMER_CATALOG,
   CUSTOMER_CATALOG_BY_ID,
@@ -22,6 +23,7 @@ const CATEGORY_ICONS = {
 // cambian los destinos de navegación.
 const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId = "" }) => {
   const { order, addCatalogItem, addComboToCart, updateCartItemQty, startNewBowl } = useOrder();
+  const { unavailableItems } = useAvailability();
   const [activeCombo, setActiveCombo] = useState(null);
   const [comboSelection, setComboSelection] = useState({
     comboBowlId: "",
@@ -30,17 +32,25 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
   });
   const openedInitialCombo = useRef(false);
 
+  // El armador normal ya filtra ingredientes no disponibles al elegir — el
+  // picker del combo tiene que hacer lo mismo, si no el cliente puede elegir
+  // algo agotado y el pedido se rechaza hasta el final, al confirmar (con un
+  // error fácil de no notar), sin ningún aviso en el momento de elegir.
+  const availableOptions = (options) => options.filter((o) => !unavailableItems.includes(o.id));
+
+  const defaultComboSelection = (item) => ({
+    comboBowlId: availableOptions(item.comboOptions.bowls)[0]?.id || "",
+    comboDrinkId: availableOptions(item.comboOptions.drinks)[0]?.id || "",
+    comboRiceCakeId: availableOptions(item.comboOptions.riceCakes)[0]?.id || "",
+  });
+
   useEffect(() => {
     if (openedInitialCombo.current || !initialComboId) return;
     const item = CUSTOMER_CATALOG_BY_ID[initialComboId];
     if (!item?.isCombo) return;
     openedInitialCombo.current = true;
     setActiveCombo(item);
-    setComboSelection({
-      comboBowlId: item.comboOptions.bowls[0]?.id || "",
-      comboDrinkId: item.comboOptions.drinks[0]?.id || "",
-      comboRiceCakeId: item.comboOptions.riceCakes[0]?.id || "",
-    });
+    setComboSelection(defaultComboSelection(item));
   }, [initialComboId]);
 
   const cartCount = order.cart.reduce((sum, line) => sum + line.qty, 0);
@@ -62,11 +72,7 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
 
   const openComboPicker = (item) => {
     setActiveCombo(item);
-    setComboSelection({
-      comboBowlId: item.comboOptions.bowls[0]?.id || "",
-      comboDrinkId: item.comboOptions.drinks[0]?.id || "",
-      comboRiceCakeId: item.comboOptions.riceCakes[0]?.id || "",
-    });
+    setComboSelection(defaultComboSelection(item));
   };
 
   const closeComboPicker = () => setActiveCombo(null);
@@ -82,10 +88,15 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
     .reduce((sum, line) => sum + line.qty, 0);
 
   const comboGroups = activeCombo ? [
-    { key: "comboBowlId", title: "Elige tu bowl", options: activeCombo.comboOptions.bowls },
-    { key: "comboDrinkId", title: "Elige tu bebida", options: activeCombo.comboOptions.drinks },
-    { key: "comboRiceCakeId", title: "Elige tu Rice Cake", options: activeCombo.comboOptions.riceCakes },
+    { key: "comboBowlId", title: "Elige tu bowl", options: availableOptions(activeCombo.comboOptions.bowls) },
+    { key: "comboDrinkId", title: "Elige tu bebida", options: availableOptions(activeCombo.comboOptions.drinks) },
+    { key: "comboRiceCakeId", title: "Elige tu Rice Cake", options: availableOptions(activeCombo.comboOptions.riceCakes) },
   ] : [];
+
+  // Si alguna categoría se quedó sin opciones disponibles (todo agotado), no
+  // hay combo válido que armar — se avisa en vez de dejar confirmar algo que
+  // el servidor va a rechazar de todos modos.
+  const comboFullyUnavailable = activeCombo && comboGroups.some((group) => group.options.length === 0);
 
   return (
     <div className={styles.wrapper}>
@@ -218,6 +229,9 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
               {comboGroups.map((group) => (
                 <fieldset key={group.key} className={styles.comboGroup}>
                   <legend>{group.title}</legend>
+                  {group.options.length === 0 && (
+                    <p className={styles.comboGroupEmpty}>Agotado por ahora, no hay opciones disponibles.</p>
+                  )}
                   <div className={styles.comboOptions}>
                     {group.options.map((option) => {
                       const catalogItem = CUSTOMER_CATALOG_BY_ID[option.id];
@@ -245,9 +259,15 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
               ))}
             </div>
 
-            <button type="button" className={styles.comboConfirm} onClick={confirmCombo}>
-              Agregar Combo Palace · {formatPrice(activeCombo.price)}
-            </button>
+            {comboFullyUnavailable ? (
+              <p className={styles.comboGroupEmpty} style={{ textAlign: "center" }}>
+                El Combo Palace no está disponible en este momento — vuelve más tarde.
+              </p>
+            ) : (
+              <button type="button" className={styles.comboConfirm} onClick={confirmCombo}>
+                Agregar Combo Palace · {formatPrice(activeCombo.price)}
+              </button>
+            )}
           </div>
         </div>
       )}
