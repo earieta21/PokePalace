@@ -358,7 +358,11 @@
 .comboBackdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  /* La barra de navegación inferior (Navbar.module.css) vive fija con
+     z-index:1000 — un modal abierto siempre debe quedar arriba de esa
+     barra persistente, o la tapa y bloquea sus botones (incluido el de
+     confirmar), como le pasaba aquí. */
+  z-index: 1200;
   display: grid;
   place-items: center;
   padding: 18px;
