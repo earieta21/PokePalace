@@ -278,6 +278,29 @@
   border: 1px solid var(--accent-border);
 }
 
+.cardDescription {
+  margin: 3px 0 0;
+  max-width: 190px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.comboAddWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.comboCount {
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .addBtn {
   flex-shrink: 0;
   padding: 9px 16px;
@@ -328,6 +351,204 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--text);
+}
+
+/* ---- Combo Palace picker ---- */
+
+.comboBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(5, 16, 10, 0.66);
+  backdrop-filter: blur(5px);
+}
+
+.comboModal {
+  width: min(680px, 100%);
+  max-height: min(820px, calc(100dvh - 36px));
+  overflow-y: auto;
+  padding: 22px;
+  border: 1px solid var(--accent-border);
+  border-radius: 24px;
+  background: var(--bg-card);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
+}
+
+.comboModalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.comboModalHeader h3 {
+  margin: 8px 0 4px;
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.comboModalHeader p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.comboModalBadge {
+  display: inline-flex;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #fff0e9;
+  color: #d84a29;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.comboClose {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.comboGroups {
+  display: grid;
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.comboGroup {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.comboGroup legend {
+  margin-bottom: 10px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.comboOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: 10px;
+}
+
+.comboOption {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.comboOption:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+}
+
+.comboOptionSelected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  box-shadow: 0 0 0 2px var(--accent-border);
+}
+
+.comboOption img,
+.comboOption > span:first-child {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #fff;
+}
+
+.comboOption > span:first-child {
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+}
+
+.comboOption strong {
+  min-width: 0;
+  font-size: 11.5px;
+  line-height: 1.25;
+}
+
+.comboCheck {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--bg-card);
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.comboConfirm {
+  width: 100%;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 850;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(34, 139, 79, 0.24);
+}
+
+.comboConfirm:hover {
+  background: var(--accent-2);
+}
+
+@media (max-width: 540px) {
+  .comboBackdrop {
+    place-items: end center;
+    padding: 0;
+  }
+
+  .comboModal {
+    width: 100%;
+    max-height: 92dvh;
+    padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
+    border-radius: 24px 24px 0 0;
+  }
+
+  .comboOptions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* ---- Floating cart bar ---- */

@@ -3,6 +3,7 @@ import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { PROTEIN_LABELS } from "../../order/OrderLabels";
 import Receipt from "../Receipt.jsx";
+import { comboPalaceSelectionSummary } from "../../data/comboPalace";
 
 const STATUS_CFG = {
   completed: { cls: "badgeGreen", label: "Completado" },
@@ -23,7 +24,8 @@ function itemBrief(order) {
   if (order.cartItems?.length) {
     for (const line of order.cartItems) {
       if (line.kind === "item") {
-        parts.push(`${line.name} ×${line.qty}`);
+        const combo = line.catalogId === "combo-palace" ? ` (${comboPalaceSelectionSummary(line)})` : "";
+        parts.push(`${line.name}${combo} ×${line.qty}`);
         continue;
       }
       const proteins = line.proteins?.map((id) => PROTEIN_LABELS[id] ?? id).join(", ") || "";

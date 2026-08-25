@@ -169,6 +169,41 @@ export const OrderProvider = ({ children }) => {
     });
   }, []);
 
+  // Cada combinación se conserva como una línea independiente para que
+  // cocina, inventario y pedidos repetidos sepan exactamente qué incluye.
+  const addComboToCart = useCallback((catalogItem, selections, qty = 1) => {
+    const comboBowlId = selections?.comboBowlId;
+    const comboDrinkId = selections?.comboDrinkId;
+    const comboRiceCakeId = selections?.comboRiceCakeId;
+    if (!comboBowlId || !comboDrinkId || !comboRiceCakeId) return;
+
+    setOrder((prev) => {
+      const matchesCombo = (line) =>
+        line.kind === "item"
+        && line.catalogId === catalogItem.catalogId
+        && line.comboBowlId === comboBowlId
+        && line.comboDrinkId === comboDrinkId
+        && line.comboRiceCakeId === comboRiceCakeId;
+      const existingIndex = prev.cart.findIndex(matchesCombo);
+      const cart = existingIndex === -1
+        ? [...prev.cart, {
+            cartId: generateCartId(),
+            kind: "item",
+            catalogId: catalogItem.catalogId,
+            name: catalogItem.name,
+            price: catalogItem.price,
+            qty,
+            comboBowlId,
+            comboDrinkId,
+            comboRiceCakeId,
+          }]
+        : prev.cart.map((line, index) => (
+            index === existingIndex ? { ...line, qty: line.qty + qty } : line
+          ));
+      return { ...prev, cart };
+    });
+  }, []);
+
   const updateCartItemQty = useCallback((cartId, qty) => {
     setOrder((prev) => ({
       ...prev,
@@ -254,6 +289,11 @@ export const OrderProvider = ({ children }) => {
             name: line.name,
             price: line.price,
             qty: line.qty || 1,
+            ...(line.catalogId === "combo-palace" ? {
+              comboBowlId: line.comboBowlId,
+              comboDrinkId: line.comboDrinkId,
+              comboRiceCakeId: line.comboRiceCakeId,
+            } : {}),
           };
         }
         const proteins = filterAvailable(line.proteins, unavailable);
@@ -320,6 +360,7 @@ export const OrderProvider = ({ children }) => {
       startNewBowl,
       editCartBowl,
       addCatalogItem,
+      addComboToCart,
       updateCartItemQty,
       removeCartLine,
       loadFavorite,
@@ -327,7 +368,7 @@ export const OrderProvider = ({ children }) => {
       resetOrder,
     }),
     [
-      order, updateOrder, addBowlToCart, startNewBowl, editCartBowl, addCatalogItem,
+      order, updateOrder, addBowlToCart, startNewBowl, editCartBowl, addCatalogItem, addComboToCart,
       updateCartItemQty, removeCartLine, loadFavorite, reorder, resetOrder, updateCheckout,
     ]
   );

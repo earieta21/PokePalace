@@ -4,6 +4,7 @@ import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
 import { PREMIUM_PROTEIN_PRICES, computeCartPricing } from "./pricing";
 import { useLanguage } from "../i18n/LanguageContext";
+import { comboPalaceSelectionLabels } from "../data/comboPalace";
 import styles from "./OrderSummary.module.css";
 
 import {
@@ -279,12 +280,19 @@ const OrderSummary = ({
     );
   };
 
-  const ItemLineCard = ({ line }) => (
-    <div className={styles.section}>
+  const ItemLineCard = ({ line }) => {
+    const comboLabels = line.catalogId === "combo-palace" ? comboPalaceSelectionLabels(line) : [];
+    return (
+      <div className={styles.section}>
       <div className={styles.sectionHeader}>
         <div>
           <h3 className={styles.subTitle}>{line.name}</h3>
           <p className={styles.detail}>${line.price.toFixed(2)} MXN c/u</p>
+          {comboLabels.map((label, index) => (
+            <p key={label} className={styles.detail}>
+              {index === 0 ? "🍣" : index === 1 ? "🥤" : "🍫"} {label}
+            </p>
+          ))}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -311,8 +319,9 @@ const OrderSummary = ({
           </button>
         </div>
       </div>
-    </div>
-  );
+      </div>
+    );
+  };
 
   return (
     <div className={styles.wrapper}>

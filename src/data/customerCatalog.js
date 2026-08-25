@@ -1,13 +1,15 @@
 import theOg from "../assets/menu/theOg.webp";
 import skinnyBowl from "../assets/menu/skinnyBowl.webp";
 import quinoaBowl from "../assets/menu/quinoaBowl.webp";
-import topoChico from "../assets/menu/products/topo-chico.jpg";
+import topoChico from "../assets/menu/products/topo-chico.png";
 import cocaZero from "../assets/menu/products/coca-zero.jpg";
+import cocaColaRegular from "../assets/menu/products/coca-cola-regular.jpg";
 import bottledWater from "../assets/menu/products/bottled-water.jpg";
-import aguaDelDia from "../assets/menu/products/agua-del-dia.jpg";
+import aguaDelDia from "../assets/menu/products/agua-del-dia.webp";
 import cacaoRiceCake from "../assets/menu/products/cacao-rice-cake.jpg";
 import chocoRiceCake from "../assets/menu/products/choco-rice-cake.jpg";
 import honeyRiceCake from "../assets/menu/products/honey-rice-cake.jpg";
+import { COMBO_PALACE_OPTIONS, COMBO_PALACE_PRICE } from "./comboPalace";
 
 // Catálogo de artículos que un cliente puede agregar directo al carrito sin
 // pasar por el armador: bowls de la casa (receta fija), bebidas y extras.
@@ -20,6 +22,18 @@ import honeyRiceCake from "../assets/menu/products/honey-rice-cake.jpg";
 // calma — el backend rechaza esos mismos ids de forma independiente (ver
 // CUSTOMER_EXCLUDED_CATALOG_IDS en backend/utils/customerOrder.js).
 export const CUSTOMER_CATALOG = Object.freeze([
+  {
+    catalogId: "combo-palace",
+    name: "Combo Palace",
+    description: "1 bowl de la casa + 1 bebida + 1 Rice Cake",
+    price: COMBO_PALACE_PRICE,
+    category: "Combos",
+    categoryKey: "combos",
+    icon: "👑",
+    image: theOg,
+    isCombo: true,
+    comboOptions: COMBO_PALACE_OPTIONS,
+  },
   {
     catalogId: "bowl-the-og",
     name: "The OG",
@@ -74,8 +88,8 @@ export const CUSTOMER_CATALOG = Object.freeze([
     category: "Bebidas",
     categoryKey: "drinks",
     icon: "🥤",
-    // Sin foto todavía — MenuBrowser.jsx cae a la tarjeta "solo ícono"
-    // cuando no hay `image`, se ve bien así.
+    image: cocaColaRegular,
+    imageFit: "contain",
   },
   {
     catalogId: "bottled-water",
@@ -95,6 +109,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
     categoryKey: "drinks",
     icon: "🥤",
     image: aguaDelDia,
+    imageFit: "contain",
   },
   {
     catalogId: "cacao-rice-cake",
@@ -128,4 +143,8 @@ export const CUSTOMER_CATALOG = Object.freeze([
   },
 ]);
 
-export const CUSTOMER_CATALOG_CATEGORIES = Object.freeze(["Bowls", "Bebidas", "Extras"]);
+export const CUSTOMER_CATALOG_CATEGORIES = Object.freeze(["Combos", "Bowls", "Bebidas", "Extras"]);
+
+export const CUSTOMER_CATALOG_BY_ID = Object.freeze(Object.fromEntries(
+  CUSTOMER_CATALOG.map((item) => [item.catalogId, item])
+));

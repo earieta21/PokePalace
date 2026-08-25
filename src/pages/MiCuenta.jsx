@@ -6,6 +6,7 @@ import { API_URL } from "../config";
 import { getItemLabel, getBaseLabel } from "../order/OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./MiCuenta.module.css";
+import { comboPalaceSelectionSummary } from "../data/comboPalace";
 
 const getProteinsText = (order, language) => {
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
@@ -15,7 +16,10 @@ const getProteinsText = (order, language) => {
 };
 
 const cartLineBrief = (line, language) => {
-  if (line.kind === "item") return `${line.name} ×${line.qty}`;
+  if (line.kind === "item") {
+    const combo = line.catalogId === "combo-palace" ? `: ${comboPalaceSelectionSummary(line)}` : "";
+    return `${line.name}${combo} ×${line.qty}`;
+  }
   const proteins = (line.proteins || []).map((id) => getItemLabel("protein", id, language)).join(", ");
   const baseLabel = getBaseLabel(line.bases, line.base, language);
   const size = line.bowlSize === "large" ? "Grande" : "Mediano";

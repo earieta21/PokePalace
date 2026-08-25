@@ -1,12 +1,17 @@
-import React from "react";
+import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
-import { CUSTOMER_CATALOG, CUSTOMER_CATALOG_CATEGORIES } from "../data/customerCatalog";
+import {
+  CUSTOMER_CATALOG,
+  CUSTOMER_CATALOG_BY_ID,
+  CUSTOMER_CATALOG_CATEGORIES,
+} from "../data/customerCatalog";
 import buildBowlBg from "../assets/poke.webp";
 import styles from "./MenuBrowser.module.css";
 
 const formatPrice = (value) => `$${Number(value).toLocaleString("es-MX")} MXN`;
 
 const CATEGORY_ICONS = {
+  Combos: "👑",
   Bowls: "🍣",
   Bebidas: "🥤",
   Extras: "🍫",
@@ -16,7 +21,13 @@ const CATEGORY_ICONS = {
 // kiosco (`src/kiosk/KioskMenuPage.jsx`) — mismo carrito (OrderContext), solo
 // cambian los destinos de navegación.
 const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false }) => {
-  const { order, addCatalogItem, updateCartItemQty, startNewBowl } = useOrder();
+  const { order, addCatalogItem, addComboToCart, updateCartItemQty, startNewBowl } = useOrder();
+  const [activeCombo, setActiveCombo] = useState(null);
+  const [comboSelection, setComboSelection] = useState({
+    comboBowlId: "",
+    comboDrinkId: "",
+    comboRiceCakeId: "",
+  });
 
   const cartCount = order.cart.reduce((sum, line) => sum + line.qty, 0);
   const cartSubtotal = order.cart.reduce((sum, line) => sum + line.price * line.qty, 0);
@@ -34,6 +45,33 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false }) => {
     const cartLine = order.cart.find((l) => l.kind === "item" && l.catalogId === item.catalogId);
     if (cartLine) updateCartItemQty(cartLine.cartId, cartLine.qty - 1);
   };
+
+  const openComboPicker = (item) => {
+    setActiveCombo(item);
+    setComboSelection({
+      comboBowlId: item.comboOptions.bowls[0]?.id || "",
+      comboDrinkId: item.comboOptions.drinks[0]?.id || "",
+      comboRiceCakeId: item.comboOptions.riceCakes[0]?.id || "",
+    });
+  };
+
+  const closeComboPicker = () => setActiveCombo(null);
+
+  const confirmCombo = () => {
+    if (!activeCombo) return;
+    addComboToCart(activeCombo, comboSelection, 1);
+    closeComboPicker();
+  };
+
+  const comboCount = order.cart
+    .filter((line) => line.kind === "item" && line.catalogId === "combo-palace")
+    .reduce((sum, line) => sum + line.qty, 0);
+
+  const comboGroups = activeCombo ? [
+    { key: "comboBowlId", title: "Elige tu bowl", options: activeCombo.comboOptions.bowls },
+    { key: "comboDrinkId", title: "Elige tu bebida", options: activeCombo.comboOptions.drinks },
+    { key: "comboRiceCakeId", title: "Elige tu Rice Cake", options: activeCombo.comboOptions.riceCakes },
+  ] : [];
 
   return (
     <div className={styles.wrapper}>
@@ -94,10 +132,20 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false }) => {
                       <div className={styles.cardBody}>
                         <div className={styles.cardBodyText}>
                           <p className={styles.cardName}>{item.name}</p>
+                          {item.description && <p className={styles.cardDescription}>{item.description}</p>}
                           <p className={styles.cardPrice}>{formatPrice(item.price)}</p>
                         </div>
 
-                        {qty > 0 ? (
+                        {item.isCombo ? (
+                          <div className={styles.comboAddWrap}>
+                            {comboCount > 0 && (
+                              <span className={styles.comboCount}>{comboCount} en carrito</span>
+                            )}
+                            <button type="button" className={styles.addBtn} onClick={() => openComboPicker(item)}>
+                              Elegir
+                            </button>
+                          </div>
+                        ) : qty > 0 ? (
                           <div className={styles.stepper}>
                             <button
                               type="button"
@@ -131,6 +179,64 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false }) => {
           );
         })}
       </div>
+
+      {activeCombo && (
+        <div className={styles.comboBackdrop} onMouseDown={closeComboPicker}>
+          <div
+            className={styles.comboModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="combo-palace-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className={styles.comboModalHeader}>
+              <div>
+                <span className={styles.comboModalBadge}>Ahorra hasta $21</span>
+                <h3 id="combo-palace-title">Arma tu Combo Palace</h3>
+                <p>Un bowl, una bebida y un Rice Cake por {formatPrice(activeCombo.price)}.</p>
+              </div>
+              <button type="button" className={styles.comboClose} onClick={closeComboPicker} aria-label="Cerrar">
+                ×
+              </button>
+            </div>
+
+            <div className={styles.comboGroups}>
+              {comboGroups.map((group) => (
+                <fieldset key={group.key} className={styles.comboGroup}>
+                  <legend>{group.title}</legend>
+                  <div className={styles.comboOptions}>
+                    {group.options.map((option) => {
+                      const catalogItem = CUSTOMER_CATALOG_BY_ID[option.id];
+                      const selected = comboSelection[group.key] === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          className={`${styles.comboOption} ${selected ? styles.comboOptionSelected : ""}`}
+                          onClick={() => setComboSelection((current) => ({ ...current, [group.key]: option.id }))}
+                          aria-pressed={selected}
+                        >
+                          {catalogItem?.image ? (
+                            <img src={catalogItem.image} alt="" loading="lazy" />
+                          ) : (
+                            <span aria-hidden="true">{catalogItem?.icon || "•"}</span>
+                          )}
+                          <strong>{option.label}</strong>
+                          {selected && <span className={styles.comboCheck} aria-hidden="true">✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
+
+            <button type="button" className={styles.comboConfirm} onClick={confirmCombo}>
+              Agregar Combo Palace · {formatPrice(activeCombo.price)}
+            </button>
+          </div>
+        </div>
+      )}
 
       {cartCount > 0 && (
         <button type="button" className={styles.cartBar} onClick={onGoToCart}>

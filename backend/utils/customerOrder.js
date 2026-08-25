@@ -170,7 +170,13 @@ export function sanitizeCustomerCart(cart) {
       if (CUSTOMER_EXCLUDED_CATALOG_IDS.has(catalogId)) {
         throw new TypeError(`Artículo ${index + 1}: no disponible para pedidos en línea`);
       }
-      rawItemLines.push({ catalogId, qty: line?.qty });
+      rawItemLines.push({
+        catalogId,
+        qty: line?.qty,
+        comboBowlId: line?.comboBowlId,
+        comboDrinkId: line?.comboDrinkId,
+        comboRiceCakeId: line?.comboRiceCakeId,
+      });
     } else {
       try {
         const bowl = sanitizeCustomerBowl(line || {});
@@ -188,6 +194,11 @@ export function sanitizeCustomerCart(cart) {
         name: item.name,
         price: item.price,
         qty: item.qty,
+        ...(item.catalogId === "combo-palace" ? {
+          comboBowlId: item.comboBowlId,
+          comboDrinkId: item.comboDrinkId,
+          comboRiceCakeId: item.comboRiceCakeId,
+        } : {}),
       }))
     : [];
 

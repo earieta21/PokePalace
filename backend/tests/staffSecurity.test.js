@@ -89,6 +89,51 @@ test("los rice cakes del POS cobran sus precios de catálogo", () => {
   assert.deepEqual(getPosInventoryDemand({ items: [cacao, choco] }), {});
 });
 
+test("Combo Palace fija precio, conserva elecciones y descuenta sus componentes", () => {
+  const [combo] = resolvePosItems([{
+    catalogId: "combo-palace",
+    price: 1,
+    qty: 2,
+    comboBowlId: "bowl-the-og",
+    comboDrinkId: "agua-del-dia",
+    comboRiceCakeId: "choco-rice-cake",
+  }]);
+
+  assert.equal(combo.price, 279);
+  assert.equal(combo.qty, 2);
+  assert.equal(combo.comboBowlId, "bowl-the-og");
+  assert.equal(combo.comboDrinkId, "agua-del-dia");
+  assert.equal(combo.comboRiceCakeId, "choco-rice-cake");
+
+  const demand = getPosInventoryDemand({ items: [combo] });
+  assert.equal(demand.white_rice, 2);
+  assert.equal(demand.tuna, 0.1);
+  assert.equal(demand.salmon, 0.1);
+  assert.equal(demand.agua_natural, 2);
+
+  assert.deepEqual(
+    getUnavailablePosSelections({ items: [combo], unavailableItems: ["agua_natural", "salmon"] }),
+    ["agua_natural", "salmon"]
+  );
+});
+
+test("Combo Palace rechaza elecciones faltantes o fuera de sus opciones", () => {
+  assert.throws(
+    () => resolvePosItems([{ catalogId: "combo-palace", qty: 1 }]),
+    PosOrderValidationError
+  );
+  assert.throws(
+    () => resolvePosItems([{
+      catalogId: "combo-palace",
+      qty: 1,
+      comboBowlId: "bowl-mediano-rapido",
+      comboDrinkId: "coca-zero",
+      comboRiceCakeId: "cacao-rice-cake",
+    }]),
+    PosOrderValidationError
+  );
+});
+
 test("el bowl mediano/grande de venta rapida cobra el precio correcto y no descuenta inventario", () => {
   const [mediano, grande] = resolvePosItems([
     { catalogId: "bowl-mediano-rapido", qty: 1 },

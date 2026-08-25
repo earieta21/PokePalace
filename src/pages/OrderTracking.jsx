@@ -7,6 +7,7 @@ import { getItemLabel, getBaseLabel } from "../order/OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import { clearActiveOrder, getOrderAccessToken, saveActiveOrder } from "../utils/orderAccess";
 import styles from "./OrderTracking.module.css";
+import { comboPalaceSelectionSummary } from "../data/comboPalace";
 
 const STEP_CONFIG = [
   { key: "pending", icon: "📋", labelKey: "tracking.received", descKey: "tracking.receivedDesc" },
@@ -549,7 +550,12 @@ export default function OrderTracking() {
             </p>
             <div className={styles.detailCard}>
               {line.kind === "item" ? (
-                <DetailRow label={t("summary.total")} value={`×${line.qty} — $${(line.price * line.qty).toFixed(2)}`} />
+                <>
+                  {line.catalogId === "combo-palace" && (
+                    <DetailRow label="Incluye" value={comboPalaceSelectionSummary(line)} />
+                  )}
+                  <DetailRow label={t("summary.total")} value={`×${line.qty} — $${(line.price * line.qty).toFixed(2)}`} />
+                </>
               ) : (
                 <>
                   <DetailRow label={t("common.base")} value={getBaseLabel(line.bases, line.base, language)} />

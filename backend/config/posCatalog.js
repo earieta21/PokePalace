@@ -7,6 +7,12 @@ export const EXTRA_SCOOP_PROTEIN_KG = 0.04;
 // Source of truth for products sold through the POS. The browser may display
 // these prices, but only this server-side catalog is used to charge an order.
 export const POS_CATALOG = Object.freeze([
+  {
+    catalogId: "combo-palace", legacyId: 25, name: "Combo Palace", price: 279, category: "combos",
+    // La receta depende de las tres elecciones guardadas en la línea. Se
+    // expande en addItemDemand para descontar exactamente esos productos.
+    inventoryRecipe: {}, comboPalace: true,
+  },
   // Los bowls de la casa — mismos nombres y recetas que los presets del
   // inicio del sitio (src/pages/Home.jsx menuItems), todos a precio de
   // bowl normal.
@@ -96,6 +102,30 @@ const BY_CATALOG_ID = new Map(POS_CATALOG.map((item) => [item.catalogId, item]))
 const BY_LEGACY_ID = new Map(POS_CATALOG.map((item) => [String(item.legacyId), item]));
 const BY_NAME = new Map(POS_CATALOG.map((item) => [normalizeName(item.name), item]));
 
+export const COMBO_PALACE_BOWL_IDS = new Set([
+  "bowl-the-og", "bowl-skinny", "bowl-quinoa",
+]);
+export const COMBO_PALACE_DRINK_IDS = new Set([
+  "mineral-water", "coca-zero", "coca-cola-regular", "agua-del-dia",
+]);
+export const COMBO_PALACE_RICE_CAKE_IDS = new Set([
+  "cacao-rice-cake", "choco-rice-cake", "miel-rice-cake",
+]);
+
+const sanitizeComboPalaceSelections = (rawItem, itemName = "Combo Palace") => {
+  const comboBowlId = typeof rawItem.comboBowlId === "string" ? rawItem.comboBowlId.trim() : "";
+  const comboDrinkId = typeof rawItem.comboDrinkId === "string" ? rawItem.comboDrinkId.trim() : "";
+  const comboRiceCakeId = typeof rawItem.comboRiceCakeId === "string" ? rawItem.comboRiceCakeId.trim() : "";
+  if (
+    !COMBO_PALACE_BOWL_IDS.has(comboBowlId)
+    || !COMBO_PALACE_DRINK_IDS.has(comboDrinkId)
+    || !COMBO_PALACE_RICE_CAKE_IDS.has(comboRiceCakeId)
+  ) {
+    throw new PosOrderValidationError(`Selecciona un bowl, una bebida y un Rice Cake válidos para ${itemName}`);
+  }
+  return { comboBowlId, comboDrinkId, comboRiceCakeId };
+};
+
 export class PosOrderValidationError extends Error {
   constructor(message) {
     super(message);
@@ -158,9 +188,16 @@ export const resolvePosItems = (items) => {
       protein = rawItem.protein;
     }
 
-    // Dos líneas del mismo producto con distinta proteína no se combinan --
+    const comboSelections = catalogItem.comboPalace
+      ? sanitizeComboPalaceSelections(rawItem, catalogItem.name)
+      : null;
+
+    // Dos líneas del mismo producto con distinta proteína o distintas
+    // elecciones del combo no se combinan.
     // se mantienen separadas para no perder de cuál proteína era cada una.
-    const mapKey = protein ? `${catalogItem.catalogId}::${protein}` : catalogItem.catalogId;
+    const mapKey = comboSelections
+      ? `${catalogItem.catalogId}::${comboSelections.comboBowlId}::${comboSelections.comboDrinkId}::${comboSelections.comboRiceCakeId}`
+      : protein ? `${catalogItem.catalogId}::${protein}` : catalogItem.catalogId;
     const previous = resolved.get(mapKey);
     const combinedQty = (previous?.qty || 0) + qty;
     if (combinedQty > 99) {
@@ -176,6 +213,7 @@ export const resolvePosItems = (items) => {
       rewardDrink: Boolean(catalogItem.rewardDrink),
       rewardSnack: Boolean(catalogItem.rewardSnack),
       ...(protein ? { protein } : {}),
+      ...(comboSelections || {}),
     });
   }
 
@@ -348,6 +386,15 @@ const addItemDemand = (demand, item) => {
   const qty = Number(item?.qty ?? 1);
   if (!Number.isInteger(qty) || qty <= 0) return;
   const catalogItem = catalogItemForStoredLine(item);
+  if (catalogItem?.comboPalace) {
+    const selections = [item.comboBowlId, item.comboDrinkId, item.comboRiceCakeId];
+    for (const catalogId of selections) {
+      if (typeof catalogId === "string" && catalogId !== catalogItem.catalogId) {
+        addItemDemand(demand, { catalogId, qty });
+      }
+    }
+    return;
+  }
   const recipe = catalogItem?.inventoryRecipe;
   if (recipe && typeof recipe === "object") {
     const entries = Object.entries(recipe);
@@ -430,6 +477,16 @@ export const getUnavailablePosSelections = ({
     consider(inventoryKeyFromName(catalogItem.name));
     for (const key of Object.keys(catalogItem.inventoryRecipe || {})) consider(key);
     consider(item.protein);
+    if (catalogItem.comboPalace) {
+      for (const catalogId of [item.comboBowlId, item.comboDrinkId, item.comboRiceCakeId]) {
+        const selectedItem = getPosCatalogItem(catalogId);
+        if (!selectedItem) continue;
+        consider(selectedItem.catalogId);
+        consider(selectedItem.legacyId);
+        consider(inventoryKeyFromName(selectedItem.name));
+        for (const key of Object.keys(selectedItem.inventoryRecipe || {})) consider(key);
+      }
+    }
   }
 
   return [...selected].sort();

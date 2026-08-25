@@ -2,6 +2,7 @@ import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { PROTEIN_LABELS } from "../../order/OrderLabels";
+import { comboPalaceSelectionSummary } from "../../data/comboPalace";
 
 const STATUS_CFG = {
   pending:   { cls: "badgeYellow", label: "Nuevo" },
@@ -28,7 +29,8 @@ function itemSummary(order) {
   if (order.cartItems?.length) {
     for (const line of order.cartItems) {
       if (line.kind === "item") {
-        segments.push(`${line.name} ×${line.qty}`);
+        const combo = line.catalogId === "combo-palace" ? ` (${comboPalaceSelectionSummary(line)})` : "";
+        segments.push(`${line.name}${combo} ×${line.qty}`);
         continue;
       }
       const proteins = line.proteins?.length ? line.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ") : "";

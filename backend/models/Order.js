@@ -22,6 +22,10 @@ const cartLineSchema = new mongoose.Schema(
     // Campos de artículo de catálogo (kind: "item")
     catalogId: { type: String, default: null },
     name:      { type: String, default: null },
+    // Elecciones del Combo Palace (kind: "item", catalogId: "combo-palace")
+    comboBowlId:     { type: String, default: null },
+    comboDrinkId:    { type: String, default: null },
+    comboRiceCakeId: { type: String, default: null },
     // Compartidos
     price: { type: Number, default: 0 },
     qty:   { type: Number, default: 1 },

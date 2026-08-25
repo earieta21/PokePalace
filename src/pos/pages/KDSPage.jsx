@@ -11,6 +11,7 @@ import {
   TOPPING_LABELS,
 } from "../../order/OrderLabels";
 import { orderTimingLabel } from "../orderTiming.js";
+import { comboPalaceSelectionSummary } from "../../data/comboPalace";
 
 const STATUS_CFG = {
   pending:   { cls: "badgeYellow", label: "Nuevo" },
@@ -43,6 +44,9 @@ function orderLines(order) {
     for (const line of order.cartItems) {
       if (line.kind === "item") {
         lines.push(`${line.name} ×${line.qty}`);
+        if (line.catalogId === "combo-palace") {
+          lines.push(`Incluye: ${comboPalaceSelectionSummary(line)}`);
+        }
         continue;
       }
       bowlNumber += 1;
@@ -293,7 +297,7 @@ export default function KDSPage({ styles, role }) {
           background: "#dc2626", color: "#fff", textAlign: "center",
           padding: "10px 16px", fontWeight: 700, fontSize: 13,
         }}>
-          ⚠️ No se pudo actualizar la cocina: {error} — toca "Actualizar" o vuelve a entrar con tu PIN si sigue.
+          ⚠️ No se pudo actualizar la cocina: {error} — toca «Actualizar» o vuelve a entrar con tu PIN si sigue.
         </div>
       )}
 

@@ -230,6 +230,25 @@ test("el carrito acepta 2 bowls y un artículo del catálogo en un solo pedido",
   assert.equal(cart[2].price, 30); // precio autoritativo del servidor, no el del cliente
 });
 
+test("el carrito acepta Combo Palace y reemplaza el precio enviado por $279", () => {
+  const [combo] = sanitizeCustomerCart([{
+    kind: "item",
+    catalogId: "combo-palace",
+    price: 0.01,
+    qty: 1,
+    comboBowlId: "bowl-quinoa",
+    comboDrinkId: "coca-zero",
+    comboRiceCakeId: "miel-rice-cake",
+  }]);
+
+  assert.equal(combo.kind, "item");
+  assert.equal(combo.price, 279);
+  assert.equal(combo.comboBowlId, "bowl-quinoa");
+  assert.equal(combo.comboDrinkId, "coca-zero");
+  assert.equal(combo.comboRiceCakeId, "miel-rice-cake");
+  assert.deepEqual(findUnavailableCustomerCartItems([combo], ["coca_zero"]), ["coca_zero"]);
+});
+
 test("el carrito rechaza los bowls de venta rápida del POS (sin receta para un cliente)", () => {
   assert.throws(
     () => sanitizeCustomerCart([{ kind: "item", catalogId: "bowl-mediano-rapido", qty: 1 }]),
