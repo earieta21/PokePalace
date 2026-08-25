@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useOrder } from "./OrderContext";
 import {
   CUSTOMER_CATALOG,
@@ -20,7 +20,7 @@ const CATEGORY_ICONS = {
 // Pantalla compartida entre la app/sitio web (`src/pages/MenuPage.jsx`) y el
 // kiosco (`src/kiosk/KioskMenuPage.jsx`) — mismo carrito (OrderContext), solo
 // cambian los destinos de navegación.
-const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false }) => {
+const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId = "" }) => {
   const { order, addCatalogItem, addComboToCart, updateCartItemQty, startNewBowl } = useOrder();
   const [activeCombo, setActiveCombo] = useState(null);
   const [comboSelection, setComboSelection] = useState({
@@ -28,6 +28,20 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false }) => {
     comboDrinkId: "",
     comboRiceCakeId: "",
   });
+  const openedInitialCombo = useRef(false);
+
+  useEffect(() => {
+    if (openedInitialCombo.current || !initialComboId) return;
+    const item = CUSTOMER_CATALOG_BY_ID[initialComboId];
+    if (!item?.isCombo) return;
+    openedInitialCombo.current = true;
+    setActiveCombo(item);
+    setComboSelection({
+      comboBowlId: item.comboOptions.bowls[0]?.id || "",
+      comboDrinkId: item.comboOptions.drinks[0]?.id || "",
+      comboRiceCakeId: item.comboOptions.riceCakes[0]?.id || "",
+    });
+  }, [initialComboId]);
 
   const cartCount = order.cart.reduce((sum, line) => sum + line.qty, 0);
   const cartSubtotal = order.cart.reduce((sum, line) => sum + line.price * line.qty, 0);

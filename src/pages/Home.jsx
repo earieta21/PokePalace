@@ -7,11 +7,14 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { useOrder } from "../order/OrderContext";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
+import { COMBO_PALACE_PRICE } from "../data/comboPalace";
 import styles from "./Home.module.css";
 
 import theOg from "../assets/menu/theOg.webp";
 import skinnyBowl from "../assets/menu/skinnyBowl.webp";
 import quinoaBowl from "../assets/menu/quinoaBowl.webp";
+import cocaColaRegular from "../assets/menu/products/coca-cola-regular.jpg";
+import honeyRiceCake from "../assets/menu/products/honey-rice-cake.jpg";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -109,6 +112,48 @@ const Home = () => {
       {/* Hero Section */}
       <section className={styles.section}>
         <HeroSection />
+      </section>
+
+      {/* Combo destacado */}
+      <section className={`${styles.section} ${styles.comboSection}`}>
+        <div className={styles.comboCopy}>
+          <span className={styles.comboBadge}>NUEVO · AHORRA HASTA $21</span>
+          <p className={styles.comboEyebrow}>Combos</p>
+          <h2 className={styles.comboTitle}>Combo Palace</h2>
+          <p className={styles.comboDescription}>
+            Elige un bowl de la casa, una bebida y tu Rice Cake favorito.
+          </p>
+          <div className={styles.comboIncludes}>
+            <span>🍣 1 bowl</span>
+            <span>🥤 1 bebida</span>
+            <span>🍫 1 Rice Cake</span>
+          </div>
+          <div className={styles.comboActionRow}>
+            <strong>${COMBO_PALACE_PRICE} MXN</strong>
+            <button
+              type="button"
+              className={styles.comboButton}
+              onClick={() => navigate("/menu?select=combo-palace")}
+            >
+              Armar mi combo →
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.comboVisual} aria-hidden="true">
+          <div className={`${styles.comboPhoto} ${styles.comboPhotoBowl}`}>
+            <img src={theOg} alt="" />
+            <span>Bowl</span>
+          </div>
+          <div className={`${styles.comboPhoto} ${styles.comboPhotoDrink}`}>
+            <img src={cocaColaRegular} alt="" />
+            <span>Bebida</span>
+          </div>
+          <div className={`${styles.comboPhoto} ${styles.comboPhotoSnack}`}>
+            <img src={honeyRiceCake} alt="" />
+            <span>Rice Cake</span>
+          </div>
+        </div>
       </section>
 
       {/* Popular Bowls */}
