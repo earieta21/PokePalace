@@ -15,9 +15,10 @@ import {
 import {
   findUnavailableCustomerCartItems,
   isCustomerManagedOrder,
-  isRestaurantClosedDay,
   isWithinRestaurantHours,
   normalizeCustomerOrderId,
+  restaurantOpenHour,
+  RESTAURANT_CLOSE_HOUR,
   sanitizeCustomerCart,
   usefulPointsToRedeem,
 } from "../utils/customerOrder.js";
@@ -48,12 +49,7 @@ const customerCanAccessOrder = (req, order) => {
 
 const sendOrderNotFound = (res) => res.status(404).json({ msg: "Orden no encontrada" });
 
-const OPEN_HOUR = 11;
-const CLOSE_HOUR = 21;
-
-const isWithinBusinessHours = (date) => {
-  return isWithinRestaurantHours(date, OPEN_HOUR, CLOSE_HOUR);
-};
+const isWithinBusinessHours = (date) => isWithinRestaurantHours(date);
 
 const validateScheduledTime = (scheduledPickupTime) => {
   const scheduled = new Date(scheduledPickupTime);
@@ -63,12 +59,8 @@ const validateScheduledTime = (scheduledPickupTime) => {
   const minTime = new Date(now.getTime() + 15 * 60 * 1000);
   if (scheduled < minTime) return "La hora debe ser al menos 15 minutos desde ahora";
 
-  if (isRestaurantClosedDay(scheduled)) {
-    return "Cerramos los miércoles — elige otro día para tu pedido programado.";
-  }
-
   if (!isWithinBusinessHours(scheduled)) {
-    return `El restaurante acepta pedidos de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00`;
+    return `El restaurante acepta pedidos de ${restaurantOpenHour(scheduled)}:00 a ${RESTAURANT_CLOSE_HOUR}:00 ese día`;
   }
 
   return null;
@@ -323,9 +315,7 @@ export const createOrder = async (req, res) => {
       isScheduled = true;
     } else if (!isWithinBusinessHours(new Date())) {
       return res.status(400).json({
-        msg: isRestaurantClosedDay(new Date())
-          ? "Hoy miércoles estamos cerrados. Puedes programar tu pedido para otro día, o pide de jueves a martes de 11:00 a 21:00."
-          : `El restaurante está cerrado ahora. Aceptamos pedidos de ${OPEN_HOUR}:00 a ${CLOSE_HOUR}:00 — puedes programar tu pedido para más tarde.`,
+        msg: `El restaurante está cerrado ahora. Hoy aceptamos pedidos de ${restaurantOpenHour(new Date())}:00 a ${RESTAURANT_CLOSE_HOUR}:00 — puedes programar tu pedido para más tarde.`,
       });
     }
 

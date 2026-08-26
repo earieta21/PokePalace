@@ -111,11 +111,13 @@ const OrderSummary = ({
   const appliedPointsDiscount = Math.min(Math.max(0, pointsDiscount), pricing.total);
   const finalTotal = Math.max(0, pricing.total - appliedPointsDiscount);
   // Time picker helpers — mantiene el rango en línea con lo que de verdad
-  // acepta el backend (11:00–21:00), para no dejar elegir una hora que
-  // luego se va a rechazar al confirmar. Usa la hora LOCAL del navegador
+  // acepta el backend (viernes a domingo abren una hora antes, 10:00 en vez
+  // de 11:00; cierre 21:00 todos los días), para no dejar elegir una hora
+  // que luego se va a rechazar al confirmar. Usa la hora LOCAL del navegador
   // (no toISOString, que da UTC y desfasa el límite varias horas).
-  const OPEN_HOUR = 11;
   const CLOSE_HOUR = 21;
+  const EARLY_OPEN_WEEKDAYS = new Set([0, 5, 6]); // domingo, viernes, sábado
+  const openHourFor = (date) => (EARLY_OPEN_WEEKDAYS.has(date.getDay()) ? 10 : 11);
 
   const toLocalDatetimeValue = (date) => {
     const pad = (n) => String(n).padStart(2, "0");
@@ -134,11 +136,11 @@ const OrderSummary = ({
   const getMinTime = () => {
     const now = new Date();
     now.setMinutes(now.getMinutes() + 15);
-    if (now.getHours() < OPEN_HOUR) {
-      now.setHours(OPEN_HOUR, 0, 0, 0);
+    if (now.getHours() < openHourFor(now)) {
+      now.setHours(openHourFor(now), 0, 0, 0);
     } else if (now.getHours() >= CLOSE_HOUR) {
       now.setDate(now.getDate() + 1);
-      now.setHours(OPEN_HOUR, 0, 0, 0);
+      now.setHours(openHourFor(now), 0, 0, 0);
     }
     return toLocalDatetimeValue(now);
   };

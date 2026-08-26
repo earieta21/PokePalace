@@ -128,18 +128,6 @@ export default function OrderSummaryPage() {
       return;
     }
 
-    // Aviso rápido en el navegador del cliente — el servidor es quien
-    // realmente decide en la zona horaria del restaurante, esto solo
-    // evita un viaje de red para el caso obvio.
-    if (
-      order?.isScheduled &&
-      order?.scheduledPickupTime &&
-      new Date(order.scheduledPickupTime).getDay() === 3
-    ) {
-      setSubmitError(t("summary.closedWednesday"));
-      return;
-    }
-
     try {
       setSaving(true);
       setSubmitError("");

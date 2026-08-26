@@ -1,4 +1,4 @@
-import { zonedParts } from "./timeZone.js";
+import { zonedParts, zonedWeekday } from "./timeZone.js";
 import { computeBowlSubtotal, computeExtrasSubtotal } from "../pricing.js";
 import { getUnavailablePosSelections, resolvePosItems } from "../config/posCatalog.js";
 
@@ -236,22 +236,21 @@ export function normalizeCustomerOrderId(value) {
   return normalized;
 }
 
-// Miércoles (0=domingo, 1=lunes, ..., 3=miércoles, ..., 6=sábado) — el
-// restaurante no abre ese día, sin importar la hora.
-const CLOSED_WEEKDAY = 3;
+// Abre los 7 días. Viernes, sábado y domingo abren una hora antes que el
+// resto de la semana; el cierre es el mismo todos los días.
+const EARLY_OPEN_WEEKDAYS = new Set([0, 5, 6]); // domingo, viernes, sábado
+export const RESTAURANT_OPEN_HOUR = 11;
+export const RESTAURANT_EARLY_OPEN_HOUR = 10;
+export const RESTAURANT_CLOSE_HOUR = 21;
 
-export function isRestaurantClosedDay(date = new Date()) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return true;
-  const { year, month, day } = zonedParts(date);
-  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  return weekday === CLOSED_WEEKDAY;
+export function restaurantOpenHour(date = new Date()) {
+  return EARLY_OPEN_WEEKDAYS.has(zonedWeekday(date)) ? RESTAURANT_EARLY_OPEN_HOUR : RESTAURANT_OPEN_HOUR;
 }
 
-export function isWithinRestaurantHours(date = new Date(), openHour = 11, closeHour = 21) {
+export function isWithinRestaurantHours(date = new Date()) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
-  if (isRestaurantClosedDay(date)) return false;
   const { hour } = zonedParts(date);
-  return hour >= openHour && hour < closeHour;
+  return hour >= restaurantOpenHour(date) && hour < RESTAURANT_CLOSE_HOUR;
 }
 
 export function isCustomerManagedOrder(order) {

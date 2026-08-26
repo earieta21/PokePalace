@@ -4,9 +4,9 @@ import {
   findUnavailableCustomerBowlItems,
   findUnavailableCustomerCartItems,
   isCustomerManagedOrder,
-  isRestaurantClosedDay,
   isWithinRestaurantHours,
   normalizeCustomerOrderId,
+  restaurantOpenHour,
   sanitizeCustomerBowl,
   sanitizeCustomerCart,
   usefulPointsToRedeem,
@@ -22,22 +22,44 @@ test("órdenes online y de WhatsApp entran a cancelación y reversión de client
 });
 
 test("los horarios de pedidos usan America/Tijuana en verano e invierno", () => {
-  // 15 de julio 2026 es miércoles en hora de Tijuana — se usa jueves 16
-  // para probar solo el límite de hora, sin que el día cerrado interfiera.
+  // 16 de julio 2026 es jueves en hora de Tijuana — horario normal (abre 11:00).
   assert.equal(isWithinRestaurantHours(new Date("2026-07-16T17:59:59Z")), false); // 10:59 PDT, jueves
   assert.equal(isWithinRestaurantHours(new Date("2026-07-16T18:00:00Z")), true);  // 11:00 PDT, jueves
-  // "2026-01-15T04:59:59Z" cae en 14 de enero local (miércoles) por el
-  // cambio de zona horaria — se usa el 16 en UTC (= 15 de enero local,
-  // jueves) para aislar el límite de hora del día cerrado.
+  // "2026-01-16T04:59:59Z" cae en 15 de enero local (jueves) por el cambio de
+  // zona horaria — confirma que el límite de las 21:00 también aplica en invierno.
   assert.equal(isWithinRestaurantHours(new Date("2026-01-16T04:59:59Z")), true);  // 20:59 PST, jueves
   assert.equal(isWithinRestaurantHours(new Date("2026-01-16T05:00:00Z")), false); // 21:00 PST, jueves
 });
 
-test("el restaurante permanece cerrado todo el miércoles sin importar la hora", () => {
-  // 15 de julio 2026 es miércoles en horario de Tijuana.
-  assert.equal(isRestaurantClosedDay(new Date("2026-07-15T18:30:00Z")), true);  // 11:30 PDT, miércoles
-  assert.equal(isRestaurantClosedDay(new Date("2026-07-16T18:30:00Z")), false); // 11:30 PDT, jueves
-  assert.equal(isWithinRestaurantHours(new Date("2026-07-15T18:30:00Z")), false); // dentro de horario pero cerrado por día
+test("viernes, sábado y domingo abren una hora antes (10:00) que el resto de la semana", () => {
+  // 17 de julio 2026 es viernes en hora de Tijuana.
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-17T16:59:59Z")), false); // 9:59 PDT, viernes
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-17T17:00:00Z")), true);  // 10:00 PDT, viernes
+  // A la misma hora, un jueves normal todavía no abre.
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-16T17:30:00Z")), false); // 10:30 PDT, jueves
+  // El cierre sigue siendo 21:00 aunque haya abierto más temprano.
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-18T03:59:59Z")), true);  // 20:59 PDT, viernes
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-18T04:00:00Z")), false); // 21:00 PDT, viernes
+  // 16 de enero 2026 (invierno) es viernes en hora de Tijuana — mismo horario
+  // temprano en temporada de horario estándar (PST).
+  assert.equal(isWithinRestaurantHours(new Date("2026-01-16T17:59:59Z")), false); // 9:59 PST, viernes
+  assert.equal(isWithinRestaurantHours(new Date("2026-01-16T18:00:00Z")), true);  // 10:00 PST, viernes
+});
+
+test("el restaurante ya abre todos los días, incluido miércoles", () => {
+  // 15 de julio 2026 es miércoles en hora de Tijuana — antes era el día
+  // cerrado, ahora abre en el horario normal (11:00) como cualquier otro
+  // día entre semana.
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-15T17:59:59Z")), false); // 10:59 PDT, miércoles
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-15T18:00:00Z")), true);  // 11:00 PDT, miércoles
+});
+
+test("restaurantOpenHour regresa 10 de viernes a domingo y 11 el resto de la semana", () => {
+  assert.equal(restaurantOpenHour(new Date("2026-07-15T20:00:00Z")), 11); // miércoles
+  assert.equal(restaurantOpenHour(new Date("2026-07-16T20:00:00Z")), 11); // jueves
+  assert.equal(restaurantOpenHour(new Date("2026-07-17T20:00:00Z")), 10); // viernes
+  assert.equal(restaurantOpenHour(new Date("2026-07-18T20:00:00Z")), 10); // sábado
+  assert.equal(restaurantOpenHour(new Date("2026-07-19T20:00:00Z")), 10); // domingo
 });
 
 test("el canje se limita a bloques completos que caben en el total", () => {

@@ -171,7 +171,7 @@ export function orderConfirmationEmail(order) {
       </a>
     </div>
     <p style="font-size:12px;color:#999;text-align:center;margin:16px 0 0">
-      Blvd. Gustavo Díaz Ordaz, Plaza La Estación, Local 24, Tijuana · Lun a Dom 11:00–21:00
+      Blvd. Gustavo Díaz Ordaz, Plaza La Estación, Local 24, Tijuana · Lun a Jue 11:00–21:00 · Vie a Dom 10:00–21:00
     </p>
   </div>
 </div>`,

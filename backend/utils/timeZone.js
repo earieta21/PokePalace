@@ -22,6 +22,13 @@ export function zonedParts(date = new Date(), timeZone = RESTAURANT_TIME_ZONE) {
   };
 }
 
+// 0=domingo, 1=lunes, ..., 6=sábado — mismo mapeo que Date.prototype.getUTCDay(),
+// pero calculado en la zona horaria del restaurante en vez de UTC/local del server.
+export function zonedWeekday(date = new Date(), timeZone = RESTAURANT_TIME_ZONE) {
+  const { year, month, day } = zonedParts(date, timeZone);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
 export function dateKeyInTimeZone(date = new Date(), timeZone = RESTAURANT_TIME_ZONE) {
   const { year, month, day } = zonedParts(date, timeZone);
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;

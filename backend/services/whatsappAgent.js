@@ -15,7 +15,8 @@ import {
   sanitizeCustomerCart,
   findUnavailableCustomerCartItems,
   isWithinRestaurantHours,
-  isRestaurantClosedDay,
+  restaurantOpenHour,
+  RESTAURANT_CLOSE_HOUR,
 } from "../utils/customerOrder.js";
 import { computeCartPricing } from "../pricing.js";
 
@@ -70,7 +71,7 @@ Reglas:
 - Antes de confirmar, resume el pedido y el total, y pregunta el nombre del cliente si no lo tienes.
 - Llama confirmar_pedido solo cuando el cliente ya dijo explícitamente que quiere cerrar el pedido y ya tienes su nombre.
 - El pedido se paga al recogerlo en el restaurante (efectivo o tarjeta) — no se cobra por WhatsApp.
-- Horario: jueves a martes, 11:00 a 21:00. Cerrado los miércoles.
+- Horario: todos los días. Lunes a jueves 11:00 a 21:00; viernes a domingo 10:00 a 21:00.
 - Si el cliente pide algo fuera de tu alcance (cancelar un pedido ya hecho, quejas, algo fuera del menú, o cualquier pregunta que no puedas responder con certeza), discúlpate y dile que llame o visite el restaurante directamente — nunca inventes información.
 
 CARRITO ACTUAL:
@@ -182,9 +183,7 @@ async function confirmOrder(session, phone, nombreCliente) {
   if (!isWithinRestaurantHours(now)) {
     return {
       error: true,
-      message: isRestaurantClosedDay(now)
-        ? "Hoy miércoles estamos cerrados. Te leo de jueves a martes, 11:00 a 21:00."
-        : "Estamos cerrados ahora. Abrimos de jueves a martes, 11:00 a 21:00.",
+      message: `Estamos cerrados ahora. Hoy abrimos de ${restaurantOpenHour(now)}:00 a ${RESTAURANT_CLOSE_HOUR}:00.`,
     };
   }
 

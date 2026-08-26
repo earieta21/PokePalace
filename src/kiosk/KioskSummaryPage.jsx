@@ -53,15 +53,6 @@ export default function KioskSummaryPage() {
       return;
     }
 
-    if (
-      order?.isScheduled &&
-      order?.scheduledPickupTime &&
-      new Date(order.scheduledPickupTime).getDay() === 3
-    ) {
-      setSubmitError("Cerramos los miércoles — elige otro día para tu pedido programado.");
-      return;
-    }
-
     try {
       setSaving(true);
       setSubmitError("");
