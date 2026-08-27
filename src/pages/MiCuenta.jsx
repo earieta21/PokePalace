@@ -214,7 +214,7 @@ export default function MiCuenta() {
                 </div>
               );
             })()}
-            <MemberQrCard token={token} onBalanceRefresh={refreshUser} />
+            <MemberQrCard token={token} onBalanceRefresh={refreshUser} language={language} />
           </div>
 
           <div className={styles.actions}>

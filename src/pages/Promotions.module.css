@@ -37,6 +37,11 @@
   box-shadow: var(--shadow-md);
 }
 
+.rewardsMemberQr {
+  width: min(430px, 100%);
+  margin: -14px auto 32px;
+}
+
 .pointsLeft {
   display: flex;
   align-items: center;

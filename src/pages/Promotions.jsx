@@ -4,6 +4,7 @@ import { AuthContext } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { API_URL } from "../config";
 import { REWARDS } from "../data/rewardsCatalog.js";
+import MemberQrCard from "../components/MemberQrCard";
 import styles from "./Promotions.module.css";
 
 const TIERS = [
@@ -299,6 +300,16 @@ export default function RewardsPage() {
       )}
 
       {/* ── Personalized guidance without extra discounts ── */}
+      {isLoggedIn && (
+        <MemberQrCard
+          token={token}
+          onBalanceRefresh={refreshUser}
+          defaultOpen
+          language={language}
+          className={styles.rewardsMemberQr}
+        />
+      )}
+
       {isLoggedIn && personalGoal && (
         <section className={`${styles.section} ${styles.personalCard}`}>
           <div className={styles.personalTopRow}>
