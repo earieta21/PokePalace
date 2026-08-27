@@ -10,7 +10,8 @@ import {
 } from "../offlineQueue";
 import CustomBowlBuilder from "../CustomBowlBuilder";
 import Receipt from "../Receipt.jsx";
-import { getRewardById } from "../../data/rewardsCatalog.js";
+import MemberQrScanner from "../MemberQrScanner.jsx";
+import { getRewardById, REWARDS } from "../../data/rewardsCatalog.js";
 import { REFERRAL_SOURCES } from "../../data/referralSources.js";
 import { TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "../../order/pricing.js";
@@ -87,6 +88,10 @@ export default function POSPage({ styles }) {
   const [customerMatches, setCustomerMatches] = useState([]);
   const [customerSearching, setCustomerSearching] = useState(false);
   const [customerSearchDone, setCustomerSearchDone] = useState(false);
+  const [memberQrPayload, setMemberQrPayload] = useState("");
+  const [showMemberScanner, setShowMemberScanner] = useState(false);
+  const [memberScanning, setMemberScanning] = useState(false);
+  const [memberRedeeming, setMemberRedeeming] = useState(null);
   const [lastReceipt, setLastReceipt] = useState(null);
   const [printRequested, setPrintRequested] = useState(false);
 
@@ -214,6 +219,10 @@ export default function POSPage({ styles }) {
     setCustomerLookup("");
     setCustomerMatches([]);
     setCustomerSearchDone(false);
+    setMemberQrPayload("");
+    setShowMemberScanner(false);
+    setMemberScanning(false);
+    setMemberRedeeming(null);
     setSuccess("");
     setError("");
   };
@@ -287,6 +296,7 @@ export default function POSPage({ styles }) {
     setCustomerLookup("");
     setCustomerMatches([]);
     setCustomerSearchDone(false);
+    setMemberQrPayload("");
     setError("");
   };
 
@@ -295,6 +305,50 @@ export default function POSPage({ styles }) {
     setCustomerLookup("");
     setCustomerMatches([]);
     setCustomerSearchDone(false);
+    setMemberQrPayload("");
+  };
+
+  const identifyMemberQr = useCallback(async (payload) => {
+    setMemberScanning(true);
+    setError("");
+    try {
+      const data = await createStaffApi(staffToken).post("/api/staff/orders/customers/scan", { payload });
+      const customer = data.customer;
+      setRewardsCustomer(customer);
+      setCliente(customer.name || "");
+      if (customer.phone) setPhone(customer.phone);
+      setCustomerLookup("");
+      setCustomerMatches([]);
+      setCustomerSearchDone(false);
+      setMemberQrPayload(payload);
+      setShowLoyalty(true);
+      setShowMemberScanner(false);
+    } catch (scanError) {
+      setError(scanError.message);
+      throw scanError;
+    } finally {
+      setMemberScanning(false);
+    }
+  }, [staffToken]);
+
+  const redeemFromMemberQr = async (catalogReward) => {
+    if (!memberQrPayload || memberRedeeming) return;
+    setMemberRedeeming(catalogReward.id);
+    setError("");
+    try {
+      const data = await api.post("/api/staff/rewards/member-redeem", {
+        payload: memberQrPayload,
+        rewardId: catalogReward.id,
+      });
+      setReward({ ...catalogReward, code: data.redemption.code });
+      setRewardCode(data.redemption.code);
+      setRewardsCustomer((current) => current ? { ...current, points: data.points } : current);
+      setShowReward(true);
+    } catch (redeemError) {
+      setError(redeemError.message);
+    } finally {
+      setMemberRedeeming(null);
+    }
   };
 
   const lookupReward = async () => {
@@ -402,12 +456,23 @@ export default function POSPage({ styles }) {
     setCustomerLookup("");
     setCustomerMatches([]);
     setCustomerSearchDone(false);
+    setMemberQrPayload("");
+    setShowMemberScanner(false);
+    setMemberScanning(false);
+    setMemberRedeeming(null);
     setTimeout(() => setSuccess(""), 4000);
     setSaving(false);
   };
 
   return (
     <div className={ui.posRoot}>
+      {showMemberScanner && (
+        <MemberQrScanner
+          busy={memberScanning}
+          onDetected={identifyMemberQr}
+          onClose={() => setShowMemberScanner(false)}
+        />
+      )}
       <header className={ui.posHeader}>
         <div>
           <span className={ui.eyebrow}>Punto de venta</span>
@@ -624,9 +689,41 @@ export default function POSPage({ styles }) {
                     ? `Ganará ${rewardsPointsPreview} puntos cuando se registre el pago.`
                     : `Ganará ${rewardsPointsPreview} puntos con esta compra${rewardsMultiplier === 2 ? " · Nivel Oro 2×" : ""}.`}
                 </p>
+                {memberQrPayload && (
+                  <div className={ui.memberRewards}>
+                    <span>Usar puntos en esta compra</span>
+                    <small>Elige un premio; los puntos se descuentan al confirmar.</small>
+                    <div>
+                      {REWARDS.map((catalogReward) => {
+                        const enoughPoints = (rewardsCustomer.points ?? 0) >= catalogReward.cost;
+                        return (
+                          <button
+                            key={catalogReward.id}
+                            type="button"
+                            disabled={!enoughPoints || Boolean(memberRedeeming) || Boolean(reward)}
+                            onClick={() => redeemFromMemberQr(catalogReward)}
+                            title={catalogReward.terms.es}
+                          >
+                            <strong>{catalogReward.name.es}</strong>
+                            <em>{enoughPoints ? `Usar ${catalogReward.cost} pts` : `Faltan ${catalogReward.cost - (rewardsCustomer.points ?? 0)} pts`}</em>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {memberRedeeming && <p>Confirmando canje…</p>}
+                  </div>
+                )}
               </div>
             ) : (
               <>
+                <button
+                  type="button"
+                  className={ui.scanMemberButton}
+                  onClick={() => { setShowMemberScanner(true); setError(""); }}
+                >
+                  <span aria-hidden="true">▦</span> Escanear QR del miembro
+                </button>
+                <div className={ui.loyaltyDivider}><span>o buscar la cuenta</span></div>
                 <form
                   className={ui.loyaltySearch}
                   onSubmit={(event) => { event.preventDefault(); searchRewardsCustomers(); }}

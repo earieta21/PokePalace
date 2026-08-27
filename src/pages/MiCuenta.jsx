@@ -7,6 +7,7 @@ import { getItemLabel, getBaseLabel } from "../order/OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./MiCuenta.module.css";
 import { comboPalaceSelectionSummary } from "../data/comboPalace";
+import MemberQrCard from "../components/MemberQrCard";
 
 const getProteinsText = (order, language) => {
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
@@ -213,6 +214,7 @@ export default function MiCuenta() {
                 </div>
               );
             })()}
+            <MemberQrCard token={token} onBalanceRefresh={refreshUser} />
           </div>
 
           <div className={styles.actions}>

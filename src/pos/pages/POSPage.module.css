@@ -869,6 +869,46 @@
   cursor: not-allowed;
 }
 
+.scanMemberButton {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--p-g2);
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 850;
+}
+
+.scanMemberButton span {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.loyaltyDivider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--p-muted);
+  font-size: 7.5px;
+  text-transform: uppercase;
+}
+
+.loyaltyDivider::before,
+.loyaltyDivider::after {
+  height: 1px;
+  flex: 1;
+  background: #dce6df;
+  content: "";
+}
+
 .loyaltyResults {
   display: grid;
   max-height: 145px;
@@ -940,6 +980,80 @@
   font-size: 8px;
   font-weight: 700;
   line-height: 1.4;
+}
+
+.memberRewards {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px dashed #d7e4da;
+}
+
+.memberRewards > span,
+.memberRewards > small {
+  display: block;
+}
+
+.memberRewards > span {
+  color: var(--p-g1);
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.memberRewards > small {
+  margin: 2px 0 7px;
+  color: var(--p-muted);
+  font-size: 7.5px;
+}
+
+.memberRewards > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.memberRewards > div > button {
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid #d7e5da;
+  border-radius: 7px;
+  background: #f8fbf9;
+  color: var(--p-g1);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.memberRewards > div > button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.memberRewards button strong,
+.memberRewards button em {
+  display: block;
+}
+
+.memberRewards button strong {
+  overflow: hidden;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberRewards button em {
+  margin-top: 2px;
+  color: var(--p-g2);
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.memberRewards > p {
+  margin: 6px 0 0;
+  color: var(--p-g2);
+  font-size: 8px;
+  font-weight: 750;
 }
 
 .loyaltyEmpty {

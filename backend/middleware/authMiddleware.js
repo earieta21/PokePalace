@@ -12,7 +12,7 @@ export const protect = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decoded?.id || decoded.type === "staff") {
+    if (!decoded?.id || decoded.type === "staff" || decoded.type === "member_qr") {
       return res.status(401).json({ msg: "Token de cliente inválido" });
     }
     req.userId = decoded.id; // 👈 lo usamos para ligar órdenes al usuario
@@ -29,7 +29,7 @@ export const optionalAuth = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decoded?.id || decoded.type === "staff") {
+    if (!decoded?.id || decoded.type === "staff" || decoded.type === "member_qr") {
       return res.status(401).json({ msg: "Token de cliente inválido" });
     }
     req.userId = decoded.id;

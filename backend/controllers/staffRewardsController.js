@@ -1,6 +1,8 @@
 import Redemption from "../models/Redemption.js";
 import SocialStoryParticipant from "../models/SocialStoryParticipant.js";
 import { STORY_REWARD } from "../config/rewardsCatalog.js";
+import { redeemReward } from "./rewardsController.js";
+import { verifyMemberQr } from "../utils/memberQr.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 
@@ -39,6 +41,25 @@ export const lookupRedemption = async (req, res) => {
     res.json({ redemption });
   } catch {
     res.status(500).json({ msg: "Error buscando el código" });
+  }
+};
+
+/* The QR proves that the customer intentionally presented this account at the
+   register. Its jti also makes one QR good for at most one loyalty redemption;
+   retries with the same reward remain idempotent. */
+export const redeemMemberReward = async (req, res) => {
+  try {
+    const memberToken = verifyMemberQr(req.body?.payload);
+    req.userId = memberToken.id;
+    req.body = {
+      ...(req.body || {}),
+      clientRedemptionId: `member-qr:${memberToken.jti}`,
+    };
+    return redeemReward(req, res);
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      msg: err.status ? err.message : "No se pudo canjear el premio con este QR",
+    });
   }
 };
 

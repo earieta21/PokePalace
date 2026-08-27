@@ -100,6 +100,7 @@ after(async () => {
     await Inventory.deleteMany({ item: { $regex: "^CI Security" } });
     await Redemption.deleteMany({ code: { $regex: "^CIPOS" } });
     await Redemption.deleteMany({ clientRedemptionId: { $regex: "^reward:ci-" } });
+    await Redemption.deleteMany({ clientRedemptionId: { $regex: "^member-qr:" } });
     await User.deleteMany({ email: { $regex: "^ci-pos-security-" } });
     await StaffUser.deleteMany({ email: { $regex: `^${STAFF_FIXTURE_PREFIX}` } });
     await mongoose.disconnect();
@@ -700,6 +701,87 @@ test("un canje Rewards concurrente descuenta y genera un solo código", async ()
   );
   assert.equal(storyAttempt.status, 400);
   assert.equal((await User.findById(account.user.id)).points, 50);
+});
+
+test("el QR temporal identifica al miembro y autoriza un solo canje en caja", async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const registration = await postJSON("/api/auth/register", {
+    name: "Miembro QR CI",
+    email: `ci-pos-security-member-${suffix}@example.test`,
+    password: "prueba-segura-123",
+  });
+  assert.equal(registration.status, 201);
+  const account = await registration.json();
+  await User.updateOne({ _id: account.user.id }, { $set: { points: 150, lifetimePoints: 150 } });
+
+  const cardResponse = await fetch(`${BASE}/api/rewards/member-card`, {
+    headers: { Authorization: `Bearer ${account.token}` },
+  });
+  assert.equal(cardResponse.status, 200);
+  const card = await cardResponse.json();
+  assert.match(card.memberQrPayload, /^POKEPALACE-MEMBER:/);
+  assert.equal(card.member.points, 150);
+
+  const encodedToken = card.memberQrPayload.replace(/^POKEPALACE-MEMBER:/, "");
+  const decoded = jwt.decode(encodedToken);
+  assert.equal(decoded.type, "member_qr");
+  assert.equal(decoded.purpose, "loyalty_member");
+  assert.equal("email" in decoded, false);
+  assert.equal("points" in decoded, false);
+
+  // El token limitado del QR no debe funcionar como sesión completa del cliente.
+  const profileWithQr = await fetch(`${BASE}/api/users/me`, {
+    headers: { Authorization: `Bearer ${encodedToken}` },
+  });
+  assert.equal(profileWithQr.status, 401);
+
+  const scan = await staffRequest("employee", "/api/staff/orders/customers/scan", {
+    method: "POST",
+    body: { payload: card.memberQrPayload },
+  });
+  assert.equal(scan.status, 200);
+  const scannedCustomer = (await scan.json()).customer;
+  assert.equal(scannedCustomer._id, account.user.id);
+  assert.equal(scannedCustomer.points, 150);
+  assert.equal("password" in scannedCustomer, false);
+
+  const redeem = (rewardId) => staffRequest("cashier", "/api/staff/rewards/member-redeem", {
+    method: "POST",
+    body: { payload: card.memberQrPayload, rewardId },
+  });
+  const firstRedemption = await redeem(1);
+  assert.equal(firstRedemption.status, 201);
+  const firstBody = await firstRedemption.json();
+  assert.equal(firstBody.points, 100);
+
+  const retry = await redeem(1);
+  assert.equal(retry.status, 200);
+  assert.equal((await retry.json()).redemption.code, firstBody.redemption.code);
+
+  // Un QR presentado autoriza un premio; para otro se necesita actualizarlo.
+  const secondReward = await redeem(2);
+  assert.equal(secondReward.status, 409);
+  assert.equal((await User.findById(account.user.id)).points, 100);
+
+  const expiredToken = jwt.sign(
+    {
+      id: account.user.id,
+      type: "member_qr",
+      purpose: "loyalty_member",
+      jti: `expired-${suffix}`,
+    },
+    process.env.JWT_SECRET || "ci-test-secret",
+    {
+      expiresIn: -1,
+      issuer: "pokepalace",
+      audience: "pokepalace-pos",
+    }
+  );
+  const expiredScan = await staffRequest("cashier", "/api/staff/orders/customers/scan", {
+    method: "POST",
+    body: { payload: `POKEPALACE-MEMBER:${expiredToken}` },
+  });
+  assert.equal(expiredScan.status, 401);
 });
 
 test("orden sin base ni proteina se rechaza", async () => {

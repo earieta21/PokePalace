@@ -9,6 +9,7 @@ import {
   getAnalytics,
   getFinance,
   searchRewardCustomers,
+  scanRewardCustomer,
 } from "../controllers/staffOrderController.js";
 import { streamOrderEvents } from "../utils/orderEvents.js";
 
@@ -23,6 +24,7 @@ router.get  ("/stats",         posSalesStaff, getOrderStats);
 router.get  ("/analytics",     seniorStaff, getAnalytics);
 router.get  ("/finance",       seniorStaff, getFinance);
 router.get  ("/customers/search", posSalesStaff, searchRewardCustomers);
+router.post ("/customers/scan",   posSalesStaff, scanRewardCustomer);
 router.get  ("/",              orderReaders, getAllOrders);
 router.post ("/",              posSalesStaff, createPosOrder);
 router.patch("/:id/status",    orderReaders, updateOrderStatus);

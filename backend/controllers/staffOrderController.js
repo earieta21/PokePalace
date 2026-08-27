@@ -5,9 +5,10 @@ import Expense from "../models/Expense.js";
 import Redemption from "../models/Redemption.js";
 import StoreSettings from "../models/StoreSettings.js";
 import { sendSMS, sendWhatsApp } from "../utils/notify.js";
-import { awardLoyaltyPoints } from "../utils/loyalty.js";
+import { awardLoyaltyPoints, expireStalePoints } from "../utils/loyalty.js";
 import { reconcileOnlineOrderCancellation } from "./orderController.js";
 import { getRewardById } from "../config/rewardsCatalog.js";
+import { verifyMemberQr } from "../utils/memberQr.js";
 import { BOWL_BASE_PRICE, computeBowlSubtotal, computeExtrasSubtotal } from "../pricing.js";
 import {
   getPosInventoryDemand,
@@ -429,6 +430,26 @@ export const searchRewardCustomers = async (req, res) => {
     return res.json({ customers });
   } catch (err) {
     return res.status(500).json({ message: "No se pudieron buscar clientes", err: err.message });
+  }
+};
+
+/* POST /api/staff/orders/customers/scan
+   Resolves a short-lived member QR without exposing customer data in the QR. */
+export const scanRewardCustomer = async (req, res) => {
+  try {
+    const memberToken = verifyMemberQr(req.body?.payload);
+    await expireStalePoints(memberToken.id);
+
+    const customer = await User.findById(memberToken.id)
+      .select("name email phone points lifetimePoints")
+      .lean();
+    if (!customer) return res.status(404).json({ message: "La cuenta Rewards ya no existe" });
+
+    return res.json({ customer });
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      message: err.status ? err.message : "No se pudo leer el QR del miembro",
+    });
   }
 };
 

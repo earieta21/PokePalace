@@ -4,6 +4,7 @@ import User from "../models/User.js";
 import Redemption from "../models/Redemption.js";
 import { expireStalePoints, reconcileRecentLoyaltyPoints, REDEMPTION_CODE_EXPIRY_DAYS } from "../utils/loyalty.js";
 import { getRewardById } from "../config/rewardsCatalog.js";
+import { createMemberQr } from "../utils/memberQr.js";
 
 // Unambiguous charset — no 0/O, 1/I/L — easier for staff to read back a code.
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -15,6 +16,30 @@ function generateCode() {
   }
   return code;
 }
+
+export const getMemberCard = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("name points lifetimePoints");
+    if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
+
+    await expireStalePoints(req.userId);
+    const freshUser = await User.findById(req.userId).select("name points lifetimePoints");
+    const memberQr = createMemberQr(req.userId);
+
+    return res.json({
+      memberQrPayload: memberQr.payload,
+      expiresAt: memberQr.expiresAt,
+      member: {
+        name: freshUser.name,
+        points: freshUser.points,
+        lifetimePoints: freshUser.lifetimePoints,
+      },
+    });
+  } catch (err) {
+    console.error("getMemberCard error:", err.message);
+    return res.status(500).json({ msg: "No se pudo generar tu QR Rewards" });
+  }
+};
 
 export const redeemReward = async (req, res) => {
   try {
