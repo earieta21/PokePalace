@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import jsQR from "jsqr";
 import ui from "./MemberQrScanner.module.css";
 
 export default function MemberQrScanner({ busy = false, onDetected, onClose }) {
   const videoRef = useRef(null);
   const scanLockedRef = useRef(false);
+  const lastDetectedRef = useRef("");
   const [manualValue, setManualValue] = useState("");
   const [cameraError, setCameraError] = useState("");
   const [scanError, setScanError] = useState("");
@@ -12,12 +14,12 @@ export default function MemberQrScanner({ busy = false, onDetected, onClose }) {
     let stream = null;
     let frame = null;
     let stopped = false;
+    let nativeDetector = null;
+    let lastSoftwareScanAt = 0;
+    const scanCanvas = document.createElement("canvas");
+    const scanContext = scanCanvas.getContext("2d", { willReadFrequently: true });
 
     const start = async () => {
-      if (!("BarcodeDetector" in window)) {
-        setCameraError("Este navegador no puede leer QR con la cámara. Usa un lector USB o pega el contenido abajo.");
-        return;
-      }
       if (!navigator.mediaDevices?.getUserMedia) {
         setCameraError("La cámara no está disponible en este dispositivo.");
         return;
@@ -31,21 +33,60 @@ export default function MemberQrScanner({ busy = false, onDetected, onClose }) {
         if (stopped || !videoRef.current) return;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
-        const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
 
-        const detect = async () => {
+        if ("BarcodeDetector" in window) {
+          try {
+            nativeDetector = new window.BarcodeDetector({ formats: ["qr_code"] });
+          } catch {
+            nativeDetector = null;
+          }
+        }
+
+        const readWithSoftware = (timestamp) => {
+          // Keep desktop POS devices responsive while resolving a QR shown on
+          // a phone. The native detector remains preferred when available.
+          if (!scanContext || timestamp - lastSoftwareScanAt < 160) return "";
+          lastSoftwareScanAt = timestamp;
+
+          const sourceWidth = videoRef.current?.videoWidth || 0;
+          const sourceHeight = videoRef.current?.videoHeight || 0;
+          if (!sourceWidth || !sourceHeight) return "";
+
+          const scale = Math.min(1, 800 / Math.max(sourceWidth, sourceHeight));
+          const width = Math.max(1, Math.round(sourceWidth * scale));
+          const height = Math.max(1, Math.round(sourceHeight * scale));
+          if (scanCanvas.width !== width) scanCanvas.width = width;
+          if (scanCanvas.height !== height) scanCanvas.height = height;
+          scanContext.drawImage(videoRef.current, 0, 0, width, height);
+          const image = scanContext.getImageData(0, 0, width, height);
+          return jsQR(image.data, width, height, { inversionAttempts: "dontInvert" })?.data || "";
+        };
+
+        const detect = async (timestamp = 0) => {
           if (stopped || scanLockedRef.current) return;
           try {
-            const codes = await detector.detect(videoRef.current);
-            const value = codes.find((code) => code.rawValue)?.rawValue;
-            if (value) {
+            let value = "";
+            if (nativeDetector) {
+              try {
+                const codes = await nativeDetector.detect(videoRef.current);
+                value = codes.find((code) => code.rawValue)?.rawValue || "";
+              } catch {
+                // Some desktop Chromium versions expose the constructor but
+                // cannot decode QR. Fall back permanently to the JS reader.
+                nativeDetector = null;
+              }
+            }
+            if (!nativeDetector && !value) value = readWithSoftware(timestamp);
+
+            if (value && value !== lastDetectedRef.current) {
               scanLockedRef.current = true;
+              lastDetectedRef.current = value;
               setScanError("");
               await onDetected(value);
               return;
             }
           } catch (error) {
-            // A frame can fail while the camera is focusing; keep scanning.
+            // Keep the modal open so a different or refreshed QR can be shown.
             scanLockedRef.current = false;
             if (error?.message) setScanError(error.message);
           }
