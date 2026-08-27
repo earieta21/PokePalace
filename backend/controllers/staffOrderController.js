@@ -18,6 +18,7 @@ import {
   resolvePosItems,
   sanitizePosBowl,
   sanitizePosRewardTopping,
+  sanitizePosReferralSource,
 } from "../config/posCatalog.js";
 import {
   RESTAURANT_TIME_ZONE,
@@ -498,6 +499,7 @@ const KITCHEN_PRIVATE_ORDER_FIELDS = [
   "paymentStatus", "subtotal", "tax", "total", "discountAmount",
   "promoCode", "pointsRedeemed", "loyaltyPointsEarned", "rewardCode",
   "rewardRedemption", "clipPaymentRequestId", "clipPaymentUrl",
+  "referralSource", "referralSourceOther",
 ];
 
 const orderResponseForRole = (order, role) => {
@@ -752,7 +754,7 @@ export const createPosOrder = async (req, res) => {
     const {
       items, customer, phone, notes, fulfillment, paymentMethod, rewardCode, customerUserId,
       base, proteins, marinades, complements, sauces, toppings, extraScoopProteins,
-      clientOrderId, rewardTopping,
+      clientOrderId, rewardTopping, referralSource, referralSourceOther,
     } = req.body;
 
     try {
@@ -792,6 +794,8 @@ export const createPosOrder = async (req, res) => {
     let safeItems;
     let safeBowl = null;
     let safeRewardTopping = null;
+    let safeReferralSource = null;
+    let safeReferralSourceOther = null;
     try {
       safeItems = resolvePosItems(items === undefined ? [] : items);
       const wantsCustomBowl = base !== undefined || proteins !== undefined;
@@ -801,6 +805,8 @@ export const createPosOrder = async (req, res) => {
       if (rewardTopping !== undefined && rewardTopping !== null && rewardTopping !== "") {
         safeRewardTopping = sanitizePosRewardTopping(rewardTopping);
       }
+      ({ referralSource: safeReferralSource, referralSourceOther: safeReferralSourceOther } =
+        sanitizePosReferralSource(referralSource, referralSourceOther));
     } catch (validationError) {
       if (validationError instanceof PosOrderValidationError) {
         return res.status(400).json({ message: validationError.message });
@@ -930,6 +936,8 @@ export const createPosOrder = async (req, res) => {
       rewardRedemption: redemption?._id || null,
       rewardCode: redemption?.code || null,
       rewardExtraTopping: safeRewardTopping,
+      referralSource: safeReferralSource,
+      referralSourceOther: safeReferralSourceOther,
       status: "pending",
       ...(hasBowl && {
         base: safeBowl.base,
@@ -1101,7 +1109,14 @@ export const getAnalytics = async (req, res) => {
       { $limit: 5 },
     ]);
 
-    res.json({ days, topProteins: proteinAgg, peakHours, topPosItems: posItemAgg });
+    // Cómo nos conocieron (solo órdenes POS donde se preguntó)
+    const referralAgg = await Order.aggregate([
+      { $match: { source: "pos", status: { $ne: "cancelled" }, referralSource: { $ne: null } } },
+      { $group: { _id: "$referralSource", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+
+    res.json({ days, topProteins: proteinAgg, peakHours, topPosItems: posItemAgg, referralSources: referralAgg });
   } catch (err) {
     res.status(500).json({ message: "Error fetching analytics", err: err.message });
   }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
+import { REFERRAL_SOURCE_LABELS } from "../../data/referralSources.js";
 
 export default function AnalyticsPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
@@ -20,13 +21,15 @@ export default function AnalyticsPage({ styles }) {
   if (loading) return <p style={{ color: "var(--p-muted)", fontSize: 13, padding: 24 }}>Cargando análisis…</p>;
   if (error)   return <p style={{ color: "red", fontSize: 13, padding: 24 }}>{error}</p>;
 
-  const { days = [], topProteins = [], peakHours = [] } = data ?? {};
+  const { days = [], topProteins = [], peakHours = [], referralSources = [] } = data ?? {};
 
   const weekOrders  = days.reduce((s, d) => s + d.orders, 0);
   const weekRevenue = days.reduce((s, d) => s + d.revenue, 0);
   const maxOrders   = Math.max(...days.map((d) => d.orders), 1);
   const maxHour     = Math.max(...peakHours.map((h) => h.count), 1);
   const maxProtein  = topProteins[0]?.count || 1;
+  const maxReferral = referralSources[0]?.count || 1;
+  const totalReferrals = referralSources.reduce((s, r) => s + r.count, 0);
 
   const fmtHour = (h) => {
     const ampm = h >= 12 ? "pm" : "am";
@@ -119,6 +122,31 @@ export default function AnalyticsPage({ styles }) {
                 <span className={styles.barValue}>{p.count}</span>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Cómo nos conocieron */}
+      <div className={styles.card} style={{ marginTop: 20 }}>
+        <p className={styles.cardTitle}>¿Cómo nos conocieron?</p>
+        {referralSources.length === 0 ? (
+          <p style={{ color: "var(--p-muted)", fontSize: 13, marginTop: 8 }}>
+            Aún no hay respuestas capturadas en el POS.
+          </p>
+        ) : (
+          <div className={styles.barChart} style={{ marginTop: 14 }}>
+            {referralSources.map((r) => {
+              const pct = totalReferrals > 0 ? Math.round((r.count / totalReferrals) * 100) : 0;
+              return (
+                <div key={r._id} className={styles.barRow}>
+                  <span className={styles.barLabel}>{REFERRAL_SOURCE_LABELS[r._id] || r._id}</span>
+                  <div className={styles.barTrack}>
+                    <div className={styles.barFill} style={{ width: `${(r.count / maxReferral) * 100}%` }} />
+                  </div>
+                  <span className={styles.barValue}>{r.count} · {pct}%</span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

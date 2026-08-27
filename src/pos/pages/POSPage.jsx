@@ -11,6 +11,7 @@ import {
 import CustomBowlBuilder from "../CustomBowlBuilder";
 import Receipt from "../Receipt.jsx";
 import { getRewardById } from "../../data/rewardsCatalog.js";
+import { REFERRAL_SOURCES } from "../../data/referralSources.js";
 import { TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "../../order/pricing.js";
 import {
@@ -65,6 +66,8 @@ export default function POSPage({ styles }) {
   const [notes, setNotes]       = useState("");
   const [fulfillment, setFulfillment] = useState("pickup");
   const [paymentMethod, setPaymentMethod] = useState("card_terminal");
+  const [referralSource, setReferralSource] = useState("");
+  const [referralSourceOther, setReferralSourceOther] = useState("");
   const [saving, setSaving]     = useState(false);
   const [success, setSuccess]   = useState("");
   const [error, setError]       = useState("");
@@ -197,6 +200,8 @@ export default function POSPage({ styles }) {
     setNotes("");
     setFulfillment("pickup");
     setPaymentMethod("card_terminal");
+    setReferralSource("");
+    setReferralSourceOther("");
     setRewardCode("");
     setReward(null);
     setRewardTopping("");
@@ -335,6 +340,8 @@ export default function POSPage({ styles }) {
       notes: notes.trim(),
       fulfillment,
       paymentMethod,
+      referralSource: referralSource || null,
+      referralSourceOther: referralSource === "otro" ? referralSourceOther.trim() : null,
       rewardCode: reward?.code || null,
       rewardTopping: reward?.type === "extra_topping" ? rewardTopping : null,
       customerUserId: rewardsCustomer?._id || null,
@@ -383,6 +390,8 @@ export default function POSPage({ styles }) {
     setNotes("");
     setFulfillment("pickup");
     setPaymentMethod("card_terminal");
+    setReferralSource("");
+    setReferralSourceOther("");
     setRewardCode("");
     setReward(null);
     setRewardTopping("");
@@ -561,6 +570,31 @@ export default function POSPage({ styles }) {
                 <button key={value} type="button" aria-pressed={paymentMethod === value} onClick={() => setPaymentMethod(value)}>{label}</button>
               ))}
             </div>
+          </div>
+
+          <div className={ui.optionGroup}>
+            <span>¿Cómo nos conoció? <small>Opcional</small></span>
+            <div className={ui.optionButtons}>
+              {REFERRAL_SOURCES.map(({ id, label, icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={referralSource === id}
+                  onClick={() => setReferralSource((current) => (current === id ? "" : id))}
+                >
+                  {icon} {label}
+                </button>
+              ))}
+            </div>
+            {referralSource === "otro" && (
+              <input
+                className={styles.input}
+                placeholder="¿Dónde fue exactamente?"
+                value={referralSourceOther}
+                onChange={(e) => setReferralSourceOther(e.target.value)}
+                maxLength={80}
+              />
+            )}
           </div>
 
           <button

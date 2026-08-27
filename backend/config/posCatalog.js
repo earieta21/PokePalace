@@ -291,6 +291,25 @@ export const sanitizePosRewardTopping = (value) => {
   return value;
 };
 
+// Canal de publicidad que el cliente dice haber usado para conocer el
+// restaurante. Los ids deben coincidir con src/data/referralSources.js.
+export const REFERRAL_SOURCES = new Set([
+  "instagram", "facebook", "tiktok", "google", "recomendacion", "ubicacion", "otro",
+]);
+
+export const sanitizePosReferralSource = (referralSource, referralSourceOther) => {
+  if (referralSource === undefined || referralSource === null || referralSource === "") {
+    return { referralSource: null, referralSourceOther: null };
+  }
+  if (typeof referralSource !== "string" || !REFERRAL_SOURCES.has(referralSource)) {
+    throw new PosOrderValidationError("Selecciona un método de publicidad válido");
+  }
+  const cleanOther = referralSource === "otro" && typeof referralSourceOther === "string" && referralSourceOther.trim()
+    ? referralSourceOther.trim().slice(0, 80)
+    : null;
+  return { referralSource, referralSourceOther: cleanOther };
+};
+
 const sanitizeChoiceList = (name, value) => {
   const rule = BOWL_RULES[name];
   const list = value === undefined ? [] : value;

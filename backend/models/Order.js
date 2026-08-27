@@ -98,6 +98,12 @@ const orderSchema = new mongoose.Schema(
     source:   { type: String, enum: ["online", "pos", "whatsapp"], default: "online" },
     total:    { type: Number, default: null },  // in MXN
 
+    // Canal de publicidad por el que el cliente dice haber conocido el
+    // restaurante (capturado por el cajero en el POS). Ver REFERRAL_SOURCES
+    // en backend/config/posCatalog.js. Opcional — null si no se preguntó.
+    referralSource:      { type: String, default: null },
+    referralSourceOther: { type: String, default: null },
+
     // Pricing — always computed server-side, never trusted from the client
     subtotal: { type: Number, default: null },
     tax:      { type: Number, default: null },
