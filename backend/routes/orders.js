@@ -1,7 +1,7 @@
 import express from "express";
 import { optionalAuth, protect } from "../middleware/authMiddleware.js";
 import { rateLimit } from "../middleware/rateLimit.js";
-import { createOrder, cancelOrder, getMyOrders, getOrderById, getWaitTime, clipWebhook } from "../controllers/orderController.js";
+import { createOrder, cancelOrder, getMyOrders, getOrderById, getWaitTime, paymentWebhook } from "../controllers/orderController.js";
 import { streamOrderEvents } from "../utils/orderEvents.js";
 
 const router = express.Router();
@@ -28,7 +28,7 @@ router.post("/", createOrderLimiter, optionalAuth, createOrder); // POST /api/or
 router.get("/events", eventsLimiter, streamOrderEvents); // GET  /api/orders/events (must be before /:id)
 router.get("/wait-time", getWaitTime);                 // GET  /api/orders/wait-time (must be before /:id)
 router.get("/mine", protect, getMyOrders);             // GET  /api/orders/mine
-router.post("/clip-webhook", clipWebhook);             // POST /api/orders/clip-webhook (must be before /:id)
+router.post("/payment-webhook", paymentWebhook);       // POST /api/orders/payment-webhook — configurar en el panel de Openpay (must be before /:id)
 router.patch("/:id/cancel", optionalAuth, cancelOrder);// PATCH /api/orders/:id/cancel
 router.get("/:id", optionalAuth, getOrderById);        // GET  /api/orders/:id
 

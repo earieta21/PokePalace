@@ -519,7 +519,7 @@ const KITCHEN_PRIVATE_ORDER_FIELDS = [
   "phone", "user", "staffId", "clientOrderId", "paymentMethod",
   "paymentStatus", "subtotal", "tax", "total", "discountAmount",
   "promoCode", "pointsRedeemed", "loyaltyPointsEarned", "rewardCode",
-  "rewardRedemption", "clipPaymentRequestId", "clipPaymentUrl",
+  "rewardRedemption", "paymentRequestId", "paymentRequestUrl",
   "referralSource", "referralSourceOther",
 ];
 

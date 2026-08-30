@@ -93,8 +93,11 @@ const orderSchema = new mongoose.Schema(
       enum: ["pending", "paid"],
       default: "pending",
     },
-    clipPaymentRequestId: { type: String, default: null },
-    clipPaymentUrl:       { type: String, default: null },
+    // Id y link del cargo generado por el procesador de pagos en línea
+    // (Openpay/BBVA desde ago 2026; antes Clip — el nombre del campo ya no
+    // referencia a ningún proveedor en particular).
+    paymentRequestId: { type: String, default: null },
+    paymentRequestUrl: { type: String, default: null },
     source:   { type: String, enum: ["online", "pos", "whatsapp"], default: "online" },
     total:    { type: Number, default: null },  // in MXN
 

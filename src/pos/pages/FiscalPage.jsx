@@ -8,7 +8,7 @@ const fmtMXN = (n) => `$${(n ?? 0).toLocaleString("es-MX", { minimumFractionDigi
 const METODO_LABEL = {
   cash: "Efectivo",
   card_terminal: "Tarjeta (terminal)",
-  online: "Pago en línea (Clip)",
+  online: "Pago en línea (Openpay)",
   pay_at_pickup: "Pagar al recoger",
 };
 

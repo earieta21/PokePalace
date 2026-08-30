@@ -192,7 +192,7 @@ export default function OrderSummaryPage() {
       refreshUser?.(); // update points balance after redemption
 
       if (data.order.paymentMethod === "online" && data.paymentUrl) {
-        window.location.href = data.paymentUrl; // Redirige al checkout hospedado por Clip
+        window.location.href = data.paymentUrl; // Redirige al checkout hospedado por Openpay
         return;
       }
 

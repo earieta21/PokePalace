@@ -5,7 +5,7 @@ import StoreSettings from "../models/StoreSettings.js";
 import mongoose from "mongoose";
 import { computeCartPricing } from "../pricing.js";
 import { sendEmail, orderConfirmationEmail } from "../utils/notify.js";
-import { createPaymentLink, getPaymentLinkStatus } from "../utils/clip.js";
+import { createPaymentLink, getPaymentLinkStatus, isValidWebhookAuth } from "../utils/openpay.js";
 import { expireStalePoints } from "../utils/loyalty.js";
 import {
   generateOrderAccessToken,
@@ -360,7 +360,7 @@ export const createOrder = async (req, res) => {
       notes: cleanNotes || null,
       // Online checkout supports pickup only. Ignore crafted fulfillment values
       // before they can poison an otherwise valid reservation. paymentMethod is
-      // whitelisted to "online" (Clip-hosted checkout) or the default
+      // whitelisted to "online" (Openpay-hosted checkout) or the default
       // pay_at_pickup — any other crafted value is ignored the same way.
       fulfillment: "pickup",
       paymentMethod: paymentMethod === "online" ? "online" : "pay_at_pickup",
@@ -391,14 +391,19 @@ export const createOrder = async (req, res) => {
 
     let paymentUrl = null;
     if (order.paymentMethod === "online") {
+      const loggedInUser = req.userId
+        ? await User.findById(req.userId).select("email").lean().catch(() => null)
+        : null;
       const link = await createPaymentLink({
         orderId: order._id,
         amount: order.total,
         description: `Pedido Poke Palace #${order._id.toString().slice(-6).toUpperCase()}`,
+        customerName: cleanCustomer,
+        customerEmail: loggedInUser?.email || null,
       });
       if (link) {
-        order.clipPaymentRequestId = link.paymentRequestId;
-        order.clipPaymentUrl = link.url;
+        order.paymentRequestId = link.paymentRequestId;
+        order.paymentRequestUrl = link.url;
         await order.save();
         paymentUrl = link.url;
       }
@@ -737,26 +742,29 @@ export const getOrderById = async (req, res) => {
   }
 };
 
-/* Clip no documenta firma/secreto para verificar sus webhooks, así que el
-   body nunca se usa como fuente de verdad: solo dispara una consulta
-   autenticada server-to-server a Clip para confirmar el estado real antes
-   de marcar el pedido como pagado. */
-export const clipWebhook = async (req, res) => {
-  res.sendStatus(200); // Clip solo necesita el 200; el resto es best-effort.
+/* Openpay firma cada webhook con el usuario/contraseña Basic Auth dados de
+   alta en su panel (ver isValidWebhookAuth), pero aun así el body nunca se
+   usa como fuente de verdad: dispara una consulta autenticada
+   server-to-server a Openpay para confirmar el estado real antes de marcar
+   el pedido como pagado. */
+export const paymentWebhook = async (req, res) => {
+  res.sendStatus(200); // Openpay solo necesita el 200; el resto es best-effort.
 
   try {
-    const paymentRequestId = req.body?.payment_request_id;
+    if (!isValidWebhookAuth(req.headers.authorization)) return;
+
+    const paymentRequestId = req.body?.transaction?.id;
     if (!paymentRequestId) return;
 
-    const order = await Order.findOne({ clipPaymentRequestId: paymentRequestId });
+    const order = await Order.findOne({ paymentRequestId });
     if (!order || order.paymentStatus === "paid") return;
 
     const status = await getPaymentLinkStatus(paymentRequestId);
-    if (status?.status === "CHECKOUT_COMPLETED") {
+    if (status?.status === "completed") {
       order.paymentStatus = "paid";
       await order.save();
     }
   } catch (err) {
-    console.error("clipWebhook error:", err.message);
+    console.error("paymentWebhook error:", err.message);
   }
 };
