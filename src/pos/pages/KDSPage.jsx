@@ -39,7 +39,8 @@ function orderLines(order) {
   // Carrito de cliente/kiosco (1+ bowls y/o artículos) — cada línea se marca
   // por separado para que cocina no mezcle los ingredientes de 2 bowls.
   if (order.cartItems?.length) {
-    const bowlCount = order.cartItems.filter((l) => l.kind === "bowl").length;
+    const bowlCount = order.cartItems.filter((l) => l.kind === "bowl").length
+      + order.cartItems.filter((l) => l.kind === "promo2x1").length * 2;
     let bowlNumber = 0;
     for (const line of order.cartItems) {
       if (line.kind === "item") {
@@ -47,6 +48,28 @@ function orderLines(order) {
         if (line.catalogId === "combo-palace") {
           lines.push(`Incluye: ${comboPalaceSelectionSummary(line)}`);
         }
+        continue;
+      }
+      if (line.kind === "promo2x1") {
+        lines.push("— 2x1 en Bowls —");
+        const proteinLabel = label(PROTEIN_LABELS, line.protein);
+        (line.bowls || []).forEach((bowl) => {
+          bowlNumber += 1;
+          lines.push(`— Bowl ${bowlNumber} (2x1) —`);
+          const baseText = bowl.bases?.length > 1
+            ? `${bowl.bases.map((id) => label(BASE_LABELS, id)).join(" + ")} (mitad y mitad)`
+            : label(BASE_LABELS, bowl.base);
+          lines.push(`Base: ${baseText}`);
+          lines.push(`Proteína: ${proteinLabel} (60 g)`);
+          if (bowl.marinades?.length)
+            lines.push(`Marinados: ${bowl.marinades.map((id) => label(MARINADE_LABELS, id)).join(", ")}`);
+          if (bowl.complements?.length)
+            lines.push(`Complementos: ${bowl.complements.map((id) => label(COMPLEMENT_LABELS, id)).join(", ")}`);
+          if (bowl.sauces?.length)
+            lines.push(`Salsas: ${bowl.sauces.map((id) => label(SAUCE_LABELS, id)).join(", ")}`);
+          if (bowl.toppings?.length)
+            lines.push(`Toppings: ${bowl.toppings.map((id) => label(TOPPING_LABELS, id)).join(", ")}`);
+        });
         continue;
       }
       bowlNumber += 1;

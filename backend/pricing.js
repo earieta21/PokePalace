@@ -11,6 +11,14 @@ export const PREMIUM_PROTEIN_PRICES = Object.freeze({
 });
 export const TAX_RATE = 0; // IVA incluido en precio
 
+// Promo pública "2x1 en Bowls" (distinta de "promo-2x1-dinein" del POS,
+// exclusiva de caja): el cliente arma 2 bowls, 1 proteína compartida entre
+// ambos (60 g + 60 g = 120 g), máx. PROMO_2X1_MAX_COMPLEMENTS complementos
+// por bowl, precio plano igual al de un bowl grande sin importar la
+// proteína/complementos elegidos.
+export const PROMO_2X1_BOWLS_PRICE = 250;
+export const PROMO_2X1_MAX_COMPLEMENTS = 4;
+
 const round2 = (n) => Math.round(n * 100) / 100;
 
 export const computeBowlSubtotal = (bowlSize) =>
@@ -51,6 +59,9 @@ export const computePricing = (bowlSize, promo, extras = {}) => {
 const cartLineSubtotal = (line) => {
   if (line.kind === "item") {
     return (Number(line.price) || 0) * (Number(line.qty) || 0);
+  }
+  if (line.kind === "promo2x1") {
+    return PROMO_2X1_BOWLS_PRICE * (Number(line.qty) || 1);
   }
   return computeBowlSubtotal(line.bowlSize) + computeExtrasSubtotal({
     extraScoops: line.extraScoopProteins?.length || 0,

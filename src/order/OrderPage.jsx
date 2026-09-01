@@ -9,7 +9,7 @@ import SauceSelection from "./SauceSelection";
 import ToppingsSelection from "./ToppingsSelection";
 import { useOrder } from "./OrderContext";
 import { ITEM_LABELS, getBaseLabel } from "./OrderLabels";
-import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "./pricing";
+import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, PROMO_2X1_BOWLS_PRICE } from "./pricing";
 import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
 
@@ -98,6 +98,31 @@ function PausedBanner({ message, t }) {
 }
 
 function PriceChip({ order, t }) {
+  if (order.promo2x1) {
+    const stageLabel = order.promo2x1.stage === 1 ? "Bowl 1 de 2" : "Bowl 2 de 2";
+    return (
+      <div style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        padding: "2px 20px 4px",
+        maxWidth: 960,
+        margin: "0 auto",
+      }}>
+        <span style={{
+          background: "var(--accent-bg)",
+          border: "1px solid var(--accent-border)",
+          color: "var(--accent)",
+          borderRadius: 999,
+          padding: "4px 12px",
+          fontSize: 13,
+          fontWeight: 700,
+        }}>
+          {stageLabel} · ${PROMO_2X1_BOWLS_PRICE} MXN por los 2 🎉
+        </span>
+      </div>
+    );
+  }
+
   const isLarge = Array.isArray(order.proteins) && order.proteins.length >= 3;
   const price = isLarge ? BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE : BOWL_BASE_PRICE;
   return (
@@ -187,7 +212,7 @@ function BowlMiniSummary({ order, step, language, t }) {
 }
 
 const OrderPage = () => {
-  const { order, updateOrder, addBowlToCart } = useOrder();
+  const { order, updateOrder, addBowlToCart, confirmPromoBowl, cancelPromo2x1 } = useOrder();
   const { language, t } = useLanguage();
   const [step, setStep] = useState(() => {
     const savedStep = Number(order.draftStep);
@@ -208,23 +233,47 @@ const OrderPage = () => {
     updateOrder("draftStep", nextStep);
   }, [updateOrder]);
 
+  // En el stage 2 de la promo 2x1 la proteína ya quedó fija con el primer
+  // bowl (compartida entre los 2) — se salta el paso 1 (proteína) para no
+  // dejar que el cliente la cambie ahí y termine confundido cuando el
+  // resultado final igual use la proteína original.
+  const isPromo2x1Stage2 = order.promo2x1?.stage === 2;
+
   const nextStep = () => {
-    const next = Math.min(step + 1, LAST_STEP);
+    let next = Math.min(step + 1, LAST_STEP);
+    if (isPromo2x1Stage2 && next === 1) next = 2;
     setOrderStep(next);
   };
 
   const prevStep = () => {
     if (step === 0) {
+      // Salir del armador a medio armar la promo 2x1 la cancela — si no, el
+      // cliente quedaría atorado con una proteína fija sin poder editarla.
+      if (order.promo2x1) cancelPromo2x1();
       navigate(-1);
       return;
     }
-    setOrderStep(Math.max(step - 1, 0));
+    let prev = Math.max(step - 1, 0);
+    if (isPromo2x1Stage2 && prev === 1) prev = 0;
+    setOrderStep(prev);
   };
 
   // Confirma el bowl en construcción como línea del carrito (nueva, o
   // reemplazando la que se estaba editando) y regresa al menú para que el
-  // cliente decida si agrega otro bowl/artículo o va al carrito.
+  // cliente decida si agrega otro bowl/artículo o va al carrito. Dentro de
+  // la promo 2x1, el primer bowl reinicia el armador para el segundo en vez
+  // de salir al menú.
   const finishBowl = () => {
+    if (order.promo2x1) {
+      const isFirstBowl = order.promo2x1.stage === 1;
+      confirmPromoBowl();
+      if (isFirstBowl) {
+        setOrderStep(0);
+      } else {
+        navigate("/menu");
+      }
+      return;
+    }
     addBowlToCart();
     navigate("/menu");
   };

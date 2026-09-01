@@ -282,6 +282,69 @@ const OrderSummary = ({
     );
   };
 
+  const PromoLineCard = ({ line }) => {
+    const proteinLabel = labels.protein?.[line.protein] || prettifyId(line.protein);
+    return (
+      <div className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <div>
+            <h3 className={styles.subTitle}>
+              <span className={styles.sectionIcon} aria-hidden="true">🎉</span>
+              2x1 en Bowls
+              <span className={styles.subTitleCount}>· ${line.price.toFixed(2)}</span>
+            </h3>
+            <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+              <span aria-hidden="true">🐟</span>
+              <strong>Proteína (los 2 bowls):</strong> {proteinLabel}
+            </p>
+          </div>
+          <button className={styles.editButton} onClick={() => removeCartLine(line.cartId)} type="button">
+            {t("summary.remove")}
+          </button>
+        </div>
+        {(line.bowls || []).map((bowl, index) => {
+          const complementsLabels = getListLabels(labels.complement, bowl.complements);
+          const saucesLabels = getListLabels(labels.sauce, bowl.sauces);
+          const toppingsLabels = getListLabels(labels.topping, bowl.toppings);
+          const marinadesLabels = getListLabels(labels.marinade, bowl.marinades);
+          return (
+            <div key={index} style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border, #eee)" }}>
+              <p className={styles.detail} style={{ fontWeight: 700 }}>Bowl {index + 1}</p>
+              <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+                <span aria-hidden="true">🍚</span>
+                <strong>{t("summary.base")}:</strong> {getBaseLabel(bowl.bases, bowl.base, language)}
+              </p>
+              {marinadesLabels.length > 0 && (
+                <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+                  <span aria-hidden="true">🧉</span>
+                  <strong>{t("summary.marinades")}:</strong> {marinadesLabels.join(", ")}
+                </p>
+              )}
+              {complementsLabels.length > 0 && (
+                <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+                  <span aria-hidden="true">🥗</span>
+                  <strong>{t("summary.complements")}:</strong> {complementsLabels.join(", ")}
+                </p>
+              )}
+              {saucesLabels.length > 0 && (
+                <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+                  <span aria-hidden="true">🥣</span>
+                  <strong>{t("summary.sauces")}:</strong> {saucesLabels.join(", ")}
+                </p>
+              )}
+              {toppingsLabels.length > 0 && (
+                <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
+                  <span aria-hidden="true">🌿</span>
+                  <strong>{t("summary.toppings")}:</strong> {toppingsLabels.join(", ")}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const ItemLineCard = ({ line }) => {
     const comboLabels = line.catalogId === "combo-palace" ? comboPalaceSelectionLabels(line) : [];
     return (
@@ -348,7 +411,9 @@ const OrderSummary = ({
             {cart.map((line) => (
               line.kind === "item"
                 ? <ItemLineCard key={line.cartId} line={line} />
-                : <BowlLineCard key={line.cartId} line={line} />
+                : line.kind === "promo2x1"
+                  ? <PromoLineCard key={line.cartId} line={line} />
+                  : <BowlLineCard key={line.cartId} line={line} />
             ))}
 
             <div className={styles.actionButtons} style={{ marginBottom: 20 }}>

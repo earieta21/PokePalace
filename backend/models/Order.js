@@ -1,14 +1,28 @@
 import mongoose from "mongoose";
 
-// Una línea del carrito de cliente/kiosco: un bowl personalizado completo o
-// un artículo del catálogo (bebida, entrada, bowl de la casa) con cantidad.
-// Convive con los campos planos de abajo (que siguen siendo lo único que usa
-// el POS/personal) — un pedido de cliente nuevo llena `cartItems` y además
-// replica el primer bowl en los campos planos, por compatibilidad con
-// cualquier lector que aún no distinga carritos.
+// Un bowl dentro de la promo "2x1 en Bowls" (kind: "promo2x1" abajo) — sin
+// proteína propia (la comparten los 2, ver `protein` en cartLineSchema).
+const promo2x1BowlSchema = new mongoose.Schema(
+  {
+    base:        { type: String, default: null },
+    bases:       { type: [String], default: [] },
+    marinades:   { type: [String], default: [] },
+    complements: { type: [String], default: [] },
+    sauces:      { type: [String], default: [] },
+    toppings:    { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
+// Una línea del carrito de cliente/kiosco: un bowl personalizado completo, un
+// artículo del catálogo (bebida, entrada, bowl de la casa) con cantidad, o la
+// promo "2x1 en Bowls". Convive con los campos planos de abajo (que siguen
+// siendo lo único que usa el POS/personal) — un pedido de cliente nuevo llena
+// `cartItems` y además replica el primer bowl en los campos planos, por
+// compatibilidad con cualquier lector que aún no distinga carritos.
 const cartLineSchema = new mongoose.Schema(
   {
-    kind: { type: String, enum: ["bowl", "item"], required: true },
+    kind: { type: String, enum: ["bowl", "item", "promo2x1"], required: true },
     // Campos de bowl (kind: "bowl")
     base:        { type: String, default: null },
     bases:       { type: [String], default: [] },
@@ -26,6 +40,10 @@ const cartLineSchema = new mongoose.Schema(
     comboBowlId:     { type: String, default: null },
     comboDrinkId:    { type: String, default: null },
     comboRiceCakeId: { type: String, default: null },
+    // Campos de la promo "2x1 en Bowls" (kind: "promo2x1") — 1 proteína
+    // compartida entre los 2 bowls (60 g + 60 g = 120 g).
+    protein: { type: String, default: null },
+    bowls:   { type: [promo2x1BowlSchema], default: [] },
     // Compartidos
     price: { type: Number, default: 0 },
     qty:   { type: Number, default: 1 },

@@ -21,15 +21,21 @@ const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
   const { unavailableItems } = useAvailability();
+  // La promo "2x1 en Bowls" comparte 1 sola proteína entre los 2 bowls
+  // (60 g + 60 g) — el stage 2 nunca pasa por aquí, ProteinSelection.jsx
+  // solo se usa para elegirla en el stage 1.
+  const isPromo2x1 = Boolean(order.promo2x1);
   const MIN_PROTEINS = 1;
-  const MAX_PROTEINS = 3;
+  const MAX_PROTEINS = isPromo2x1 ? 1 : 3;
 
   const proteins = [
     { id: "tuna", image: tuna },
     { id: "salmon", image: salmon },
     { id: "shrimp", image: shrimp },
     { id: "tofu", image: tofu },
-    { id: "seared_tuna", image: searedTuna },
+    // Atún sellado lleva un extra de $20 que la promo (precio plano) no
+    // cobra — se excluye para no prometer un extra que nunca se cobrará.
+    ...(isPromo2x1 ? [] : [{ id: "seared_tuna", image: searedTuna }]),
   ];
 
   const [selectedProteins, setSelectedProteins] = useState(() => {
@@ -112,9 +118,11 @@ const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
       <div className={styles.selectionInfo}>
         <span>{t("order.proteinCount", { count: selectedProteins.length, max: MAX_PROTEINS })}</span>
         <strong>
-          {selectedProteins.length === MAX_PROTEINS
-            ? t("order.proteinInfoLarge")
-            : t("order.proteinInfoNormal")}
+          {isPromo2x1
+            ? "Se usa en tus 2 bowls (60 g + 60 g)"
+            : selectedProteins.length === MAX_PROTEINS
+              ? t("order.proteinInfoLarge")
+              : t("order.proteinInfoNormal")}
         </strong>
       </div>
 
@@ -173,7 +181,7 @@ const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
         })}
       </div>
 
-      {selectedProteins.length > 0 && (
+      {selectedProteins.length > 0 && !isPromo2x1 && (
         <div className={styles.extraScoopSection}>
           <p className={styles.extraScoopTitle}>{t("order.extraScoopTitle")}</p>
           <p className={styles.extraScoopHint}>{t("order.extraScoopHint")}</p>
