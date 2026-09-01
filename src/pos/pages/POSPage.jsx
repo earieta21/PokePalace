@@ -33,6 +33,12 @@ const MENU = [
   // Van primero porque son los mas usados en hora pico.
   { id: 20, name: "Bowl mediano", price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗", needsProtein: true },
   { id: 21, name: "Bowl grande",  price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🥗", needsProtein: true },
+  // Promo de un solo día (2026-09-01) — 2 bowls por el precio de un bowl
+  // grande, solo para comer en el local, máx. 4 complementos por bowl
+  // (regla verbal para el cajero, no se valida aquí). Cuando termine la
+  // promoción, quitar esta línea y la entrada "promo-2x1-dinein" en
+  // backend/config/posCatalog.js.
+  { id: 26, name: "Promo 2x1 (solo en local)", price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🎉", needsProtein: true },
   { id: 1,  name: "The OG",         price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍣" },
   { id: 2,  name: "Skinny Bowl",    price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗" },
   { id: 3,  name: "Quinoa Bowl",    price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍤" },

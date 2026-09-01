@@ -136,6 +136,7 @@ export function findUnavailableCustomerBowlItems(bowl, unavailableItems) {
 export const CUSTOMER_EXCLUDED_CATALOG_IDS = new Set([
   "bowl-mediano-rapido",
   "bowl-grande-rapido",
+  "promo-2x1-dinein",
 ]);
 
 const MAX_CART_LINES = 12;

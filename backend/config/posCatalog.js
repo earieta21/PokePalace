@@ -52,6 +52,18 @@ export const POS_CATALOG = Object.freeze([
     catalogId: "bowl-grande-rapido", legacyId: 21, name: "Bowl grande", price: 250, category: "bowls",
     inventoryRecipe: {},
   },
+  // Promo 2x1 de un solo día (solo en local) — 2 bowls medianos por el precio
+  // de un bowl grande. Misma proteína para los 2, 60 g + 60 g = 120 g total
+  // (ver el condicional de proteinKg en addItemDemand más abajo). Complementos
+  // limitados a 4 por bowl, pero eso no se rastrea aquí — no se captura la
+  // receta, igual que bowl-mediano-rapido/bowl-grande-rapido. Cuando termine
+  // la promo, quitar esta entrada de POS_CATALOG y la línea correspondiente
+  // en src/pos/pages/POSPage.jsx MENU (no hay toggle de disponibilidad para
+  // productos completos, solo para ingredientes sueltos).
+  {
+    catalogId: "promo-2x1-dinein", legacyId: 26, name: "Promo 2x1 (solo en local)", price: 250, category: "bowls",
+    inventoryRecipe: {},
+  },
   {
     // Mantiene catalogId/legacyId de "Agua Mineral" para que las órdenes
     // históricas y colas offline sigan resolviendo al mismo producto.
@@ -420,12 +432,14 @@ const addItemDemand = (demand, item) => {
     if (entries.length > 0) {
       for (const [key, portions] of entries) addDemand(demand, key, portions * qty);
     } else if (typeof item?.protein === "string" && item.protein) {
-      // Venta rápida sin receta (bowl mediano/grande): se descuenta la
-      // proteína capturada en caja, aunque el resto del bowl (base,
+      // Venta rápida sin receta (bowl mediano/grande/promo 2x1): se descuenta
+      // la proteína capturada en caja, aunque el resto del bowl (base,
       // complementos, salsas) no se pueda rastrear. Sin proteína capturada
       // no se descuenta nada -- comportamiento original: no se sabe qué
-      // llevó el bowl.
-      const proteinKg = catalogItem.catalogId === "bowl-grande-rapido"
+      // llevó el bowl. La promo 2x1 usa 60 g + 60 g = 120 g, la misma suma
+      // que un bowl grande, aunque el motivo sea otro (2 bowls chicos, no 1
+      // bowl con más proteína).
+      const proteinKg = catalogItem.catalogId === "bowl-grande-rapido" || catalogItem.catalogId === "promo-2x1-dinein"
         ? LARGE_BOWL_PROTEIN_KG
         : MEDIUM_BOWL_PROTEIN_KG;
       addDemand(demand, item.protein, proteinKg * qty);
