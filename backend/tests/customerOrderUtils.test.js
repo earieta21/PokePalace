@@ -251,10 +251,10 @@ test("el carrito acepta 2 bowls y un artículo del catálogo en un solo pedido",
   assert.equal(cart[2].kind, "item");
   assert.equal(cart[2].catalogId, "coca-zero");
   assert.equal(cart[2].qty, 2);
-  assert.equal(cart[2].price, 30); // precio autoritativo del servidor, no el del cliente
+  assert.equal(cart[2].price, 35); // precio autoritativo del servidor, no el del cliente
 });
 
-test("el carrito acepta Combo Palace y reemplaza el precio enviado por $279", () => {
+test("el carrito acepta Combo Palace y reemplaza el precio enviado por $289", () => {
   const [combo] = sanitizeCustomerCart([{
     kind: "item",
     catalogId: "combo-palace",
@@ -266,7 +266,7 @@ test("el carrito acepta Combo Palace y reemplaza el precio enviado por $279", ()
   }]);
 
   assert.equal(combo.kind, "item");
-  assert.equal(combo.price, 279);
+  assert.equal(combo.price, 289);
   assert.equal(combo.comboBowlId, "bowl-quinoa");
   assert.equal(combo.comboDrinkId, "coca-zero");
   assert.equal(combo.comboRiceCakeId, "miel-rice-cake");

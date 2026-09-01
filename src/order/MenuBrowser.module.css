@@ -404,16 +404,6 @@
   line-height: 1.45;
 }
 
-.comboModalBadge {
-  display: inline-flex;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: #fff0e9;
-  color: #d84a29;
-  font-size: 11px;
-  font-weight: 850;
-}
-
 .comboClose {
   display: grid;
   place-items: center;

@@ -1,4 +1,4 @@
-export const COMBO_PALACE_PRICE = 279;
+export const COMBO_PALACE_PRICE = 289;
 
 export const COMBO_PALACE_OPTIONS = Object.freeze({
   bowls: Object.freeze([

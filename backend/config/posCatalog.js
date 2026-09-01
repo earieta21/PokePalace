@@ -8,7 +8,7 @@ export const EXTRA_SCOOP_PROTEIN_KG = 0.04;
 // these prices, but only this server-side catalog is used to charge an order.
 export const POS_CATALOG = Object.freeze([
   {
-    catalogId: "combo-palace", legacyId: 25, name: "Combo Palace", price: 279, category: "combos",
+    catalogId: "combo-palace", legacyId: 25, name: "Combo Palace", price: 289, category: "combos",
     // La receta depende de las tres elecciones guardadas en la línea. Se
     // expande en addItemDemand para descontar exactamente esos productos.
     inventoryRecipe: {}, comboPalace: true,
@@ -71,11 +71,11 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: { topochico: 1 },
   },
   {
-    catalogId: "coca-zero", legacyId: 13, name: "Coca-Zero", price: 30, category: "drinks",
+    catalogId: "coca-zero", legacyId: 13, name: "Coca-Zero", price: 35, category: "drinks",
     inventoryRecipe: { coca_zero: 1 },
   },
   {
-    catalogId: "coca-cola-regular", legacyId: 24, name: "Coca-Cola", price: 30, category: "drinks",
+    catalogId: "coca-cola-regular", legacyId: 24, name: "Coca-Cola", price: 35, category: "drinks",
     inventoryRecipe: { coca_cola: 1 },
   },
   {

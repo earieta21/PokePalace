@@ -74,7 +74,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
   {
     catalogId: "coca-zero",
     name: "Coca-Zero",
-    price: 30,
+    price: 35,
     category: "Bebidas",
     categoryKey: "drinks",
     icon: "🥤",
@@ -84,7 +84,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
   {
     catalogId: "coca-cola-regular",
     name: "Coca-Cola",
-    price: 30,
+    price: 35,
     category: "Bebidas",
     categoryKey: "drinks",
     icon: "🥤",

@@ -216,7 +216,6 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
           >
             <div className={styles.comboModalHeader}>
               <div>
-                <span className={styles.comboModalBadge}>Ahorra hasta $21</span>
                 <h3 id="combo-palace-title">Arma tu Combo Palace</h3>
                 <p>Un bowl, una bebida y un Rice Cake por {formatPrice(activeCombo.price)}.</p>
               </div>

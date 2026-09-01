@@ -123,7 +123,7 @@ const Home = () => {
       {/* Combo destacado */}
       <section className={`${styles.section} ${styles.comboSection}`}>
         <div className={styles.comboCopy}>
-          <span className={styles.comboBadge}>NUEVO · AHORRA HASTA $21</span>
+          <span className={styles.comboBadge}>NUEVO</span>
           <p className={styles.comboEyebrow}>Combos</p>
           <h2 className={styles.comboTitle}>Combo Palace</h2>
           <p className={styles.comboDescription}>
