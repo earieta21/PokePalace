@@ -16,6 +16,14 @@ const fmtHour = (h) => {
   return `${ampm(h)}–${ampm((h + 1) % 24)}`;
 };
 
+// Suma/resta días de calendario a un date-key "YYYY-MM-DD" sin tocar horas —
+// solo se usa para mover la etiqueta de semana, nunca para instantes reales.
+const shiftDateKey = (dateKey, days) => {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+};
+
 /* Cambio porcentual vs semana pasada. null = sin base de comparación. */
 const pctChange = (cur, prev) =>
   prev > 0 ? ((cur - prev) / prev) * 100 : null;
@@ -45,16 +53,45 @@ export default function SummaryPage({ styles }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
+  const [weekStart, setWeekStart] = useState(null); // null = semana actual
+
+  const [showHistory, setShowHistory] = useState(false);
+  const [weeks, setWeeks]             = useState(null);
+  const [weeksError, setWeeksError]   = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get("/api/staff/summary")
+    const qs = weekStart ? `?weekStart=${weekStart}` : "";
+    api.get(`/api/staff/summary${qs}`)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [staffToken]);
+  }, [staffToken, weekStart]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!showHistory || weeks !== null) return;
+    api.get("/api/staff/summary/weeks")
+      .then((d) => setWeeks(d.weeks || []))
+      .catch((e) => setWeeksError(e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showHistory]);
+
+  const goToWeek = (ws) => { setWeekStart(ws); setShowHistory(false); };
+  const goPrevWeek = () => data && setWeekStart(shiftDateKey(data.weekStart, -7));
+  const goNextWeek = () => data && !data.isCurrentWeek && setWeekStart(shiftDateKey(data.weekStart, 7));
+  const goCurrentWeek = () => setWeekStart(null);
+
+  const weeksByMonth = [];
+  if (weeks) {
+    const seen = new Map();
+    for (const w of weeks) {
+      let group = seen.get(w.month);
+      if (!group) { group = { month: w.month, items: [] }; seen.set(w.month, group); weeksByMonth.push(group); }
+      group.items.push(w);
+    }
+  }
 
   const sales = data?.sales;
   const money = data?.money;
@@ -97,13 +134,70 @@ export default function SummaryPage({ styles }) {
         <div>
           <h1 className={styles.pageTitle}>Resumen semanal</h1>
           <p className={styles.pageSubtitle}>
-            {data ? `Semana del ${data.range.from} al ${data.range.to}` : "Cómo va el negocio, en dos minutos."}
+            {data
+              ? `Semana del ${data.range.from} al ${data.range.to}${data.isCurrentWeek ? " (actual)" : ""}`
+              : "Cómo va el negocio, en dos minutos."}
           </p>
         </div>
         <div className={ui.headerActions}>
           <button className={styles.btnGhost} onClick={load} title="Volver a cargar los datos">↻ Actualizar</button>
         </div>
       </div>
+
+      {data && (
+        <div className={ui.weekNav}>
+          <button type="button" className={styles.btnGhost} onClick={goPrevWeek} disabled={loading}>
+            ◀ Semana anterior
+          </button>
+          {!data.isCurrentWeek && (
+            <button type="button" className={styles.btnGhost} onClick={goNextWeek} disabled={loading}>
+              Semana siguiente ▶
+            </button>
+          )}
+          {!data.isCurrentWeek && (
+            <button type="button" className={styles.btnGhost} onClick={goCurrentWeek} disabled={loading}>
+              Ir a la semana actual
+            </button>
+          )}
+          <button
+            type="button"
+            className={styles.btnGhost}
+            onClick={() => setShowHistory((v) => !v)}
+            aria-expanded={showHistory}
+          >
+            {showHistory ? "Ocultar historial" : "📅 Ver historial de semanas"}
+          </button>
+        </div>
+      )}
+
+      {showHistory && (
+        <div className={ui.historyPanel}>
+          {weeksError && <p style={{ color: "red", fontSize: 12.5 }}>{weeksError}</p>}
+          {!weeksError && weeks === null && <p className={ui.loadingText}>Cargando historial…</p>}
+          {weeks !== null && weeks.length === 0 && (
+            <p className={ui.loadingText}>Aún no hay semanas registradas.</p>
+          )}
+          {weeksByMonth.map((group) => (
+            <div key={group.month} className={ui.historyMonth}>
+              <span className={ui.historyMonthLabel}>{group.month}</span>
+              <div className={ui.historyWeeks}>
+                {group.items.map((w) => (
+                  <button
+                    key={w.weekStart}
+                    type="button"
+                    className={`${ui.historyWeekRow} ${data?.weekStart === w.weekStart ? ui.historyWeekActive : ""}`}
+                    onClick={() => goToWeek(w.weekStart)}
+                  >
+                    <span>{w.label}</span>
+                    <span>{w.orders} orden{w.orders !== 1 ? "es" : ""}</span>
+                    <strong>{fmtMXN(w.revenue)}</strong>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && <p style={{ color: "red", fontSize: 13, marginBottom: 12 }}>{error}</p>}
       {loading && <p className={ui.loadingText}>Cargando tu resumen…</p>}

@@ -8,6 +8,7 @@ import {
   dateKeyInTimeZone,
   zonedDateTimeToUtc,
   zonedParts,
+  RESTAURANT_TIME_ZONE,
 } from "../utils/timeZone.js";
 
 /* Las fechas se guardan en UTC y se agrupan con America/Tijuana para respetar
@@ -45,6 +46,18 @@ function mondayOf(date) {
 
 const dateStr = (d) => dateKeyInTimeZone(d);
 
+// Interpreta ?weekStart=YYYY-MM-DD (cualquier día de la semana deseada) y lo
+// ancla al lunes de esa semana. Ignora valores inválidos o futuros — nunca
+// deja ver "la próxima semana" antes de que exista.
+function resolveWeekFrom(weekStartParam, currentWeekFrom) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(weekStartParam || ""));
+  if (!match) return currentWeekFrom;
+  const [, year, month, day] = match;
+  const instant = zonedDateTimeToUtc({ year: Number(year), month: Number(month), day: Number(day) });
+  const requested = mondayOf(instant);
+  return requested <= currentWeekFrom ? requested : currentWeekFrom;
+}
+
 function salesMetrics(orders) {
   const valid = orders.filter((o) => o.status !== "cancelled");
   const paid  = valid.filter((o) => o.paymentStatus === "paid" && o.total != null);
@@ -56,23 +69,31 @@ function salesMetrics(orders) {
   };
 }
 
-/* GET /api/staff/summary — resumen de esta semana vs la anterior */
+/* GET /api/staff/summary — resumen de una semana vs la anterior.
+   ?weekStart=YYYY-MM-DD navega a semanas pasadas; sin parámetro (o uno
+   futuro) muestra la semana actual. */
 export const getWeeklySummary = async (req, res) => {
   try {
-    const now      = new Date();
-    const weekFrom = mondayOf(now);
-    const prevFrom = mondayOf(new Date(weekFrom.getTime() - 86400000));
+    const now             = new Date();
+    const currentWeekFrom = mondayOf(now);
+    const weekFrom         = resolveWeekFrom(req.query.weekStart, currentWeekFrom);
+    const isCurrentWeek    = weekFrom.getTime() === currentWeekFrom.getTime();
+    const weekTo           = new Date(weekFrom.getTime() + 7 * 86400000); // límite exclusivo
+    const prevFrom         = mondayOf(new Date(weekFrom.getTime() - 86400000));
+    const weekToStr        = dateStr(weekTo);
 
     const [orders, expenses, inventory, waste, errorLogs, registeredCustomers] = await Promise.all([
-      Order.find({ createdAt: { $gte: prevFrom } }).lean(),
-      Expense.find({ date: { $gte: dateStr(prevFrom) } }).lean(),
+      Order.find({ createdAt: { $gte: prevFrom, $lt: weekTo } }).lean(),
+      Expense.find({ date: { $gte: dateStr(prevFrom), $lt: weekToStr } }).lean(),
       Inventory.find().lean(),
-      WasteLog.find({ createdAt: { $gte: prevFrom } }).lean(),
-      ErrorLog.find({ lastSeenAt: { $gte: weekFrom } }).lean(),
-      User.countDocuments({ role: "user" }),
+      WasteLog.find({ createdAt: { $gte: prevFrom, $lt: weekTo } }).lean(),
+      ErrorLog.find({ lastSeenAt: { $gte: weekFrom, $lt: weekTo } }).lean(),
+      // Cuentas creadas hasta el final de la semana consultada, para que el
+      // historial de semanas pasadas no muestre el total de HOY.
+      User.countDocuments({ role: "user", createdAt: { $lt: weekTo } }),
     ]);
 
-    const thisOrders = orders.filter((o) => o.createdAt >= weekFrom);
+    const thisOrders = orders.filter((o) => o.createdAt >= weekFrom && o.createdAt < weekTo);
     const prevOrders = orders.filter((o) => o.createdAt < weekFrom);
 
     const sales     = salesMetrics(thisOrders);
@@ -129,8 +150,13 @@ export const getWeeklySummary = async (req, res) => {
     const wastePrev  = waste.filter((w) => w.createdAt < weekFrom);
     const wasteCost  = (list) => parseFloat(list.reduce((s, w) => s + (w.cost || 0), 0).toFixed(2));
 
+    // La semana en curso aún no termina — su "hasta" es hoy, no el domingo.
+    const rangeTo = isCurrentWeek ? now : new Date(weekTo.getTime() - 86400000);
+
     res.json({
-      range: { from: weekFromStr, to: dateStr(now), prevFrom: dateStr(prevFrom) },
+      weekStart: weekFromStr,
+      isCurrentWeek,
+      range: { from: weekFromStr, to: dateStr(rangeTo), prevFrom: dateStr(prevFrom) },
       sales: { ...sales, prev: prevSales },
       money: {
         expenses: parseFloat(expThis.toFixed(2)),
@@ -157,5 +183,49 @@ export const getWeeklySummary = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: "Error al generar el resumen", err: err.message });
+  }
+};
+
+/* GET /api/staff/summary/weeks — historial de semanas con ventas/órdenes,
+   agrupable por mes en el frontend. Más reciente primero. */
+export const getSummaryWeeks = async (req, res) => {
+  try {
+    const orders = await Order.find({ status: { $ne: "cancelled" } })
+      .select("createdAt paymentStatus total")
+      .lean();
+
+    const byWeek = new Map(); // lunes (epoch ms) -> { weekFrom, orders, revenue }
+    for (const o of orders) {
+      const weekFrom = mondayOf(new Date(o.createdAt));
+      const key = weekFrom.getTime();
+      const bucket = byWeek.get(key) || { weekFrom, orders: 0, revenue: 0 };
+      bucket.orders += 1;
+      if (o.paymentStatus === "paid" && o.total != null) bucket.revenue += o.total;
+      byWeek.set(key, bucket);
+    }
+
+    const dayMonthFmt = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", timeZone: RESTAURANT_TIME_ZONE });
+    const monthFmt = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric", timeZone: RESTAURANT_TIME_ZONE });
+    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+    const weeks = [...byWeek.values()]
+      .sort((a, b) => b.weekFrom - a.weekFrom)
+      .slice(0, 26) // ~6 meses
+      .map(({ weekFrom, orders: orderCount, revenue }) => {
+        const weekTo = new Date(weekFrom.getTime() + 6 * 86400000);
+        return {
+          weekStart: dateStr(weekFrom),
+          from: dateStr(weekFrom),
+          to: dateStr(weekTo),
+          label: `${dayMonthFmt.format(weekFrom)} – ${dayMonthFmt.format(weekTo)}`,
+          month: capitalize(monthFmt.format(weekFrom)),
+          orders: orderCount,
+          revenue: parseFloat(revenue.toFixed(2)),
+        };
+      });
+
+    res.json({ weeks });
+  } catch (err) {
+    res.status(500).json({ message: "Error al generar el historial semanal", err: err.message });
   }
 };
