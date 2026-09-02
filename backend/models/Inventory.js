@@ -51,6 +51,14 @@ const inventorySchema = new mongoose.Schema(
       default: [],
       select: false,
     },
+    // Idempotencia para consumo interno. Si el servidor o la red se cortan
+    // entre crear el registro y responder, el mismo consumo puede reanudarse
+    // sin volver a retirar proteína del inventario.
+    processedConsumptionIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "StaffConsumption" }],
+      default: [],
+      select: false,
+    },
   },
   { timestamps: true }
 );

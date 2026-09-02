@@ -29,6 +29,7 @@ import SalesDashboardPage from "../pos/pages/SalesDashboardPage";
 import SummaryPage from "../pos/pages/SummaryPage";
 import InventoryPage from "../pos/pages/InventoryPage";
 import WastePage from "../pos/pages/WastePage";
+import ConsumptionPage from "../pos/pages/ConsumptionPage";
 import CustomersPage from "../pos/pages/CustomersPage";
 import posStyles from "../pos/EmployeePortal.module.css";
 
@@ -139,12 +140,12 @@ const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 // periódico (horario, avisos), y al final lo administrativo/menos frecuente
 // (ventas, fin, panel).
 const TABS_BY_ROLE = {
-  employee: ["pos", "inicio", "tareas", "temp", "horario", "avisos"],
-  cashier:  ["pos", "premios", "inicio", "tareas", "temp", "hist", "corte", "horario", "avisos"],
-  kitchen:  ["cocina", "inicio", "tareas", "temp", "hist", "mermas", "horario", "avisos"],
-  manager:  ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "panel"],
-  admin:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
-  owner:    ["pos", "cocina", "premios", "inicio", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
+  employee: ["pos", "inicio", "consumo", "tareas", "temp", "horario", "avisos"],
+  cashier:  ["pos", "premios", "inicio", "consumo", "tareas", "temp", "hist", "corte", "horario", "avisos"],
+  kitchen:  ["cocina", "inicio", "consumo", "tareas", "temp", "hist", "mermas", "horario", "avisos"],
+  manager:  ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
 };
 
 const TAB_META = {
@@ -163,6 +164,7 @@ const TAB_META = {
   disponibilidad: { label: "Tienda", title: "Disponibilidad de la tienda", icon: ToggleRight },
   panel:   { label: "Equipo", title: "Administración del equipo", icon: TrendingUp },
   inicio:  { label: "Inicio", title: "Mi turno", icon: Clock },
+  consumo: { label: "Consumo", title: "Consumo interno", icon: Coffee },
   tareas:  { label: "Tareas", title: "Tareas del local", icon: CheckSquare },
   temp:    { label: "Temperaturas", mobileLabel: "Temp.", title: "Control de temperaturas", icon: Thermometer },
   horario: { label: "Horario", title: "Horario del equipo", icon: Calendar },
@@ -171,16 +173,16 @@ const TAB_META = {
 
 const TAB_GROUPS = [
   { id: "operacion", label: "Operación", tabs: ["pos", "cocina", "premios"] },
-  { id: "turno", label: "Mi turno", tabs: ["inicio", "tareas", "temp"] },
+  { id: "turno", label: "Mi turno", tabs: ["inicio", "consumo", "tareas", "temp"] },
   { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv", "mermas", "corte"] },
   { id: "equipo", label: "Equipo", tabs: ["horario", "avisos"] },
   { id: "gestion", label: "Administración", tabs: ["resumen", "clientes", "ventas", "fin", "fiscal", "panel"] },
 ];
 
 const MOBILE_PRIMARY_BY_ROLE = {
-  employee: ["pos", "inicio", "tareas", "temp"],
-  cashier: ["pos", "premios", "inicio", "tareas"],
-  kitchen: ["cocina", "inicio", "tareas", "temp"],
+  employee: ["pos", "inicio", "consumo", "tareas"],
+  cashier: ["pos", "premios", "inicio", "consumo"],
+  kitchen: ["cocina", "inicio", "consumo", "tareas"],
   manager: ["pos", "cocina", "inicio", "inv"],
   admin: ["pos", "cocina", "inicio", "inv"],
   owner: ["pos", "cocina", "inicio", "inv"],
@@ -509,6 +511,7 @@ export default function UnifiedStaffApp() {
           {/* Main content */}
           <main className={`${shellStyles.main} ${isWideTab ? shellStyles.mainWide : shellStyles.mainStandard} ${posStyles.staffEmbed}`}>
             {tab === "inicio"  && <HomeTab me={me} now={now} openEntry={openEntry} time={time} schedule={schedule} checklist={checklist} onClockIn={clockIn} onClockOut={clockOut} onBreakStart={startBreak} onBreakEnd={endBreak} clockError={clockError} clockBusy={clockBusy} />}
+            {tab === "consumo" && <ConsumptionPage styles={posStyles} staffUser={{ id: me.id, name: me.name, role: me.role }} employees={employees} />}
             {tab === "tareas"  && <TasksTab employees={employees} checklist={checklist} onToggle={toggleTask} />}
             {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
             {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
@@ -1841,7 +1844,7 @@ function TimeRecordsView({ actor, employees, entries, onUpdateTimeRecord }) {
                 </p>
                 {(t.breaks || []).length > 0 && (
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    {t.breaks.map((b, i) => `lonche ${fmtTime(b.start)}–${b.end ? fmtTime(b.end) : "en curso"}`).join(" · ")}
+                    {t.breaks.map((b) => `lonche ${fmtTime(b.start)}–${b.end ? fmtTime(b.end) : "en curso"}`).join(" · ")}
                   </p>
                 )}
               </div>

@@ -13,6 +13,7 @@ import Redemption from "../models/Redemption.js";
 import Announcement from "../models/Announcement.js";
 import StoreSettings from "../models/StoreSettings.js";
 import SocialStoryParticipant from "../models/SocialStoryParticipant.js";
+import StaffConsumption from "../models/StaffConsumption.js";
 
 /* GET /api/staff/backup/status */
 export const getBackupStatus = async (req, res) => {
@@ -34,12 +35,12 @@ export const exportBackup = async (req, res) => {
       users, staffUsers, orders, inventory, expenses,
       timeRecords, tempRecords, checklistRecords, schedules,
       wasteLogs, promoCodes, redemptions, announcements,
-      storeSettings, socialStoryParticipants,
+      storeSettings, socialStoryParticipants, staffConsumptions,
     ] = await Promise.all([
       User.find().select("+password").lean(),
       StaffUser.find().select("+password +pin").lean(),
       Order.find().lean(),
-      Inventory.find().lean(),
+      Inventory.find().select("+processedConsumptionIds").lean(),
       Expense.find().lean(),
       TimeRecord.find().lean(),
       TempRecord.find().lean(),
@@ -51,13 +52,14 @@ export const exportBackup = async (req, res) => {
       Announcement.find().lean(),
       StoreSettings.find().lean(),
       SocialStoryParticipant.find().lean(),
+      StaffConsumption.find().lean(),
     ]);
 
     const collections = {
       users, staffUsers, orders, inventory, expenses,
       timeRecords, tempRecords, checklistRecords, schedules,
       wasteLogs, promoCodes, redemptions, announcements,
-      storeSettings, socialStoryParticipants,
+      storeSettings, socialStoryParticipants, staffConsumptions,
     };
 
     const counts = Object.fromEntries(

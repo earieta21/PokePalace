@@ -24,6 +24,7 @@ import staffFiscalRoutes from "./routes/staffFiscal.js";
 import staffCashCutRoutes from "./routes/staffCashCuts.js";
 import staffAuditLogRoutes from "./routes/staffAuditLog.js";
 import staffCustomersRoutes from "./routes/staffCustomers.js";
+import staffConsumptionRoutes from "./routes/staffConsumption.js";
 import whatsappRoutes from "./routes/whatsapp.js";
 import { logServerError } from "./controllers/monitorController.js";
 import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
@@ -97,6 +98,7 @@ app.use("/api/staff/fiscal",   staffFiscalRoutes);
 app.use("/api/staff/cash-cuts",staffCashCutRoutes);
 app.use("/api/staff/audit-log",staffAuditLogRoutes);
 app.use("/api/staff/customers",staffCustomersRoutes);
+app.use("/api/staff/consumption",staffConsumptionRoutes);
 
 app.get("/", (req, res) => {
   res.send("API Poke Palace funcionando 🍣");

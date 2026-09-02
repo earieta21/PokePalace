@@ -12,6 +12,7 @@ import mongoose from "mongoose";
    saber cuánto hay ahorita. */
 export const INVENTORY_MOVEMENT_TYPES = [
   "restock", "restock_batch", "sale_deduction", "sale_reversal",
+  "internal_consumption", "internal_consumption_reversal",
   "manual_adjustment",
   "waste",            // reservado -- se conecta cuando se ligue la merma a inventario
   "count_adjustment", // reservado -- se conecta con los conteos físicos
@@ -31,7 +32,7 @@ const inventoryMovementSchema = new mongoose.Schema(
     actorName: { type: String, default: "system" },
 
     reference:     { type: String, default: null }, // orderId / restockRequestId / futuro wasteLogId / countId
-    referenceType: { type: String, enum: ["order", "restockRequest", "manual", "waste", "count"], default: "manual" },
+    referenceType: { type: String, enum: ["order", "restockRequest", "manual", "waste", "count", "consumption"], default: "manual" },
 
     reason:     { type: String, default: "", trim: true, maxlength: 500 },
     locationId: { type: String, default: null },
