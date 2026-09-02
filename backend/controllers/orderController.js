@@ -7,6 +7,7 @@ import { computeCartPricing } from "../pricing.js";
 import { sendEmail, orderConfirmationEmail } from "../utils/notify.js";
 import { createPaymentLink, getPaymentLinkStatus, isValidWebhookAuth } from "../utils/openpay.js";
 import { expireStalePoints } from "../utils/loyalty.js";
+import { isPromo2x1Day } from "../utils/promoSchedule.js";
 import {
   generateOrderAccessToken,
   hashOrderAccessToken,
@@ -285,6 +286,16 @@ export const createOrder = async (req, res) => {
         msg: "Uno o más ingredientes de tu pedido ya no están disponibles. Actualiza tu selección e intenta de nuevo.",
         code: "ITEM_UNAVAILABLE",
         unavailableItems: unavailableSelections,
+      });
+    }
+
+    // La promo 2x1 solo corre martes/jueves — revisado aparte de la
+    // disponibilidad de ingredientes porque es una regla de horario, no de
+    // inventario (ver isPromo2x1Day).
+    if (safeCart.some((line) => line.kind === "promo2x1") && !isPromo2x1Day()) {
+      return res.status(409).json({
+        msg: "La promo 2x1 en Bowls solo está disponible los martes y jueves.",
+        code: "PROMO_2X1_UNAVAILABLE",
       });
     }
 

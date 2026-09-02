@@ -1,5 +1,6 @@
 import { useState, useContext, useEffect, useCallback, useRef } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
+import { useAvailability } from "../../context/AvailabilityContext";
 import { createStaffApi } from "../api";
 import {
   createClientOrderId,
@@ -33,12 +34,13 @@ const MENU = [
   // Van primero porque son los mas usados en hora pico.
   { id: 20, name: "Bowl mediano", price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗", needsProtein: true },
   { id: 21, name: "Bowl grande",  price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🥗", needsProtein: true },
-  // Promo de un solo día (2026-09-01) — 2 bowls por el precio de un bowl
+  // Promo recurrente martes y jueves — 2 bowls por el precio de un bowl
   // grande, solo para comer en el local, máx. 4 complementos por bowl
-  // (regla verbal para el cajero, no se valida aquí). Cuando termine la
-  // promoción, quitar esta línea y la entrada "promo-2x1-dinein" en
-  // backend/config/posCatalog.js.
-  { id: 26, name: "Promo 2x1 (solo en local)", price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🎉", needsProtein: true },
+  // (regla verbal para el cajero, no se valida aquí). Se oculta del menú
+  // los demás días vía promo2x1Active (ver visibleMenu más abajo); el
+  // servidor también la rechaza fuera de esos días (isPromo2x1Day en
+  // backend/config/posCatalog.js), así que ocultarla aquí es solo UX.
+  { id: 26, name: "Promo 2x1 (solo en local)", price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🎉", needsProtein: true, promo2x1: true },
   { id: 1,  name: "The OG",         price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍣" },
   { id: 2,  name: "Skinny Bowl",    price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗" },
   { id: 3,  name: "Quinoa Bowl",    price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍤" },
@@ -64,6 +66,7 @@ const IVA = 0; // IVA incluido en precio
 
 export default function POSPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
+  const { promo2x1Active } = useAvailability();
   const api = createStaffApi(staffToken);
   const pendingSaleRef = useRef(null);
 
@@ -254,6 +257,7 @@ export default function POSPage({ styles }) {
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const visibleMenu = MENU.filter((item) => {
+    if (item.promo2x1 && !promo2x1Active) return false;
     const matchesCategory = menuCategory === "Todos" || item.category === menuCategory;
     const matchesSearch = item.name.toLowerCase().includes(menuSearch.trim().toLowerCase());
     return matchesCategory && matchesSearch;

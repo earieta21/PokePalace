@@ -1,3 +1,5 @@
+import { isPromo2x1Day } from "../utils/promoSchedule.js";
+
 // Protein stock is stored in kilograms. A medium bowl contains 100 g total,
 // a large bowl contains 120 g total, and every extra scoop adds 40 g.
 export const MEDIUM_BOWL_PROTEIN_KG = 0.1;
@@ -52,14 +54,14 @@ export const POS_CATALOG = Object.freeze([
     catalogId: "bowl-grande-rapido", legacyId: 21, name: "Bowl grande", price: 250, category: "bowls",
     inventoryRecipe: {},
   },
-  // Promo 2x1 de un solo día (solo en local) — 2 bowls medianos por el precio
-  // de un bowl grande. Misma proteína para los 2, 60 g + 60 g = 120 g total
-  // (ver el condicional de proteinKg en addItemDemand más abajo). Complementos
-  // limitados a 4 por bowl, pero eso no se rastrea aquí — no se captura la
-  // receta, igual que bowl-mediano-rapido/bowl-grande-rapido. Cuando termine
-  // la promo, quitar esta entrada de POS_CATALOG y la línea correspondiente
-  // en src/pos/pages/POSPage.jsx MENU (no hay toggle de disponibilidad para
-  // productos completos, solo para ingredientes sueltos).
+  // Promo 2x1 recurrente, solo martes y jueves (solo en local) — 2 bowls
+  // medianos por el precio de un bowl grande. Misma proteína para los 2,
+  // 60 g + 60 g = 120 g total (ver el condicional de proteinKg en
+  // addItemDemand más abajo). Complementos limitados a 4 por bowl, pero eso
+  // no se rastrea aquí — no se captura la receta, igual que
+  // bowl-mediano-rapido/bowl-grande-rapido. El día se valida en
+  // resolvePosItems (isPromo2x1Day) — fuera de martes/jueves esta línea se
+  // rechaza aunque llegue en el body.
   {
     catalogId: "promo-2x1-dinein", legacyId: 26, name: "Promo 2x1 (solo en local)", price: 250, category: "bowls",
     inventoryRecipe: {},
@@ -180,6 +182,10 @@ export const resolvePosItems = (items) => {
 
     if (!catalogItem) {
       throw new PosOrderValidationError("Uno de los productos no existe en el catálogo del POS");
+    }
+
+    if (catalogItem.catalogId === "promo-2x1-dinein" && !isPromo2x1Day()) {
+      throw new PosOrderValidationError("La Promo 2x1 solo está disponible los martes y jueves");
     }
 
     const qty = Number(rawItem.qty ?? 1);

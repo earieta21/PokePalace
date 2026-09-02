@@ -6,6 +6,7 @@ import { computeBowlSubtotal } from "../order/pricing";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useOrder } from "../order/OrderContext";
 import { AuthContext } from "../context/AuthContext";
+import { useAvailability } from "../context/AvailabilityContext";
 import { API_URL } from "../config";
 import { COMBO_PALACE_PRICE } from "../data/comboPalace";
 import { PROMO_2X1_BOWLS_PRICE } from "../order/pricing";
@@ -22,6 +23,7 @@ const Home = () => {
   const { t } = useLanguage();
   const { addCatalogItem, reorder, startPromo2x1 } = useOrder();
   const { user, isLoggedIn, token } = useContext(AuthContext);
+  const { promo2x1Active } = useAvailability();
 
   // Último pedido completado del cliente — si existe, se ofrece "Ordenar de
   // nuevo" para saltarse el armador. Se limpia al cerrar sesión.
@@ -162,7 +164,10 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Promo 2x1 en Bowls */}
+      {/* Promo 2x1 en Bowls — solo martes y jueves, confirmado por el servidor
+          (ver /api/settings/availability) para no depender del reloj del
+          dispositivo del cliente. */}
+      {promo2x1Active && (
       <section className={`${styles.section} ${styles.comboSection} ${styles.promo2x1Section}`}>
         <div className={styles.comboCopy}>
           <span className={styles.comboBadge}>PROMO · 2 BOWLS POR 1</span>
@@ -199,6 +204,7 @@ const Home = () => {
           </div>
         </div>
       </section>
+      )}
 
       {/* Popular Bowls */}
       <section className={styles.section}>

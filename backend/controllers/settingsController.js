@@ -1,9 +1,15 @@
 import StoreSettings from "../models/StoreSettings.js";
+import { isPromo2x1Day } from "../utils/promoSchedule.js";
 
 export const getAvailability = async (req, res) => {
   try {
     const doc = await StoreSettings.findOne({ key: "main" });
-    res.json({ unavailableItems: doc?.unavailableItems ?? [] });
+    res.json({
+      unavailableItems: doc?.unavailableItems ?? [],
+      // La promo 2x1 solo corre martes/jueves — el frontend usa esto para
+      // mostrar/ocultar la sección sin que cada pantalla calcule el día.
+      promo2x1Active: isPromo2x1Day(),
+    });
   } catch {
     res.status(500).json({ msg: "Error al obtener disponibilidad" });
   }
