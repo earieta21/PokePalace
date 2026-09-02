@@ -21,6 +21,10 @@ const cartLineBrief = (line, language) => {
     const combo = line.catalogId === "combo-palace" ? `: ${comboPalaceSelectionSummary(line)}` : "";
     return `${line.name}${combo} ×${line.qty}`;
   }
+  if (line.kind === "promo2x1") {
+    const proteinLabel = getItemLabel("protein", line.protein, language);
+    return `2x1 en Bowls: ${proteinLabel} (2 bowls)`;
+  }
   const proteins = (line.proteins || []).map((id) => getItemLabel("protein", id, language)).join(", ");
   const baseLabel = getBaseLabel(line.bases, line.base, language);
   const size = line.bowlSize === "large" ? "Grande" : "Mediano";

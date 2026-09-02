@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAvailability } from "../context/AvailabilityContext";
-import { computeBowlSubtotal, computeExtrasSubtotal } from "./pricing";
+import { computeBowlSubtotal, computeExtrasSubtotal, PROMO_2X1_BOWLS_PRICE } from "./pricing";
 
 const OrderContext = createContext();
 const ORDER_STORAGE_KEY = "pokePalaceOrderDraft";
@@ -46,6 +46,11 @@ const blankOrder = () => ({
   ...blankBowlDraft(),
   cart: [],
   editingCartId: null,
+  // Estado de la promo "2x1 en Bowls" en construcción — null cuando no está
+  // activa. `stage` 1 = armando el primer bowl (elige la proteína
+  // compartida), 2 = armando el segundo (proteína ya fija). `bowlA` guarda
+  // el primer bowl mientras se arma el segundo.
+  promo2x1: null,
   customer: "",
   phone: "",
   notes: "",
@@ -113,6 +118,72 @@ export const OrderProvider = ({ children }) => {
         ? prev.cart.map((l) => (l.cartId === prev.editingCartId ? line : l))
         : [...prev.cart, line];
       return { ...prev, ...blankBowlDraft(), editingCartId: null, cart, draftStep: 0 };
+    });
+  }, []);
+
+  // Activa el armador en modo "2x1 en Bowls": limpia el borrador y arranca
+  // en stage 1 (el primer bowl, donde el cliente elige la proteína que
+  // compartirán los 2 bowls).
+  const startPromo2x1 = useCallback(() => {
+    setOrder((prev) => ({
+      ...prev,
+      ...blankBowlDraft(),
+      promo2x1: { stage: 1, protein: null, bowlA: null },
+      editingCartId: null,
+      draftStep: 0,
+    }));
+  }, []);
+
+  // Sale del modo "2x1 en Bowls" sin agregar nada al carrito — usado cuando
+  // el cliente se regresa a la mitad del armador.
+  const cancelPromo2x1 = useCallback(() => {
+    setOrder((prev) => ({ ...prev, ...blankBowlDraft(), promo2x1: null, draftStep: 0 }));
+  }, []);
+
+  // Confirma el bowl en construcción dentro de la promo 2x1. En stage 1
+  // guarda ese bowl y reinicia el armador para el segundo, con la proteína
+  // ya fija (compartida). En stage 2 combina ambos bowls en 1 sola línea de
+  // carrito a precio plano y sale del modo promo.
+  const confirmPromoBowl = useCallback(() => {
+    setOrder((prev) => {
+      if (!prev.promo2x1) return prev;
+      const bowlSnapshot = {
+        base: prev.base,
+        bases: prev.bases,
+        marinades: prev.marinades,
+        complements: prev.complements,
+        sauces: prev.sauces,
+        toppings: prev.toppings,
+      };
+
+      if (prev.promo2x1.stage === 1) {
+        const protein = prev.proteins[0];
+        return {
+          ...prev,
+          ...blankBowlDraft(),
+          proteins: [protein],
+          protein,
+          promo2x1: { stage: 2, protein, bowlA: bowlSnapshot },
+          draftStep: 0,
+        };
+      }
+
+      const line = {
+        cartId: generateCartId(),
+        kind: "promo2x1",
+        catalogId: "promo-2x1-bowls",
+        protein: prev.promo2x1.protein,
+        bowls: [prev.promo2x1.bowlA, bowlSnapshot],
+        price: PROMO_2X1_BOWLS_PRICE,
+        qty: 1,
+      };
+      return {
+        ...prev,
+        ...blankBowlDraft(),
+        promo2x1: null,
+        cart: [...prev.cart, line],
+        draftStep: 0,
+      };
     });
   }, []);
 
@@ -296,6 +367,34 @@ export const OrderProvider = ({ children }) => {
             } : {}),
           };
         }
+        if (line.kind === "promo2x1") {
+          if (unavailable.has(line.protein)) return null;
+          const bowls = (Array.isArray(line.bowls) ? line.bowls : []).map((bowl) => {
+            const bowlBases = Array.isArray(bowl.bases) && bowl.bases.length > 0
+              ? bowl.bases
+              : bowl.base ? [bowl.base] : [];
+            const bases = filterAvailable(bowlBases, unavailable);
+            if (bases.length === 0) return null;
+            return {
+              base: bases[0],
+              bases,
+              marinades: filterAvailable(bowl.marinades, unavailable),
+              complements: filterAvailable(bowl.complements, unavailable),
+              sauces: filterAvailable(bowl.sauces, unavailable),
+              toppings: filterAvailable(bowl.toppings, unavailable),
+            };
+          });
+          if (bowls.length !== 2 || bowls.some((b) => b === null)) return null;
+          return {
+            cartId: generateCartId(),
+            kind: "promo2x1",
+            catalogId: "promo-2x1-bowls",
+            protein: line.protein,
+            bowls,
+            price: PROMO_2X1_BOWLS_PRICE,
+            qty: 1,
+          };
+        }
         const proteins = filterAvailable(line.proteins, unavailable);
         if (proteins.length === 0) return null;
         const lineBases = Array.isArray(line.bases) && line.bases.length > 0
@@ -357,6 +456,9 @@ export const OrderProvider = ({ children }) => {
       order: { ...order, updateCheckout },
       updateOrder,
       addBowlToCart,
+      startPromo2x1,
+      cancelPromo2x1,
+      confirmPromoBowl,
       startNewBowl,
       editCartBowl,
       addCatalogItem,
@@ -368,7 +470,8 @@ export const OrderProvider = ({ children }) => {
       resetOrder,
     }),
     [
-      order, updateOrder, addBowlToCart, startNewBowl, editCartBowl, addCatalogItem, addComboToCart,
+      order, updateOrder, addBowlToCart, startPromo2x1, cancelPromo2x1, confirmPromoBowl, startNewBowl,
+      editCartBowl, addCatalogItem, addComboToCart,
       updateCartItemQty, removeCartLine, loadFavorite, reorder, resetOrder, updateCheckout,
     ]
   );

@@ -928,10 +928,10 @@ test("el POS calcula catálogo, deduplica reintentos y descuenta inventario una 
   const created = await staffRequest("cashier", "/api/staff/orders", { method: "POST", body: payload });
   assert.equal(created.status, 201);
   const firstBody = await created.json();
-  assert.equal(firstBody.order.subtotal, 60);
-  assert.equal(firstBody.order.total, 60);
+  assert.equal(firstBody.order.subtotal, 70);
+  assert.equal(firstBody.order.total, 70);
   assert.equal(firstBody.order.items[0].name, "Coca-Zero");
-  assert.equal(firstBody.order.items[0].price, 30);
+  assert.equal(firstBody.order.items[0].price, 35);
 
   const retried = await staffRequest("cashier", "/api/staff/orders", { method: "POST", body: payload });
   assert.equal(retried.status, 200);

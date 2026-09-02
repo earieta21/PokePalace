@@ -546,7 +546,7 @@ export default function OrderTracking() {
         order.cartItems.map((line, idx) => (
           <section className={styles.section} key={line.catalogId ? `${line.catalogId}-${idx}` : `bowl-${idx}`}>
             <p className={styles.sectionTitle}>
-              {line.kind === "item" ? line.name : t("tracking.yourBowl")}
+              {line.kind === "item" ? line.name : line.kind === "promo2x1" ? "2x1 en Bowls" : t("tracking.yourBowl")}
             </p>
             <div className={styles.detailCard}>
               {line.kind === "item" ? (
@@ -555,6 +555,21 @@ export default function OrderTracking() {
                     <DetailRow label="Incluye" value={comboPalaceSelectionSummary(line)} />
                   )}
                   <DetailRow label={t("summary.total")} value={`×${line.qty} — $${(line.price * line.qty).toFixed(2)}`} />
+                </>
+              ) : line.kind === "promo2x1" ? (
+                <>
+                  <DetailRow label={t("common.proteins")} value={getItemLabel("protein", line.protein, language)} />
+                  {(line.bowls || []).map((bowl, bowlIdx) => (
+                    <DetailRow
+                      key={bowlIdx}
+                      label={`Bowl ${bowlIdx + 1}`}
+                      value={[
+                        getBaseLabel(bowl.bases, bowl.base, language),
+                        ...(bowl.complements || []).map((id) => getItemLabel("complement", id, language)),
+                      ].filter(Boolean).join(", ")}
+                    />
+                  ))}
+                  <DetailRow label={t("summary.total")} value={`$${line.price.toFixed(2)}`} />
                 </>
               ) : (
                 <>

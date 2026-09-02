@@ -4,7 +4,7 @@ import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./ComplementsSelection.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
-import { COMPLEMENT_FREE_LIMIT, EXTRA_COMPLEMENT_PRICE } from "./pricing";
+import { COMPLEMENT_FREE_LIMIT, EXTRA_COMPLEMENT_PRICE, PROMO_2X1_MAX_COMPLEMENTS } from "./pricing";
 
 import aguacate from "../assets/complements/aguacate.webp";
 import algas from "../assets/complements/algas.webp";
@@ -46,6 +46,10 @@ const ComplementsSelection = ({ onNext, onBack, isKiosk = false }) => {
   );
   const [error, setError] = useState("");
 
+  // La promo "2x1 en Bowls" limita cada bowl a menos complementos que un
+  // bowl normal (que solo tope con el tamaño del catálogo).
+  const maxComplements = order.promo2x1 ? PROMO_2X1_MAX_COMPLEMENTS : complements.length;
+
   const toggleComplement = (complementId) => {
     setSelectedComplements((prev) => {
       if (prev.includes(complementId)) {
@@ -54,8 +58,8 @@ const ComplementsSelection = ({ onNext, onBack, isKiosk = false }) => {
         return next;
       }
 
-      if (prev.length >= complements.length) {
-        setError(t("order.complementsMaxError", { max: complements.length }));
+      if (prev.length >= maxComplements) {
+        setError(t("order.complementsMaxError", { max: maxComplements }));
         return prev;
       }
 
@@ -79,7 +83,9 @@ const ComplementsSelection = ({ onNext, onBack, isKiosk = false }) => {
         <div className={styles.badge}>{t("order.step", { step: 4, total: 6 })}</div>
         <h2 className={styles.title}>{t("order.complementsTitle")}</h2>
         <p className={styles.subtitle}>
-          {t("order.complementsSubtitle", { free: COMPLEMENT_FREE_LIMIT, price: EXTRA_COMPLEMENT_PRICE })}
+          {order.promo2x1
+            ? `Elige hasta ${PROMO_2X1_MAX_COMPLEMENTS} complementos para este bowl — incluidos en la promo.`
+            : t("order.complementsSubtitle", { free: COMPLEMENT_FREE_LIMIT, price: EXTRA_COMPLEMENT_PRICE })}
         </p>
         {extraCount > 0 && (
           <p className={styles.subtitle} style={{ fontWeight: 700 }}>

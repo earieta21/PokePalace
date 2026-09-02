@@ -255,6 +255,55 @@
   }
 }
 
+/* Promo 2x1 en Bowls — mismo layout que Combo Palace, tinte distinto para
+   diferenciarla a simple vista, y 2 fotos de bowl en vez de bowl/bebida/rice
+   cake (por eso necesita sus propias clases de posición). */
+.promo2x1Section {
+  background:
+    radial-gradient(circle at 84% 14%, rgba(140, 220, 255, 0.22), transparent 35%),
+    linear-gradient(125deg, #14213d 0%, #1d3a63 58%, #2c5c94 100%);
+}
+
+.promo2x1Section .comboEyebrow {
+  color: #8ecbff;
+}
+
+.promo2x1Section .comboButton {
+  color: #14315c;
+}
+
+.promo2x1PhotoLeft {
+  z-index: 2;
+  top: 42px;
+  left: 4%;
+  width: 46%;
+  height: 230px;
+  transform: rotate(-5deg);
+}
+
+.promo2x1PhotoRight {
+  z-index: 3;
+  top: 70px;
+  right: 6%;
+  width: 46%;
+  height: 230px;
+  transform: rotate(5deg);
+}
+
+@media (max-width: 760px) {
+  .promo2x1PhotoLeft {
+    top: 24px;
+    left: 6%;
+    height: 190px;
+  }
+
+  .promo2x1PhotoRight {
+    top: 40px;
+    right: 8%;
+    height: 190px;
+  }
+}
+
 .welcomeCard {
   display: flex;
   align-items: center;

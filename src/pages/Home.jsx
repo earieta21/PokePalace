@@ -8,6 +8,7 @@ import { useOrder } from "../order/OrderContext";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
 import { COMBO_PALACE_PRICE } from "../data/comboPalace";
+import { PROMO_2X1_BOWLS_PRICE } from "../order/pricing";
 import styles from "./Home.module.css";
 
 import theOg from "../assets/menu/theOg.webp";
@@ -19,7 +20,7 @@ import honeyRiceCake from "../assets/menu/products/honey-rice-cake.jpg";
 const Home = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { addCatalogItem, reorder } = useOrder();
+  const { addCatalogItem, reorder, startPromo2x1 } = useOrder();
   const { user, isLoggedIn, token } = useContext(AuthContext);
 
   // Último pedido completado del cliente — si existe, se ofrece "Ordenar de
@@ -82,6 +83,11 @@ const Home = () => {
     navigate("/menu");
   };
 
+  const handleStartPromo2x1 = () => {
+    startPromo2x1();
+    navigate("/order");
+  };
+
   return (
     <div className={styles.home}>
       {/* Background decor */}
@@ -117,7 +123,7 @@ const Home = () => {
       {/* Combo destacado */}
       <section className={`${styles.section} ${styles.comboSection}`}>
         <div className={styles.comboCopy}>
-          <span className={styles.comboBadge}>NUEVO · AHORRA HASTA $21</span>
+          <span className={styles.comboBadge}>NUEVO</span>
           <p className={styles.comboEyebrow}>Combos</p>
           <h2 className={styles.comboTitle}>Combo Palace</h2>
           <p className={styles.comboDescription}>
@@ -152,6 +158,44 @@ const Home = () => {
           <div className={`${styles.comboPhoto} ${styles.comboPhotoSnack}`}>
             <img src={honeyRiceCake} alt="" />
             <span>Rice Cake</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Promo 2x1 en Bowls */}
+      <section className={`${styles.section} ${styles.comboSection} ${styles.promo2x1Section}`}>
+        <div className={styles.comboCopy}>
+          <span className={styles.comboBadge}>PROMO · 2 BOWLS POR 1</span>
+          <p className={styles.comboEyebrow}>Promociones</p>
+          <h2 className={styles.comboTitle}>2x1 en Bowls</h2>
+          <p className={styles.comboDescription}>
+            Arma 2 bowls con la misma proteína (60 g + 60 g) y hasta 4 complementos cada uno, por el precio de 1 bowl grande.
+          </p>
+          <div className={styles.comboIncludes}>
+            <span>🐟 1 proteína compartida</span>
+            <span>🥗 4 complementos c/u</span>
+            <span>🍱 2 bowls</span>
+          </div>
+          <div className={styles.comboActionRow}>
+            <strong>${PROMO_2X1_BOWLS_PRICE} MXN</strong>
+            <button
+              type="button"
+              className={styles.comboButton}
+              onClick={handleStartPromo2x1}
+            >
+              Armar mis 2 bowls →
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.comboVisual} aria-hidden="true">
+          <div className={`${styles.comboPhoto} ${styles.promo2x1PhotoLeft}`}>
+            <img src={theOg} alt="" />
+            <span>Bowl 1</span>
+          </div>
+          <div className={`${styles.comboPhoto} ${styles.promo2x1PhotoRight}`}>
+            <img src={skinnyBowl} alt="" />
+            <span>Bowl 2</span>
           </div>
         </div>
       </section>

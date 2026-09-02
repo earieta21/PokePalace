@@ -99,7 +99,7 @@ test("Combo Palace fija precio, conserva elecciones y descuenta sus componentes"
     comboRiceCakeId: "choco-rice-cake",
   }]);
 
-  assert.equal(combo.price, 279);
+  assert.equal(combo.price, 289);
   assert.equal(combo.qty, 2);
   assert.equal(combo.comboBowlId, "bowl-the-og");
   assert.equal(combo.comboDrinkId, "agua-del-dia");
@@ -183,7 +183,7 @@ test("el POS rechaza una proteina invalida en un bowl de venta rapida", () => {
 test("el POS mantiene compatibilidad por nombre exacto sin confiar en price", () => {
   const [item] = resolvePosItems([{ name: "Coca-Zero", price: 9999, qty: 1 }]);
   assert.equal(item.catalogId, "coca-zero");
-  assert.equal(item.price, 30);
+  assert.equal(item.price, 35);
 });
 
 test("el POS rechaza productos, ids y cantidades fuera del catálogo", () => {

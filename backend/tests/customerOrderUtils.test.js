@@ -3,16 +3,18 @@ import assert from "node:assert/strict";
 import {
   findUnavailableCustomerBowlItems,
   findUnavailableCustomerCartItems,
+  findUnavailablePromo2x1Items,
   isCustomerManagedOrder,
   isWithinRestaurantHours,
   normalizeCustomerOrderId,
   restaurantOpenHour,
   sanitizeCustomerBowl,
   sanitizeCustomerCart,
+  sanitizeCustomerPromo2x1,
   usefulPointsToRedeem,
 } from "../utils/customerOrder.js";
 import { stableCustomerOrderObjectId } from "../utils/orderReservations.js";
-import { BOWL_BASE_PRICE, computePricing } from "../pricing.js";
+import { BOWL_BASE_PRICE, computePricing, PROMO_2X1_BOWLS_PRICE } from "../pricing.js";
 
 test("órdenes online y de WhatsApp entran a cancelación y reversión de cliente", () => {
   assert.equal(isCustomerManagedOrder({ source: "online" }), true);
@@ -249,10 +251,10 @@ test("el carrito acepta 2 bowls y un artículo del catálogo en un solo pedido",
   assert.equal(cart[2].kind, "item");
   assert.equal(cart[2].catalogId, "coca-zero");
   assert.equal(cart[2].qty, 2);
-  assert.equal(cart[2].price, 30); // precio autoritativo del servidor, no el del cliente
+  assert.equal(cart[2].price, 35); // precio autoritativo del servidor, no el del cliente
 });
 
-test("el carrito acepta Combo Palace y reemplaza el precio enviado por $279", () => {
+test("el carrito acepta Combo Palace y reemplaza el precio enviado por $289", () => {
   const [combo] = sanitizeCustomerCart([{
     kind: "item",
     catalogId: "combo-palace",
@@ -264,7 +266,7 @@ test("el carrito acepta Combo Palace y reemplaza el precio enviado por $279", ()
   }]);
 
   assert.equal(combo.kind, "item");
-  assert.equal(combo.price, 279);
+  assert.equal(combo.price, 289);
   assert.equal(combo.comboBowlId, "bowl-quinoa");
   assert.equal(combo.comboDrinkId, "coca-zero");
   assert.equal(combo.comboRiceCakeId, "miel-rice-cake");
@@ -308,4 +310,67 @@ test("la disponibilidad del carrito revisa bowls y artículos por separado", () 
   assert.deepEqual(findUnavailableCustomerCartItems(cart, ["salmon"]), ["salmon"]);
   assert.deepEqual(findUnavailableCustomerCartItems(cart, ["coca_zero"]), ["coca_zero"]);
   assert.deepEqual(findUnavailableCustomerCartItems(cart, ["not_in_cart"]), []);
+});
+
+test("2x1 en Bowls exige 1 proteína válida y exactamente 2 bowls", () => {
+  const validBowl = { base: "white_rice", complements: ["avocado"] };
+  assert.throws(
+    () => sanitizeCustomerPromo2x1({ protein: "not_a_protein", bowls: [validBowl, validBowl] }),
+    /1 proteína válida/
+  );
+  assert.throws(
+    () => sanitizeCustomerPromo2x1({ protein: "salmon", bowls: [validBowl] }),
+    /se requieren 2 bowls/
+  );
+  assert.throws(
+    () => sanitizeCustomerPromo2x1({ protein: "salmon", bowls: [validBowl, validBowl, validBowl] }),
+    /se requieren 2 bowls/
+  );
+});
+
+test("2x1 en Bowls limita cada bowl a 4 complementos aunque el catálogo permita más", () => {
+  const tooManyComplements = {
+    base: "white_rice",
+    complements: ["avocado", "edamame", "cucumber", "mango", "beet"],
+  };
+  assert.throws(
+    () => sanitizeCustomerPromo2x1({
+      protein: "salmon",
+      bowls: [tooManyComplements, { base: "quinoa" }],
+    }),
+    /Selección inválida en complements/
+  );
+
+  const promo = sanitizeCustomerPromo2x1({
+    protein: "salmon",
+    bowls: [
+      { base: "white_rice", complements: ["avocado", "edamame", "cucumber", "mango"] },
+      { base: "quinoa", complements: [] },
+    ],
+  });
+  assert.equal(promo.protein, "salmon");
+  assert.equal(promo.bowls.length, 2);
+  assert.equal(promo.bowls[0].complements.length, 4);
+});
+
+test("el carrito acepta 2x1 en Bowls, ignora el precio enviado por el cliente y revisa disponibilidad de ambos bowls", () => {
+  const [promoLine] = sanitizeCustomerCart([{
+    kind: "promo2x1",
+    protein: "salmon",
+    price: 1, // el cliente podría mandar cualquier cosa — el servidor manda
+    bowls: [
+      { base: "white_rice", complements: ["avocado"] },
+      { base: "quinoa", complements: ["edamame", "cucumber"] },
+    ],
+  }]);
+
+  assert.equal(promoLine.kind, "promo2x1");
+  assert.equal(promoLine.catalogId, "promo-2x1-bowls");
+  assert.equal(promoLine.price, PROMO_2X1_BOWLS_PRICE);
+  assert.equal(promoLine.qty, 1);
+
+  assert.deepEqual(findUnavailablePromo2x1Items(promoLine, ["salmon"]), ["salmon"]);
+  assert.deepEqual(findUnavailablePromo2x1Items(promoLine, ["edamame"]), ["edamame"]);
+  assert.deepEqual(findUnavailablePromo2x1Items(promoLine, ["not_in_promo"]), []);
+  assert.deepEqual(findUnavailableCustomerCartItems([promoLine], ["quinoa"]), ["quinoa"]);
 });

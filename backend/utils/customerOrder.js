@@ -1,5 +1,10 @@
 import { zonedParts, zonedWeekday } from "./timeZone.js";
-import { computeBowlSubtotal, computeExtrasSubtotal } from "../pricing.js";
+import {
+  computeBowlSubtotal,
+  computeExtrasSubtotal,
+  PROMO_2X1_BOWLS_PRICE,
+  PROMO_2X1_MAX_COMPLEMENTS,
+} from "../pricing.js";
 import { getUnavailablePosSelections, resolvePosItems } from "../config/posCatalog.js";
 
 export const CUSTOMER_ORDER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,99}$/;
@@ -103,6 +108,51 @@ export function sanitizeCustomerBowl({
   };
 }
 
+// Un bowl dentro de la promo "2x1 en Bowls" — como sanitizeCustomerBowl,
+// pero sin proteína propia (la comparten los 2 bowls, se valida aparte en
+// sanitizeCustomerPromo2x1) y con un tope de complementos más bajo que un
+// bowl normal.
+function sanitizePromo2x1Bowl({ base, bases, marinades, complements, sauces, toppings }, index) {
+  const baseInput = Array.isArray(bases) && bases.length > 0
+    ? bases
+    : typeof base === "string" && base
+      ? [base]
+      : [];
+  if (
+    baseInput.length === 0 ||
+    baseInput.length > 2 ||
+    new Set(baseInput).size !== baseInput.length ||
+    baseInput.some((id) => typeof id !== "string" || !BOWL_CATALOG.base.has(id))
+  ) {
+    throw new TypeError(`Bowl ${index + 1} de la promo: selecciona una base válida`);
+  }
+  const safeBases = [...baseInput];
+
+  return {
+    base: safeBases[0],
+    bases: safeBases,
+    marinades: normalizeCatalogList(marinades, "marinades", 2),
+    complements: normalizeCatalogList(complements, "complements", PROMO_2X1_MAX_COMPLEMENTS),
+    sauces: normalizeCatalogList(sauces, "sauces", 2),
+    toppings: normalizeCatalogList(toppings, "toppings", 5),
+  };
+}
+
+// Promo pública "2x1 en Bowls": 1 proteína compartida entre 2 bowls
+// personalizados (60 g + 60 g = 120 g), cada uno con máx.
+// PROMO_2X1_MAX_COMPLEMENTS complementos, precio plano
+// PROMO_2X1_BOWLS_PRICE sin importar lo elegido.
+export function sanitizeCustomerPromo2x1({ protein, bowls }) {
+  if (typeof protein !== "string" || !BOWL_CATALOG.proteins.has(protein)) {
+    throw new TypeError("2x1 en Bowls: selecciona 1 proteína válida");
+  }
+  if (!Array.isArray(bowls) || bowls.length !== 2) {
+    throw new TypeError("2x1 en Bowls: se requieren 2 bowls");
+  }
+  const safeBowls = bowls.map((bowl, index) => sanitizePromo2x1Bowl(bowl || {}, index));
+  return { protein, bowls: safeBowls };
+}
+
 /**
  * Returns the catalog ids selected by a customer that staff has marked as
  * unavailable. The browser and the staff availability screen both exchange
@@ -130,12 +180,36 @@ export function findUnavailableCustomerBowlItems(bowl, unavailableItems) {
   return [...new Set(selectedIds.filter((item) => unavailable.has(item)))];
 }
 
+// Como findUnavailableCustomerBowlItems, pero para una línea de la promo
+// "2x1 en Bowls" — revisa la proteína compartida y los ingredientes de
+// ambos bowls.
+export function findUnavailablePromo2x1Items(promoLine, unavailableItems) {
+  if (!promoLine || !Array.isArray(unavailableItems) || unavailableItems.length === 0) {
+    return [];
+  }
+
+  const unavailable = new Set(
+    unavailableItems.filter((item) => typeof item === "string")
+  );
+  const bowlIds = (Array.isArray(promoLine.bowls) ? promoLine.bowls : []).flatMap((bowl) => [
+    ...(Array.isArray(bowl?.bases) && bowl.bases.length > 0 ? bowl.bases : [bowl?.base]),
+    ...(Array.isArray(bowl?.marinades) ? bowl.marinades : []),
+    ...(Array.isArray(bowl?.complements) ? bowl.complements : []),
+    ...(Array.isArray(bowl?.sauces) ? bowl.sauces : []),
+    ...(Array.isArray(bowl?.toppings) ? bowl.toppings : []),
+  ]);
+  const selectedIds = [promoLine.protein, ...bowlIds];
+
+  return [...new Set(selectedIds.filter((item) => unavailable.has(item)))];
+}
+
 // Artículos del catálogo POS que existen solo para que el personal cobre
 // rápido sin capturar el bowl completo (no traen receta de inventario) — no
 // tienen sentido como elección deliberada de un cliente armando su pedido.
 export const CUSTOMER_EXCLUDED_CATALOG_IDS = new Set([
   "bowl-mediano-rapido",
   "bowl-grande-rapido",
+  "promo-2x1-dinein",
 ]);
 
 const MAX_CART_LINES = 12;
@@ -177,6 +251,19 @@ export function sanitizeCustomerCart(cart) {
         comboDrinkId: line?.comboDrinkId,
         comboRiceCakeId: line?.comboRiceCakeId,
       });
+    } else if (line?.kind === "promo2x1") {
+      try {
+        const promo = sanitizeCustomerPromo2x1(line || {});
+        bowlLines.push({
+          kind: "promo2x1",
+          catalogId: "promo-2x1-bowls",
+          ...promo,
+          price: PROMO_2X1_BOWLS_PRICE,
+          qty: 1,
+        });
+      } catch (promoError) {
+        throw new TypeError(`2x1 en Bowls (línea ${index + 1}): ${promoError.message}`);
+      }
     } else {
       try {
         const bowl = sanitizeCustomerBowl(line || {});
@@ -215,6 +302,10 @@ export function findUnavailableCustomerCartItems(cart, unavailableItems) {
   for (const line of cart) {
     if (line.kind === "item") {
       for (const id of getUnavailablePosSelections({ items: [line], unavailableItems })) {
+        found.add(id);
+      }
+    } else if (line.kind === "promo2x1") {
+      for (const id of findUnavailablePromo2x1Items(line, unavailableItems)) {
         found.add(id);
       }
     } else {
