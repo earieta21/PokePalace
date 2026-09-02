@@ -82,6 +82,15 @@ export const getWeeklySummary = async (req, res) => {
     const prevFrom         = mondayOf(new Date(weekFrom.getTime() - 86400000));
     const weekToStr        = dateStr(weekTo);
 
+    // Punto hasta donde "esta semana" cuenta: ahora mismo si es la semana en
+    // curso (para no comparar 2 días contra los 7 completos de la anterior),
+    // o el domingo de esa semana si ya se cerró por completo. prevCutoff es
+    // ese mismo punto, una semana antes -- así "vs semana pasada" siempre
+    // compara periodos del mismo tamaño (p.ej. martes vs martes, no martes
+    // vs la semana completa).
+    const cutoff     = isCurrentWeek ? now : weekTo;
+    const prevCutoff = new Date(cutoff.getTime() - 7 * 86400000);
+
     const [orders, expenses, inventory, waste, errorLogs, registeredCustomers] = await Promise.all([
       Order.find({ createdAt: { $gte: prevFrom, $lt: weekTo } }).lean(),
       Expense.find({ date: { $gte: dateStr(prevFrom), $lt: weekToStr } }).lean(),
@@ -94,10 +103,16 @@ export const getWeeklySummary = async (req, res) => {
     ]);
 
     const thisOrders = orders.filter((o) => o.createdAt >= weekFrom && o.createdAt < weekTo);
-    const prevOrders = orders.filter((o) => o.createdAt < weekFrom);
+    // Semana pasada completa (lunes a domingo) -- se usa solo para "clientes
+    // que regresaron", un cruce de identidad entre semanas que no debe
+    // acortarse igual que las cifras de venta.
+    const prevOrdersFull = orders.filter((o) => o.createdAt < weekFrom);
+    // Semana pasada hasta el mismo punto que ya llevamos esta semana --
+    // la comparación real para los KPIs.
+    const prevOrdersToDate = orders.filter((o) => o.createdAt >= prevFrom && o.createdAt < prevCutoff);
 
     const sales     = salesMetrics(thisOrders);
-    const prevSales = salesMetrics(prevOrders);
+    const prevSales = salesMetrics(prevOrdersToDate);
 
     // Desglose por día y hora pico (solo semana actual, hora local Tijuana)
     const byDay = DAY_LABELS.map((day) => ({ day, revenue: 0, orders: 0 }));
@@ -133,21 +148,31 @@ export const getWeeklySummary = async (req, res) => {
 
     // Clientes que regresaron: identidad = usuario o teléfono, con orden previa a esta semana
     const idOf = (o) => (o.user ? String(o.user) : o.phone || null);
-    const before = new Set(prevOrders.map(idOf).filter(Boolean));
+    const before = new Set(prevOrdersFull.map(idOf).filter(Boolean));
     const returning = new Set(
       thisOrders.map(idOf).filter((id) => id && before.has(id))
     ).size;
 
-    // Gastos y ganancia
-    const weekFromStr = dateStr(weekFrom);
+    // Gastos y ganancia. Expense.date es un date-key (día completo, no
+    // instante), así que el corte de "hasta el mismo punto" se expresa como
+    // el último día a incluir, inclusive -- por eso la resta de un día extra
+    // cuando prevCutoff cae justo en la medianoche del lunes de esta semana
+    // (semana pasada ya cerrada: se quiere el domingo completo, no el lunes).
+    const weekFromStr    = dateStr(weekFrom);
+    const prevFromStr    = dateStr(prevFrom);
+    const prevCutoffStr  = isCurrentWeek
+      ? dateStr(prevCutoff)
+      : dateStr(new Date(prevCutoff.getTime() - 86400000));
     const expThis = expenses.filter((e) => e.date >= weekFromStr).reduce((s, e) => s + e.amount, 0);
-    const expPrev = expenses.filter((e) => e.date <  weekFromStr).reduce((s, e) => s + e.amount, 0);
+    const expPrev = expenses
+      .filter((e) => e.date >= prevFromStr && e.date <= prevCutoffStr)
+      .reduce((s, e) => s + e.amount, 0);
 
     // Inventario y merma
     const lowCount   = inventory.filter((i) => i.qty <= (i.minQty ?? 0)).length;
     const totalValue = inventory.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.cost) || 0), 0);
     const wasteThis  = waste.filter((w) => w.createdAt >= weekFrom);
-    const wastePrev  = waste.filter((w) => w.createdAt < weekFrom);
+    const wastePrev  = waste.filter((w) => w.createdAt >= prevFrom && w.createdAt < prevCutoff);
     const wasteCost  = (list) => parseFloat(list.reduce((s, w) => s + (w.cost || 0), 0).toFixed(2));
 
     // La semana en curso aún no termina — su "hasta" es hoy, no el domingo.

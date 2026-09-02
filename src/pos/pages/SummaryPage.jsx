@@ -28,20 +28,23 @@ const shiftDateKey = (dateKey, days) => {
 const pctChange = (cur, prev) =>
   prev > 0 ? ((cur - prev) / prev) * 100 : null;
 
-function Delta({ current, previous, goodWhenUp = true }) {
+// partial: la semana en curso compara solo hasta hoy contra el mismo punto de
+// la semana pasada (ej. martes vs martes), no contra la semana completa.
+function Delta({ current, previous, goodWhenUp = true, partial = false }) {
+  const label = partial ? "vs mismo día, semana pasada" : "vs semana pasada";
   const pct = pctChange(current, previous);
   if (pct === null) {
     return <span className={`${ui.delta} ${ui.deltaFlat}`}>sin semana previa</span>;
   }
   const rounded = Math.round(pct);
   if (rounded === 0) {
-    return <span className={`${ui.delta} ${ui.deltaFlat}`}>= igual que la semana pasada</span>;
+    return <span className={`${ui.delta} ${ui.deltaFlat}`}>= igual que {label.replace("vs ", "")}</span>;
   }
   const up = rounded > 0;
   const good = up === goodWhenUp;
   return (
     <span className={`${ui.delta} ${good ? ui.deltaUp : ui.deltaDown}`}>
-      {up ? "↑" : "↓"} {Math.abs(rounded)}% vs semana pasada
+      {up ? "↑" : "↓"} {Math.abs(rounded)}% {label}
     </span>
   );
 }
@@ -241,22 +244,22 @@ export default function SummaryPage({ styles }) {
               <div className={ui.kpiCard}>
                 <small>Ventas</small>
                 <strong>{fmtMXN(sales.revenue)}</strong>
-                <Delta current={sales.revenue} previous={sales.prev.revenue} />
+                <Delta current={sales.revenue} previous={sales.prev.revenue} partial={data.isCurrentWeek} />
               </div>
               <div className={ui.kpiCard}>
                 <small>Órdenes</small>
                 <strong>{sales.orders}</strong>
-                <Delta current={sales.orders} previous={sales.prev.orders} />
+                <Delta current={sales.orders} previous={sales.prev.orders} partial={data.isCurrentWeek} />
               </div>
               <div className={ui.kpiCard}>
                 <small>Ticket promedio</small>
                 <strong>{fmtMXN(sales.avgTicket)}</strong>
-                <Delta current={sales.avgTicket} previous={sales.prev.avgTicket} />
+                <Delta current={sales.avgTicket} previous={sales.prev.avgTicket} partial={data.isCurrentWeek} />
               </div>
               <div className={ui.kpiCard}>
                 <small>Ganancia neta</small>
                 <strong>{fmtMXN(money.net)}</strong>
-                <Delta current={money.net} previous={money.prev.net} />
+                <Delta current={money.net} previous={money.prev.net} partial={data.isCurrentWeek} />
               </div>
             </div>
           </section>
