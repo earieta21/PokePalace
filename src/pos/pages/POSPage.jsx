@@ -15,7 +15,7 @@ import MemberQrScanner from "../MemberQrScanner.jsx";
 import { getRewardById, REWARDS } from "../../data/rewardsCatalog.js";
 import { REFERRAL_SOURCES } from "../../data/referralSources.js";
 import { TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
-import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE } from "../../order/pricing.js";
+import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, PREMIUM_PROTEIN_PRICES } from "../../order/pricing.js";
 import {
   COMBO_PALACE_OPTIONS,
   COMBO_PALACE_PRICE,
@@ -52,7 +52,11 @@ const MENU = [
   { id: 16, name: "Cacao Rice Cake",          price:  30, category: "Extras", icon: "🍫" },
   { id: 17, name: "Choco Rice Cake",          price:  35, category: "Extras", icon: "🍫", rewardSnack: true },
   { id: 23, name: "Miel Rice Cake",           price:  35, category: "Extras", icon: "🍯" },
-  { id: 22, name: "Atún Sellado Extra",       price:  20, category: "Extras", icon: "🍣" },
+  // Porción extra (40 g) de cualquier proteína ya en el bowl. El precio
+  // mostrado aquí es el base ($40) — si en el picker se elige atún sellado,
+  // confirmProteinPick suma el upcharge de PREMIUM_PROTEIN_PRICES ($20 más,
+  // $60 total), igual que valida resolvePosItems en el servidor.
+  { id: 27, name: "Extra de proteína",        price: EXTRA_SCOOP_PRICE, category: "Extras", icon: "🍤", needsProtein: true, extraProtein: true },
 ];
 
 const MENU_CATEGORIES = ["Todos", "Combos", "Bowls", "Bebidas", "Extras"];
@@ -178,8 +182,12 @@ export default function POSPage({ styles }) {
     setProteinPickerItem(null);
     if (!item) return;
     const proteinLabel = QUICK_PROTEINS.find((p) => p.id === proteinId)?.label || "";
+    const price = item.extraProtein
+      ? EXTRA_SCOOP_PRICE + (PREMIUM_PROTEIN_PRICES[proteinId] || 0)
+      : item.price;
     addItem({
       ...item,
+      price,
       protein: proteinId,
       name: `${item.name} (${proteinLabel})`,
       cartKey: `${item.id}-${proteinId}`,
@@ -865,6 +873,9 @@ export default function POSPage({ styles }) {
                   }}
                 >
                   {p.label}
+                  {proteinPickerItem?.extraProtein && PREMIUM_PROTEIN_PRICES[p.id]
+                    ? ` (+$${PREMIUM_PROTEIN_PRICES[p.id]})`
+                    : ""}
                 </button>
               ))}
             </div>

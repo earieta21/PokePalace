@@ -1,4 +1,5 @@
 import { isPromo2x1Day } from "../utils/promoSchedule.js";
+import { EXTRA_SCOOP_PRICE, PREMIUM_PROTEIN_PRICES } from "../pricing.js";
 
 // Protein stock is stored in kilograms. A medium bowl contains 100 g total,
 // a large bowl contains 120 g total, and every extra scoop adds 40 g.
@@ -102,11 +103,15 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: {},
   },
   {
-    // Cobro rápido de una porción extra de atún sellado sin pasar por el
-    // armador completo — mismo upcharge que PREMIUM_PROTEIN_PRICES.seared_tuna
-    // en src/order/pricing.js.
-    catalogId: "seared-tuna-extra", legacyId: 22, name: "Atún Sellado Extra", price: 20, category: "extras",
-    inventoryRecipe: { seared_tuna: EXTRA_SCOOP_PROTEIN_KG },
+    // Cobro rápido de una porción extra (40 g) de cualquier proteína ya en
+    // el bowl, sin pasar por el armador completo. No trae inventoryRecipe a
+    // propósito -- la proteína la captura el cajero en el picker (ver
+    // resolvePosItems más abajo), igual que bowl-mediano-rapido/
+    // bowl-grande-rapido. El precio base es EXTRA_SCOOP_PRICE; si la
+    // proteína elegida trae upcharge en PREMIUM_PROTEIN_PRICES (hoy solo
+    // atún sellado, +$20), resolvePosItems lo suma.
+    catalogId: "extra-protein-scoop", legacyId: 27, name: "Extra de proteína", price: EXTRA_SCOOP_PRICE, category: "extras",
+    inventoryRecipe: {},
   },
 ]);
 
@@ -206,6 +211,10 @@ export const resolvePosItems = (items) => {
       protein = rawItem.protein;
     }
 
+    if (catalogItem.catalogId === "extra-protein-scoop" && !protein) {
+      throw new PosOrderValidationError("Selecciona la proteína del extra");
+    }
+
     const comboSelections = catalogItem.comboPalace
       ? sanitizeComboPalaceSelections(rawItem, catalogItem.name)
       : null;
@@ -222,10 +231,16 @@ export const resolvePosItems = (items) => {
       throw new PosOrderValidationError(`Cantidad inválida para ${catalogItem.name}`);
     }
 
+    // El extra de proteína cobra el upcharge de la proteína elegida (hoy
+    // solo atún sellado) encima del precio base de un scoop extra.
+    const price = catalogItem.catalogId === "extra-protein-scoop"
+      ? EXTRA_SCOOP_PRICE + (PREMIUM_PROTEIN_PRICES[protein] || 0)
+      : catalogItem.price;
+
     resolved.set(mapKey, {
       catalogId: catalogItem.catalogId,
       name: catalogItem.name,
-      price: catalogItem.price,
+      price,
       qty: combinedQty,
       category: catalogItem.category,
       rewardDrink: Boolean(catalogItem.rewardDrink),
@@ -444,10 +459,12 @@ const addItemDemand = (demand, item) => {
       // no se descuenta nada -- comportamiento original: no se sabe qué
       // llevó el bowl. La promo 2x1 usa 60 g + 60 g = 120 g, la misma suma
       // que un bowl grande, aunque el motivo sea otro (2 bowls chicos, no 1
-      // bowl con más proteína).
-      const proteinKg = catalogItem.catalogId === "bowl-grande-rapido" || catalogItem.catalogId === "promo-2x1-dinein"
-        ? LARGE_BOWL_PROTEIN_KG
-        : MEDIUM_BOWL_PROTEIN_KG;
+      // bowl con más proteína). El extra de proteína es solo el scoop (40 g).
+      const proteinKg = catalogItem.catalogId === "extra-protein-scoop"
+        ? EXTRA_SCOOP_PROTEIN_KG
+        : catalogItem.catalogId === "bowl-grande-rapido" || catalogItem.catalogId === "promo-2x1-dinein"
+          ? LARGE_BOWL_PROTEIN_KG
+          : MEDIUM_BOWL_PROTEIN_KG;
       addDemand(demand, item.protein, proteinKg * qty);
     }
   } else {

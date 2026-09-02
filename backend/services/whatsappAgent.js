@@ -28,9 +28,9 @@ const MAX_HISTORY_MESSAGES = 16; // turnos de texto plano guardados en la sesió
 const MAX_TOOL_ITERATIONS = 4;
 
 // Menú vendible por WhatsApp: los 3 bowls de la casa + bebidas + rice cakes.
-// Excluye "bowl-mediano-rapido"/"bowl-grande-rapido" (venta exprés del POS
-// sin receta conocida) y "seared-tuna-extra" (solo tiene sentido como
-// scoop extra de un bowl, no como artículo suelto por chat).
+// Excluye "bowl-mediano-rapido"/"bowl-grande-rapido"/"promo-2x1-dinein"/
+// "extra-protein-scoop" (venta exprés del POS sin receta conocida — mismo
+// CUSTOMER_EXCLUDED_CATALOG_IDS que ya bloquea el checkout en línea).
 const MENU_CATALOG_IDS = [
   "bowl-the-og", "bowl-skinny", "bowl-quinoa",
   "mineral-water", "coca-zero", "coca-cola-regular", "bottled-water", "agua-del-dia",
