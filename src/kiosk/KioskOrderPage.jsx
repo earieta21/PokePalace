@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOrder } from "../order/OrderContext";
+import { PROMO_2X1_BOWLS_PRICE } from "../order/pricing";
 import useIdleTimeout from "./useIdleTimeout";
 
 import BaseSelection from "../order/BaseSelection";
@@ -14,7 +15,7 @@ const IDLE_TIMEOUT_MS = 60000;
 const LAST_STEP = 5;
 
 export default function KioskOrderPage() {
-  const { order, updateOrder, resetOrder, addBowlToCart } = useOrder();
+  const { order, updateOrder, resetOrder, addBowlToCart, confirmPromoBowl } = useOrder();
   const [step, setStep] = useState(() => {
     const savedStep = Number(order.draftStep);
     return Number.isInteger(savedStep) && savedStep >= 0 && savedStep <= LAST_STEP ? savedStep : 0;
@@ -28,17 +29,41 @@ export default function KioskOrderPage() {
 
   useIdleTimeout(goToWelcome, IDLE_TIMEOUT_MS);
 
+  // En el stage 2 de la promo 2x1 la proteína ya quedó fija con el primer
+  // bowl (compartida) — se salta el paso 1 (proteína), igual que en
+  // OrderPage.jsx (la versión web del armador).
+  const isPromo2x1Stage2 = order.promo2x1?.stage === 2;
+
   const setOrderStep = (nextStep) => {
     setStep(nextStep);
     updateOrder("draftStep", nextStep);
   };
-  const nextStep = () => setOrderStep(Math.min(step + 1, LAST_STEP));
-  const prevStep = () => setOrderStep(Math.max(0, step - 1));
+  const nextStep = () => {
+    let next = Math.min(step + 1, LAST_STEP);
+    if (isPromo2x1Stage2 && next === 1) next = 2;
+    setOrderStep(next);
+  };
+  const prevStep = () => {
+    let prev = Math.max(0, step - 1);
+    if (isPromo2x1Stage2 && prev === 1) prev = 0;
+    setOrderStep(prev);
+  };
 
   // Confirma el bowl en construcción como línea del carrito y regresa al
   // menú para que el cliente decida si agrega otro bowl/artículo o va al
-  // carrito — igual que en la app web.
+  // carrito — igual que en la app web. Dentro de la promo 2x1, el primer
+  // bowl reinicia el armador para el segundo en vez de salir al menú.
   const finishBowl = () => {
+    if (order.promo2x1) {
+      const isFirstBowl = order.promo2x1.stage === 1;
+      confirmPromoBowl();
+      if (isFirstBowl) {
+        setOrderStep(0);
+      } else {
+        navigate("/kiosk/menu");
+      }
+      return;
+    }
     addBowlToCart();
     navigate("/kiosk/menu");
   };
@@ -75,6 +100,24 @@ export default function KioskOrderPage() {
       >
         Cancelar pedido
       </button>
+      {order.promo2x1 && (
+        <div
+          style={{
+            position: "fixed",
+            top: 14,
+            left: 14,
+            zIndex: 50,
+            padding: "9px 16px",
+            borderRadius: 999,
+            background: "#14315c",
+            color: "#fff",
+            fontWeight: 800,
+            fontSize: 12.5,
+          }}
+        >
+          {order.promo2x1.stage === 1 ? "Bowl 1 de 2" : "Bowl 2 de 2"} · 2x1 en Bowls · ${PROMO_2X1_BOWLS_PRICE} MXN por los 2 🎉
+        </div>
+      )}
       {steps[step]}
     </div>
   );

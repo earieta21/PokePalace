@@ -181,6 +181,9 @@ const Home = () => {
             <span>🥗 4 complementos c/u</span>
             <span>🍱 2 bowls</span>
           </div>
+          <p style={{ margin: "10px 0 0", fontSize: 12.5, fontStyle: "italic", color: "rgba(255,255,255,0.72)" }}>
+            Solo para comer en el restaurante — no aplica para pedidos para llevar.
+          </p>
           <div className={styles.comboActionRow}>
             <strong>${PROMO_2X1_BOWLS_PRICE} MXN</strong>
             <button

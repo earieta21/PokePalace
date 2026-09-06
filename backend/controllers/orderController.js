@@ -268,7 +268,12 @@ export const createOrder = async (req, res) => {
       scheduledPickupTime,
       pointsToRedeem,
       paymentMethod,
+      fulfillment,
     } = req.body;
+    // Whitelist explícito: "delivery" sigue deshabilitado (no se cobra por
+    // otra razón, ver OrderSummary.jsx) y cualquier otro valor manipulado
+    // cae a "pickup" — mismo patrón que ya se usa abajo para paymentMethod.
+    const safeFulfillment = fulfillment === "dine_in" ? "dine_in" : "pickup";
 
     let safeCart;
     try {
@@ -289,14 +294,22 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // La promo 2x1 solo corre martes/jueves — revisado aparte de la
-    // disponibilidad de ingredientes porque es una regla de horario, no de
-    // inventario (ver isPromo2x1Day).
-    if (safeCart.some((line) => line.kind === "promo2x1") && !isPromo2x1Day()) {
-      return res.status(409).json({
-        msg: "La promo 2x1 en Bowls solo está disponible los martes y jueves.",
-        code: "PROMO_2X1_UNAVAILABLE",
-      });
+    // La promo 2x1 solo corre martes/jueves y solo para comer en el
+    // restaurante — revisado aparte de la disponibilidad de ingredientes
+    // porque son reglas de horario/canal, no de inventario.
+    if (safeCart.some((line) => line.kind === "promo2x1")) {
+      if (!isPromo2x1Day()) {
+        return res.status(409).json({
+          msg: "La promo 2x1 en Bowls solo está disponible los martes y jueves.",
+          code: "PROMO_2X1_UNAVAILABLE",
+        });
+      }
+      if (safeFulfillment !== "dine_in") {
+        return res.status(400).json({
+          msg: "2x1 en Bowls es solo para comer en el restaurante. Cambia a \"Comer en restaurante\" o quita ese artículo de tu carrito.",
+          code: "PROMO_2X1_DINE_IN_ONLY",
+        });
+      }
     }
 
     // Espejo del primer bowl (y de los artículos planos) en los campos
@@ -369,11 +382,11 @@ export const createOrder = async (req, res) => {
       customer: cleanCustomer,
       phone: cleanPhone,
       notes: cleanNotes || null,
-      // Online checkout supports pickup only. Ignore crafted fulfillment values
-      // before they can poison an otherwise valid reservation. paymentMethod is
-      // whitelisted to "online" (Openpay-hosted checkout) or the default
-      // pay_at_pickup — any other crafted value is ignored the same way.
-      fulfillment: "pickup",
+      // fulfillment ya viene saneado a "pickup"/"dine_in" (safeFulfillment,
+      // arriba) -- "delivery" y cualquier otro valor manipulado caen a
+      // pickup. paymentMethod se whitelistea igual: "online" (Openpay) o el
+      // default pay_at_pickup.
+      fulfillment: safeFulfillment,
       paymentMethod: paymentMethod === "online" ? "online" : "pay_at_pickup",
       paymentStatus: "pending",
       source: "online",

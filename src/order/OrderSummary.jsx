@@ -110,6 +110,12 @@ const OrderSummary = ({
   const pricing = computeCartPricing(cart, promoApplied);
   const appliedPointsDiscount = Math.min(Math.max(0, pointsDiscount), pricing.total);
   const finalTotal = Math.max(0, pricing.total - appliedPointsDiscount);
+  // 2x1 en Bowls es solo para comer en el restaurante — el servidor rechaza
+  // igual esta combinación, pero bloquear aquí evita que el cliente llegue
+  // hasta el envío para enterarse.
+  const hasPromo2x1BlockedByFulfillment = cart.some(
+    (line) => line.kind === "promo2x1" && order.fulfillment !== "dine_in"
+  );
   // Time picker helpers — mantiene el rango en línea con lo que de verdad
   // acepta el backend (viernes a domingo abren una hora antes, 10:00 en vez
   // de 11:00; cierre 21:00 todos los días), para no dejar elegir una hora
@@ -284,6 +290,7 @@ const OrderSummary = ({
 
   const PromoLineCard = ({ line }) => {
     const proteinLabel = labels.protein?.[line.protein] || prettifyId(line.protein);
+    const blockedByFulfillment = order.fulfillment !== "dine_in";
     return (
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
@@ -297,11 +304,19 @@ const OrderSummary = ({
               <span aria-hidden="true">🐟</span>
               <strong>Proteína (los 2 bowls):</strong> {proteinLabel}
             </p>
+            <p className={styles.detail} style={{ fontStyle: "italic" }}>
+              Solo para comer en el restaurante — no aplica para llevar.
+            </p>
           </div>
           <button className={styles.editButton} onClick={() => removeCartLine(line.cartId)} type="button">
             {t("summary.remove")}
           </button>
         </div>
+        {blockedByFulfillment && (
+          <p className={styles.submitError} role="alert" style={{ marginTop: 8 }}>
+            Elegiste “Recoger en restaurante”. Para incluir 2x1 en Bowls cambia a “Comer en restaurante” arriba, o quita este artículo.
+          </p>
+        )}
         {(line.bowls || []).map((bowl, index) => {
           const complementsLabels = getListLabels(labels.complement, bowl.complements);
           const saucesLabels = getListLabels(labels.sauce, bowl.sauces);
@@ -684,7 +699,7 @@ const OrderSummary = ({
               className={styles.confirmButton}
               onClick={onConfirm}
               type="button"
-              disabled={saving || cart.length === 0}
+              disabled={saving || cart.length === 0 || hasPromo2x1BlockedByFulfillment}
               aria-busy={saving}
             >
               {saving ? t("summary.sending") : `${t("summary.confirm")} — $${finalTotal.toFixed(2)}`}

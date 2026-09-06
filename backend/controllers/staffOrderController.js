@@ -729,10 +729,12 @@ export const updateOrderStatus = async (req, res) => {
       sendWhatsApp(order.phone, template, [num])
         .then((sent) => {
           if (!sent) {
-            return sendSMS(
-              order.phone,
-              `Poke Palace: ¡Tu pedido #${num} está listo! 🥢 Pasa a recogerlo. Plaza La Estación, Local 24.`
-            );
+            // "Pasa a recogerlo" no aplica si el cliente eligió comer en el
+            // restaurante -- ya está aquí, no viene a recoger nada.
+            const readyText = order.fulfillment === "dine_in"
+              ? `Poke Palace: ¡Tu pedido #${num} está listo! 🥢 Plaza La Estación, Local 24.`
+              : `Poke Palace: ¡Tu pedido #${num} está listo! 🥢 Pasa a recogerlo. Plaza La Estación, Local 24.`;
+            return sendSMS(order.phone, readyText);
           }
         })
         .catch((err) => console.error("ready notification error:", err.message));
