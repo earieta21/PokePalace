@@ -158,6 +158,11 @@ export default function InventoryPage({ styles, role }) {
   const [receiveSearch, setReceiveSearch] = useState("");
   const [receiveQty, setReceiveQty]       = useState({}); // { itemId: "3.5" }
   const [receiveCost, setReceiveCost]     = useState({}); // { itemId: "42.00" } — costo de ESTA compra, opcional
+  // "unit": el número capturado es el costo por unidad (por lata, por kg…).
+  // "total": es lo que se pagó por TODO el paquete/caja — el costo por
+  // unidad se calcula solo (total ÷ cantidad recibida), igual que en el
+  // formulario de "Nuevo artículo".
+  const [receiveCostMode, setReceiveCostMode] = useState({}); // { itemId: "unit" | "total" }
   const [receiveSaving, setReceiveSaving] = useState(false);
   const [receiveRequestId, setReceiveRequestId] = useState("");
 
@@ -290,8 +295,27 @@ export default function InventoryPage({ styles, role }) {
     setReceiving(false);
     setReceiveQty({});
     setReceiveCost({});
+    setReceiveCostMode({});
     setReceiveSearch("");
     setReceiveRequestId("");
+  };
+
+  const toggleReceiveCostMode = (id) => {
+    setReceiveRequestId("");
+    setReceiveCostMode((previous) => ({
+      ...previous,
+      [id]: previous[id] === "total" ? "unit" : "total",
+    }));
+  };
+
+  // Costo por unidad de esta compra: si el modo es "total", divide entre la
+  // cantidad recibida; si no, usa el número capturado tal cual.
+  const receiveUnitCost = (id) => {
+    const raw = parseFloat(receiveCost[id]);
+    if (!Number.isFinite(raw) || raw <= 0) return null;
+    if (receiveCostMode[id] !== "total") return raw;
+    const qty = parseFloat(receiveQty[id]);
+    return qty > 0 ? raw / qty : null;
   };
 
   /* ── Add new item ── */
@@ -458,7 +482,7 @@ export default function InventoryPage({ styles, role }) {
       const result = await api.post("/api/staff/inventory/restock-batch", {
         requestId,
         lines: entries.map(([itemId, value]) => {
-          const costValue = parseFloat(receiveCost[itemId]);
+          const costValue = receiveUnitCost(itemId);
           return {
             itemId,
             amount: parseFloat(value),
@@ -474,6 +498,7 @@ export default function InventoryPage({ styles, role }) {
       const spent = result.expenses.reduce((sum, expense) => sum + (expense?.amount || 0), 0);
       setReceiveQty({});
       setReceiveCost({});
+      setReceiveCostMode({});
       setReceiveSearch("");
       setReceiveRequestId("");
       setReceiving(false);
@@ -645,20 +670,37 @@ export default function InventoryPage({ styles, role }) {
                               aria-label={`Cantidad recibida de ${row.item}`}
                             />
                             <span style={{ fontSize: 11, color: "var(--p-muted)", width: 34 }}>{row.unit}</span>
-                            {hasValue && (
-                              <label className={ui.receiveCostField}>
-                                <span>$</span>
-                                <input
-                                  type="number" min="0" step="0.01"
-                                  placeholder={row.cost > 0 ? row.cost.toFixed(2) : "costo"}
-                                  value={receiveCost[row._id] ?? ""}
-                                  onChange={(e) => updateReceiveCost(row._id, e.target.value)}
-                                  className={ui.receiveCostInput}
-                                  aria-label={`Costo por ${row.unit} de esta compra de ${row.item}`}
-                                />
-                                <span>/{row.unit}</span>
-                              </label>
-                            )}
+                            {hasValue && (() => {
+                              const costMode = receiveCostMode[row._id] === "total" ? "total" : "unit";
+                              const unitCostPreview = costMode === "total" ? receiveUnitCost(row._id) : null;
+                              return (
+                                <label className={ui.receiveCostField}>
+                                  <span>$</span>
+                                  <input
+                                    type="number" min="0" step="0.01"
+                                    placeholder={costMode === "total" ? "total pagado" : (row.cost > 0 ? row.cost.toFixed(2) : "costo")}
+                                    value={receiveCost[row._id] ?? ""}
+                                    onChange={(e) => updateReceiveCost(row._id, e.target.value)}
+                                    className={ui.receiveCostInput}
+                                    aria-label={costMode === "total"
+                                      ? `Total pagado por esta compra de ${row.item}`
+                                      : `Costo por ${row.unit} de esta compra de ${row.item}`}
+                                  />
+                                  <button
+                                    type="button"
+                                    className={ui.receiveCostModeToggle}
+                                    onClick={() => toggleReceiveCostMode(row._id)}
+                                    title={costMode === "total"
+                                      ? "Cambiar a costo por unidad"
+                                      : "Cambiar a: pagué esto en total (ej. un paquete de 12)"}
+                                  >
+                                    {costMode === "total"
+                                      ? (unitCostPreview != null ? `= $${unitCostPreview.toFixed(2)}/${row.unit}` : `total ÷ cantidad`)
+                                      : `/${row.unit}`}
+                                  </button>
+                                </label>
+                              );
+                            })()}
                           </div>
                         );
                       })}
@@ -670,7 +712,12 @@ export default function InventoryPage({ styles, role }) {
           )}
 
           <div className={ui.receiveFooter}>
-            <span>2. Si el precio cambió, captura el costo de esta compra (si lo dejas en blanco se usa el costo anterior). Revisa las cantidades y guarda la recepción — el gasto se anota solo en Finanzas.</span>
+            <span>
+              2. Si el precio cambió, captura el costo de esta compra (si lo dejas en blanco se usa el costo anterior).
+              Toca el botón junto al costo (ej. "/lata") para cambiarlo a "lo que pagué en total" — útil si compraste
+              un paquete (ej. 12 latas por $180): pones cantidad 12 y ahí el total $180, y se calcula solo el costo
+              por lata. Revisa las cantidades y guarda la recepción — el gasto se anota solo en Finanzas.
+            </span>
             <button className={styles.btnPrimary} disabled={pendingReceiveCount === 0 || receiveSaving} onClick={submitReceiving}>
               {receiveSaving ? "Guardando…" : `Guardar recepción${pendingReceiveCount > 0 ? ` (${pendingReceiveCount})` : ""}`}
             </button>

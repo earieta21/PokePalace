@@ -567,6 +567,22 @@
   text-align: center;
 }
 
+.receiveCostModeToggle {
+  padding: 3px 6px;
+  border: 1px dashed var(--p-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--p-g2);
+  font-family: "DM Mono", monospace;
+  font-size: 10.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.receiveCostModeToggle:hover {
+  background: rgba(74, 122, 90, 0.08);
+}
+
 .receiveFooter {
   display: flex;
   align-items: center;
