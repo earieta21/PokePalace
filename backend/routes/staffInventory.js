@@ -8,6 +8,7 @@ import {
   restockItem,
   restockBatch,
   backfillInventoryExpenses,
+  resetInventoryValues,
   deleteItem,
   getItemMovements,
 } from "../controllers/staffInventoryController.js";
@@ -23,6 +24,7 @@ router.get   ("/",          anyStaff, getInventory);
 router.post  ("/",    seniorStaff, createItem);
 router.post  ("/restock-batch", seniorStaff, restockBatch);
 router.post  ("/backfill-expenses", ownerOnly, backfillInventoryExpenses);
+router.post  ("/reset-values", ownerOnly, resetInventoryValues);
 router.patch ("/:id", seniorStaff, updateItem);
 router.patch ("/:id/restock", seniorStaff, restockItem);
 router.delete("/:id", seniorStaff, deleteItem);

@@ -316,6 +316,53 @@ export const getLowStock = async (req, res) => {
   }
 };
 
+/* POST /api/staff/inventory/reset-values
+   Pone cantidad y costo en 0 en TODOS los artículos, sin tocar nombre,
+   sección, categoría, unidad, proveedor ni los vínculos con el menú
+   (menuKeys) -- para cuando la valoración quedó mal capturada y hay que
+   volver a contar/cotizar desde cero sin rehacer el trabajo de vincular
+   cada ingrediente al menú. Solo dueño/admin (ver requireStaffAuth en la
+   ruta). Deja rastro por artículo en el ledger y en auditoría, igual que
+   una edición manual normal. */
+export const resetInventoryValues = async (req, res) => {
+  try {
+    const before = await Inventory.find({ $or: [{ qty: { $ne: 0 } }, { cost: { $ne: 0 } }] })
+      .select("item qty cost")
+      .lean();
+
+    if (before.length === 0) {
+      return res.json({ itemsReset: 0 });
+    }
+
+    await Inventory.updateMany({}, { $set: { qty: 0, cost: 0 } });
+
+    const actor = actorFromStaff(req.staff);
+    await Promise.all(before.map(async (item) => {
+      if (item.qty !== 0) {
+        await recordInventoryMovement({
+          itemId: item._id, itemName: item.item, type: "manual_adjustment",
+          delta: -item.qty, qtyBefore: item.qty, qtyAfter: 0,
+          ...actor, referenceType: "manual",
+          reason: "Reinicio de inventario: cantidad y costo a 0",
+        });
+      }
+      const changes = [];
+      if (item.qty !== 0)  changes.push({ field: "qty",  oldValue: item.qty,  newValue: 0 });
+      if (item.cost !== 0) changes.push({ field: "cost", oldValue: item.cost, newValue: 0 });
+      if (changes.length > 0) {
+        await recordAudit({
+          entity: "Inventory", entityId: item._id, action: "update",
+          changes, ...actor, source: "manual", reason: "Reinicio de inventario",
+        });
+      }
+    }));
+
+    res.json({ itemsReset: before.length });
+  } catch (err) {
+    res.status(500).json({ message: "Error al reiniciar el inventario", err: err.message });
+  }
+};
+
 /* DELETE /api/staff/inventory/:id */
 export const deleteItem = async (req, res) => {
   try {

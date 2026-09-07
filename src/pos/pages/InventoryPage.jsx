@@ -126,6 +126,12 @@ export default function InventoryPage({ styles, role }) {
   const canBackfillExpenses = role === "owner" || role === "admin";
   const [backfilling, setBackfilling] = useState(false);
 
+  // Reiniciar cantidad y costo a 0 en todo el inventario (deja nombres y
+  // vínculos al menú intactos) — solo dueño/admin, para cuando la valoración
+  // quedó mal capturada y hay que volver a contar/cotizar desde cero.
+  const canResetInventory = role === "owner" || role === "admin";
+  const [resetting, setResetting] = useState(false);
+
   // Add-item form
   const [showForm, setShowForm] = useState(false);
   const [form, setForm]         = useState(EMPTY_FORM);
@@ -179,6 +185,32 @@ export default function InventoryPage({ styles, role }) {
       setError(e.message);
     } finally {
       setBackfilling(false);
+    }
+  };
+
+  const resetInventoryValues = async () => {
+    if (resetting || items.length === 0) return;
+    const answer = window.prompt(
+      `Esto pondrá en 0 la cantidad y el costo de los ${items.length} artículos ` +
+      `del inventario (valor actual: $${totalValue.toLocaleString("es-MX", { maximumFractionDigits: 0 })}).\n\n` +
+      `Los nombres, secciones y los vínculos con el menú NO se borran — solo cantidad y costo.\n\n` +
+      `Escribe REINICIAR para confirmar.`
+    );
+    if (answer !== "REINICIAR") return;
+    setResetting(true);
+    setError("");
+    try {
+      const r = await api.post("/api/staff/inventory/reset-values", {});
+      load();
+      setNotice(
+        r.itemsReset > 0
+          ? `Se reinició la cantidad y el costo de ${r.itemsReset} artículo${r.itemsReset !== 1 ? "s" : ""}. Ya puedes volver a capturarlos.`
+          : "El inventario ya estaba en 0."
+      );
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -490,6 +522,16 @@ export default function InventoryPage({ styles, role }) {
               title="Registra en Finanzas el valor de existencias que nunca pasaron por Recibir mercancía"
             >
               {backfilling ? "Registrando…" : "$ Registrar existencias en Finanzas"}
+            </button>
+          )}
+          {canResetInventory && (
+            <button
+              className={`${styles.btnGhost} ${ui.dangerButton}`}
+              onClick={resetInventoryValues}
+              disabled={resetting || loading || items.length === 0}
+              title="Pone cantidad y costo en 0 en todo el inventario, sin borrar artículos ni sus vínculos al menú"
+            >
+              {resetting ? "Reiniciando…" : "⟳ Reiniciar cantidades y costos"}
             </button>
           )}
           <button

@@ -1051,6 +1051,15 @@
   font-size: 10px !important;
 }
 
+.dangerButton {
+  border-color: rgba(211, 84, 69, 0.3) !important;
+  color: #b44336 !important;
+}
+
+.dangerButton:hover {
+  background: rgba(211, 84, 69, 0.09) !important;
+}
+
 .deleteButton {
   display: grid;
   width: 26px;
