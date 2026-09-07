@@ -21,7 +21,7 @@ const Menu = ({ items = [], onSelect }) => {
           className={styles.menuCard}
           type="button"
           onClick={() => onSelect?.(item)}
-          aria-label={`${item.name} — ${formatMenuPrice(item.price)}`}
+          aria-label={`${item.name}${item.description ? `. ${item.description}` : ""} — ${formatMenuPrice(item.price)}`}
         >
           <div className={styles.imageWrap}>
             <img
@@ -35,6 +35,10 @@ const Menu = ({ items = [], onSelect }) => {
 
           <div className={styles.cardBody}>
             <h3 className={styles.menuName}>{item.name}</h3>
+
+            {item.description && (
+              <p className={styles.menuDescription}>{item.description}</p>
+            )}
 
             <p className={styles.menuPrice}>{formatMenuPrice(item.price)}</p>
           </div>

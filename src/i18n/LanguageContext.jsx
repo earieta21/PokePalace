@@ -53,6 +53,9 @@ const TRANSLATIONS = {
     "menu.emeraldSalmon": "The OG",
     "menu.spicyTuna": "Skinny Bowl",
     "menu.tropicalShrimp": "Quinoa Bowl",
+    "menu.emeraldSalmonDescription": "Arroz blanco, atún, salmón, surimi, vegetales, piña, spicy mayo y toppings crujientes.",
+    "menu.spicyTunaDescription": "Arroz y mezcla de lechugas, atún, camarón, mango, aguacate, vegetales y aderezo de cilantro.",
+    "menu.tropicalShrimpDescription": "Quinoa, atún, camarón, surimi spicy, edamame, vegetales y aderezo de cilantro.",
 
     "order.next": "Siguiente",
     "order.selected": "Seleccionados",
@@ -376,6 +379,9 @@ const TRANSLATIONS = {
     "menu.emeraldSalmon": "The OG",
     "menu.spicyTuna": "Skinny Bowl",
     "menu.tropicalShrimp": "Quinoa Bowl",
+    "menu.emeraldSalmonDescription": "White rice, tuna, salmon, surimi, vegetables, pineapple, spicy mayo, and crunchy toppings.",
+    "menu.spicyTunaDescription": "Rice and spring mix, tuna, shrimp, mango, avocado, vegetables, and cilantro dressing.",
+    "menu.tropicalShrimpDescription": "Quinoa, tuna, shrimp, spicy surimi, edamame, vegetables, and cilantro dressing.",
 
     "order.next": "Next",
     "order.selected": "Selected",

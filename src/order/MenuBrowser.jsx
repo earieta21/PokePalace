@@ -248,7 +248,12 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
                           ) : (
                             <span aria-hidden="true">{catalogItem?.icon || "•"}</span>
                           )}
-                          <strong>{option.label}</strong>
+                          <span className={styles.comboOptionText}>
+                            <strong>{option.label}</strong>
+                            {catalogItem?.description && (
+                              <small>{catalogItem.description}</small>
+                            )}
+                          </span>
                           {selected && <span className={styles.comboCheck} aria-hidden="true">✓</span>}
                         </button>
                       );

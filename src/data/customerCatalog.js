@@ -37,6 +37,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
   {
     catalogId: "bowl-the-og",
     name: "The OG",
+    description: "Arroz blanco, atún, salmón, surimi, vegetales, piña, spicy mayo y toppings crujientes.",
     price: 230,
     category: "Bowls",
     categoryKey: "bowls",
@@ -46,6 +47,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
   {
     catalogId: "bowl-skinny",
     name: "Skinny Bowl",
+    description: "Arroz y mezcla de lechugas, atún, camarón, mango, aguacate, vegetales y aderezo de cilantro.",
     price: 230,
     category: "Bowls",
     categoryKey: "bowls",
@@ -55,6 +57,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
   {
     catalogId: "bowl-quinoa",
     name: "Quinoa Bowl",
+    description: "Quinoa, atún, camarón, surimi spicy, edamame, vegetales y aderezo de cilantro.",
     price: 230,
     category: "Bowls",
     categoryKey: "bowls",
