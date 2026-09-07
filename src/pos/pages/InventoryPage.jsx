@@ -127,9 +127,10 @@ export default function InventoryPage({ styles, role }) {
   const [backfilling, setBackfilling] = useState(false);
 
   // Reiniciar cantidad y costo a 0 en todo el inventario (deja nombres y
-  // vínculos al menú intactos) — solo dueño/admin, para cuando la valoración
-  // quedó mal capturada y hay que volver a contar/cotizar desde cero.
-  const canResetInventory = role === "owner" || role === "admin";
+  // vínculos al menú intactos) — solo el dueño puede autorizarlo, ni
+  // siquiera un admin, para cuando la valoración quedó mal capturada y hay
+  // que volver a contar/cotizar desde cero.
+  const canResetInventory = role === "owner";
   const [resetting, setResetting] = useState(false);
 
   // Add-item form
