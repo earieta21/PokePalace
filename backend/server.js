@@ -104,6 +104,7 @@ app.use("/api/staff/consumption",staffConsumptionRoutes);
 app.use("/api/staff/fixed-expenses",staffFixedExpenseRoutes);
 
 app.get("/", (req, res) => {
+  if (process.env.RENDER_GIT_COMMIT) res.set("X-App-Revision", process.env.RENDER_GIT_COMMIT);
   res.send("API Poke Palace funcionando 🍣");
 });
 
