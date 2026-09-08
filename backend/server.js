@@ -25,10 +25,12 @@ import staffCashCutRoutes from "./routes/staffCashCuts.js";
 import staffAuditLogRoutes from "./routes/staffAuditLog.js";
 import staffCustomersRoutes from "./routes/staffCustomers.js";
 import staffConsumptionRoutes from "./routes/staffConsumption.js";
+import staffFixedExpenseRoutes from "./routes/staffFixedExpenses.js";
 import whatsappRoutes from "./routes/whatsapp.js";
 import { logServerError } from "./controllers/monitorController.js";
 import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
 import { startOrderChangeStream } from "./utils/orderEvents.js";
+import { registerDueFixedExpenses } from "./utils/fixedExpenses.js";
 
 dotenv.config();
 
@@ -99,6 +101,7 @@ app.use("/api/staff/cash-cuts",staffCashCutRoutes);
 app.use("/api/staff/audit-log",staffAuditLogRoutes);
 app.use("/api/staff/customers",staffCustomersRoutes);
 app.use("/api/staff/consumption",staffConsumptionRoutes);
+app.use("/api/staff/fixed-expenses",staffFixedExpenseRoutes);
 
 app.get("/", (req, res) => {
   res.send("API Poke Palace funcionando 🍣");
@@ -136,6 +139,22 @@ function startKeepAlive() {
   console.log("⏰ Keep-alive activo cada 10 min");
 }
 
+// Los gastos fijos (renta, luz...) se anotan solos en Finanzas el día del mes
+// que se configuró. Se revisa al arrancar y cada hora en vez de esperar a que
+// alguien abra la app, para que el gasto quede aunque nadie entre ese día.
+// Repetir la revisión es inofensivo: Expense.sourceRef impide duplicados.
+function startFixedExpenseScheduler() {
+  const run = () => registerDueFixedExpenses()
+    .then((created) => {
+      if (created.length > 0) {
+        console.log(`💸 Gastos fijos anotados: ${created.map((e) => e.description).join(", ")}`);
+      }
+    })
+    .catch((err) => console.error("registerDueFixedExpenses:", err.message));
+  run();
+  setInterval(run, 60 * 60 * 1000);
+}
+
 const start = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
@@ -145,6 +164,7 @@ const start = async () => {
     app.listen(PORT, () => {
       console.log(`✅ Server running on ${PORT}`);
       startKeepAlive();
+      startFixedExpenseScheduler();
     });
   } catch (err) {
     console.error("❌ Error conectando a MongoDB:", err.message);

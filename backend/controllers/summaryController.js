@@ -7,42 +7,13 @@ import User from "../models/User.js";
 import {
   dateKeyInTimeZone,
   zonedDateTimeToUtc,
-  zonedParts,
   RESTAURANT_TIME_ZONE,
 } from "../utils/timeZone.js";
-
-/* Las fechas se guardan en UTC y se agrupan con America/Tijuana para respetar
-   tanto el día local como los cambios estacionales de huso horario. */
-const toTijuana = (date) => {
-  const parts = zonedParts(date);
-  return new Date(Date.UTC(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-    parts.minute,
-    parts.second
-  ));
-};
-const fromTijuana = (date) => zonedDateTimeToUtc({
-  year: date.getUTCFullYear(),
-  month: date.getUTCMonth() + 1,
-  day: date.getUTCDate(),
-  hour: date.getUTCHours(),
-  minute: date.getUTCMinutes(),
-  second: date.getUTCSeconds(),
-});
+// mondayOf/toTijuana viven en utils/weeks.js para que la nómina y este resumen
+// no puedan discrepar sobre dónde empieza y termina una semana.
+import { mondayOf, toTijuana } from "../utils/weeks.js";
 
 const DAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-
-// Lunes 00:00 (hora Tijuana) de la semana que contiene `date`, como instante UTC.
-function mondayOf(date) {
-  const tj = toTijuana(date);
-  const monday = new Date(Date.UTC(tj.getUTCFullYear(), tj.getUTCMonth(), tj.getUTCDate()));
-  const day = monday.getUTCDay();
-  monday.setUTCDate(monday.getUTCDate() - (day === 0 ? 6 : day - 1));
-  return fromTijuana(monday);
-}
 
 const dateStr = (d) => dateKeyInTimeZone(d);
 

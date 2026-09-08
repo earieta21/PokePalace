@@ -19,6 +19,13 @@ const CATEGORIES = [
 ];
 const categoryIcon = (name) => CATEGORIES.find((c) => c.name === name)?.icon || "📦";
 
+const SOURCE_LABEL = {
+  manual: "Manual",
+  inventario: "Inventario",
+  fijo: "Gasto fijo automático",
+  nomina: "Nómina",
+};
+
 const PERIODS = [
   { id: "semana",   label: "Esta semana",  icon: "📅", hint: "De lunes a hoy" },
   { id: "mes",      label: "Este mes",     icon: "🗓️", hint: "Del día 1 a hoy" },
@@ -47,9 +54,28 @@ function getRange(period) {
 const fmtMXN = (n) => `$${(n ?? 0).toLocaleString("es-MX")}`;
 const today  = () => tijuanaDateKey();
 
+// "2026-09-01" + "2026-09-07" → "1 – 7 sep". Se arma en UTC a propósito: el
+// date-key ya viene resuelto en hora Tijuana desde el servidor, así que
+// interpretarlo en la zona del navegador lo correría un día.
+const weekLabel = (weekStart, weekEnd) => {
+  const parse = (key) => {
+    const [y, m, d] = key.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d));
+  };
+  const day = (key) => parse(key).toLocaleDateString("es-MX", { day: "numeric", timeZone: "UTC" });
+  const dayMonth = (key) => parse(key).toLocaleDateString("es-MX", { day: "numeric", month: "short", timeZone: "UTC" });
+  return `${day(weekStart)} – ${dayMonth(weekEnd)}`;
+};
+
 export default function FinancePage({ styles }) {
-  const { staffToken } = useContext(StaffAuthContext);
+  const { staffToken, staffUser } = useContext(StaffAuthContext);
   const api = createStaffApi(staffToken);
+
+  // Configurar los gastos fijos y confirmar cuánto se pagó de nómina es
+  // decisión de dueño/admin; un gerente los ve pero no los cambia. El
+  // servidor lo vuelve a exigir — esto solo evita mostrar botones que
+  // fallarían.
+  const canManageFixed = staffUser?.role === "owner" || staffUser?.role === "admin";
 
   const [period, setPeriod]   = useState("mes");
   const [summary, setSummary] = useState(null);
@@ -67,6 +93,18 @@ export default function FinancePage({ styles }) {
   const [formError, setFormError] = useState("");
   const [confirmDel, setConfirmDel] = useState(null);
 
+  // Gastos fijos (se anotan solos) + nómina semanal (se confirma a mano)
+  const [fixed, setFixed]         = useState([]);
+  const [weeks, setWeeks]         = useState([]);
+  const [fixedLoading, setFixedLoading] = useState(true);
+  const [showFixedForm, setShowFixedForm] = useState(false);
+  const [fixedForm, setFixedForm] = useState({ name: "", category: "Renta", amount: "", dayOfMonth: "1" });
+  const [fixedError, setFixedError] = useState("");
+  const [fixedSaving, setFixedSaving] = useState(false);
+  const [editingFixed, setEditingFixed] = useState(null);
+  const [payrollAmounts, setPayrollAmounts] = useState({}); // { weekStart: "8450" }
+  const [payrollSaving, setPayrollSaving] = useState(null);
+
   const { from, to } = getRange(period);
 
   const load = useCallback(() => {
@@ -82,11 +120,117 @@ export default function FinancePage({ styles }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const loadFixed = useCallback(() => {
+    setFixedLoading(true);
+    Promise.all([
+      api.get("/api/staff/fixed-expenses"),
+      api.get("/api/staff/fixed-expenses/payroll/weeks"),
+    ])
+      .then(([f, p]) => {
+        setFixed(f.items ?? []);
+        const list = p.weeks ?? [];
+        setWeeks(list);
+        // El monto calculado llega precargado y editable: si alguien olvidó
+        // checar salida, el cálculo queda corto y hay que corregirlo.
+        setPayrollAmounts(Object.fromEntries(
+          list.filter((w) => !w.registered).map((w) => [w.weekStart, String(Math.round(w.total))])
+        ));
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setFixedLoading(false));
+  }, [staffToken]);
+
+  useEffect(() => { loadFixed(); }, [loadFixed]);
+
   useEffect(() => {
     if (!notice) return undefined;
     const timeout = window.setTimeout(() => setNotice(""), 3500);
     return () => window.clearTimeout(timeout);
   }, [notice]);
+
+  const closeFixedForm = () => {
+    setShowFixedForm(false);
+    setEditingFixed(null);
+    setFixedForm({ name: "", category: "Renta", amount: "", dayOfMonth: "1" });
+    setFixedError("");
+  };
+
+  const startEditFixed = (item) => {
+    setEditingFixed(item._id);
+    setFixedForm({
+      name: item.name,
+      category: item.category,
+      amount: String(item.amount),
+      dayOfMonth: String(item.dayOfMonth),
+    });
+    setShowFixedForm(true);
+    setFixedError("");
+  };
+
+  const saveFixed = async () => {
+    const amount = parseFloat(fixedForm.amount);
+    const dayOfMonth = parseInt(fixedForm.dayOfMonth, 10);
+    if (!fixedForm.name.trim()) return setFixedError("Ponle un nombre (ej. Renta del local).");
+    if (!Number.isFinite(amount) || amount <= 0) return setFixedError("Ingresa un monto válido.");
+    if (!Number.isInteger(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) {
+      return setFixedError("El día debe estar entre 1 y 31.");
+    }
+    setFixedError("");
+    setFixedSaving(true);
+    try {
+      const payload = { name: fixedForm.name.trim(), category: fixedForm.category, amount, dayOfMonth };
+      if (editingFixed) {
+        await api.patch(`/api/staff/fixed-expenses/${editingFixed}`, payload);
+        setNotice(`Se actualizó "${payload.name}".`);
+      } else {
+        const r = await api.post("/api/staff/fixed-expenses", payload);
+        setNotice(r.registeredNow
+          ? `"${payload.name}" quedó configurado y ya se anotó el gasto de este mes.`
+          : `"${payload.name}" quedó configurado — se anotará solo el día ${dayOfMonth} de cada mes.`);
+      }
+      closeFixedForm();
+      loadFixed();
+      load();
+    } catch (e) { setFixedError(e.message); }
+    finally { setFixedSaving(false); }
+  };
+
+  const toggleFixed = async (item) => {
+    try {
+      await api.patch(`/api/staff/fixed-expenses/${item._id}`, { active: !item.active });
+      setNotice(item.active
+        ? `"${item.name}" pausado — dejará de anotarse.`
+        : `"${item.name}" reactivado.`);
+      loadFixed();
+    } catch (e) { setError(e.message); }
+  };
+
+  const removeFixed = async (item) => {
+    try {
+      await api.delete(`/api/staff/fixed-expenses/${item._id}`);
+      setNotice(`Se quitó "${item.name}" de los gastos fijos.`);
+      loadFixed();
+    } catch (e) { setError(e.message); }
+  };
+
+  const registerPayroll = async (week) => {
+    const amount = parseFloat(payrollAmounts[week.weekStart]);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return setError("Captura el monto de la nómina antes de registrarla.");
+    }
+    setPayrollSaving(week.weekStart);
+    setError("");
+    try {
+      await api.post("/api/staff/fixed-expenses/payroll/register", {
+        weekStart: week.weekStart,
+        amount,
+      });
+      setNotice(`Nómina de la semana ${week.weekStart} registrada: ${fmtMXN(amount)}.`);
+      loadFixed();
+      load();
+    } catch (e) { setError(e.message); }
+    finally { setPayrollSaving(null); }
+  };
 
   const closeForm = () => {
     setShowForm(false);
@@ -132,6 +276,17 @@ export default function FinancePage({ styles }) {
     ? ((summary.profit / summary.revenue) * 100).toFixed(1)
     : null;
 
+  // Todas las semanas pendientes (para poder ponerse al corriente de un
+  // jalón) más las 2 últimas ya registradas, como confirmación. `weeks` viene
+  // de la más reciente a la más vieja.
+  let registeredShown = 0;
+  const shownWeeks = weeks.filter((week) => {
+    if (!week.registered) return true;
+    registeredShown += 1;
+    return registeredShown <= 2;
+  });
+  const pendingWeeks = weeks.filter((week) => !week.registered).length;
+
   function exportCSV() {
     const rows = [
       ["Resumen", `${from} a ${to}`],
@@ -141,7 +296,7 @@ export default function FinancePage({ styles }) {
       ["Órdenes pagadas", summary?.orderCount ?? 0],
       [],
       ["Fecha", "Categoría", "Descripción", "Monto", "Origen"],
-      ...expenses.map((e) => [e.date, e.category, e.description, e.amount, e.source === "inventario" ? "Inventario" : "Manual"]),
+      ...expenses.map((e) => [e.date, e.category, e.description, e.amount, SOURCE_LABEL[e.source] ?? "Manual"]),
     ];
     downloadCSV(`finanzas_${from}_a_${to}.csv`, rows);
   }
@@ -317,6 +472,199 @@ export default function FinancePage({ styles }) {
         </div>
       </div>
 
+      {/* ── Gastos fijos y nómina ── */}
+      <div className={`${styles.card} ${ui.breakdownCard}`}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+          <div>
+            <p className={styles.cardTitle}>Gastos fijos y nómina</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--p-muted)" }}>
+              Los gastos fijos se anotan solos cada mes. La nómina se confirma cada semana porque el monto cambia según las horas checadas.
+            </p>
+          </div>
+          {canManageFixed && (
+            <button
+              className={styles.btnGhost}
+              type="button"
+              onClick={() => (showFixedForm ? closeFixedForm() : setShowFixedForm(true))}
+            >
+              {showFixedForm ? "Cancelar" : "+ Gasto fijo"}
+            </button>
+          )}
+        </div>
+
+        {showFixedForm && canManageFixed && (
+          <div style={{ marginTop: 14, padding: 14, border: "1px solid var(--p-border)", borderRadius: 10 }}>
+            {fixedError && <p style={{ color: "red", fontSize: 12, marginBottom: 10 }}>{fixedError}</p>}
+            <div className={styles.formGroup}>
+              <label className={styles.label}>¿Qué gasto es? *</label>
+              <input
+                className={styles.input}
+                placeholder="Ej: Renta del local, Luz, Internet…"
+                value={fixedForm.name}
+                onChange={(e) => setFixedForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div className={ui.categoryPicker} style={{ marginBottom: 12 }}>
+              {CATEGORIES.map((category) => (
+                <button
+                  key={category.name}
+                  type="button"
+                  aria-pressed={fixedForm.category === category.name}
+                  onClick={() => setFixedForm((f) => ({ ...f, category: category.name }))}
+                >
+                  <span>{category.icon}</span>{category.name}
+                </button>
+              ))}
+            </div>
+            <div className={styles.formRow}>
+              <div className={styles.formGroup} style={{ marginBottom: 0 }}>
+                <label className={styles.label}>Monto cada mes (MXN) *</label>
+                <input
+                  className={styles.input} type="number" min="0" step="0.01" placeholder="21600"
+                  value={fixedForm.amount}
+                  onChange={(e) => setFixedForm((f) => ({ ...f, amount: e.target.value }))}
+                />
+              </div>
+              <div className={styles.formGroup} style={{ marginBottom: 0 }}>
+                <label className={styles.label}>Día del mes en que se anota *</label>
+                <input
+                  className={styles.input} type="number" min="1" max="31" placeholder="1"
+                  value={fixedForm.dayOfMonth}
+                  onChange={(e) => setFixedForm((f) => ({ ...f, dayOfMonth: e.target.value }))}
+                />
+              </div>
+            </div>
+            <p style={{ margin: "10px 0 0", fontSize: 11.5, color: "var(--p-muted)" }}>
+              Si el día ya pasó este mes, el gasto se anota de una vez al guardar. En meses más cortos (día 31 en febrero) se usa el último día del mes.
+            </p>
+            <div className={ui.formActions} style={{ marginTop: 12 }}>
+              <button className={styles.btnPrimary} type="button" onClick={saveFixed} disabled={fixedSaving}>
+                {fixedSaving ? "Guardando…" : editingFixed ? "Guardar cambios" : "Agregar gasto fijo"}
+              </button>
+              <button className={styles.btnGhost} type="button" onClick={closeFixedForm}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginTop: 16 }}>
+          <p style={{ margin: "0 0 8px", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--p-muted)" }}>
+            Cada mes, automático
+          </p>
+          {fixedLoading ? (
+            <p style={{ color: "var(--p-muted)", fontSize: 13 }}>Cargando…</p>
+          ) : fixed.length === 0 ? (
+            <p style={{ color: "var(--p-muted)", fontSize: 12.5 }}>
+              Todavía no hay gastos fijos configurados{canManageFixed ? " — agrega la renta con el botón de arriba." : "."}
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {fixed.map((item) => (
+                <div
+                  key={item._id}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                    padding: "9px 12px", borderRadius: 8, background: "var(--p-bg)",
+                    opacity: item.active ? 1 : 0.55,
+                  }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: 13, flex: 1, minWidth: 140 }}>
+                    {categoryIcon(item.category)} {item.name}
+                  </span>
+                  <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12.5 }}>{fmtMXN(item.amount)}</span>
+                  <span style={{ fontSize: 11, color: "var(--p-muted)" }}>día {item.dueDay}</span>
+                  <span style={{ fontSize: 11, color: item.registeredThisPeriod ? "var(--p-g2, #2d6a4f)" : "var(--p-muted)" }}>
+                    {!item.active
+                      ? "pausado"
+                      : item.registeredThisPeriod
+                        ? `✓ anotado el ${item.registeredDate}`
+                        : "pendiente este mes"}
+                  </span>
+                  {canManageFixed && (
+                    <span style={{ display: "flex", gap: 4 }}>
+                      <button className={styles.btnGhost} type="button" onClick={() => startEditFixed(item)} style={{ padding: "4px 10px", fontSize: 11 }}>
+                        Editar
+                      </button>
+                      <button className={styles.btnGhost} type="button" onClick={() => toggleFixed(item)} style={{ padding: "4px 10px", fontSize: 11 }}>
+                        {item.active ? "Pausar" : "Activar"}
+                      </button>
+                      <button className={ui.deleteButton} type="button" onClick={() => removeFixed(item)} aria-label={`Quitar ${item.name}`} title="Quitar de gastos fijos">×</button>
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginTop: 18 }}>
+          <p style={{ margin: "0 0 8px", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--p-muted)" }}>
+            Nómina por semana
+            {pendingWeeks > 0 && ` · ${pendingWeeks} pendiente${pendingWeeks !== 1 ? "s" : ""}`}
+          </p>
+          {fixedLoading ? (
+            <p style={{ color: "var(--p-muted)", fontSize: 13 }}>Calculando…</p>
+          ) : weeks.length === 0 ? (
+            <p style={{ color: "var(--p-muted)", fontSize: 12.5 }}>Todavía no hay semanas cerradas.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {shownWeeks.map((week) => (
+                <div
+                  key={week.weekStart}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                    padding: "9px 12px", borderRadius: 8,
+                    background: week.registered ? "var(--p-bg)" : "rgba(212, 160, 23, 0.08)",
+                  }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: 13, flex: 1, minWidth: 130 }}>
+                    👥 Semana {weekLabel(week.weekStart, week.weekEnd)}
+                  </span>
+                  {week.registered ? (
+                    <span style={{ fontSize: 12, color: "var(--p-g2, #2d6a4f)" }}>
+                      ✓ registrada · {fmtMXN(week.registeredAmount)}
+                    </span>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: 11, color: "var(--p-muted)" }}>
+                        calculado {fmtMXN(Math.round(week.total))}
+                      </span>
+                      {canManageFixed ? (
+                        <>
+                          <input
+                            className={styles.input}
+                            type="number" min="0" step="0.01"
+                            style={{ width: 110 }}
+                            value={payrollAmounts[week.weekStart] ?? ""}
+                            onChange={(e) => setPayrollAmounts((prev) => ({ ...prev, [week.weekStart]: e.target.value }))}
+                            aria-label={`Monto de nómina de la semana ${week.weekStart}`}
+                          />
+                          <button
+                            className={styles.btnPrimary}
+                            type="button"
+                            onClick={() => registerPayroll(week)}
+                            disabled={payrollSaving === week.weekStart}
+                            style={{ padding: "6px 12px", fontSize: 12 }}
+                          >
+                            {payrollSaving === week.weekStart ? "Guardando…" : "Registrar"}
+                          </button>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: 11, color: "var(--p-muted)" }}>pendiente de registrar</span>
+                      )}
+                    </>
+                  )}
+                  {week.warnings?.length > 0 && !week.registered && (
+                    <span style={{ flexBasis: "100%", fontSize: 11, color: "#8a6d1f" }}>
+                      ⚠ {week.warnings.join(" ")} Revisa el monto antes de registrar.
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* ── Category breakdown ── */}
       <div className={`${styles.card} ${ui.breakdownCard}`}>
         <p className={styles.cardTitle}>Gastos por categoría</p>
@@ -387,6 +735,8 @@ export default function FinancePage({ styles }) {
                 <td>
                   <span className={`${styles.badge} ${styles.badgeGray}`}>{categoryIcon(e.category)} {e.category}</span>
                   {e.source === "inventario" && <span className={ui.sourceBadge}>📦 Inventario</span>}
+                  {e.source === "fijo" && <span className={ui.sourceBadge}>🔁 Automático</span>}
+                  {e.source === "nomina" && <span className={ui.sourceBadge}>👥 Nómina</span>}
                 </td>
                 <td style={{ fontWeight: 500 }}>{e.description}</td>
                 <td className={styles.tdMono}>${e.amount.toLocaleString("es-MX")} MXN</td>

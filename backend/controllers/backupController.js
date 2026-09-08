@@ -14,6 +14,7 @@ import Announcement from "../models/Announcement.js";
 import StoreSettings from "../models/StoreSettings.js";
 import SocialStoryParticipant from "../models/SocialStoryParticipant.js";
 import StaffConsumption from "../models/StaffConsumption.js";
+import FixedExpense from "../models/FixedExpense.js";
 
 /* GET /api/staff/backup/status */
 export const getBackupStatus = async (req, res) => {
@@ -36,6 +37,7 @@ export const exportBackup = async (req, res) => {
       timeRecords, tempRecords, checklistRecords, schedules,
       wasteLogs, promoCodes, redemptions, announcements,
       storeSettings, socialStoryParticipants, staffConsumptions,
+      fixedExpenses,
     ] = await Promise.all([
       User.find().select("+password").lean(),
       StaffUser.find().select("+password +pin").lean(),
@@ -53,6 +55,7 @@ export const exportBackup = async (req, res) => {
       StoreSettings.find().lean(),
       SocialStoryParticipant.find().lean(),
       StaffConsumption.find().lean(),
+      FixedExpense.find().lean(),
     ]);
 
     const collections = {
@@ -60,6 +63,7 @@ export const exportBackup = async (req, res) => {
       timeRecords, tempRecords, checklistRecords, schedules,
       wasteLogs, promoCodes, redemptions, announcements,
       storeSettings, socialStoryParticipants, staffConsumptions,
+      fixedExpenses,
     };
 
     const counts = Object.fromEntries(
