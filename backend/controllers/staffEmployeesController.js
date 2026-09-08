@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import StaffUser from "../models/StaffUser.js";
+import TimeRecord from "../models/TimeRecord.js";
 import {
   canAssignStaffRole,
   canManageStaffRole,
@@ -137,5 +138,50 @@ export const updateEmployee = async (req, res) => {
     res.json({ employee });
   } catch (err) {
     res.status(400).json({ message: "Error updating employee", err: err.message });
+  }
+};
+
+/* DELETE /api/staff/employees/:id?force=true (admin/owner plus hierarchy
+   checks). Un empleado con checadas registradas alimenta la nómina de
+   semanas pasadas (computeWeeklyPayroll): borrarlo sin más dejaría ese pago
+   invisible en cualquier semana que se vuelva a calcular. Por eso, si tiene
+   checadas, se rechaza a menos que `force=true` -- y en ese caso se borran
+   también sus checadas, para no dejar registros huérfanos apuntando a un
+   empleado que ya no existe. Dar de baja (`active: false`) sigue siendo la
+   opción normal; esto es solo para limpiar cuentas de prueba/duplicadas. */
+export const deleteEmployee = async (req, res) => {
+  try {
+    const target = await StaffUser.findById(req.params.id).select("_id name role active locationId");
+    if (!target) return res.status(404).json({ message: "Empleado no encontrado" });
+    if (sameId(target._id, req.staff.id)) {
+      return res.status(403).json({ message: "No puedes eliminar tu propia cuenta desde este panel" });
+    }
+    if (req.staff.locationId && target.locationId !== req.staff.locationId) {
+      return res.status(403).json({ message: "No puedes administrar otra sucursal" });
+    }
+    if (!canManageStaffRole(req.staff.role, target.role)) {
+      return res.status(403).json({ message: "No tienes permiso para eliminar a este integrante" });
+    }
+    if (await isLastActiveOwner(target, { active: false })) {
+      return res.status(409).json({ message: "Debe permanecer al menos un dueño activo" });
+    }
+
+    const timeRecordCount = await TimeRecord.countDocuments({ employeeId: target._id });
+    const force = req.query.force === "true";
+    if (timeRecordCount > 0 && !force) {
+      return res.status(409).json({
+        message: `${target.name} tiene ${timeRecordCount} checada${timeRecordCount === 1 ? "" : "s"} registrada${timeRecordCount === 1 ? "" : "s"} — eliminarlo dejaría huecos en la nómina de esas semanas. Da de baja en vez de eliminar, o confirma para borrar también sus checadas.`,
+        timeRecordCount,
+      });
+    }
+
+    if (force && timeRecordCount > 0) {
+      await TimeRecord.deleteMany({ employeeId: target._id });
+    }
+    await StaffUser.findByIdAndDelete(target._id);
+
+    res.json({ ok: true, deletedTimeRecords: force ? timeRecordCount : 0 });
+  } catch (err) {
+    res.status(500).json({ message: "Error al eliminar empleado", err: err.message });
   }
 };
