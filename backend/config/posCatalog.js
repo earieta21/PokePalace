@@ -371,14 +371,18 @@ const sanitizeExtraScoops = (value, chosenProteins) => {
   return [...list];
 };
 
-export const sanitizePosBowl = ({ base, proteins, marinades, complements, sauces, toppings, extraScoopProteins }) => {
-  if (typeof base !== "string" || !BOWL_RULES.base.allowed.has(base)) {
-    throw new PosOrderValidationError("Selecciona una base válida para el bowl");
+export const sanitizePosBowl = ({ base, bases, proteins, marinades, complements, sauces, toppings, extraScoopProteins }) => {
+  const safeBases = bases === undefined ? [base] : bases;
+  if (!Array.isArray(safeBases) || safeBases.length < 1 || safeBases.length > 2
+    || new Set(safeBases).size !== safeBases.length
+    || safeBases.some((id) => typeof id !== "string" || !BOWL_RULES.base.allowed.has(id))) {
+    throw new PosOrderValidationError("Selecciona una o dos bases válidas para el bowl");
   }
 
   const safeProteins = sanitizeChoiceList("proteins", proteins);
   return {
-    base,
+    base: safeBases[0],
+    bases: [...safeBases],
     proteins: safeProteins,
     // Size is derived from the validated protein count. A browser-provided
     // bowlSize can never lower the amount charged for three proteins.
@@ -519,7 +523,7 @@ export const getUnavailablePosSelections = ({
 
   if (bowl) {
     consider(bowl.base);
-    for (const field of ["proteins", "marinades", "complements", "sauces", "toppings", "extraScoopProteins"]) {
+    for (const field of ["bases", "proteins", "marinades", "complements", "sauces", "toppings", "extraScoopProteins"]) {
       for (const key of Array.isArray(bowl[field]) ? bowl[field] : []) consider(key);
     }
   }

@@ -776,7 +776,7 @@ export const createPosOrder = async (req, res) => {
   try {
     const {
       items, customer, phone, notes, fulfillment, paymentMethod, rewardCode, customerUserId,
-      base, proteins, marinades, complements, sauces, toppings, extraScoopProteins,
+      base, bases, proteins, marinades, complements, sauces, toppings, extraScoopProteins,
       clientOrderId, rewardTopping, referralSource, referralSourceOther,
     } = req.body;
 
@@ -821,9 +821,9 @@ export const createPosOrder = async (req, res) => {
     let safeReferralSourceOther = null;
     try {
       safeItems = resolvePosItems(items === undefined ? [] : items);
-      const wantsCustomBowl = base !== undefined || proteins !== undefined;
+      const wantsCustomBowl = base !== undefined || bases !== undefined || proteins !== undefined;
       if (wantsCustomBowl) {
-        safeBowl = sanitizePosBowl({ base, proteins, marinades, complements, sauces, toppings, extraScoopProteins });
+        safeBowl = sanitizePosBowl({ base, bases, proteins, marinades, complements, sauces, toppings, extraScoopProteins });
       }
       if (rewardTopping !== undefined && rewardTopping !== null && rewardTopping !== "") {
         safeRewardTopping = sanitizePosRewardTopping(rewardTopping);
@@ -964,6 +964,7 @@ export const createPosOrder = async (req, res) => {
       status: "pending",
       ...(hasBowl && {
         base: safeBowl.base,
+        bases: safeBowl.bases,
         protein: safeBowl.proteins.join(", "),
         proteins: safeBowl.proteins,
         bowlSize: safeBowl.bowlSize,

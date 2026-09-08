@@ -308,6 +308,26 @@ test("el topping Rewards se limita al catálogo operativo", () => {
   );
 });
 
+test("el POS conserva mitad y mitad, divide inventario y revisa ambas bases", () => {
+  const bowl = sanitizePosBowl({ bases: ["white_rice", "quinoa"], proteins: ["salmon"] });
+  assert.equal(bowl.base, "white_rice");
+  assert.deepEqual(bowl.bases, ["white_rice", "quinoa"]);
+  const demand = getPosInventoryDemand(bowl);
+  assert.equal(demand.white_rice, 0.5);
+  assert.equal(demand.quinoa, 0.5);
+  assert.deepEqual(getUnavailablePosSelections({ bowl, unavailableItems: ["quinoa"] }), ["quinoa"]);
+  assert.equal(computeBowlSubtotal(bowl.bowlSize), 230);
+  const legacy = sanitizePosBowl({ base: "quinoa", proteins: ["salmon"] });
+  assert.deepEqual(legacy.bases, ["quinoa"]);
+  assert.equal(getPosInventoryDemand(legacy).quinoa, 1);
+});
+
+test("el POS rechaza bases vacías, repetidas, falsas o más de dos", () => {
+  for (const bases of [[], null, "quinoa", ["quinoa", "quinoa"], ["white_rice", "fake"], ["white_rice", "quinoa", "spring_mix"]]) {
+    assert.throws(() => sanitizePosBowl({ bases, proteins: ["salmon"] }), PosOrderValidationError);
+  }
+});
+
 test("el tamaño y precio del bowl se derivan de proteínas validadas", () => {
   const bowl = sanitizePosBowl({
     base: "white_rice",
