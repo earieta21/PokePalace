@@ -33,11 +33,12 @@ function orderLines(order) {
   const lines = [];
 
   const bowlLine = (bowl, index) => {
-    const bases = bowl.bases?.length > 1 ? bowl.bases : (bowl.base ? [bowl.base] : []);
+    const isHalfHalf = bowl.bases?.length > 1;
+    const bases = isHalfHalf ? bowl.bases : (bowl.base ? [bowl.base] : []);
     lines.push({
       title: `Bowl ${index != null ? `${index} ` : ""}${bowl.bowlSize === "large" ? "Grande" : "Normal"}`,
       rows: [
-        ["Base", labelList(bases, BASE_LABELS).join(" + ") || "—"],
+        ["Base", `${labelList(bases, BASE_LABELS).join(" + ") || "—"}${isHalfHalf ? " ⚠️ MITAD Y MITAD" : ""}`],
         ["Proteína", labelList(bowl.proteins, PROTEIN_LABELS).join(", ") || "—"],
         ["Marinado", labelList(bowl.marinades, MARINADE_LABELS).join(", ") || "—"],
         ["Complementos", labelList(bowl.complements, COMPLEMENT_LABELS).join(", ") || "—"],

@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
-import { PROTEIN_LABELS } from "../../order/OrderLabels";
+import { PROTEIN_LABELS, BASE_LABELS } from "../../order/OrderLabels";
 import { comboPalaceSelectionSummary } from "../../data/comboPalace";
 
 const STATUS_CFG = {
@@ -23,6 +23,17 @@ function elapsed(createdAt) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// Igual que las demás pantallas de staff (KDS, Historial): si trae 2 bases
+// es "mitad y mitad" y se marca aparte para que no se confunda con una sola
+// base rara ni se pase por alto en un vistazo rápido.
+function baseInfo(bases, base) {
+  const isHalfHalf = Array.isArray(bases) && bases.length > 1;
+  const text = isHalfHalf
+    ? bases.map((id) => BASE_LABELS[id] ?? id).join(" + ")
+    : (BASE_LABELS[base] ?? base);
+  return { text, isHalfHalf };
+}
+
 function itemSummary(order) {
   const segments = [];
 
@@ -34,9 +45,9 @@ function itemSummary(order) {
         continue;
       }
       const proteins = line.proteins?.length ? line.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", ") : "";
-      const baseText = line.bases?.length > 1 ? line.bases.join(" + ") : line.base;
+      const { text: baseText, isHalfHalf } = baseInfo(line.bases, line.base);
       const size = line.bowlSize === "large" ? "Bowl grande" : "Bowl normal";
-      segments.push(`${size}: ${proteins} en ${baseText}`);
+      segments.push(`${size}: ${proteins} en ${baseText}${isHalfHalf ? " ⚠️ MITAD Y MITAD" : ""}`);
     }
     return segments.join(" + ") || "Bowl personalizado";
   }
@@ -53,8 +64,8 @@ function itemSummary(order) {
     const parts = [];
     if (order.proteins?.length) parts.push(order.proteins.map((id) => PROTEIN_LABELS[id] ?? id).join(", "));
     else if (order.protein) parts.push(order.protein);
-    const baseText = order.bases?.length > 1 ? order.bases.join(" + ") : order.base;
-    parts.push(`en ${baseText}`);
+    const { text: baseText, isHalfHalf } = baseInfo(order.bases, order.base);
+    parts.push(`en ${baseText}${isHalfHalf ? " ⚠️ MITAD Y MITAD" : ""}`);
     const size = order.bowlSize === "large" ? "Bowl grande" : "Bowl normal";
     segments.push(`${size}: ${parts.join(" ")}`);
   }

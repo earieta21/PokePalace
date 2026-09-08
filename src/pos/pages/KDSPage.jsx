@@ -56,10 +56,12 @@ function orderLines(order) {
         (line.bowls || []).forEach((bowl) => {
           bowlNumber += 1;
           lines.push(`— Bowl ${bowlNumber} (2x1) —`);
-          const baseText = bowl.bases?.length > 1
-            ? `${bowl.bases.map((id) => label(BASE_LABELS, id)).join(" + ")} (mitad y mitad)`
+          const isHalfHalf = bowl.bases?.length > 1;
+          const baseText = isHalfHalf
+            ? bowl.bases.map((id) => label(BASE_LABELS, id)).join(" + ")
             : label(BASE_LABELS, bowl.base);
           lines.push(`Base: ${baseText}`);
+          if (isHalfHalf) lines.push("⚠️ MITAD Y MITAD DE BASE");
           lines.push(`Proteína: ${proteinLabel} (60 g)`);
           if (bowl.marinades?.length)
             lines.push(`Marinados: ${bowl.marinades.map((id) => label(MARINADE_LABELS, id)).join(", ")}`);
@@ -74,10 +76,12 @@ function orderLines(order) {
       }
       bowlNumber += 1;
       lines.push(bowlCount > 1 ? `— Bowl ${bowlNumber} —` : "— Bowl —");
-      const baseText = line.bases?.length > 1
-        ? `${line.bases.map((id) => label(BASE_LABELS, id)).join(" + ")} (mitad y mitad)`
+      const isHalfHalf = line.bases?.length > 1;
+      const baseText = isHalfHalf
+        ? line.bases.map((id) => label(BASE_LABELS, id)).join(" + ")
         : label(BASE_LABELS, line.base);
       lines.push(`Base: ${baseText}`);
+      if (isHalfHalf) lines.push("⚠️ MITAD Y MITAD DE BASE");
       if (line.proteins?.length) {
         lines.push(`Proteínas: ${line.proteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
       }
@@ -108,10 +112,12 @@ function orderLines(order) {
   }
 
   if (order.base) {
-    const baseText = order.bases?.length > 1
-      ? `${order.bases.map((id) => label(BASE_LABELS, id)).join(" + ")} (mitad y mitad)`
+    const isHalfHalf = order.bases?.length > 1;
+    const baseText = isHalfHalf
+      ? order.bases.map((id) => label(BASE_LABELS, id)).join(" + ")
       : label(BASE_LABELS, order.base);
     lines.push(`Base: ${baseText}`);
+    if (isHalfHalf) lines.push("⚠️ MITAD Y MITAD DE BASE");
     if (order.proteins?.length) {
       lines.push(`Proteínas: ${order.proteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
     } else if (order.protein) {
