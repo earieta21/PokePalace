@@ -14,7 +14,7 @@ import Receipt from "../Receipt.jsx";
 import MemberQrScanner from "../MemberQrScanner.jsx";
 import { getRewardById, REWARDS } from "../../data/rewardsCatalog.js";
 import { REFERRAL_SOURCES } from "../../data/referralSources.js";
-import { TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
+import { getBaseLabel, COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, PREMIUM_PROTEIN_PRICES } from "../../order/pricing.js";
 import {
   COMBO_PALACE_OPTIONS,
@@ -26,7 +26,7 @@ import ui from "./POSPage.module.css";
 const CUSTOM_BOWL_ID = "custom-bowl";
 
 const MENU = [
-  { id: 25, name: "Combo Palace", price: COMBO_PALACE_PRICE, category: "Combos", icon: "👑", needsCombo: true },
+  { id: 25, name: "Combo Palace", price: COMBO_PALACE_PRICE, category: "Promos", icon: "👑", needsCombo: true },
   // Venta rapida sin ingredientes especificos - para cuando no da tiempo de
   // capturar el bowl personalizado completo (ej. fila larga). needsProtein
   // hace que se pregunte la proteina antes de agregarlo, para poder
@@ -40,7 +40,7 @@ const MENU = [
   // los demás días vía promo2x1Active (ver visibleMenu más abajo); el
   // servidor también la rechaza fuera de esos días (isPromo2x1Day en
   // backend/config/posCatalog.js), así que ocultarla aquí es solo UX.
-  { id: 26, name: "Promo 2x1 (solo en local)", price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🎉", needsProtein: true, promo2x1: true },
+  { id: 26, name: "Promo 2x1 (solo en local)", price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Promos", icon: "🎉", needsProtein: true, promo2x1: true },
   { id: 1,  name: "The OG",         price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍣" },
   { id: 2,  name: "Skinny Bowl",    price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗" },
   { id: 3,  name: "Quinoa Bowl",    price: BOWL_BASE_PRICE, category: "Bowls", icon: "🍤" },
@@ -49,22 +49,25 @@ const MENU = [
   { id: 24, name: "Coca-Cola",               price:  35, category: "Bebidas", icon: "🥤" },
   { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
   { id: 15, name: "Agua del día",              price:  35, category: "Bebidas", icon: "🥤", rewardDrink: true },
-  { id: 16, name: "Cacao Rice Cake",          price:  30, category: "Extras", icon: "🍫" },
-  { id: 17, name: "Choco Rice Cake",          price:  35, category: "Extras", icon: "🍫", rewardSnack: true },
-  { id: 23, name: "Miel Rice Cake",           price:  35, category: "Extras", icon: "🍯" },
+  { id: 16, name: "Cacao Rice Cake",          price:  30, category: "Rice Cakes", icon: "🍫" },
+  { id: 17, name: "Choco Rice Cake",          price:  35, category: "Rice Cakes", icon: "🍫", rewardSnack: true },
+  { id: 23, name: "Miel Rice Cake",           price:  35, category: "Rice Cakes", icon: "🍯" },
   // Porción extra (40 g) de cualquier proteína ya en el bowl. El precio
   // mostrado aquí es el base ($40) — si en el picker se elige atún sellado,
   // confirmProteinPick suma el upcharge de PREMIUM_PROTEIN_PRICES ($20 más,
   // $60 total), igual que valida resolvePosItems en el servidor.
-  { id: 27, name: "Extra de proteína",        price: EXTRA_SCOOP_PRICE, category: "Extras", icon: "🍤", needsProtein: true, extraProtein: true },
+  { id: 27, name: "Extra de proteína",        price: EXTRA_SCOOP_PRICE, category: "Bowls", icon: "🍤", needsProtein: true, extraProtein: true },
 ];
 
-const MENU_CATEGORIES = ["Todos", "Combos", "Bowls", "Bebidas", "Extras"];
+const MENU_CATEGORIES = ["Todos", "Promos", "Bowls", "Bebidas", "Rice Cakes"];
+MENU.sort((a, b) => MENU_CATEGORIES.indexOf(a.category) - MENU_CATEGORIES.indexOf(b.category));
 
 // Opciones para el picker rapido de proteina (bowls sin receta fija).
 const QUICK_PROTEINS = ["tuna", "salmon", "shrimp", "tofu", "seared_tuna"].map((id) => ({
   id, label: PROTEIN_LABELS[id],
 }));
+
+const normalizeSearch = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 const IVA = 0; // IVA incluido en precio
 
@@ -73,6 +76,12 @@ export default function POSPage({ styles }) {
   const { promo2x1Active } = useAvailability();
   const api = createStaffApi(staffToken);
   const pendingSaleRef = useRef(null);
+  const cartRef = useRef(null);
+  const builderPanelRef = useRef(null);
+  const [builderVersion, setBuilderVersion] = useState(0);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [showReferral, setShowReferral] = useState(false);
+  const [cashReceived, setCashReceived] = useState("");
 
   const [cart, setCart]         = useState([]);
   const [cliente, setCliente]   = useState("");
@@ -107,6 +116,12 @@ export default function POSPage({ styles }) {
   const [memberRedeeming, setMemberRedeeming] = useState(null);
   const [lastReceipt, setLastReceipt] = useState(null);
   const [printRequested, setPrintRequested] = useState(false);
+
+  useEffect(() => {
+    if (mode !== "bowl") return;
+    builderPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    builderPanelRef.current?.focus({ preventScroll: true });
+  }, [mode]);
 
   const printLastReceipt = () => {
     if (!lastReceipt) return;
@@ -159,9 +174,13 @@ export default function POSPage({ styles }) {
     setSuccess(""); setError("");
   };
 
-  const removeItem = (key) => setCart((prev) => prev.filter((i) => cartKeyOf(i) !== key));
+  const removeItem = (key) => {
+    if (key === CUSTOM_BOWL_ID) resetBuilder();
+    setCart((prev) => prev.filter((i) => cartKeyOf(i) !== key));
+  };
 
   const changeQty = (key, delta) => {
+    if (key === CUSTOM_BOWL_ID && delta < 0) resetBuilder();
     setCart((previous) => previous
       .map((item) => cartKeyOf(item) === key ? { ...item, qty: item.qty + delta } : item)
       .filter((item) => item.qty > 0));
@@ -214,9 +233,18 @@ export default function POSPage({ styles }) {
     setComboPickerItem(null);
   };
 
+  const resetBuilder = () => {
+    setBuilderVersion((version) => version + 1);
+    setMode("menu");
+  };
+
   const clearOrder = () => {
+    resetBuilder();
     pendingSaleRef.current = null;
     setCart([]);
+    setCashReceived("");
+    setShowReferral(false);
+    setConfirmClear(false);
     setCliente("");
     setPhone("");
     setNotes("");
@@ -259,7 +287,7 @@ export default function POSPage({ styles }) {
       },
     ]);
     setSuccess(""); setError("");
-    setMode("menu");
+    resetBuilder();
   };
 
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
@@ -267,7 +295,7 @@ export default function POSPage({ styles }) {
   const visibleMenu = MENU.filter((item) => {
     if (item.promo2x1 && !promo2x1Active) return false;
     const matchesCategory = menuCategory === "Todos" || item.category === menuCategory;
-    const matchesSearch = item.name.toLowerCase().includes(menuSearch.trim().toLowerCase());
+    const matchesSearch = normalizeSearch(item.name).includes(normalizeSearch(menuSearch.trim()));
     return matchesCategory && matchesSearch;
   });
   const iva      = subtotal * IVA;
@@ -286,6 +314,8 @@ export default function POSPage({ styles }) {
     rewardDiscount = Math.min(BOWL_BASE_PRICE, Math.min(...bowlLines.map((item) => item.price)));
   }
   const total = Math.max(0, subtotal + iva - rewardDiscount);
+  const cashAmount = Number(cashReceived);
+  const cashShort = paymentMethod === "cash" && cashReceived !== "" && (!Number.isFinite(cashAmount) || cashAmount < total);
   const rewardsMultiplier = (rewardsCustomer?.lifetimePoints ?? 0) >= 300 ? 2 : 1;
   const rewardsPointsPreview = Math.floor(total / 10) * rewardsMultiplier;
 
@@ -387,7 +417,7 @@ export default function POSPage({ styles }) {
   };
 
   const handleCobrar = async () => {
-    if (cart.length === 0 || saving) return;
+    if (cart.length === 0 || saving || cashShort || mode === "bowl") return;
     if (reward?.type === "extra_topping" && !rewardTopping) {
       setError("Selecciona el topping extra elegido por el cliente.");
       return;
@@ -419,6 +449,7 @@ export default function POSPage({ styles }) {
       customerUserId: rewardsCustomer?._id || null,
       ...(customBowl && {
         base: customBowl.bowl.base,
+        bases: customBowl.bowl.bases,
         proteins: customBowl.bowl.proteins,
         bowlSize: customBowl.bowl.bowlSize,
         marinades: customBowl.bowl.marinades,
@@ -456,7 +487,11 @@ export default function POSPage({ styles }) {
       }
     }
 
+    resetBuilder();
     setCart([]);
+    setCashReceived("");
+    setShowReferral(false);
+    setConfirmClear(false);
     setCliente("");
     setPhone("");
     setNotes("");
@@ -539,19 +574,22 @@ export default function POSPage({ styles }) {
             className={mode === "bowl" ? ui.modeActive : ""}
             aria-pressed={mode === "bowl"}
           >
-            <span>＋</span> Crear bowl
+            <span>＋</span> {customRewardBowl ? "Editar bowl" : "Armar tu bowl"}
           </button>
         </div>
 
-        {mode === "menu" ? (
+        {mode === "menu" && (
           <>
             <div className={ui.menuIntro}>
               <div><span>Paso 1</span><h2>Elige los productos</h2><p>Toca una tarjeta para agregarla a la orden.</p></div>
               <label className={ui.menuSearch}>
                 <span>⌕</span>
-                <input value={menuSearch} onChange={(e) => setMenuSearch(e.target.value)} placeholder="Buscar producto…" />
+                <input value={menuSearch} onChange={(e) => setMenuSearch(e.target.value)} aria-label="Buscar producto" placeholder="Buscar producto…" />
               </label>
             </div>
+            <button type="button" className={ui.bowlShortcut} onClick={() => setMode("bowl")}>
+              <span aria-hidden="true">🥗</span><span><strong>{customRewardBowl ? "Editar bowl personalizado" : "Armar tu bowl"}</strong><small>Elige ingredientes · Mediano ${BOWL_BASE_PRICE} / Grande ${BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE}</small></span><span aria-hidden="true">→</span>
+            </button>
             <div className={ui.categoryTabs} aria-label="Categorías del menú">
               {MENU_CATEGORIES.map((category) => (
                 <button key={category} type="button" aria-pressed={menuCategory === category} onClick={() => setMenuCategory(category)}>{category}</button>
@@ -575,32 +613,33 @@ export default function POSPage({ styles }) {
                 >
                   {quantity > 0 && <span className={ui.inCartBadge}>{quantity}</span>}
                   <span className={ui.productIcon}>{item.icon}</span>
-                  <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.category}</small></span>
+                  <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.needsCombo ? "Elige bowl, bebida y snack" : item.needsProtein ? "Elige la proteína" : "Toca para agregar"}</small></span>
                   <span className={ui.productPrice}>${item.price}</span>
                   <span className={ui.addProduct}>+</span>
                 </button>
                 );
               })}
             </div>
-            {visibleMenu.length === 0 && <div className={ui.noProducts}>No encontramos productos con ese nombre.</div>}
+            {visibleMenu.length === 0 && <div className={ui.noProducts}>No encontramos productos con esos filtros.<button type="button" onClick={() => { setMenuSearch(""); setMenuCategory("Todos"); }}>Ver todos los productos</button></div>}
           </>
-        ) : (
-          <div className={ui.bowlPanel}>
-            <div className={ui.menuIntro}><div><span>Paso 1</span><h2>Arma un bowl</h2><p>Selecciona una base, proteína y complementos.</p></div></div>
-            <CustomBowlBuilder onAdd={handleAddBowl} onCancel={() => setMode("menu")} />
-          </div>
         )}
+        <div className={ui.bowlPanel} hidden={mode !== "bowl"} ref={builderPanelRef} tabIndex={-1} aria-label="Armar tu bowl">
+          <div className={ui.menuIntro}><div><span>Paso 1</span><h2>Armar tu bowl</h2><p>Elige los ingredientes y revisa el precio antes de agregarlo.</p></div></div>
+          {customRewardBowl && <p className={ui.bowlNotice}>Estás editando el bowl de esta orden. Para otro bowl personalizado, abre un ticket separado.</p>}
+          <CustomBowlBuilder key={`${builderVersion}-${customRewardBowl ? "edit" : "new"}`} initialBowl={customRewardBowl?.bowl} onAdd={handleAddBowl} onCancel={resetBuilder} />
+        </div>
       </section>
 
       {/* Carrito */}
-      <aside className={ui.cartPanel}>
+      <aside className={ui.cartPanel} ref={cartRef} tabIndex={-1} aria-label="Orden actual">
         <div className={ui.cartHeader}>
           <div><span>Paso 2</span><strong>Revisa la orden</strong></div>
           {cart.length > 0 && (
-            <button type="button" onClick={clearOrder}>Nueva orden</button>
+            <button type="button" onClick={() => setConfirmClear(true)}>Vaciar orden</button>
           )}
         </div>
 
+        {confirmClear && <div className={ui.clearConfirmation} role="alert"><strong>¿Vaciar esta orden?</strong><p>Se quitarán todos los productos y datos capturados.</p><div><button type="button" onClick={() => setConfirmClear(false)}>Conservar orden</button><button type="button" onClick={clearOrder}>Sí, vaciar</button></div></div>}
         {queuedCount > 0 && (
           <div className={ui.offlineNotice}>
             <span>
@@ -620,6 +659,13 @@ export default function POSPage({ styles }) {
               <div className={ui.cartItemInfo}>
                 <strong>{item.name}</strong>
                 {item.comboBowlId && <span className={ui.cartItemMeta}>{comboPalaceSelectionSummary(item)}</span>}
+                {item.bowl && <><span className={ui.cartItemMeta}>{[
+                  getBaseLabel(item.bowl.bases, item.bowl.base),
+                  ...item.bowl.proteins.map((id) => PROTEIN_LABELS[id]),
+                  ...item.bowl.complements.map((id) => COMPLEMENT_LABELS[id]),
+                  ...item.bowl.sauces.map((id) => SAUCE_LABELS[id]),
+                  ...item.bowl.toppings.map((id) => TOPPING_LABELS[id]),
+                ].join(" · ")}</span><button type="button" className={ui.editBowl} onClick={() => setMode("bowl")}>Editar ingredientes</button></>}
                 <small>${item.price} c/u</small>
               </div>
               <div className={ui.qtyControl}>
@@ -655,8 +701,8 @@ export default function POSPage({ styles }) {
             </div>
           </div>
 
-          <div className={ui.optionGroup}>
-            <span>¿Cómo nos conoció? <small>Opcional</small></span>
+          <button type="button" className={ui.detailsToggle} aria-expanded={showReferral} onClick={() => setShowReferral((visible) => !visible)}><span>¿Cómo nos conoció? <small>Opcional</small></span><span>{showReferral ? "−" : "+"}</span></button>
+          {showReferral && <div className={ui.optionGroup}>
             <div className={ui.optionButtons}>
               {REFERRAL_SOURCES.map(({ id, label, icon }) => (
                 <button
@@ -678,7 +724,7 @@ export default function POSPage({ styles }) {
                 maxLength={80}
               />
             )}
-          </div>
+          </div>}
 
           <button
             type="button"
@@ -827,9 +873,11 @@ export default function POSPage({ styles }) {
             <small>IVA incluido</small>
           </div>
 
+          {paymentMethod === "cash" && cart.length > 0 && <div className={ui.cashPanel}><label htmlFor="pos-cash">Efectivo recibido <small>Opcional · calcula el cambio</small></label><input id="pos-cash" type="number" min="0" step="0.01" inputMode="decimal" value={cashReceived} onChange={(event) => setCashReceived(event.target.value)} placeholder={String(total)} /><p role="status">{cashReceived !== "" ? cashShort ? `Faltan $${Math.max(0, total - (cashAmount || 0)).toLocaleString("es-MX")}` : `Cambio: $${(cashAmount - total).toLocaleString("es-MX", { maximumFractionDigits: 2 })}` : "Ingresa el monto que te entregó el cliente."}</p></div>}
+          {mode === "bowl" && <p className={ui.bowlNotice}>Agrega o guarda el bowl antes de cobrar. Si no lo necesitas, pulsa Cancelar.</p>}
           <div className={ui.checkoutStep}><span>Paso 3</span><strong>Confirma y cobra</strong></div>
-          <button className={ui.chargeButton} onClick={handleCobrar} disabled={cart.length === 0 || saving || (reward?.type === "extra_topping" && !rewardTopping)} type="button">
-            {saving ? "Enviando orden…" : cart.length === 0 ? "Agrega productos para cobrar" : `Cobrar $${total.toLocaleString("es-MX")} MXN`}
+          <button className={ui.chargeButton} onClick={handleCobrar} disabled={cart.length === 0 || saving || cashShort || mode === "bowl" || (reward?.type === "extra_topping" && !rewardTopping)} type="button">
+            {saving ? "Enviando orden…" : cart.length === 0 ? "Agrega productos para cobrar" : paymentMethod === "pay_at_pickup" ? `Guardar sin cobrar · $${total.toLocaleString("es-MX")}` : `Cobrar $${total.toLocaleString("es-MX")} MXN`}
           </button>
         </div>
       </aside>
@@ -858,7 +906,7 @@ export default function POSPage({ styles }) {
               ¿De qué proteína es el {proteinPickerItem.name.toLowerCase()}?
             </h3>
             <p style={{ margin: "0 0 16px", fontSize: 12.5, color: "#777" }}>
-              Para poder descontarla del inventario.
+              Toca la proteína para agregar el producto a la orden.
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
               {QUICK_PROTEINS.map((p) => (
@@ -949,6 +997,7 @@ export default function POSPage({ styles }) {
         </div>
       )}
 
+      {cart.length > 0 && mode === "menu" && <button type="button" className={ui.mobileCart} onClick={() => { cartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); cartRef.current?.focus({ preventScroll: true }); }}>Ver orden · {cartItemCount} producto{cartItemCount !== 1 ? "s" : ""}<strong>${total.toLocaleString("es-MX")} →</strong></button>}
       <Receipt order={lastReceipt} />
     </div>
   );

@@ -1,212 +1,92 @@
-import { useState } from "react";
-import {
-  BASE_LABELS,
-  PROTEIN_LABELS,
-  COMPLEMENT_LABELS,
-  SAUCE_LABELS,
-  TOPPING_LABELS,
-} from "../order/OrderLabels";
-import {
-  BOWL_BASE_PRICE,
-  LARGE_BOWL_UPCHARGE,
-  PREMIUM_PROTEIN_PRICES,
-  computeExtrasSubtotal,
-} from "../order/pricing";
+import { useRef, useState } from "react";
+import { BASE_LABELS, PROTEIN_LABELS, COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS, getBaseLabel } from "../order/OrderLabels";
+import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, PREMIUM_PROTEIN_PRICES, COMPLEMENT_FREE_LIMIT, EXTRA_COMPLEMENT_PRICE, computeExtrasSubtotal } from "../order/pricing";
+import ui from "./CustomBowlBuilder.module.css";
 
-// Real base ids only — BASE_LABELS has a legacy "mixed_greens" alias pointing
-// at the same label as "spring_mix", which would render as a duplicate chip.
-const BASE_IDS = ["white_rice", "spring_mix", "quinoa"];
-const PROTEIN_IDS = ["tuna", "salmon", "shrimp", "tofu", "seared_tuna"];
-const COMPLEMENT_IDS = [
-  "shredded_carrots", "seaweed", "edamame", "red_onion", "cucumber",
-  "mango", "pineapple", "beet", "surimi", "spicy_surimi", "avocado",
-];
-const SAUCE_IDS = [
-  "spicy_mayo", "sweet_dressing", "citrus_dressing", "red_sauce",
-  "sriracha", "cilantro_dressing",
-];
-const TOPPING_IDS = [
-  "black_olives", "toasted_peanuts", "sesame_seeds", "nori_strips", "masago", "croutons",
-  "crispy_onions",
+const GROUPS = [
+  { key: "bases", title: "Base", hint: "Elige 1 base o 2 para mitad y mitad, sin costo extra.", max: 2, labels: BASE_LABELS, ids: ["white_rice", "spring_mix", "quinoa"] },
+  { key: "proteins", title: "Proteínas", hint: `1 o 2: mediano · 3: grande (+$${LARGE_BOWL_UPCHARGE}).`, max: 3, labels: PROTEIN_LABELS, ids: ["tuna", "salmon", "shrimp", "tofu", "seared_tuna"] },
+  { key: "complements", title: "Complementos", hint: `${COMPLEMENT_FREE_LIMIT} incluidos. Cada adicional cuesta $${EXTRA_COMPLEMENT_PRICE}.`, max: 11, labels: COMPLEMENT_LABELS, ids: ["shredded_carrots", "seaweed", "edamame", "red_onion", "cucumber", "mango", "pineapple", "beet", "surimi", "spicy_surimi", "avocado"] },
+  { key: "sauces", title: "Aderezos", hint: "Hasta 2 incluidos. También puedes dejarlo sin aderezos.", max: 2, labels: SAUCE_LABELS, ids: ["spicy_mayo", "sweet_dressing", "citrus_dressing", "red_sauce", "sriracha", "cilantro_dressing"] },
+  { key: "toppings", title: "Toppings", hint: "Hasta 5 incluidos. También puedes dejarlo sin toppings.", max: 5, labels: TOPPING_LABELS, ids: ["black_olives", "toasted_peanuts", "sesame_seeds", "nori_strips", "masago", "croutons", "crispy_onions"] },
 ];
 
-const MIN_PROTEINS = 1;
-const MAX_PROTEINS = 3;
-const MAX_COMPLEMENTS = COMPLEMENT_IDS.length;
-const MAX_SAUCES = 2;
-const MAX_TOPPINGS = 5;
+const emptyDraft = () => ({ base: null, bases: [], proteins: [], marinades: [], complements: [], sauces: [], toppings: [] });
 
-const emptyDraft = () => ({
-  base: null,
-  proteins: [],
-  marinades: [],
-  complements: [],
-  sauces: [],
-  toppings: [],
-});
+export default function CustomBowlBuilder({ onAdd, onCancel, initialBowl }) {
+  const [draft, setDraft] = useState(() => {
+    const bases = initialBowl?.bases?.length ? [...initialBowl.bases] : initialBowl?.base ? [initialBowl.base] : [];
+    return { ...emptyDraft(), ...initialBowl, bases, base: bases[0] || null };
+  });
+  const [step, setStep] = useState(0);
+  const [message, setMessage] = useState("");
+  const stepRefs = useRef([]);
+  const group = GROUPS[step];
+  const selection = (key) => draft[key];
+  const selected = selection(group.key);
+  const isLarge = draft.proteins.length === 3;
+  const premium = draft.proteins.reduce((sum, id) => sum + (PREMIUM_PROTEIN_PRICES[id] || 0), 0);
+  const extraComplements = Math.max(0, draft.complements.length - COMPLEMENT_FREE_LIMIT);
+  const price = BOWL_BASE_PRICE + (isLarge ? LARGE_BOWL_UPCHARGE : 0)
+    + computeExtrasSubtotal({ complementsCount: draft.complements.length, proteins: draft.proteins });
+  const missing = !draft.base ? "Selecciona una base" : !draft.proteins.length ? "Selecciona al menos una proteína" : "";
 
-function toggleInList(list, id, max) {
-  if (list.includes(id)) return list.filter((x) => x !== id);
-  if (list.length >= max) return list;
-  return [...list, id];
-}
+  const navigate = (index) => {
+    setStep(index);
+    setMessage("");
+    stepRefs.current[index]?.focus();
+  };
 
-function ChipGroup({ title, hint, ids, labels, selected, max, onToggle, optionPrices = {} }) {
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.4px", color: "var(--p-muted)" }}>
-          {title}
-        </span>
-        {max != null && (
-          <span style={{ fontSize: 11, color: "var(--p-muted)" }}>{selected.length}/{max}{hint}</span>
-        )}
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {ids.map((id) => {
-          const active = selected.includes(id);
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onToggle(id)}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 999,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                border: active ? "2px solid #52b788" : "1.5px solid rgba(82,183,136,0.35)",
-                background: active ? "#52b788" : "rgba(82,183,136,0.08)",
-                color: active ? "#fff" : "inherit",
-                transition: "all 120ms ease",
-                transform: active ? "scale(1.04)" : "scale(1)",
-              }}
-            >
-              {active ? "✓ " : ""}{labels[id] || id}
-              {optionPrices[id] ? ` (+$${optionPrices[id]})` : ""}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-export default function CustomBowlBuilder({ onAdd, onCancel }) {
-  const [draft, setDraft] = useState(emptyDraft);
-  const [error, setError] = useState("");
-
-  const isLarge = draft.proteins.length === MAX_PROTEINS;
-  const price = BOWL_BASE_PRICE
-    + (isLarge ? LARGE_BOWL_UPCHARGE : 0)
-    + computeExtrasSubtotal({
-      complementsCount: draft.complements.length,
-      proteins: draft.proteins,
+  const toggle = (id) => {
+    if (!selected.includes(id) && selected.length >= group.max) {
+      setMessage(`Puedes elegir hasta ${group.max}. Quita una selección para cambiarla.`);
+      return;
+    }
+    setDraft((current) => {
+      const next = current[group.key].includes(id) ? current[group.key].filter((value) => value !== id) : [...current[group.key], id];
+      return { ...current, [group.key]: next, ...(group.key === "bases" && { base: next[0] || null }) };
     });
-
-  const handleAdd = () => {
-    if (!draft.base) return setError("Selecciona una base.");
-    if (draft.proteins.length < MIN_PROTEINS) return setError("Selecciona al menos 1 proteína.");
-
-    onAdd({
-      base: draft.base,
-      proteins: draft.proteins,
-      bowlSize: isLarge ? "large" : "normal",
-      marinades: draft.marinades,
-      complements: draft.complements,
-      sauces: draft.sauces,
-      toppings: draft.toppings,
-      price,
-    });
-    setDraft(emptyDraft());
-    setError("");
+    setMessage("");
   };
 
   return (
-    <div>
-      <ChipGroup
-        title="Base"
-        ids={BASE_IDS}
-        labels={BASE_LABELS}
-        selected={draft.base ? [draft.base] : []}
-        onToggle={(id) => { setDraft((d) => ({ ...d, base: d.base === id ? null : id })); setError(""); }}
-      />
-
-      <ChipGroup
-        title="Proteínas"
-        hint={` · 3 = bowl grande (+$${LARGE_BOWL_UPCHARGE} MXN)`}
-        ids={PROTEIN_IDS}
-        labels={PROTEIN_LABELS}
-        selected={draft.proteins}
-        max={MAX_PROTEINS}
-        optionPrices={PREMIUM_PROTEIN_PRICES}
-        onToggle={(id) => { setDraft((d) => ({ ...d, proteins: toggleInList(d.proteins, id, MAX_PROTEINS) })); setError(""); }}
-      />
-
-      <ChipGroup
-        title="Complementos"
-        hint=" · más de 6 cuestan $15 c/u"
-        ids={COMPLEMENT_IDS}
-        labels={COMPLEMENT_LABELS}
-        selected={draft.complements}
-        max={MAX_COMPLEMENTS}
-        onToggle={(id) => setDraft((d) => ({ ...d, complements: toggleInList(d.complements, id, MAX_COMPLEMENTS) }))}
-      />
-
-      <ChipGroup
-        title="Aderezos"
-        ids={SAUCE_IDS}
-        labels={SAUCE_LABELS}
-        selected={draft.sauces}
-        max={MAX_SAUCES}
-        onToggle={(id) => setDraft((d) => ({ ...d, sauces: toggleInList(d.sauces, id, MAX_SAUCES) }))}
-      />
-
-      <ChipGroup
-        title="Toppings"
-        ids={TOPPING_IDS}
-        labels={TOPPING_LABELS}
-        selected={draft.toppings}
-        max={MAX_TOPPINGS}
-        onToggle={(id) => setDraft((d) => ({ ...d, toppings: toggleInList(d.toppings, id, MAX_TOPPINGS) }))}
-      />
-
-      {error && <p style={{ color: "red", fontSize: 12, margin: "4px 0 10px" }}>{error}</p>}
-
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <button
-          type="button"
-          onClick={handleAdd}
-          style={{
-            flex: 1,
-            padding: "12px 16px",
-            borderRadius: 10,
-            border: "none",
-            background: "var(--p-accent, #1a1a1a)",
-            color: "#fff",
-            fontWeight: 700,
-            fontSize: 13.5,
-            cursor: "pointer",
-          }}
-        >
-          Agregar bowl — ${price} MXN
-        </button>
-        <button
-          type="button"
-          onClick={() => { setDraft(emptyDraft()); onCancel?.(); }}
-          style={{
-            padding: "12px 16px",
-            borderRadius: 10,
-            border: "1px solid var(--p-border, #ddd)",
-            background: "transparent",
-            fontWeight: 600,
-            fontSize: 13,
-            cursor: "pointer",
-          }}
-        >
-          Cancelar
-        </button>
+    <div className={ui.builder}>
+      <div className={ui.sizeBanner}>
+        <div><strong>{initialBowl ? "Editando tu bowl" : "Bowl a tu gusto"}</strong><span>Mediano ${BOWL_BASE_PRICE} · Grande ${BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE}</span></div>
+        <span className={ui.sizeBadge}>{isLarge ? "Grande · 3 proteínas" : "Mediano · 1–2 proteínas"}</span>
+      </div>
+      <nav className={ui.steps} aria-label="Pasos para armar el bowl">
+        {GROUPS.map((entry, index) => (
+          <button key={entry.key} type="button" ref={(element) => { stepRefs.current[index] = element; }} aria-current={step === index ? "step" : undefined} onClick={() => navigate(index)}>
+            <span>{selection(entry.key).length ? "✓" : index + 1}</span>{entry.title}
+            <small>{selection(entry.key).length}/{entry.max}</small>
+          </button>
+        ))}
+      </nav>
+      <section className={ui.ingredientPanel} aria-labelledby="bowl-step-title">
+        <div className={ui.groupHeader}><div><span>Paso {step + 1} de 5{step < 2 ? " · Obligatorio" : " · Opcional"}</span><h3 id="bowl-step-title">{group.title}</h3></div><strong>{selected.length} de {group.max}</strong></div>
+        <p className={ui.hint}>{group.hint}</p>
+        <div className={ui.ingredients}>
+          {group.ids.map((id) => {
+            const active = selected.includes(id);
+            const extra = group.key === "proteins" ? PREMIUM_PROTEIN_PRICES[id] || 0 : group.key === "complements" && !active && selected.length >= COMPLEMENT_FREE_LIMIT ? EXTRA_COMPLEMENT_PRICE : 0;
+            return <button key={id} type="button" aria-pressed={active} aria-disabled={!active && selected.length >= group.max} onClick={() => toggle(id)}><span className={ui.check}>{active ? "✓" : "+"}</span><span>{group.labels[id]}{extra > 0 && <small>+${extra}</small>}</span></button>;
+          })}
+        </div>
+        <p className={ui.feedback} role="status">{message || (group.key === "bases" && selected.length === 2 ? "Mitad y mitad: 50% de cada base. Toca una base seleccionada para quitarla." : selected.length >= group.max ? "Límite alcanzado. Toca un ingrediente seleccionado para quitarlo." : "Toca un ingrediente para elegirlo o quitarlo.")}</p>
+        <div className={ui.navigation}>
+          <button type="button" disabled={step === 0} onClick={() => navigate(step - 1)}>← Anterior</button>
+          {step < 4 && <button type="button" className={ui.next} disabled={step < 2 && !selected.length} onClick={() => navigate(step + 1)}>{step > 1 && !selected.length ? "Continuar sin " + group.title.toLowerCase() : "Siguiente: " + GROUPS[step + 1].title} →</button>}
+        </div>
+      </section>
+      <section className={ui.summary} aria-label="Resumen del bowl">
+        <h3>Así queda el bowl <small>Toca una sección para cambiarla</small></h3>
+        {GROUPS.map((entry, index) => <button type="button" key={entry.key} onClick={() => navigate(index)}><strong>{entry.title}</strong><span>{(entry.key === "bases" ? (draft.bases.length ? getBaseLabel(draft.bases, draft.base) : "") : selection(entry.key).map((id) => entry.labels[id]).join(", ")) || (index < 2 ? "Falta elegir" : "Sin " + entry.title.toLowerCase())}</span><span aria-hidden="true">✎</span></button>)}
+      </section>
+      <div className={ui.footer}>
+        <div className={ui.pricing} aria-live="polite"><span>{isLarge ? "Bowl grande" : "Bowl mediano"}<strong>${price} <small>MXN</small></strong></span><small>Base ${BOWL_BASE_PRICE}{isLarge ? ` + tamaño $${LARGE_BOWL_UPCHARGE}` : ""}{premium ? ` + proteína premium $${premium}` : ""}{extraComplements ? ` + ${extraComplements} complemento(s) extra $${extraComplements * EXTRA_COMPLEMENT_PRICE}` : ""}</small></div>
+        {missing && <p className={ui.missing}>{missing} para agregar el bowl.</p>}
+        <div className={ui.actions}><button type="button" onClick={onCancel}>Cancelar</button><button type="button" className={ui.add} disabled={Boolean(missing)} onClick={() => onAdd({ ...draft, bowlSize: isLarge ? "large" : "normal", price })}>{initialBowl ? "Guardar cambios" : "Agregar a la orden"} · ${price}</button></div>
       </div>
     </div>
   );

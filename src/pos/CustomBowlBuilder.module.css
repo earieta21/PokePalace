@@ -1,0 +1,55 @@
+.builder { color: var(--p-ink); font-size: 14px; }
+.sizeBanner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 16px; background: #edf6ef; border-radius: 12px; }
+.sizeBanner strong, .sizeBanner div > span { display: block; }
+.sizeBanner div > span { margin-top: 5px; color: #526458; font-size: 13px; }
+.sizeBadge { padding: 8px 10px; border-radius: 8px; background: white; color: #24563c; font-size: 12px; font-weight: 700; }
+.steps { display: flex; gap: 6px; margin: 18px 0; overflow-x: auto; padding-bottom: 4px; }
+.builder button { font: inherit; cursor: pointer; }
+.steps button { display: flex; flex: 1; align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px; min-height: 64px; padding: 8px; border: 1px solid #d7e2da; border-radius: 9px; background: #fff; color: #526458; font-size: 12px; font-weight: 700; }
+.steps button > span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #edf3ef; }
+.steps small { font-weight: 400; }
+.steps button[aria-current] { background: #2d6a4f; border-color: #2d6a4f; color: #fff; }
+.steps button[aria-current] > span { background: #fff; color: #24563c; }
+.ingredientPanel { padding: 18px; border: 1px solid #d7e2da; border-radius: 12px; }
+.groupHeader { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.groupHeader span { color: #526458; font-size: 12px; }
+.groupHeader h3 { margin: 4px 0; font-size: 22px; }
+.groupHeader > strong { white-space: nowrap; color: #24563c; font-size: 14px; }
+.hint { margin: 4px 0 16px; color: #526458; line-height: 1.5; }
+.ingredients { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.ingredients button { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 12px; border: 2px solid #dfe7e1; border-radius: 10px; background: #fff; color: #243c2d; text-align: left; font-weight: 600; }
+.ingredients button[aria-pressed="true"] { border-color: #2d6a4f; background: #edf7f0; }
+.ingredients button[aria-disabled="true"] { background: #f4f4f2; color: #69746d; }
+.check { display: grid; flex: 0 0 24px; height: 24px; place-items: center; border-radius: 6px; background: #f0f4f1; }
+[aria-pressed="true"] > .check { background: #2d6a4f; color: white; }
+.ingredients small { display: block; margin-top: 4px; color: #805015; font-size: 12px; }
+.feedback { min-height: 36px; margin: 12px 0; color: #526458; font-size: 13px; line-height: 1.4; }
+.navigation, .actions { display: flex; justify-content: space-between; gap: 10px; }
+.navigation button, .actions button { min-height: 46px; padding: 10px 14px; border: 1px solid #d7e2da; border-radius: 8px; background: #fff; color: #24563c; font-weight: 700; }
+.navigation .next { background: #edf6ef; }
+.builder button:disabled { opacity: .5; cursor: not-allowed; }
+.summary { margin: 20px 0; }
+.summary h3 { margin: 0 0 10px; font-size: 16px; }
+.summary h3 small { display: block; margin-top: 4px; font-size: 12px; font-weight: 400; color: #526458; }
+.summary button { display: grid; grid-template-columns: 104px minmax(0, 1fr) 16px; gap: 8px; width: 100%; min-height: 44px; padding: 10px 0; border: 0; border-bottom: 1px solid #e3eae5; background: none; color: #526458; text-align: left; font-size: 13px; line-height: 1.5; }
+.summary button strong { color: #243c2d; }
+.footer { position: sticky; bottom: 0; z-index: 2; padding: 14px; border: 1px solid #ceded2; border-radius: 12px; background: #fff; box-shadow: 0 -4px 16px #173c2010; }
+.pricing > span { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-weight: 600; }
+.pricing strong { font-size: 24px; color: #24563c; white-space: nowrap; }
+.pricing strong small { font-size: 12px; }
+.pricing > small { display: block; margin: 6px 0 12px; color: #526458; line-height: 1.5; }
+.missing { font-size: 12px; margin: 6px 0 10px; color: #805015; }
+.actions .add { flex: 1; background: #2d6a4f; color: white; border-color: #2d6a4f; }
+.builder button:focus-visible { outline: 3px solid #cb9227; outline-offset: 3px; }
+@media (max-width: 560px) {
+  .steps button { flex: 0 0 98px; }
+  .ingredientPanel { padding: 12px; }
+  .ingredients { gap: 7px; }
+  .ingredients button { padding: 9px; font-size: 13px; }
+  .summary button { grid-template-columns: 90px minmax(0, 1fr) 16px; }
+  .navigation button, .actions button { padding: 10px; font-size: 13px; }
+}
+
+@media (max-width: 1023px) {
+  .footer { bottom: calc(86px + env(safe-area-inset-bottom)); }
+}
