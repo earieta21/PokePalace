@@ -28,13 +28,15 @@ function buildMessage(summary) {
 Vence el 17 de ${MES_LABEL[dueMonth]}.
 
 Ingresos cobrados: ${fmtMXN(summary.ingresos.conIva)} (${summary.ordenesCobradas} órdenes)
-IVA cobrado (16%): ${fmtMXN(summary.ingresos.ivaTrasladado)}
+IVA cobrado: ${fmtMXN(summary.iva.trasladado)}
+IVA acreditable (con factura): −${fmtMXN(summary.iva.acreditable)}
+IVA neto: ${fmtMXN(summary.iva.neto)}
 ISR estimado (${(summary.isr.tasa * 100).toFixed(1)}%): ${fmtMXN(summary.isr.estimado)}
-Estimado a pagar: ${fmtMXN(summary.totalEstimado)}
+Estimado a pagar (ISR + IVA neto): ${fmtMXN(summary.totalEstimado)}
 
-Gastos registrados: ${fmtMXN(summary.gastos.total)} (${summary.gastos.movimientos} movimientos)
+Gastos registrados: ${fmtMXN(summary.gastos.total)} — ${summary.gastos.conFactura} de ${summary.gastos.movimientos} con factura
 
-Esto es una estimación de la app — pásaselo a tu contador para que revise y presente antes del 17. Ver el detalle completo en la pestaña Fiscal del portal.`;
+Esto es una estimación de la app — verifícala y pásasela a tu contador antes de presentar el 17. Ver el detalle completo en la pestaña Fiscal del portal.`;
 }
 
 /* Corre en un scheduler (ver startFiscalReminderScheduler en server.js).

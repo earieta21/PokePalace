@@ -93,9 +93,9 @@ export default function FiscalPage({ styles }) {
               <em>{data.ordenesCobradas} órdenes pagadas (IVA incluido)</em>
             </div>
             <div className={ui.kpiCard}>
-              <small>IVA cobrado (16%)</small>
-              <strong>{fmtMXN(data.ingresos.ivaTrasladado)}</strong>
-              <em>Sobre base de {fmtMXN(data.ingresos.base)}</em>
+              <small>IVA neto a pagar</small>
+              <strong>{fmtMXN(data.iva.neto)}</strong>
+              <em>{fmtMXN(data.iva.trasladado)} cobrado − {fmtMXN(data.iva.acreditable)} acreditado</em>
             </div>
             <div className={ui.kpiCard}>
               <small>ISR estimado ({(data.isr.tasa * 100).toFixed(1)}%)</small>
@@ -105,7 +105,7 @@ export default function FiscalPage({ styles }) {
             <div className={`${ui.kpiCard} ${ui.totalCard}`}>
               <small>Estimado a pagar</small>
               <strong>{fmtMXN(data.totalEstimado)}</strong>
-              <em>ISR + IVA (sin acreditar facturas de compras)</em>
+              <em>ISR + IVA neto</em>
             </div>
           </div>
 
@@ -127,6 +127,10 @@ export default function FiscalPage({ styles }) {
             <div className={ui.detailRow}>
               <span>Gastos registrados en el mes ({data.gastos.movimientos})</span>
               <strong>{fmtMXN(data.gastos.total)}</strong>
+            </div>
+            <div className={ui.detailRow}>
+              <span>Con factura (CFDI) — acreditan IVA</span>
+              <strong>{data.gastos.conFactura} de {data.gastos.movimientos}</strong>
             </div>
           </div>
 

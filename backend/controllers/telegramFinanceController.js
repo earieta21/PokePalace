@@ -63,14 +63,21 @@ async function runExtraction(session, chatId, imageBuffer, mimeType) {
     createdBy: `Telegram: ${session.telegramName || session.telegramUsername || chatId}`,
     source: "telegram",
     receiptUrl: session.pendingReceipt.cloudinaryUrl,
+    // Todo lo que llega por este bot es una factura -- el IVA solo se llena
+    // si el ticket lo traía desglosado (nunca se asume una tasa).
+    hasFactura: true,
+    facturaIva: extracted.iva,
   });
 
+  const ivaNote = extracted.iva != null
+    ? `\nIVA: $${extracted.iva.toLocaleString("es-MX")} (acreditable)`
+    : "\n⚠️ No se vio el IVA desglosado — agrégalo en Finanzas para que se acredite.";
   const reviewNote = extracted.needsReview
     ? "\n⚠️ No quedó 100% claro — revísalo en Finanzas antes de darlo por bueno."
     : "";
   await sendTelegramMessage(
     chatId,
-    `✅ Gasto registrado: $${expense.amount.toLocaleString("es-MX")} — ${expense.category}\n${expense.description}\n${expense.date}${reviewNote}`
+    `✅ Gasto registrado: $${expense.amount.toLocaleString("es-MX")} — ${expense.category}\n${expense.description}\n${expense.date}${ivaNote}${reviewNote}`
   );
 
   clearPendingReceipt(session);

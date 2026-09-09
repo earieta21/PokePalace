@@ -26,6 +26,14 @@ const expenseSchema = new mongoose.Schema(
     // Foto de la factura/ticket en Cloudinary (source: "telegram") — el
     // comprobante que respalda el gasto para el contador.
     receiptUrl:  { type: String, default: null },
+    // Si esta compra tiene CFDI (factura fiscal válida, con RFC) — es lo
+    // único que decide si el IVA de este gasto se puede acreditar contra el
+    // IVA cobrado, sin importar si se pagó en efectivo o con tarjeta (ver
+    // services/fiscalCalc.js). facturaIva es el IVA de ESA factura tal cual
+    // viene desglosado, nunca se asume un % — evita adivinar tasas (hay
+    // insumos de restaurante exentos o a tasa distinta de 16%).
+    hasFactura:  { type: Boolean, default: false },
+    facturaIva:  { type: Number, default: null, min: 0 },
   },
   { timestamps: true }
 );

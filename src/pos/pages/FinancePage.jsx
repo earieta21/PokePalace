@@ -89,6 +89,7 @@ export default function FinancePage({ styles }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     category: "Ingredientes", description: "", amount: "", date: today(),
+    hasFactura: false, facturaIva: "",
   });
   const [saving, setSaving]       = useState(false);
   const [formError, setFormError] = useState("");
@@ -235,7 +236,7 @@ export default function FinancePage({ styles }) {
 
   const closeForm = () => {
     setShowForm(false);
-    setForm({ category: "Ingredientes", description: "", amount: "", date: today() });
+    setForm({ category: "Ingredientes", description: "", amount: "", date: today(), hasFactura: false, facturaIva: "" });
     setFormError("");
   };
 
@@ -245,7 +246,12 @@ export default function FinancePage({ styles }) {
     if (!form.amount || isNaN(amt) || amt <= 0) return setFormError("Ingresa un monto válido.");
     setFormError(""); setSaving(true);
     try {
-      const { expense } = await api.post("/api/staff/expenses", { ...form, amount: amt });
+      const payload = {
+        ...form,
+        amount: amt,
+        facturaIva: form.hasFactura && form.facturaIva ? parseFloat(form.facturaIva) : null,
+      };
+      const { expense } = await api.post("/api/staff/expenses", payload);
       setExpenses((prev) => [expense, ...prev]);
       setSummary((prev) => prev
         ? { ...prev, expenses: prev.expenses + amt, profit: prev.profit - amt }
@@ -255,6 +261,27 @@ export default function FinancePage({ styles }) {
       closeForm();
     } catch (e) { setFormError(e.message); }
     finally { setSaving(false); }
+  };
+
+  // Marca/desmarca un gasto ya guardado como "con factura" -- útil cuando la
+  // factura llega después de haber capturado la compra a mano. Solo importa
+  // si hay CFDI, no cómo se pagó.
+  const toggleFactura = async (expense) => {
+    const nextHasFactura = !expense.hasFactura;
+    let facturaIva = null;
+    if (nextHasFactura) {
+      const answer = window.prompt(`¿Cuál fue el IVA de esta factura (${expense.description})? Déjalo en blanco si no lo tienes a la mano.`, "");
+      if (answer === null) return; // canceló
+      const parsed = parseFloat(answer);
+      facturaIva = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+    }
+    try {
+      const { expense: updated } = await api.patch(`/api/staff/expenses/${expense._id}`, {
+        hasFactura: nextHasFactura, facturaIva,
+      });
+      setExpenses((prev) => prev.map((e) => (e._id === updated._id ? updated : e)));
+      setNotice(nextHasFactura ? "Marcado como con factura." : "Se quitó la marca de factura.");
+    } catch (e) { setError(e.message); }
   };
 
   const handleDelete = async (id) => {
@@ -415,6 +442,22 @@ export default function FinancePage({ styles }) {
                 />
               </div>
             </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, fontSize: 13 }}>
+              <input type="checkbox"
+                checked={form.hasFactura}
+                onChange={(e) => setForm((f) => ({ ...f, hasFactura: e.target.checked, facturaIva: e.target.checked ? f.facturaIva : "" }))}
+              />
+              ¿Tiene factura (CFDI)? — solo así se puede acreditar el IVA, sin importar si pagaste en efectivo o tarjeta
+            </label>
+            {form.hasFactura && (
+              <div className={styles.formGroup} style={{ marginTop: 8 }}>
+                <label className={styles.label}>IVA de esta factura (MXN, opcional)</label>
+                <input className={styles.input} type="number" min="0" step="0.01" placeholder="Tal como viene en el CFDI"
+                  value={form.facturaIva}
+                  onChange={(e) => setForm((f) => ({ ...f, facturaIva: e.target.value }))}
+                />
+              </div>
+            )}
           </div>
 
           <div className={ui.formActions}>
@@ -739,6 +782,18 @@ export default function FinancePage({ styles }) {
                   {e.source === "fijo" && <span className={ui.sourceBadge}>🔁 Automático</span>}
                   {e.source === "nomina" && <span className={ui.sourceBadge}>👥 Nómina</span>}
                   {e.source === "telegram" && <span className={ui.sourceBadge}>🤖 Telegram</span>}
+                  <button
+                    type="button"
+                    onClick={() => toggleFactura(e)}
+                    title={e.hasFactura ? "Tiene factura (CFDI) — clic para quitar la marca" : "Marcar que esta compra tiene factura (CFDI)"}
+                    style={{
+                      marginLeft: 4, border: "none", borderRadius: 999, padding: "1px 7px", fontSize: 11, cursor: "pointer",
+                      background: e.hasFactura ? "rgba(74,122,90,0.15)" : "rgba(0,0,0,0.06)",
+                      color: e.hasFactura ? "#2d6a4f" : "var(--p-muted)",
+                    }}
+                  >
+                    🧾 {e.hasFactura ? "con factura" : "sin factura"}
+                  </button>
                 </td>
                 <td style={{ fontWeight: 500 }}>
                   {e.description}

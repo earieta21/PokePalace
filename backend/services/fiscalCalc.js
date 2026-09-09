@@ -56,6 +56,15 @@ export async function computeFiscalSummary(year, month) {
 
   const gastosTotal = expenses.reduce((sum, expense) => sum + expense.amount, 0);
 
+  // Solo el IVA de gastos marcados hasFactura (CFDI real) se puede acreditar
+  // -- nunca se asume una tasa, se suma tal cual lo capturó el usuario para
+  // cada factura (facturaIva). Efectivo o tarjeta no importa; lo que importa
+  // es si hay factura.
+  const facturados = expenses.filter((e) => e.hasFactura && e.facturaIva != null);
+  const ivaAcreditable = round2(facturados.reduce((sum, e) => sum + e.facturaIva, 0));
+  const ivaNeto = round2(ivaTrasladado - ivaAcreditable);
+  const gastosConFacturaSinIva = expenses.filter((e) => e.hasFactura && e.facturaIva == null).length;
+
   // Vencimiento: día 17 del mes siguiente
   const dueMonth = month === 12 ? 1 : month + 1;
   const dueYear = month === 12 ? year + 1 : year;
@@ -74,17 +83,27 @@ export async function computeFiscalSummary(year, month) {
       tasa: rate,
       estimado: round2(isrEstimado),
     },
-    // Sin acreditar IVA de compras (requiere facturas CFDI): estimación conservadora.
+    iva: {
+      trasladado: round2(ivaTrasladado),   // IVA cobrado en ventas
+      acreditable: ivaAcreditable,          // IVA de compras con factura (CFDI)
+      neto: ivaNeto,                        // lo que de verdad se paga de IVA
+    },
+    // Legado: mismo campo que ya leía el front antes de acreditar IVA de compras.
     ivaEstimado: round2(ivaTrasladado),
-    totalEstimado: round2(isrEstimado + ivaTrasladado),
+    totalEstimado: round2(isrEstimado + ivaNeto),
     gastos: {
       total: round2(gastosTotal),
       movimientos: expenses.length,
+      conFactura: facturados.length,
+      conFacturaSinIvaCapturado: gastosConFacturaSinIva,
     },
     vencimiento: `${dueYear}-${String(dueMonth).padStart(2, "0")}-17`,
     notas: [
       "El ISR en RESICO se calcula sobre ingresos cobrados sin IVA; los gastos NO lo reducen.",
-      "El IVA estimado es el cobrado; las facturas (CFDI) de compras con IVA pueden reducirlo. Pide factura con tu RFC a cada proveedor.",
+      "El IVA neto ya descuenta el IVA de las compras marcadas \"con factura\" -- efectivo o tarjeta no importa, lo que cuenta es tener el CFDI.",
+      ...(gastosConFacturaSinIva > 0
+        ? [`Hay ${gastosConFacturaSinIva} gasto${gastosConFacturaSinIva === 1 ? "" : "s"} marcado${gastosConFacturaSinIva === 1 ? "" : "s"} "con factura" sin el IVA capturado -- no se está acreditando hasta que se le agregue.`]
+        : []),
       "Estimación informativa: la declaración la debe revisar/presentar tu contador antes del día 17.",
     ],
   };

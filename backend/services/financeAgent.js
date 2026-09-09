@@ -24,6 +24,7 @@ const EXTRACT_TOOL = {
     type: "object",
     properties: {
       monto: { type: "number", description: "Monto total en pesos mexicanos (MXN), tal como aparece en el ticket. Sin comas ni símbolo de peso." },
+      iva: { type: "number", description: "El IVA de ESTA factura tal como viene desglosado en el ticket (no lo calcules ni asumas una tasa -- solo repórtalo si el ticket lo muestra explícitamente como línea de IVA). Omite este campo por completo si no se ve un desglose de IVA." },
       fecha: { type: "string", description: "Fecha del ticket en formato YYYY-MM-DD. Si no se alcanza a leer, usa la fecha de hoy que te dieron." },
       categoria: { type: "string", enum: EXPENSE_CATEGORIES, description: "La categoría que mejor describe este gasto." },
       descripcion: { type: "string", description: "Breve descripción: proveedor y qué se compró (máx. 100 caracteres)." },
@@ -55,7 +56,8 @@ ${notesText}
 Reglas:
 - Nunca inventes un monto que no puedas leer con razonable certeza en la imagen o en lo que dijo el usuario -- en ese caso usa confianza "baja" y pregunta concretamente qué falta.
 - Si el usuario ya aclaró algo en su texto (por ejemplo dictó el monto porque la foto salió borrosa), confía en eso.
-- La descripción debe ser corta y útil para un estado de cuenta, no una transcripción completa del ticket.`;
+- La descripción debe ser corta y útil para un estado de cuenta, no una transcripción completa del ticket.
+- Todo lo que llega por este bot se trata como factura (CFDI) real -- nunca calcules ni asumas el IVA a partir del total; repórtalo solo si el ticket lo muestra desglosado como línea de IVA, y omite el campo si no.`;
 
   const res = await fetch(ANTHROPIC_API_URL, {
     method: "POST",
@@ -97,9 +99,11 @@ export async function extractExpenseFromReceipt(buffer, mimeType, userNotes = []
   const toolUse = response.content?.find((b) => b.type === "tool_use");
   if (!toolUse?.input) throw new Error("El agente no regresó datos estructurados");
 
-  const { monto, fecha, categoria, descripcion, confianza, duda } = toolUse.input;
+  const { monto, iva, fecha, categoria, descripcion, confianza, duda } = toolUse.input;
   const numericAmount = Number(monto);
   const safeAmount = Number.isFinite(numericAmount) ? Math.round(numericAmount * 100) / 100 : null;
+  const numericIva = Number(iva);
+  const safeIva = Number.isFinite(numericIva) && numericIva >= 0 ? Math.round(numericIva * 100) / 100 : null;
 
   const needsReview = confianza !== "alta"
     || safeAmount === null
@@ -109,6 +113,7 @@ export async function extractExpenseFromReceipt(buffer, mimeType, userNotes = []
 
   return {
     amount: safeAmount,
+    iva: safeIva,
     date: /^\d{4}-\d{2}-\d{2}$/.test(fecha || "") ? fecha : today(),
     category: EXPENSE_CATEGORIES.includes(categoria) ? categoria : "Otros",
     description: String(descripcion || "Factura por Telegram").slice(0, 200),

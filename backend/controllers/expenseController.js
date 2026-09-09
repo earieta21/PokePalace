@@ -82,10 +82,18 @@ export const getFinanceSummary = async (req, res) => {
   }
 };
 
+// facturaIva nunca se calcula solo (no se asume una tasa) -- si viene, debe
+// ser el número que el usuario leyó/tecleó de la factura real.
+function parseFacturaIva(hasFactura, facturaIva) {
+  if (!hasFactura || facturaIva === undefined || facturaIva === null || facturaIva === "") return null;
+  const n = Number(facturaIva);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 /* POST /api/staff/expenses */
 export const createExpense = async (req, res) => {
   try {
-    const { category, description, amount, date, locationId } = req.body;
+    const { category, description, amount, date, locationId, hasFactura, facturaIva } = req.body;
     if (!category || !description?.trim() || amount == null || !date) {
       return res.status(400).json({ message: "category, description, amount y date son requeridos" });
     }
@@ -103,10 +111,36 @@ export const createExpense = async (req, res) => {
       date,
       locationId:  req.staff?.locationId || locationId || "tij-centro-01",
       createdBy:   req.staff?.name || req.staff?.email || "staff",
+      hasFactura:  Boolean(hasFactura),
+      facturaIva:  parseFacturaIva(hasFactura, facturaIva),
     });
     res.status(201).json({ expense });
   } catch (err) {
     res.status(400).json({ message: "Error al crear gasto", err: err.message });
+  }
+};
+
+/* PATCH /api/staff/expenses/:id — hoy solo para marcar/corregir si tiene
+   factura (CFDI) y su IVA, p. ej. cuando llega la factura días después de
+   una compra ya registrada. */
+export const updateExpense = async (req, res) => {
+  try {
+    const existing = await Expense.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: "Gasto no encontrado" });
+
+    if (req.body.hasFactura !== undefined) existing.hasFactura = Boolean(req.body.hasFactura);
+    if (req.body.facturaIva !== undefined || req.body.hasFactura !== undefined) {
+      existing.facturaIva = parseFacturaIva(existing.hasFactura, req.body.facturaIva ?? existing.facturaIva);
+    }
+    if (req.body.category !== undefined) existing.category = req.body.category;
+    if (req.body.description !== undefined && req.body.description.trim()) {
+      existing.description = req.body.description.trim();
+    }
+
+    await existing.save();
+    res.json({ expense: existing });
+  } catch (err) {
+    res.status(400).json({ message: "Error al actualizar gasto", err: err.message });
   }
 };
 
