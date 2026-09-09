@@ -32,6 +32,7 @@ import { logServerError } from "./controllers/monitorController.js";
 import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
 import { startOrderChangeStream } from "./utils/orderEvents.js";
 import { registerDueFixedExpenses } from "./utils/fixedExpenses.js";
+import { checkAndSendFiscalReminder } from "./utils/fiscalReminder.js";
 
 dotenv.config();
 
@@ -158,6 +159,20 @@ function startFixedExpenseScheduler() {
   setInterval(run, 60 * 60 * 1000);
 }
 
+// Recordatorio fiscal: unos días antes del 17 manda por Telegram el paquete
+// del mes que toca declarar. Mismo patrón que los gastos fijos -- revisar
+// seguido es inofensivo, checkAndSendFiscalReminder ya es idempotente por
+// fecha límite.
+function startFiscalReminderScheduler() {
+  const run = () => checkAndSendFiscalReminder()
+    .then((sent) => {
+      if (sent) console.log(`📋 Recordatorio fiscal enviado (declaración de ${sent.sentFor})`);
+    })
+    .catch((err) => console.error("checkAndSendFiscalReminder:", err.message));
+  run();
+  setInterval(run, 60 * 60 * 1000);
+}
+
 const start = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
@@ -168,6 +183,7 @@ const start = async () => {
       console.log(`✅ Server running on ${PORT}`);
       startKeepAlive();
       startFixedExpenseScheduler();
+      startFiscalReminderScheduler();
     });
   } catch (err) {
     console.error("❌ Error conectando a MongoDB:", err.message);
