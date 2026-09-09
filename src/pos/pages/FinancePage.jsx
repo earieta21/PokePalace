@@ -24,6 +24,7 @@ const SOURCE_LABEL = {
   inventario: "Inventario",
   fijo: "Gasto fijo automático",
   nomina: "Nómina",
+  telegram: "Telegram",
 };
 
 const PERIODS = [
@@ -737,8 +738,16 @@ export default function FinancePage({ styles }) {
                   {e.source === "inventario" && <span className={ui.sourceBadge}>📦 Inventario</span>}
                   {e.source === "fijo" && <span className={ui.sourceBadge}>🔁 Automático</span>}
                   {e.source === "nomina" && <span className={ui.sourceBadge}>👥 Nómina</span>}
+                  {e.source === "telegram" && <span className={ui.sourceBadge}>🤖 Telegram</span>}
                 </td>
-                <td style={{ fontWeight: 500 }}>{e.description}</td>
+                <td style={{ fontWeight: 500 }}>
+                  {e.description}
+                  {e.receiptUrl && (
+                    <a href={e.receiptUrl} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 6, fontSize: 11, whiteSpace: "nowrap" }}>
+                      📎 factura
+                    </a>
+                  )}
+                </td>
                 <td className={styles.tdMono}>${e.amount.toLocaleString("es-MX")} MXN</td>
                 <td>
                   {confirmDel === e._id ? (

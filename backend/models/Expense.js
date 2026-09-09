@@ -18,10 +18,14 @@ const expenseSchema = new mongoose.Schema(
     createdBy:   { type: String, default: "staff" },
     // "fijo": gasto recurrente que se anota solo cada mes (ver FixedExpense).
     // "nomina": la nómina de una semana ya cerrada, registrada desde Finanzas.
-    source:      { type: String, enum: ["manual", "inventario", "fijo", "nomina"], default: "manual" },
+    // "telegram": factura mandada por foto al bot de Finanzas, leída por el agente.
+    source:      { type: String, enum: ["manual", "inventario", "fijo", "nomina", "telegram"], default: "manual" },
     // Sparse so existing/manual expenses remain unchanged; inventory
     // receptions use it to avoid creating the same expense twice on retry.
     sourceRef:   { type: String, unique: true, sparse: true, trim: true },
+    // Foto de la factura/ticket en Cloudinary (source: "telegram") — el
+    // comprobante que respalda el gasto para el contador.
+    receiptUrl:  { type: String, default: null },
   },
   { timestamps: true }
 );
