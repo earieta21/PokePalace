@@ -10,7 +10,7 @@ import {
 } from "../../order/OrderLabels";
 
 const INVENTORY_SECTIONS = [
-  { name: "Comida", icon: "🍣", categories: ["Proteínas", "Granos", "Verduras", "Salsas", "Extras", "Otro"] },
+  { name: "Comida", icon: "🍣", categories: ["Proteínas", "Complementos", "Toppings", "Granos", "Verduras", "Salsas", "Extras", "Otro"] },
   { name: "Bebidas", icon: "🥤", categories: ["Refrescos", "Aguas", "Otro"] },
   { name: "Limpieza", icon: "🧼", categories: ["Químicos", "Higiene", "Utensilios", "Desechables", "Otro"] },
   { name: "Empaque", icon: "🥡", categories: ["Contenedores", "Cubiertos", "Bolsas", "Servilletas", "Otro"] },
@@ -66,9 +66,9 @@ const MENU_GROUPS = [
   { labels: BASE_LABELS,       group: "Base",       category: "Granos",    unit: "kg" },
   { labels: PROTEIN_LABELS,    group: "Proteína",    category: "Proteínas", unit: "kg" },
   { labels: MARINADE_LABELS,   group: "Marinado",   category: "Salsas",    unit: "L"  },
-  { labels: COMPLEMENT_LABELS, group: "Complemento", category: "Verduras",  unit: "kg" },
+  { labels: COMPLEMENT_LABELS, group: "Complemento", category: "Complementos", unit: "kg" },
   { labels: SAUCE_LABELS,      group: "Salsa",       category: "Salsas",    unit: "botellas" },
-  { labels: TOPPING_LABELS,    group: "Topping",     category: "Extras",    unit: "paq" },
+  { labels: TOPPING_LABELS,    group: "Topping",     category: "Toppings",  unit: "paq" },
 ];
 
 const MENU_ITEMS = MENU_GROUPS.flatMap(({ labels, group, category, unit }) =>
