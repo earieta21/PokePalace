@@ -22,6 +22,7 @@ const OrderSummary = ({
   saving = false,
   submitError = "",
   showOnlinePayment = false,
+  isKiosk = false,
 }) => {
   const { order, startNewBowl, editCartBowl, removeCartLine, updateCartItemQty } = useOrder();
   const { isLoggedIn, token } = useContext(AuthContext);
@@ -510,18 +511,20 @@ const OrderSummary = ({
               />
             </label>
 
-            <label className={styles.field}>
-              <span>{t("summary.phone")}</span>
-              <input
-                name="phone"
-                value={order.phone || ""}
-                onChange={(e) => order.updateCheckout("phone", e.target.value)}
-                placeholder={t("summary.phonePlaceholder")}
-                autoComplete="tel"
-                inputMode="tel"
-                required
-              />
-            </label>
+            {!isKiosk && (
+              <label className={styles.field}>
+                <span>{t("summary.phone")}</span>
+                <input
+                  name="phone"
+                  value={order.phone || ""}
+                  onChange={(e) => order.updateCheckout("phone", e.target.value)}
+                  placeholder={t("summary.phonePlaceholder")}
+                  autoComplete="tel"
+                  inputMode="tel"
+                  required
+                />
+              </label>
+            )}
 
             <label className={styles.field}>
               <span>{t("summary.fulfillment")}</span>

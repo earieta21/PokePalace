@@ -43,8 +43,8 @@ export default function KioskSummaryPage() {
       return;
     }
 
-    if (!order?.customer?.trim() || !order?.phone?.trim()) {
-      setSubmitError("Agrega tu nombre y teléfono para confirmar el pedido.");
+    if (!order?.customer?.trim()) {
+      setSubmitError("Agrega tu nombre para confirmar el pedido.");
       return;
     }
 
@@ -62,6 +62,7 @@ export default function KioskSummaryPage() {
         cart: order.cart,
         customer: order.customer,
         phone: order.phone,
+        fromKiosk: true,
         notes: order.notes,
         fulfillment: order.fulfillment,
         paymentMethod: order.paymentMethod,
@@ -139,6 +140,7 @@ export default function KioskSummaryPage() {
         onConfirm={onConfirm}
         saving={saving}
         submitError={submitError}
+        isKiosk
       />
     </div>
   );
