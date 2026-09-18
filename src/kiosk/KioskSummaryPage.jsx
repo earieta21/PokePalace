@@ -19,8 +19,20 @@ export default function KioskSummaryPage() {
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
+  // Cliente identificado por QR desde su celular. Vive SOLO en memoria: el
+  // kiosco es una pantalla compartida y el token de su cuenta no debe quedar
+  // guardado para el siguiente cliente.
+  const [pairing, setPairing] = useState(null);
+
+  const handlePaired = useCallback((data) => {
+    setPairing(data);
+    if (data.name) order.updateCheckout("customer", data.name);
+    if (data.phone) order.updateCheckout("phone", data.phone);
+  }, [order]);
+
   const goToWelcome = useCallback(() => {
     clearOrderSubmission("kiosk");
+    setPairing(null);
     resetOrder();
     navigate("/kiosk", { replace: true });
   }, [resetOrder, navigate]);
@@ -33,6 +45,7 @@ export default function KioskSummaryPage() {
 
   const onRestart = () => {
     clearOrderSubmission("kiosk");
+    setPairing(null);
     resetOrder();
     navigate("/kiosk/menu", { replace: true });
   };
@@ -74,12 +87,18 @@ export default function KioskSummaryPage() {
         clientOrderId: submission.clientOrderId,
       });
 
+      // Con cuenta ligada el pedido va autenticado (así se le acreditan los
+      // puntos); sin ella, sigue el camino de invitado con su token.
+      const headers = { "Content-Type": "application/json" };
+      if (pairing?.orderToken) {
+        headers.Authorization = `Bearer ${pairing.orderToken}`;
+      } else {
+        headers["X-Order-Token"] = submission.orderToken;
+      }
+
       const res = await fetch(`${API_URL}/api/orders`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Order-Token": submission.orderToken,
-        },
+        headers,
         body: JSON.stringify(submission.payload),
       });
 
@@ -141,6 +160,8 @@ export default function KioskSummaryPage() {
         saving={saving}
         submitError={submitError}
         isKiosk
+        pairing={pairing}
+        onPaired={handlePaired}
       />
     </div>
   );

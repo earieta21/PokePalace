@@ -6,6 +6,8 @@ import { API_URL } from "../config";
 import { PREMIUM_PROTEIN_PRICES, computeCartPricing } from "./pricing";
 import { useLanguage } from "../i18n/LanguageContext";
 import { comboPalaceSelectionLabels } from "../data/comboPalace";
+import KioskPairingQr from "../kiosk/KioskPairingQr";
+import kioskPairStyles from "../kiosk/KioskPairingQr.module.css";
 import styles from "./OrderSummary.module.css";
 
 import {
@@ -24,6 +26,8 @@ const OrderSummary = ({
   submitError = "",
   showOnlinePayment = false,
   isKiosk = false,
+  pairing = null,
+  onPaired,
 }) => {
   const { order, startNewBowl, editCartBowl, removeCartLine, updateCartItemQty } = useOrder();
   const { isLoggedIn, token } = useContext(AuthContext);
@@ -489,6 +493,22 @@ const OrderSummary = ({
               </p>
             )}
           </div>
+        )}
+
+        {isKiosk && (
+          pairing
+            ? (
+              <div className={kioskPairStyles.paired}>
+                <span className={kioskPairStyles.pairedIcon} aria-hidden="true">✅</span>
+                <div>
+                  <p className={kioskPairStyles.pairedTitle}>¡Hola, {pairing.name}!</p>
+                  <p className={kioskPairStyles.pairedSubtitle}>
+                    Este pedido acumula puntos en tu cuenta.
+                  </p>
+                </div>
+              </div>
+            )
+            : <KioskPairingQr onPaired={onPaired} />
         )}
 
         {!isKiosk && !isLoggedIn && (

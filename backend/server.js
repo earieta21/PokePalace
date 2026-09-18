@@ -29,6 +29,7 @@ import staffConsumptionRoutes from "./routes/staffConsumption.js";
 import staffFixedExpenseRoutes from "./routes/staffFixedExpenses.js";
 import whatsappRoutes from "./routes/whatsapp.js";
 import telegramFinanceRoutes from "./routes/telegramFinance.js";
+import kioskPairingRoutes from "./routes/kioskPairing.js";
 import { logServerError } from "./controllers/monitorController.js";
 import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
 import { startOrderChangeStream } from "./utils/orderEvents.js";
@@ -107,6 +108,7 @@ app.use("/api/staff/costing", staffCostingRoutes);
 app.use("/api/staff/consumption",staffConsumptionRoutes);
 app.use("/api/staff/fixed-expenses",staffFixedExpenseRoutes);
 app.use("/api/telegram",       telegramFinanceRoutes);
+app.use("/api/kiosk-pairing",  kioskPairingRoutes);
 
 app.get("/", (req, res) => {
   if (process.env.RENDER_GIT_COMMIT) res.set("X-App-Revision", process.env.RENDER_GIT_COMMIT);

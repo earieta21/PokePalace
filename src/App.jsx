@@ -25,6 +25,8 @@ const LocationPage     = lazy(() => import("./pages/LocationPage"));
 const QrCodePage       = lazy(() => import("./pages/QrCodePage"));
 const ClaimRewardPage  = lazy(() => import("./pages/ClaimRewardPage"));
 const PrivacyPolicy    = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService   = lazy(() => import("./pages/TermsOfService"));
+const KioskPair        = lazy(() => import("./pages/KioskPair"));
 
 // Kiosk & staff — lazy loaded (never used by regular customers)
 const KioskLayout      = lazy(() => import("./kiosk/KioskLayout"));
@@ -89,6 +91,8 @@ const App = () => {
               <Route path="/ubicaciones" element={<LocationPage />} />
               <Route path="/qr" element={<QrCodePage />} />
               <Route path="/aviso-de-privacidad" element={<PrivacyPolicy />} />
+              <Route path="/terminos-de-servicio" element={<TermsOfService />} />
+              <Route path="/pair/:token" element={<KioskPair />} />
 
               <Route path="/menu" element={<MenuPage />} />
               <Route path="/order" element={<OrderPage />} />

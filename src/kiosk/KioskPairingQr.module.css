@@ -1,0 +1,70 @@
+.card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--accent-bg);
+  border: 2px solid var(--accent-border);
+}
+
+.qrBox {
+  flex-shrink: 0;
+  padding: 8px;
+  border-radius: 12px;
+  background: #fff;
+  line-height: 0;
+}
+
+.text {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+.optional {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-2);
+  opacity: 0.75;
+}
+
+/* Confirmación una vez que el cliente ya se identificó desde su celular. */
+.paired {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--accent-bg);
+  border: 2px solid var(--accent);
+}
+
+.pairedIcon { font-size: 26px; flex-shrink: 0; }
+
+.pairedTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.pairedSubtitle {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
