@@ -70,6 +70,8 @@ const buildReport = async (config) => {
   return {
     config: {
       base: config.base,
+      baseCostPerKg: config.baseCostPerKg,
+      baseGramsPerPortion: config.baseGramsPerPortion,
       marinades: config.marinades,
       complements: config.complements,
       sauces: config.sauces,
@@ -115,7 +117,7 @@ export const updateCosting = async (req, res) => {
       if (req.body?.[field]) config[field] = cleanPart(req.body[field], config[field]);
     }
 
-    for (const field of ["comboDrinkCost", "comboRiceCakeCost"]) {
+    for (const field of ["baseCostPerKg", "baseGramsPerPortion", "comboDrinkCost", "comboRiceCakeCost"]) {
       if (req.body?.[field] !== undefined) {
         config[field] = Math.max(0, Number(req.body[field]) || 0);
       }

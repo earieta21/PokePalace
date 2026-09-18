@@ -17,7 +17,12 @@ const bowlCostingSchema = new mongoose.Schema(
   {
     _id: { type: String, default: "bowl-costing" },
 
+    // La base se captura por kilo + gramos por porción en vez de "costo por
+    // porción" a secas: así queda registrado cuánto es una porción, que antes
+    // no vivía en ningún lado del sistema.
     base: { type: partSchema, default: () => ({ costPerUnit: 0, unitsPerBowl: 1 }) },
+    baseCostPerKg: { type: Number, default: 0, min: 0 },
+    baseGramsPerPortion: { type: Number, default: 0, min: 0 },
     marinades: { type: partSchema, default: () => ({ costPerUnit: 0, unitsPerBowl: 1 }) },
     complements: { type: partSchema, default: () => ({ costPerUnit: 0, unitsPerBowl: 4 }) },
     sauces: { type: partSchema, default: () => ({ costPerUnit: 0, unitsPerBowl: 1 }) },

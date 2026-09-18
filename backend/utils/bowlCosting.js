@@ -84,13 +84,25 @@ export function resolveProteinCosts(inventoryItems = [], overrides = {}) {
 
 const partCost = (part) => round2((Number(part?.costPerUnit) || 0) * (Number(part?.unitsPerBowl) || 0));
 
+/**
+ * Costo de la porción de base. Si ya se capturó costo por kilo y gramos por
+ * porción, esos mandan — es el dato más fiel. Si no, se usa el costo por
+ * porción capturado a mano (como estaba antes).
+ */
+export function baseCost(config) {
+  const perKg = Number(config?.baseCostPerKg) || 0;
+  const grams = Number(config?.baseGramsPerPortion) || 0;
+  if (perKg > 0 && grams > 0) return round2((perKg / 1000) * grams);
+  return partCost(config?.base);
+}
+
 /** Desglose de costo de un bowl con una proteína, igual que la tabla de costeo. */
 export function computeBowlCost({ config, proteinCosts, proteinKey, size = "normal" }) {
   const kg = size === "large" ? LARGE_BOWL_PROTEIN_KG : MEDIUM_BOWL_PROTEIN_KG;
   const proteinCostPerKg = proteinCosts?.[proteinKey]?.costPerKg || 0;
 
   const rows = {
-    base: partCost(config.base),
+    base: baseCost(config),
     protein: round2(proteinCostPerKg * kg),
     marinades: partCost(config.marinades),
     complements: partCost(config.complements),

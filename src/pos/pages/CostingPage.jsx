@@ -8,8 +8,8 @@ const pct = (n) => `${(Number(n) || 0).toFixed(1)}%`;
 
 // Las partes del bowl que se capturan a mano: el inventario todavía no sabe
 // cuántas porciones rinde un paquete, así que esto se define una vez aquí.
+// La base no va aquí: se captura por kilo + gramos en su propio bloque.
 const PARTS = [
-  { key: "base", label: "Base", hint: "Arroz, quinoa o ensalada — costo de 1 porción" },
   { key: "marinades", label: "Marinados", hint: "Costo por marinado" },
   { key: "complements", label: "Complementos", hint: "Costo por complemento" },
   { key: "sauces", label: "Salsas", hint: "Costo por salsa" },
@@ -42,6 +42,8 @@ export default function CostingPage({ styles }) {
         costPerUnit: String(report.config[key]?.costPerUnit ?? 0),
         unitsPerBowl: String(report.config[key]?.unitsPerBowl ?? 0),
       }])),
+      baseCostPerKg: String(report.config.baseCostPerKg ?? 0),
+      baseGramsPerPortion: String(report.config.baseGramsPerPortion ?? 0),
       comboDrinkCost: String(report.config.comboDrinkCost ?? 0),
       comboRiceCakeCost: String(report.config.comboRiceCakeCost ?? 0),
       promoMinMarginPct: String(report.config.promoMinMarginPct ?? 25),
@@ -78,6 +80,8 @@ export default function CostingPage({ styles }) {
           costPerUnit: Number(form[key].costPerUnit) || 0,
           unitsPerBowl: Number(form[key].unitsPerBowl) || 0,
         }])),
+        baseCostPerKg: Number(form.baseCostPerKg) || 0,
+        baseGramsPerPortion: Number(form.baseGramsPerPortion) || 0,
         comboDrinkCost: Number(form.comboDrinkCost) || 0,
         comboRiceCakeCost: Number(form.comboRiceCakeCost) || 0,
         promoMinMarginPct: Number(form.promoMinMarginPct) || 0,
@@ -140,7 +144,12 @@ export default function CostingPage({ styles }) {
             </thead>
             <tbody>
               <tr>
-                <td className={ui.stickyCol}>Base</td>
+                <td className={ui.stickyCol}>
+                  Base
+                  {data.config.baseGramsPerPortion > 0 && (
+                    <span className={ui.hint}>{data.config.baseGramsPerPortion} g</span>
+                  )}
+                </td>
                 {bowls.map((b) => <td key={b.proteinKey}>{money(b.rows.base)}</td>)}
               </tr>
               <tr>
@@ -241,6 +250,36 @@ export default function CostingPage({ styles }) {
             Cuánto cuesta cada parte y cuántas van en un bowl. Para sacar el costo por porción:
             lo que costó el paquete ÷ cuántas porciones rinde.
           </p>
+
+          <div className={ui.baseBlock}>
+            <label>Base <span className={ui.hint}>Arroz, quinoa o ensalada</span></label>
+            <div className={ui.baseRow}>
+              <div className={ui.field}>
+                <span className={ui.hint}>Costo por kilo</span>
+                <input
+                  type="number" min="0" step="0.5" inputMode="decimal"
+                  value={form.baseCostPerKg}
+                  onChange={(e) => setForm((p) => ({ ...p, baseCostPerKg: e.target.value }))}
+                  aria-label="Costo por kilo de la base"
+                />
+              </div>
+              <div className={ui.field}>
+                <span className={ui.hint}>Gramos por porción</span>
+                <input
+                  type="number" min="0" step="10" inputMode="decimal"
+                  value={form.baseGramsPerPortion}
+                  onChange={(e) => setForm((p) => ({ ...p, baseGramsPerPortion: e.target.value }))}
+                  aria-label="Gramos por porción de la base"
+                />
+              </div>
+              <div className={ui.baseResult}>
+                <span className={ui.hint}>Costo por porción</span>
+                <strong>
+                  {money(((Number(form.baseCostPerKg) || 0) / 1000) * (Number(form.baseGramsPerPortion) || 0))}
+                </strong>
+              </div>
+            </div>
+          </div>
 
           <div className={ui.grid}>
             {PARTS.map(({ key, label, hint }) => (
