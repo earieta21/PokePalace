@@ -5,7 +5,7 @@ import {
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
   ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard, Landmark,
-  Menu, X, Wallet, Pencil, Users,
+  Menu, X, Wallet, Pencil, Users, Calculator,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -31,6 +31,7 @@ import InventoryPage from "../pos/pages/InventoryPage";
 import WastePage from "../pos/pages/WastePage";
 import ConsumptionPage from "../pos/pages/ConsumptionPage";
 import CustomersPage from "../pos/pages/CustomersPage";
+import CostingPage from "../pos/pages/CostingPage";
 import posStyles from "../pos/EmployeePortal.module.css";
 
 /* ============================================================================
@@ -143,9 +144,9 @@ const TABS_BY_ROLE = {
   employee: ["pos", "inicio", "consumo", "tareas", "temp", "horario", "avisos"],
   cashier:  ["pos", "premios", "inicio", "consumo", "tareas", "temp", "hist", "corte", "horario", "avisos"],
   kitchen:  ["cocina", "inicio", "consumo", "tareas", "temp", "hist", "mermas", "horario", "avisos"],
-  manager:  ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "panel"],
-  admin:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
-  owner:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "fiscal", "panel"],
+  manager:  ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "fiscal", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "fiscal", "panel"],
 };
 
 const TAB_META = {
@@ -160,6 +161,7 @@ const TAB_META = {
   mermas:  { label: "Mermas", title: "Registro de merma", icon: Trash2 },
   corte:   { label: "Corte", title: "Corte de caja", icon: Wallet },
   fin:     { label: "Finanzas", title: "Finanzas", icon: BarChart3 },
+  costeo:  { label: "Costeo", title: "Costeo de bowls", icon: Calculator },
   fiscal:  { label: "Fiscal", title: "Asistente fiscal (SAT)", icon: Landmark },
   disponibilidad: { label: "Tienda", title: "Disponibilidad de la tienda", icon: ToggleRight },
   panel:   { label: "Equipo", title: "Administración del equipo", icon: TrendingUp },
@@ -176,7 +178,7 @@ const TAB_GROUPS = [
   { id: "turno", label: "Mi turno", tabs: ["inicio", "consumo", "tareas", "temp"] },
   { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv", "mermas", "corte"] },
   { id: "equipo", label: "Equipo", tabs: ["horario", "avisos"] },
-  { id: "gestion", label: "Administración", tabs: ["resumen", "clientes", "ventas", "fin", "fiscal", "panel"] },
+  { id: "gestion", label: "Administración", tabs: ["resumen", "clientes", "ventas", "fin", "costeo", "fiscal", "panel"] },
 ];
 
 const MOBILE_PRIMARY_BY_ROLE = {
@@ -529,6 +531,7 @@ export default function UnifiedStaffApp() {
             {tab === "mermas"  && <WastePage styles={posStyles} />}
             {tab === "corte"   && <CashCutPage styles={posStyles} />}
             {tab === "fin"     && <FinancePage styles={posStyles} />}
+            {tab === "costeo"  && <CostingPage styles={posStyles} />}
             {tab === "fiscal"  && <FiscalPage styles={posStyles} />}
           </main>
         </div>
