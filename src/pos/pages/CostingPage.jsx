@@ -48,6 +48,12 @@ export default function CostingPage({ styles }) {
       comboRiceCakeCost: String(report.config.comboRiceCakeCost ?? 0),
       promoMinMarginPct: String(report.config.promoMinMarginPct ?? 25),
       promoEligibleMinMarginPct: String(report.config.promoEligibleMinMarginPct ?? 40),
+      complementCosts: Object.fromEntries(
+        (report.complementUsage?.keys || []).map((key) => [
+          key,
+          String(report.config.complementCosts?.[key] ?? ""),
+        ])
+      ),
       proteinCostPerKgOverride: Object.fromEntries(
         (report.bowls || []).map((b) => [
           b.proteinKey,
@@ -86,6 +92,7 @@ export default function CostingPage({ styles }) {
         comboRiceCakeCost: Number(form.comboRiceCakeCost) || 0,
         promoMinMarginPct: Number(form.promoMinMarginPct) || 0,
         promoEligibleMinMarginPct: Number(form.promoEligibleMinMarginPct) || 0,
+        complementCosts: form.complementCosts,
         proteinCostPerKgOverride: form.proteinCostPerKgOverride,
       };
       hydrate(await api.put("/api/staff/costing", payload));
@@ -101,7 +108,10 @@ export default function CostingPage({ styles }) {
   if (!data || !form) return <p className={ui.error}>{error || "No se pudo cargar el costeo."}</p>;
 
   const bowls = data.bowls || [];
+  const usage = data.complementUsage || {};
   const missingCosts = bowls.filter((b) => b.proteinSource === "falta");
+  // Cuántos de cada cosa lleva un bowl de verdad, para no capturar a ojo.
+  const realAvg = usage.averagePerBowl || {};
 
   return (
     <section className={styles?.portalSurface}>
@@ -285,7 +295,10 @@ export default function CostingPage({ styles }) {
             {PARTS.map(({ key, label, hint }) => (
               <div key={key} className={ui.field}>
                 <label>{label}</label>
-                <span className={ui.hint}>{hint}</span>
+                <span className={ui.hint}>
+                  {hint}
+                  {realAvg[key] !== undefined && ` · promedio real: ${realAvg[key]} por bowl`}
+                </span>
                 <div className={ui.inputRow}>
                   <input
                     type="number" min="0" step="0.01" inputMode="decimal"
@@ -307,6 +320,43 @@ export default function CostingPage({ styles }) {
               </div>
             ))}
           </div>
+
+          <h4 className={ui.subhead}>
+            Costo por complemento
+            <span className={ui.hint}>
+              Cada uno se pondera por qué tan seguido lo piden, según {usage.bowls} bowls
+              reales de los últimos {usage.windowDays} días. Los que dejes en cero no suman.
+            </span>
+          </h4>
+          <div className={ui.complementGrid}>
+            {(usage.keys || []).map((key) => {
+              const freq = usage.frequency?.[key] || 0;
+              const cost = Number(form.complementCosts?.[key]) || 0;
+              return (
+                <div key={key} className={ui.complementRow}>
+                  <div className={ui.complementName}>
+                    <span>{usage.labels?.[key] || key}</span>
+                    <span className={ui.freq}>{Math.round(freq * 100)}% de los bowls</span>
+                  </div>
+                  <input
+                    type="number" min="0" step="0.5" inputMode="decimal"
+                    placeholder="0"
+                    value={form.complementCosts?.[key] ?? ""}
+                    onChange={(e) => setForm((p) => ({
+                      ...p,
+                      complementCosts: { ...p.complementCosts, [key]: e.target.value },
+                    }))}
+                    aria-label={`Costo por porción de ${usage.labels?.[key] || key}`}
+                  />
+                  <span className={ui.complementShare}>{money(cost * freq)}</span>
+                </div>
+              );
+            })}
+          </div>
+          <p className={ui.complementTotal}>
+            Costo de complementos por bowl promedio:
+            <strong>{money(data.bowls[0]?.rows.complements || 0)}</strong>
+          </p>
 
           <h4 className={ui.subhead}>Proteínas sin costo en el inventario ($ por kg)</h4>
           <div className={ui.grid}>

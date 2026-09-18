@@ -29,6 +29,12 @@ const bowlCostingSchema = new mongoose.Schema(
     toppings: { type: partSchema, default: () => ({ costPerUnit: 0, unitsPerBowl: 2 }) },
     packaging: { type: partSchema, default: () => ({ costPerUnit: 0, unitsPerBowl: 1 }) },
 
+    // Costo por porción de cada complemento. No son intercambiables — el
+    // aguacate va en 59% de los bowls y la jícama casi en ninguno — así que el
+    // costo se pondera por qué tan seguido se pide cada uno de verdad, en vez
+    // de un promedio que esconde esa diferencia. { avocado: 8.5 }
+    complementCosts: { type: Map, of: Number, default: {} },
+
     // Costo por kg de cada proteína cuando el inventario no lo puede dar solo
     // (p. ej. Tofu se lleva por pieza, no por kg). { tofu: 120 }
     proteinCostPerKgOverride: { type: Map, of: Number, default: {} },
