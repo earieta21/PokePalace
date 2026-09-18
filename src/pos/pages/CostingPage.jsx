@@ -49,10 +49,10 @@ export default function CostingPage({ styles }) {
       promoMinMarginPct: String(report.config.promoMinMarginPct ?? 25),
       promoEligibleMinMarginPct: String(report.config.promoEligibleMinMarginPct ?? 40),
       complementCosts: Object.fromEntries(
-        (report.complementUsage?.keys || []).map((key) => [
-          key,
-          String(report.config.complementCosts?.[key] ?? ""),
-        ])
+        (report.complementUsage?.keys || []).map((key) => [key, {
+          costPerUnit: String(report.config.complementCosts?.[key]?.costPerUnit || ""),
+          portionsPerUnit: String(report.config.complementCosts?.[key]?.portionsPerUnit || ""),
+        }])
       ),
       proteinCostPerKgOverride: Object.fromEntries(
         (report.bowls || []).map((b) => [
@@ -92,7 +92,12 @@ export default function CostingPage({ styles }) {
         comboRiceCakeCost: Number(form.comboRiceCakeCost) || 0,
         promoMinMarginPct: Number(form.promoMinMarginPct) || 0,
         promoEligibleMinMarginPct: Number(form.promoEligibleMinMarginPct) || 0,
-        complementCosts: form.complementCosts,
+        complementCosts: Object.fromEntries(
+          Object.entries(form.complementCosts).map(([key, v]) => [key, {
+            costPerUnit: Number(v.costPerUnit) || 0,
+            portionsPerUnit: Number(v.portionsPerUnit) || 0,
+          }])
+        ),
         proteinCostPerKgOverride: form.proteinCostPerKgOverride,
       };
       hydrate(await api.put("/api/staff/costing", payload));
@@ -324,31 +329,68 @@ export default function CostingPage({ styles }) {
           <h4 className={ui.subhead}>
             Costo por complemento
             <span className={ui.hint}>
-              Cada uno se pondera por qué tan seguido lo piden, según {usage.bowls} bowls
-              reales de los últimos {usage.windowDays} días. Los que dejes en cero no suman.
+              Pon lo que te cuesta la unidad que compras (kilo, pieza o paquete) y cuántas
+              porciones rinde — la app saca el costo por porción. El costo sale del inventario
+              cuando ya está capturado ahí. Se pondera por qué tan seguido lo piden, según
+              {" "}{usage.bowls} bowls reales de los últimos {usage.windowDays} días.
             </span>
           </h4>
           <div className={ui.complementGrid}>
             {(usage.keys || []).map((key) => {
+              const label = usage.labels?.[key] || key;
               const freq = usage.frequency?.[key] || 0;
-              const cost = Number(form.complementCosts?.[key]) || 0;
+              const resolved = data.complementCosts?.[key] || {};
+              const entry = form.complementCosts?.[key] || {};
+              const costPerUnit = Number(entry.costPerUnit) || resolved.costPerUnit || 0;
+              const portions = Number(entry.portionsPerUnit) || 0;
+              const perPortion = costPerUnit > 0 && portions > 0 ? costPerUnit / portions : 0;
               return (
-                <div key={key} className={ui.complementRow}>
-                  <div className={ui.complementName}>
-                    <span>{usage.labels?.[key] || key}</span>
+                <div key={key} className={ui.complementCard}>
+                  <div className={ui.complementHead}>
+                    <span className={ui.complementLabel}>{label}</span>
                     <span className={ui.freq}>{Math.round(freq * 100)}% de los bowls</span>
                   </div>
-                  <input
-                    type="number" min="0" step="0.5" inputMode="decimal"
-                    placeholder="0"
-                    value={form.complementCosts?.[key] ?? ""}
-                    onChange={(e) => setForm((p) => ({
-                      ...p,
-                      complementCosts: { ...p.complementCosts, [key]: e.target.value },
-                    }))}
-                    aria-label={`Costo por porción de ${usage.labels?.[key] || key}`}
-                  />
-                  <span className={ui.complementShare}>{money(cost * freq)}</span>
+                  <div className={ui.complementInputs}>
+                    <label>
+                      <span className={ui.hint}>
+                        Costo por {resolved.unit || "unidad"}
+                        {resolved.source === "inventario" && " · del inventario"}
+                      </span>
+                      <input
+                        type="number" min="0" step="0.5" inputMode="decimal"
+                        placeholder={resolved.costPerUnit ? String(resolved.costPerUnit) : "0"}
+                        value={entry.costPerUnit ?? ""}
+                        onChange={(e) => setForm((p) => ({
+                          ...p,
+                          complementCosts: {
+                            ...p.complementCosts,
+                            [key]: { ...p.complementCosts[key], costPerUnit: e.target.value },
+                          },
+                        }))}
+                        aria-label={`Costo por unidad de ${label}`}
+                      />
+                    </label>
+                    <label>
+                      <span className={ui.hint}>Porciones que rinde</span>
+                      <input
+                        type="number" min="0" step="1" inputMode="decimal"
+                        placeholder="0"
+                        value={entry.portionsPerUnit ?? ""}
+                        onChange={(e) => setForm((p) => ({
+                          ...p,
+                          complementCosts: {
+                            ...p.complementCosts,
+                            [key]: { ...p.complementCosts[key], portionsPerUnit: e.target.value },
+                          },
+                        }))}
+                        aria-label={`Porciones por unidad de ${label}`}
+                      />
+                    </label>
+                  </div>
+                  <div className={ui.complementFoot}>
+                    <span>{money(perPortion)} por porción</span>
+                    <strong>{money(perPortion * freq)}</strong>
+                  </div>
                 </div>
               );
             })}

@@ -8,6 +8,7 @@ import {
   computeBowlCost,
   computeComboCost,
   promoVerdict,
+  resolveComplementCosts,
   resolveProteinCosts,
   weightedMargin,
 } from "../utils/bowlCosting.js";
@@ -119,8 +120,16 @@ const buildReport = async (config) => {
     Object.fromEntries(config.proteinCostPerKgOverride || [])
   );
 
+  const capturedComplements = Object.fromEntries(
+    [...(config.complementCosts || [])].map(([key, value]) => [
+      key,
+      { costPerUnit: value?.costPerUnit || 0, portionsPerUnit: value?.portionsPerUnit || 0 },
+    ])
+  );
+  const complementCosts = resolveComplementCosts(inventoryItems, capturedComplements);
+
   const bowls = PROTEIN_KEYS.map((proteinKey) => {
-    const bowl = computeBowlCost({ config, proteinCosts, proteinKey, complementUsage });
+    const bowl = computeBowlCost({ config, proteinCosts, proteinKey, complementUsage, complementCosts });
     return { ...bowl, verdict: promoVerdict(bowl, config), sold30d: salesMix[proteinKey] || 0 };
   });
 
@@ -143,7 +152,7 @@ const buildReport = async (config) => {
       promoMinMarginPct: config.promoMinMarginPct,
       promoEligibleMinMarginPct: config.promoEligibleMinMarginPct,
       proteinCostPerKgOverride: Object.fromEntries(config.proteinCostPerKgOverride || []),
-      complementCosts: Object.fromEntries(config.complementCosts || []),
+      complementCosts: capturedComplements,
       updatedAt: config.updatedAt,
       updatedBy: config.updatedBy,
     },
@@ -156,6 +165,7 @@ const buildReport = async (config) => {
       labels: COMPLEMENT_LABELS,
       keys: COMPLEMENT_KEYS,
     },
+    complementCosts,
   };
 };
 
@@ -200,11 +210,13 @@ export const updateCosting = async (req, res) => {
     if (req.body?.complementCosts && typeof req.body.complementCosts === "object") {
       for (const key of COMPLEMENT_KEYS) {
         const raw = req.body.complementCosts[key];
-        if (raw === "" || raw === null) {
+        if (raw === null || raw === undefined) continue;
+        const costPerUnit = Math.max(0, Number(raw.costPerUnit) || 0);
+        const portionsPerUnit = Math.max(0, Number(raw.portionsPerUnit) || 0);
+        if (costPerUnit === 0 && portionsPerUnit === 0) {
           config.complementCosts.delete(key);
-        } else if (raw !== undefined) {
-          const value = Number(raw);
-          if (Number.isFinite(value) && value >= 0) config.complementCosts.set(key, value);
+        } else {
+          config.complementCosts.set(key, { costPerUnit, portionsPerUnit });
         }
       }
     }

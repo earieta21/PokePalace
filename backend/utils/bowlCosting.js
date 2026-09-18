@@ -56,6 +56,27 @@ const INVENTORY_NAME_ALIASES = {
   seared_tuna: ["atun sellado", "atun"],
 };
 
+// Igual que las proteínas: el inventario no tiene `menuKeys` llenos, así que
+// se empata por nombre como respaldo.
+const COMPLEMENT_INVENTORY_ALIASES = {
+  shredded_carrots: ["zanahoria", "zanahoria rallada"],
+  cucumber: ["pepino"],
+  mango: ["mango"],
+  jicama: ["jicama"],
+  seaweed: ["wakame alga", "alga", "ensalada de alga"],
+  avocado: ["aguacate"],
+  edamame: ["edamame"],
+  red_onion: ["cebolla morada"],
+  beet: ["betabel"],
+  surimi: ["surimi"],
+  spicy_surimi: ["surimi"],
+  kale: ["kale", "col rizada"],
+  peas: ["chicharo", "chicharos"],
+  corn: ["elote", "maiz"],
+  pineapple: ["pina"],
+  chia_seeds: ["chia delgada", "chia", "semillas de chia"],
+};
+
 const normalize = (value) => String(value || "")
   .trim()
   .toLowerCase()
@@ -122,28 +143,57 @@ export function baseCost(config) {
 }
 
 /**
- * Costo de complementos de un bowl promedio. Si ya se capturó el costo de
- * complementos individuales, se pondera cada uno por qué tan seguido lo piden
- * (aguacate en 59% de los bowls pesa más que jícama en 0%). Si no hay nada
- * capturado, cae al promedio simple × cantidad.
+ * Costo por porción de cada complemento. Se arma igual que las proteínas: el
+ * precio de la unidad (kilo, pieza o paquete) sale del inventario cuando se
+ * puede, y quien captura solo dice cuántas porciones rinde esa unidad — que es
+ * el dato que el inventario no tiene y nadie más puede saber.
  */
-export function complementsCost(config, usage) {
-  const costs = config?.complementCosts instanceof Map
-    ? Object.fromEntries(config.complementCosts)
-    : (config?.complementCosts || {});
+export function resolveComplementCosts(inventoryItems = [], captured = {}) {
+  const byKey = {};
 
-  const captured = COMPLEMENT_KEYS.filter((key) => Number(costs[key]) > 0);
-  if (captured.length === 0 || !usage) return partCost(config?.complements);
+  for (const key of COMPLEMENT_KEYS) {
+    const entry = captured?.[key] || {};
+    const portions = Number(entry.portionsPerUnit) || 0;
+    const manualCost = Number(entry.costPerUnit) || 0;
+
+    const linked = inventoryItems.find((item) => (item.menuKeys || []).includes(key));
+    const aliases = COMPLEMENT_INVENTORY_ALIASES[key] || [];
+    const byName = inventoryItems.find((item) => aliases.includes(normalize(item.item)));
+    const match = linked || byName;
+    const inventoryCost = Number(match?.cost) > 0 ? Number(match.cost) : 0;
+
+    const costPerUnit = manualCost > 0 ? manualCost : inventoryCost;
+    byKey[key] = {
+      costPerUnit,
+      portionsPerUnit: portions,
+      unit: match?.unit || null,
+      itemName: match?.item || null,
+      source: manualCost > 0 ? "manual" : inventoryCost > 0 ? "inventario" : "falta",
+      costPerPortion: costPerUnit > 0 && portions > 0 ? round2(costPerUnit / portions) : 0,
+    };
+  }
+
+  return byKey;
+}
+
+/**
+ * Costo de complementos de un bowl promedio: cada complemento pesa según qué
+ * tan seguido lo piden (aguacate en 77% de los bowls pesa más que jícama en
+ * 0%). Sin nada capturado, cae al promedio simple × cantidad.
+ */
+export function complementsCost(config, usage, complementCosts) {
+  const withCost = COMPLEMENT_KEYS.filter((key) => (complementCosts?.[key]?.costPerPortion || 0) > 0);
+  if (withCost.length === 0 || !usage) return partCost(config?.complements);
 
   let total = 0;
-  for (const key of captured) {
-    total += Number(costs[key]) * (Number(usage.frequency?.[key]) || 0);
+  for (const key of withCost) {
+    total += complementCosts[key].costPerPortion * (Number(usage.frequency?.[key]) || 0);
   }
   return round2(total);
 }
 
 /** Desglose de costo de un bowl con una proteína, igual que la tabla de costeo. */
-export function computeBowlCost({ config, proteinCosts, proteinKey, size = "normal", complementUsage = null }) {
+export function computeBowlCost({ config, proteinCosts, proteinKey, size = "normal", complementUsage = null, complementCosts = null }) {
   const kg = size === "large" ? LARGE_BOWL_PROTEIN_KG : MEDIUM_BOWL_PROTEIN_KG;
   const proteinCostPerKg = proteinCosts?.[proteinKey]?.costPerKg || 0;
 
@@ -151,7 +201,7 @@ export function computeBowlCost({ config, proteinCosts, proteinKey, size = "norm
     base: baseCost(config),
     protein: round2(proteinCostPerKg * kg),
     marinades: partCost(config.marinades),
-    complements: complementsCost(config, complementUsage),
+    complements: complementsCost(config, complementUsage, complementCosts),
     sauces: partCost(config.sauces),
     toppings: partCost(config.toppings),
     packaging: partCost(config.packaging),
