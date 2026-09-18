@@ -6,6 +6,11 @@ const signToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
 };
 
+// Incentivo para que la gente cree cuenta en vez de seguir pidiendo como
+// invitado — sin esto casi nadie se registra y el programa de recompensas
+// no tiene con quién funcionar.
+const SIGNUP_BONUS_POINTS = 50;
+
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -51,6 +56,9 @@ export const register = async (req, res) => {
       name: cleanName,
       email: cleanEmail,
       password: hashedPassword,
+      points: SIGNUP_BONUS_POINTS,
+      lifetimePoints: SIGNUP_BONUS_POINTS,
+      pointsLastEarnedAt: new Date(),
     });
 
     const token = signToken(user._id);

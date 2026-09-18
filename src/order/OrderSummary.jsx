@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useOrder } from "./OrderContext";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
@@ -26,6 +27,7 @@ const OrderSummary = ({
 }) => {
   const { order, startNewBowl, editCartBowl, removeCartLine, updateCartItemQty } = useOrder();
   const { isLoggedIn, token } = useContext(AuthContext);
+  const location = useLocation();
   const { language, t } = useLanguage();
   const labels = ITEM_LABELS[language] || ITEM_LABELS.es;
 
@@ -486,6 +488,23 @@ const OrderSummary = ({
                 {favoriteMsg}
               </p>
             )}
+          </div>
+        )}
+
+        {!isKiosk && !isLoggedIn && (
+          <div className={styles.signupPrompt}>
+            <span className={styles.signupPromptIcon} aria-hidden="true">🎁</span>
+            <div className={styles.signupPromptText}>
+              <p className={styles.signupPromptTitle}>{t("summary.signupPromptTitle")}</p>
+              <p className={styles.signupPromptSubtitle}>{t("summary.signupPromptSubtitle")}</p>
+            </div>
+            <Link
+              className={styles.signupPromptButton}
+              to="/register"
+              state={{ from: location.pathname + location.search }}
+            >
+              {t("summary.signupPromptCta")}
+            </Link>
           </div>
         )}
 
