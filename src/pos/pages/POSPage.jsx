@@ -89,6 +89,10 @@ export default function POSPage({ styles }) {
   const [notes, setNotes]       = useState("");
   const [fulfillment, setFulfillment] = useState("pickup");
   const [paymentMethod, setPaymentMethod] = useState("card_terminal");
+  // El POS se recorre en 3 fases para no tener todo encima a la vez. La
+  // navegación es libre a propósito: en hora pico el cajero salta entre pasos
+  // (el cliente agrega algo mientras paga) y un flujo rígido le estorbaría.
+  const [phase, setPhase] = useState(1);
   const [referralSource, setReferralSource] = useState("");
   const [referralSourceOther, setReferralSourceOther] = useState("");
   const [saving, setSaving]     = useState(false);
@@ -239,6 +243,7 @@ export default function POSPage({ styles }) {
   };
 
   const clearOrder = () => {
+    setPhase(1);
     resetBuilder();
     pendingSaleRef.current = null;
     setCart([]);
@@ -498,6 +503,7 @@ export default function POSPage({ styles }) {
     setFulfillment("pickup");
     setPaymentMethod("card_terminal");
     setReferralSource("");
+    setPhase(1);
     setReferralSourceOther("");
     setRewardCode("");
     setReward(null);
@@ -556,84 +562,334 @@ export default function POSPage({ styles }) {
       )}
       {error && <div className={ui.errorBanner} role="alert"><span>!</span>{error}</div>}
 
+      <nav className={ui.phaseNav} aria-label="Pasos de la orden">
+        {[
+          [1, "Productos", cart.length > 0 ? `${cart.length} en la orden` : "Elige qué lleva"],
+          [2, "Cliente", rewardsCustomer ? rewardsCustomer.name : "Puntos y referido"],
+          [3, "Cobrar", cart.length > 0 ? `$${total.toLocaleString("es-MX")}` : "Sin productos"],
+        ].map(([number, label, detail]) => (
+          <button
+            key={number}
+            type="button"
+            className={phase === number ? ui.phaseActive : ""}
+            aria-current={phase === number ? "step" : undefined}
+            onClick={() => setPhase(number)}
+          >
+            <span className={ui.phaseNumber}>{number}</span>
+            <span className={ui.phaseText}><strong>{label}</strong><small>{detail}</small></span>
+          </button>
+        ))}
+      </nav>
+
       <div className={ui.posWorkspace}>
       {/* Menú / Bowl personalizado */}
-      <section className={ui.menuPanel}>
+      {/* Fase 1 — Productos */}
+      {phase === 1 && (
+        <section className={ui.menuPanel}>
         <div className={ui.modeSwitch}>
-          <button
-            type="button"
-            onClick={() => setMode("menu")}
-            className={mode === "menu" ? ui.modeActive : ""}
-            aria-pressed={mode === "menu"}
-          >
-            <span>▦</span> Productos
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("bowl")}
-            className={mode === "bowl" ? ui.modeActive : ""}
-            aria-pressed={mode === "bowl"}
-          >
-            <span>＋</span> {customRewardBowl ? "Editar bowl" : "Armar tu bowl"}
-          </button>
+        <button
+        type="button"
+        onClick={() => setMode("menu")}
+        className={mode === "menu" ? ui.modeActive : ""}
+        aria-pressed={mode === "menu"}
+        >
+        <span>▦</span> Productos
+        </button>
+        <button
+        type="button"
+        onClick={() => setMode("bowl")}
+        className={mode === "bowl" ? ui.modeActive : ""}
+        aria-pressed={mode === "bowl"}
+        >
+        <span>＋</span> {customRewardBowl ? "Editar bowl" : "Armar tu bowl"}
+        </button>
         </div>
 
         {mode === "menu" && (
-          <>
-            <div className={ui.menuIntro}>
-              <div><span>Paso 1</span><h2>Elige los productos</h2><p>Toca una tarjeta para agregarla a la orden.</p></div>
-              <label className={ui.menuSearch}>
-                <span>⌕</span>
-                <input value={menuSearch} onChange={(e) => setMenuSearch(e.target.value)} aria-label="Buscar producto" placeholder="Buscar producto…" />
-              </label>
-            </div>
-            <button type="button" className={ui.bowlShortcut} onClick={() => setMode("bowl")}>
-              <span aria-hidden="true">🥗</span><span><strong>{customRewardBowl ? "Editar bowl personalizado" : "Armar tu bowl"}</strong><small>Elige ingredientes · Mediano ${BOWL_BASE_PRICE} / Grande ${BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE}</small></span><span aria-hidden="true">→</span>
-            </button>
-            <div className={ui.categoryTabs} aria-label="Categorías del menú">
-              {MENU_CATEGORIES.map((category) => (
-                <button key={category} type="button" aria-pressed={menuCategory === category} onClick={() => setMenuCategory(category)}>{category}</button>
-              ))}
-            </div>
-            <div className={ui.productGrid}>
-              {visibleMenu.map((item) => {
-                // Un mismo producto puede tener varias líneas en el carrito
-                // si es un bowl rápido con distinta proteína cada vez.
-                const quantity = cart
-                  .filter((cartItem) => cartItem.id === item.id)
-                  .reduce((sum, cartItem) => sum + cartItem.qty, 0);
-                return (
-                <button
-                  key={item.id}
-                  className={ui.productCard}
-                  onClick={() => item.needsProtein
-                    ? setProteinPickerItem(item)
-                    : item.needsCombo ? openComboPicker(item) : addItem(item)}
-                  type="button"
-                >
-                  {quantity > 0 && <span className={ui.inCartBadge}>{quantity}</span>}
-                  <span className={ui.productIcon}>{item.icon}</span>
-                  <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.needsCombo ? "Elige bowl, bebida y snack" : item.needsProtein ? "Elige la proteína" : "Toca para agregar"}</small></span>
-                  <span className={ui.productPrice}>${item.price}</span>
-                  <span className={ui.addProduct}>+</span>
-                </button>
-                );
-              })}
-            </div>
-            {visibleMenu.length === 0 && <div className={ui.noProducts}>No encontramos productos con esos filtros.<button type="button" onClick={() => { setMenuSearch(""); setMenuCategory("Todos"); }}>Ver todos los productos</button></div>}
-          </>
+        <>
+        <div className={ui.menuIntro}>
+        <div><span>Paso 1</span><h2>Elige los productos</h2><p>Toca una tarjeta para agregarla a la orden.</p></div>
+        <label className={ui.menuSearch}>
+        <span>⌕</span>
+        <input value={menuSearch} onChange={(e) => setMenuSearch(e.target.value)} aria-label="Buscar producto" placeholder="Buscar producto…" />
+        </label>
+        </div>
+        <button type="button" className={ui.bowlShortcut} onClick={() => setMode("bowl")}>
+        <span aria-hidden="true">🥗</span><span><strong>{customRewardBowl ? "Editar bowl personalizado" : "Armar tu bowl"}</strong><small>Elige ingredientes · Mediano ${BOWL_BASE_PRICE} / Grande ${BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE}</small></span><span aria-hidden="true">→</span>
+        </button>
+        <div className={ui.categoryTabs} aria-label="Categorías del menú">
+        {MENU_CATEGORIES.map((category) => (
+        <button key={category} type="button" aria-pressed={menuCategory === category} onClick={() => setMenuCategory(category)}>{category}</button>
+        ))}
+        </div>
+        <div className={ui.productGrid}>
+        {visibleMenu.map((item) => {
+        // Un mismo producto puede tener varias líneas en el carrito
+        // si es un bowl rápido con distinta proteína cada vez.
+        const quantity = cart
+        .filter((cartItem) => cartItem.id === item.id)
+        .reduce((sum, cartItem) => sum + cartItem.qty, 0);
+        return (
+        <button
+        key={item.id}
+        className={ui.productCard}
+        onClick={() => item.needsProtein
+        ? setProteinPickerItem(item)
+        : item.needsCombo ? openComboPicker(item) : addItem(item)}
+        type="button"
+        >
+        {quantity > 0 && <span className={ui.inCartBadge}>{quantity}</span>}
+        <span className={ui.productIcon}>{item.icon}</span>
+        <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.needsCombo ? "Elige bowl, bebida y snack" : item.needsProtein ? "Elige la proteína" : "Toca para agregar"}</small></span>
+        <span className={ui.productPrice}>${item.price}</span>
+        <span className={ui.addProduct}>+</span>
+        </button>
+        );
+        })}
+        </div>
+        {visibleMenu.length === 0 && <div className={ui.noProducts}>No encontramos productos con esos filtros.<button type="button" onClick={() => { setMenuSearch(""); setMenuCategory("Todos"); }}>Ver todos los productos</button></div>}
+        </>
         )}
         <div className={ui.bowlPanel} hidden={mode !== "bowl"} ref={builderPanelRef} tabIndex={-1} aria-label="Armar tu bowl">
-          <div className={ui.menuIntro}><div><span>Paso 1</span><h2>Armar tu bowl</h2><p>Elige los ingredientes y revisa el precio antes de agregarlo.</p></div></div>
-          {customRewardBowl && <p className={ui.bowlNotice}>Estás editando el bowl de esta orden. Para otro bowl personalizado, abre un ticket separado.</p>}
-          <CustomBowlBuilder key={`${builderVersion}-${customRewardBowl ? "edit" : "new"}`} initialBowl={customRewardBowl?.bowl} onAdd={handleAddBowl} onCancel={resetBuilder} />
+        <div className={ui.menuIntro}><div><span>Paso 1</span><h2>Armar tu bowl</h2><p>Elige los ingredientes y revisa el precio antes de agregarlo.</p></div></div>
+        {customRewardBowl && <p className={ui.bowlNotice}>Estás editando el bowl de esta orden. Para otro bowl personalizado, abre un ticket separado.</p>}
+        <CustomBowlBuilder key={`${builderVersion}-${customRewardBowl ? "edit" : "new"}`} initialBowl={customRewardBowl?.bowl} onAdd={handleAddBowl} onCancel={resetBuilder} />
         </div>
-      </section>
+        </section>
+      )}
+
+      {/* Fase 2 — Cliente */}
+      {phase === 2 && (
+        <section className={ui.menuPanel}>
+          <div className={ui.menuIntro}>
+            <div><span>Paso 2</span><h2>Datos del cliente</h2><p>Entrega, puntos y de dónde nos conoce.</p></div>
+          </div>
+          <div className={ui.orderOptions}>
+            <div className={ui.optionGroup}>
+            <span>Entrega</span>
+            <div className={ui.optionButtons}>
+            {[
+            ["pickup", "Para llevar"], ["dine_in", "En restaurante"], ["delivery", "Delivery"],
+            ].map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={fulfillment === value} onClick={() => setFulfillment(value)}>{label}</button>
+            ))}
+            </div>
+            </div>
+
+            {/* Rewards y notas siguen plegables: son opcionales y abrirlos
+                siempre volveria a llenar la pantalla, que es justo lo que se
+                quiso quitar. */}
+            <button
+            type="button"
+            className={ui.detailsToggle}
+            aria-expanded={showLoyalty || Boolean(rewardsCustomer)}
+            onClick={() => setShowLoyalty((visible) => !visible)}
+            >
+            <span>
+            <span className={ui.loyaltyIcon} aria-hidden="true">★</span>{" "}
+            {rewardsCustomer ? rewardsCustomer.name : "Cliente Rewards"} <small>Opcional · suma puntos</small>
+            </span>
+            <span>{(showLoyalty || rewardsCustomer) ? "−" : "+"}</span>
+            </button>
+            {(showLoyalty || rewardsCustomer) && (
+            <section className={ui.loyaltyPanel} aria-label="Cliente Rewards">
+            {rewardsCustomer ? (
+            <div className={ui.loyaltySelected}>
+            <div>
+            <strong>{rewardsCustomer.name}</strong>
+            <span>{rewardsCustomer.phone || rewardsCustomer.email}</span>
+            <small>Saldo actual: {rewardsCustomer.points ?? 0} puntos</small>
+            </div>
+            <button type="button" onClick={removeRewardsCustomer}>Cambiar</button>
+            <p>
+            {paymentMethod === "pay_at_pickup"
+            ? `Ganará ${rewardsPointsPreview} puntos cuando se registre el pago.`
+            : `Ganará ${rewardsPointsPreview} puntos con esta compra${rewardsMultiplier === 2 ? " · Nivel Oro 2×" : ""}.`}
+            </p>
+            {memberQrPayload && (
+            <div className={ui.memberRewards}>
+            <span>Usar puntos en esta compra</span>
+            <small>Elige un premio; los puntos se descuentan al confirmar.</small>
+            <div>
+            {REWARDS.map((catalogReward) => {
+            const enoughPoints = (rewardsCustomer.points ?? 0) >= catalogReward.cost;
+            return (
+            <button
+            key={catalogReward.id}
+            type="button"
+            disabled={!enoughPoints || Boolean(memberRedeeming) || Boolean(reward)}
+            onClick={() => redeemFromMemberQr(catalogReward)}
+            title={catalogReward.terms.es}
+            >
+            <strong>{catalogReward.name.es}</strong>
+            <em>{enoughPoints ? `Usar ${catalogReward.cost} pts` : `Faltan ${catalogReward.cost - (rewardsCustomer.points ?? 0)} pts`}</em>
+            </button>
+            );
+            })}
+            </div>
+            {memberRedeeming && <p>Confirmando canje…</p>}
+            </div>
+            )}
+            </div>
+            ) : (
+            <>
+            <button
+            type="button"
+            className={ui.scanMemberButton}
+            onClick={() => { setShowMemberScanner(true); setError(""); }}
+            >
+            <span aria-hidden="true">▦</span> Escanear QR del miembro
+            </button>
+            <div className={ui.loyaltyDivider}><span>o buscar la cuenta</span></div>
+            <form
+            className={ui.loyaltySearch}
+            onSubmit={(event) => { event.preventDefault(); searchRewardsCustomers(); }}
+            >
+            <input
+            value={customerLookup}
+            onChange={(event) => {
+            setCustomerLookup(event.target.value);
+            setCustomerMatches([]);
+            setCustomerSearchDone(false);
+            }}
+            placeholder="Teléfono, correo o nombre"
+            autoComplete="off"
+            />
+            <button type="submit" disabled={customerLookup.trim().length < 3 || customerSearching}>
+            {customerSearching ? "Buscando…" : "Buscar"}
+            </button>
+            </form>
+            {customerMatches.length > 0 && (
+            <div className={ui.loyaltyResults}>
+            {customerMatches.map((customer) => (
+            <button key={customer._id} type="button" onClick={() => selectRewardsCustomer(customer)}>
+            <span><strong>{customer.name}</strong><small>{customer.phone || customer.email}</small></span>
+            <em>{customer.points ?? 0} pts</em>
+            </button>
+            ))}
+            </div>
+            )}
+            {customerSearchDone && customerMatches.length === 0 && (
+            <p className={ui.loyaltyEmpty}>No encontramos una cuenta. La venta puede continuar sin Rewards.</p>
+            )}
+            </>
+            )}
+            </section>
+            )}
+
+            <button type="button" className={ui.detailsToggle} aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails((visible) => !visible)}>
+            <span>Cliente y notas <small>Opcional</small></span><span>{showCustomerDetails ? "−" : "+"}</span>
+            </button>
+            {showCustomerDetails && (
+            <div className={ui.optionalFields}>
+            <input className={styles.input} placeholder="Cliente o número de mesa" value={cliente} onChange={(e) => setCliente(e.target.value)} />
+            <input className={styles.input} placeholder="Teléfono" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <input className={styles.input} placeholder="Notas para cocina" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
+            )}
+
+            {/* El referido solo se pregunta a quien no es miembro: a un cliente
+                conocido no tiene caso volver a preguntarle, y en hora pico cada
+                toque de más cuesta. */}
+            {!rewardsCustomer && (
+              <div className={ui.optionGroup}>
+                <span>¿Cómo nos conoció? <small>Un toque</small></span>
+                <div className={ui.optionButtons}>
+                  {REFERRAL_SOURCES.map(({ id, label, icon }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={referralSource === id}
+                      onClick={() => setReferralSource((current) => (current === id ? "" : id))}
+                    >
+                      {icon} {label}
+                    </button>
+                  ))}
+                </div>
+                {referralSource === "otro" && (
+                  <input
+                    className={styles.input}
+                    placeholder="¿Dónde fue exactamente?"
+                    value={referralSourceOther}
+                    onChange={(e) => setReferralSourceOther(e.target.value)}
+                    maxLength={80}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Fase 3 — Cobro */}
+      {phase === 3 && (
+        <section className={ui.menuPanel}>
+          <div className={ui.menuIntro}>
+            <div><span>Paso 3</span><h2>Cobrar</h2><p>Elige la forma de pago y confirma.</p></div>
+          </div>
+          <div className={ui.orderOptions}>
+            <div className={ui.optionGroup}>
+            <span>Forma de pago</span>
+            <div className={ui.optionButtons}>
+            {[
+            ["card_terminal", "Tarjeta"], ["cash", "Efectivo"], ["pay_at_pickup", "Pendiente"],
+            ].map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={paymentMethod === value} onClick={() => setPaymentMethod(value)}>{label}</button>
+            ))}
+            </div>
+            </div>
+          </div>
+          <div className={ui.checkoutPanel}>
+          <button type="button" className={ui.detailsToggle} aria-expanded={showReward} onClick={() => setShowReward((visible) => !visible)}>
+          <span>Código de premio <small>Opcional</small></span><span>{showReward ? "−" : "+"}</span>
+          </button>
+          {showReward && (
+          <div className={ui.rewardArea}>
+          <div>
+          <input className={styles.input} value={rewardCode} onChange={(e) => { setRewardCode(e.target.value.toUpperCase()); setReward(null); setRewardTopping(""); }} placeholder="Código" maxLength={6} />
+          <button type="button" className={styles.btnGhost} onClick={lookupReward} disabled={!rewardCode.trim() || rewardLoading}>{rewardLoading ? "Buscando…" : "Aplicar"}</button>
+          </div>
+          {reward && <div className={ui.rewardSuccess}><strong>{reward.name.es}</strong><span>{reward.terms.es}</span></div>}
+          {reward?.type === "extra_topping" && (
+          <label>
+          <span>Elige el topping extra</span>
+          <select
+          className={styles.input}
+          value={rewardTopping}
+          onChange={(event) => { setRewardTopping(event.target.value); setError(""); }}
+          required
+          >
+          <option value="">Seleccionar topping…</option>
+          {Object.entries(TOPPING_LABELS).map(([id, label]) => (
+          <option key={id} value={id}>{label}</option>
+          ))}
+          </select>
+          </label>
+          )}
+          </div>
+          )}
+
+          <div className={ui.totalBreakdown}>
+          <div><span>Subtotal</span><span>${subtotal.toLocaleString("es-MX")}</span></div>
+          {rewardDiscount > 0 && <div className={ui.discountRow}><span>Premio aplicado</span><strong>−${rewardDiscount.toLocaleString("es-MX")}</strong></div>}
+          <div className={ui.totalFinal}><span>Total</span><strong>${total.toLocaleString("es-MX")} MXN</strong></div>
+          <small>IVA incluido</small>
+          </div>
+
+          {paymentMethod === "cash" && cart.length > 0 && <div className={ui.cashPanel}><label htmlFor="pos-cash">Efectivo recibido <small>Opcional · calcula el cambio</small></label><input id="pos-cash" type="number" min="0" step="0.01" inputMode="decimal" value={cashReceived} onChange={(event) => setCashReceived(event.target.value)} placeholder={String(total)} /><p role="status">{cashReceived !== "" ? cashShort ? `Faltan $${Math.max(0, total - (cashAmount || 0)).toLocaleString("es-MX")}` : `Cambio: $${(cashAmount - total).toLocaleString("es-MX", { maximumFractionDigits: 2 })}` : "Ingresa el monto que te entregó el cliente."}</p></div>}
+          {mode === "bowl" && <p className={ui.bowlNotice}>Agrega o guarda el bowl antes de cobrar. Si no lo necesitas, pulsa Cancelar.</p>}
+
+          <button className={ui.chargeButton} onClick={handleCobrar} disabled={cart.length === 0 || saving || cashShort || mode === "bowl" || (reward?.type === "extra_topping" && !rewardTopping)} type="button">
+          {saving ? "Enviando orden…" : cart.length === 0 ? "Agrega productos para cobrar" : paymentMethod === "pay_at_pickup" ? `Guardar sin cobrar · $${total.toLocaleString("es-MX")}` : `Cobrar $${total.toLocaleString("es-MX")} MXN`}
+          </button>
+          </div>
+        </section>
+      )}
 
       {/* Carrito */}
       <aside className={ui.cartPanel} ref={cartRef} tabIndex={-1} aria-label="Orden actual">
         <div className={ui.cartHeader}>
-          <div><span>Paso 2</span><strong>Revisa la orden</strong></div>
+          <div><span>Tu orden</span><strong>{cart.length} producto{cart.length === 1 ? "" : "s"}</strong></div>
           {cart.length > 0 && (
             <button type="button" onClick={() => setConfirmClear(true)}>Vaciar orden</button>
           )}
@@ -677,208 +933,6 @@ export default function POSPage({ styles }) {
               <button className={ui.removeItem} onClick={() => removeItem(cartKeyOf(item))} type="button" aria-label={`Quitar ${item.name}`}>×</button>
             </div>
           ))}
-        </div>
-
-        <div className={ui.orderOptions}>
-          <div className={ui.optionGroup}>
-            <span>Entrega</span>
-            <div className={ui.optionButtons}>
-              {[
-                ["pickup", "Para llevar"], ["dine_in", "En restaurante"], ["delivery", "Delivery"],
-              ].map(([value, label]) => (
-                <button key={value} type="button" aria-pressed={fulfillment === value} onClick={() => setFulfillment(value)}>{label}</button>
-              ))}
-            </div>
-          </div>
-          <div className={ui.optionGroup}>
-            <span>Forma de pago</span>
-            <div className={ui.optionButtons}>
-              {[
-                ["card_terminal", "Tarjeta"], ["cash", "Efectivo"], ["pay_at_pickup", "Pendiente"],
-              ].map(([value, label]) => (
-                <button key={value} type="button" aria-pressed={paymentMethod === value} onClick={() => setPaymentMethod(value)}>{label}</button>
-              ))}
-            </div>
-          </div>
-
-          <button type="button" className={ui.detailsToggle} aria-expanded={showReferral} onClick={() => setShowReferral((visible) => !visible)}><span>¿Cómo nos conoció? <small>Opcional</small></span><span>{showReferral ? "−" : "+"}</span></button>
-          {showReferral && <div className={ui.optionGroup}>
-            <div className={ui.optionButtons}>
-              {REFERRAL_SOURCES.map(({ id, label, icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={referralSource === id}
-                  onClick={() => setReferralSource((current) => (current === id ? "" : id))}
-                >
-                  {icon} {label}
-                </button>
-              ))}
-            </div>
-            {referralSource === "otro" && (
-              <input
-                className={styles.input}
-                placeholder="¿Dónde fue exactamente?"
-                value={referralSourceOther}
-                onChange={(e) => setReferralSourceOther(e.target.value)}
-                maxLength={80}
-              />
-            )}
-          </div>}
-
-          <button
-            type="button"
-            className={ui.detailsToggle}
-            aria-expanded={showLoyalty || Boolean(rewardsCustomer)}
-            onClick={() => setShowLoyalty((visible) => !visible)}
-          >
-            <span>
-              <span className={ui.loyaltyIcon} aria-hidden="true">★</span>{" "}
-              {rewardsCustomer ? rewardsCustomer.name : "Cliente Rewards"} <small>Opcional · suma puntos</small>
-            </span>
-            <span>{(showLoyalty || rewardsCustomer) ? "−" : "+"}</span>
-          </button>
-          {(showLoyalty || rewardsCustomer) && (
-          <section className={ui.loyaltyPanel} aria-label="Cliente Rewards">
-            {rewardsCustomer ? (
-              <div className={ui.loyaltySelected}>
-                <div>
-                  <strong>{rewardsCustomer.name}</strong>
-                  <span>{rewardsCustomer.phone || rewardsCustomer.email}</span>
-                  <small>Saldo actual: {rewardsCustomer.points ?? 0} puntos</small>
-                </div>
-                <button type="button" onClick={removeRewardsCustomer}>Cambiar</button>
-                <p>
-                  {paymentMethod === "pay_at_pickup"
-                    ? `Ganará ${rewardsPointsPreview} puntos cuando se registre el pago.`
-                    : `Ganará ${rewardsPointsPreview} puntos con esta compra${rewardsMultiplier === 2 ? " · Nivel Oro 2×" : ""}.`}
-                </p>
-                {memberQrPayload && (
-                  <div className={ui.memberRewards}>
-                    <span>Usar puntos en esta compra</span>
-                    <small>Elige un premio; los puntos se descuentan al confirmar.</small>
-                    <div>
-                      {REWARDS.map((catalogReward) => {
-                        const enoughPoints = (rewardsCustomer.points ?? 0) >= catalogReward.cost;
-                        return (
-                          <button
-                            key={catalogReward.id}
-                            type="button"
-                            disabled={!enoughPoints || Boolean(memberRedeeming) || Boolean(reward)}
-                            onClick={() => redeemFromMemberQr(catalogReward)}
-                            title={catalogReward.terms.es}
-                          >
-                            <strong>{catalogReward.name.es}</strong>
-                            <em>{enoughPoints ? `Usar ${catalogReward.cost} pts` : `Faltan ${catalogReward.cost - (rewardsCustomer.points ?? 0)} pts`}</em>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {memberRedeeming && <p>Confirmando canje…</p>}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className={ui.scanMemberButton}
-                  onClick={() => { setShowMemberScanner(true); setError(""); }}
-                >
-                  <span aria-hidden="true">▦</span> Escanear QR del miembro
-                </button>
-                <div className={ui.loyaltyDivider}><span>o buscar la cuenta</span></div>
-                <form
-                  className={ui.loyaltySearch}
-                  onSubmit={(event) => { event.preventDefault(); searchRewardsCustomers(); }}
-                >
-                  <input
-                    value={customerLookup}
-                    onChange={(event) => {
-                      setCustomerLookup(event.target.value);
-                      setCustomerMatches([]);
-                      setCustomerSearchDone(false);
-                    }}
-                    placeholder="Teléfono, correo o nombre"
-                    autoComplete="off"
-                  />
-                  <button type="submit" disabled={customerLookup.trim().length < 3 || customerSearching}>
-                    {customerSearching ? "Buscando…" : "Buscar"}
-                  </button>
-                </form>
-                {customerMatches.length > 0 && (
-                  <div className={ui.loyaltyResults}>
-                    {customerMatches.map((customer) => (
-                      <button key={customer._id} type="button" onClick={() => selectRewardsCustomer(customer)}>
-                        <span><strong>{customer.name}</strong><small>{customer.phone || customer.email}</small></span>
-                        <em>{customer.points ?? 0} pts</em>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {customerSearchDone && customerMatches.length === 0 && (
-                  <p className={ui.loyaltyEmpty}>No encontramos una cuenta. La venta puede continuar sin Rewards.</p>
-                )}
-              </>
-            )}
-          </section>
-          )}
-
-          <button type="button" className={ui.detailsToggle} aria-expanded={showCustomerDetails} onClick={() => setShowCustomerDetails((visible) => !visible)}>
-            <span>Cliente y notas <small>Opcional</small></span><span>{showCustomerDetails ? "−" : "+"}</span>
-          </button>
-          {showCustomerDetails && (
-            <div className={ui.optionalFields}>
-              <input className={styles.input} placeholder="Cliente o número de mesa" value={cliente} onChange={(e) => setCliente(e.target.value)} />
-              <input className={styles.input} placeholder="Teléfono" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <input className={styles.input} placeholder="Notas para cocina" value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
-          )}
-        </div>
-
-        <div className={ui.checkoutPanel}>
-          <button type="button" className={ui.detailsToggle} aria-expanded={showReward} onClick={() => setShowReward((visible) => !visible)}>
-            <span>Código de premio <small>Opcional</small></span><span>{showReward ? "−" : "+"}</span>
-          </button>
-          {showReward && (
-            <div className={ui.rewardArea}>
-              <div>
-                <input className={styles.input} value={rewardCode} onChange={(e) => { setRewardCode(e.target.value.toUpperCase()); setReward(null); setRewardTopping(""); }} placeholder="Código" maxLength={6} />
-                <button type="button" className={styles.btnGhost} onClick={lookupReward} disabled={!rewardCode.trim() || rewardLoading}>{rewardLoading ? "Buscando…" : "Aplicar"}</button>
-              </div>
-              {reward && <div className={ui.rewardSuccess}><strong>{reward.name.es}</strong><span>{reward.terms.es}</span></div>}
-              {reward?.type === "extra_topping" && (
-                <label>
-                  <span>Elige el topping extra</span>
-                  <select
-                    className={styles.input}
-                    value={rewardTopping}
-                    onChange={(event) => { setRewardTopping(event.target.value); setError(""); }}
-                    required
-                  >
-                    <option value="">Seleccionar topping…</option>
-                    {Object.entries(TOPPING_LABELS).map(([id, label]) => (
-                      <option key={id} value={id}>{label}</option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
-          )}
-
-          <div className={ui.totalBreakdown}>
-            <div><span>Subtotal</span><span>${subtotal.toLocaleString("es-MX")}</span></div>
-            {rewardDiscount > 0 && <div className={ui.discountRow}><span>Premio aplicado</span><strong>−${rewardDiscount.toLocaleString("es-MX")}</strong></div>}
-            <div className={ui.totalFinal}><span>Total</span><strong>${total.toLocaleString("es-MX")} MXN</strong></div>
-            <small>IVA incluido</small>
-          </div>
-
-          {paymentMethod === "cash" && cart.length > 0 && <div className={ui.cashPanel}><label htmlFor="pos-cash">Efectivo recibido <small>Opcional · calcula el cambio</small></label><input id="pos-cash" type="number" min="0" step="0.01" inputMode="decimal" value={cashReceived} onChange={(event) => setCashReceived(event.target.value)} placeholder={String(total)} /><p role="status">{cashReceived !== "" ? cashShort ? `Faltan $${Math.max(0, total - (cashAmount || 0)).toLocaleString("es-MX")}` : `Cambio: $${(cashAmount - total).toLocaleString("es-MX", { maximumFractionDigits: 2 })}` : "Ingresa el monto que te entregó el cliente."}</p></div>}
-          {mode === "bowl" && <p className={ui.bowlNotice}>Agrega o guarda el bowl antes de cobrar. Si no lo necesitas, pulsa Cancelar.</p>}
-          <div className={ui.checkoutStep}><span>Paso 3</span><strong>Confirma y cobra</strong></div>
-          <button className={ui.chargeButton} onClick={handleCobrar} disabled={cart.length === 0 || saving || cashShort || mode === "bowl" || (reward?.type === "extra_topping" && !rewardTopping)} type="button">
-            {saving ? "Enviando orden…" : cart.length === 0 ? "Agrega productos para cobrar" : paymentMethod === "pay_at_pickup" ? `Guardar sin cobrar · $${total.toLocaleString("es-MX")}` : `Cobrar $${total.toLocaleString("es-MX")} MXN`}
-          </button>
         </div>
       </aside>
       </div>
