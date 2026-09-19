@@ -25,7 +25,7 @@ import surimi from "../assets/complements/surimi.jpg";
 const ComplementsSelection = ({ onNext, onBack, isKiosk = false }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
-  const { unavailableItems } = useAvailability();
+  const { unavailableItems, hiddenIngredients } = useAvailability();
 
   const complements = [
     { id: "shredded_carrots", image: zanahoria },
@@ -39,7 +39,9 @@ const ComplementsSelection = ({ onNext, onBack, isKiosk = false }) => {
     { id: "surimi", image: surimi },
     { id: "spicy_surimi", image: spicySurimi },
     { id: "avocado", image: aguacate },
-  ];
+    // Lo que el negocio no maneja ni se ofrece — distinto de agotado, que sí
+    // se muestra marcado.
+  ].filter((complement) => !hiddenIngredients.includes(complement.id));
 
   const [selectedComplements, setSelectedComplements] = useState(
     order.complements || []

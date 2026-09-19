@@ -20,7 +20,7 @@ import searedTuna from "../assets/protein/searedTuna.webp";
 const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
   const { order, updateOrder } = useOrder();
   const { language, t } = useLanguage();
-  const { unavailableItems } = useAvailability();
+  const { unavailableItems, hiddenIngredients } = useAvailability();
   // La promo "2x1 en Bowls" comparte 1 sola proteína entre los 2 bowls
   // (60 g + 60 g) — el stage 2 nunca pasa por aquí, ProteinSelection.jsx
   // solo se usa para elegirla en el stage 1.
@@ -36,7 +36,9 @@ const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
     // Atún sellado lleva un extra de $20 que la promo (precio plano) no
     // cobra — se excluye para no prometer un extra que nunca se cobrará.
     ...(isPromo2x1 ? [] : [{ id: "seared_tuna", image: searedTuna }]),
-  ];
+    // Lo que el negocio no maneja ni se ofrece — no es lo mismo que agotado,
+    // que sí se muestra marcado.
+  ].filter((protein) => !hiddenIngredients.includes(protein.id));
 
   const [selectedProteins, setSelectedProteins] = useState(() => {
     if (Array.isArray(order.proteins) && order.proteins.length > 0) return order.proteins;

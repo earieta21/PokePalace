@@ -444,8 +444,9 @@ export default function CostingPage({ styles }) {
           <h4 className={ui.subhead}>
             Ingredientes que manejas
             <span className={ui.hint}>
-              Apaga los que no vendes: desaparecen de la tabla y de la captura. Esto es
-              permanente — para algo agotado solo hoy, usa la pestaña Tienda.
+              Apaga los que no vendes: desaparecen del costeo <strong>y dejan de ofrecerse</strong>
+              {" "}a los clientes en el sitio, el kiosco y el POS. Esto es permanente — para algo
+              agotado solo hoy, usa la pestaña Tienda.
             </span>
           </h4>
           <div className={ui.toggleGrid}>
