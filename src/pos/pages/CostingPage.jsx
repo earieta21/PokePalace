@@ -54,6 +54,8 @@ export default function CostingPage({ styles }) {
           portionsPerUnit: String(report.config.complementCosts?.[key]?.portionsPerUnit || ""),
         }])
       ),
+      disabledProteins: report.config.disabledProteins || [],
+      disabledComplements: report.config.disabledComplements || [],
       proteinCostPerKgOverride: Object.fromEntries(
         (report.bowls || []).map((b) => [
           b.proteinKey,
@@ -72,6 +74,20 @@ export default function CostingPage({ styles }) {
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Prender/apagar un ingrediente guarda de inmediato: es un cambio de una
+  // sola decisión y esperar al botón "Guardar" haría que la tabla se vea
+  // desactualizada mientras tanto.
+  const toggleIngredient = async (field, key) => {
+    const current = form[field] || [];
+    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+    setForm((prev) => ({ ...prev, [field]: next }));
+    try {
+      hydrate(await api.put("/api/staff/costing", { [field]: next }));
+    } catch (e) {
+      setError(e.message);
+    }
+  };
 
   const setPart = (partKey, field, value) =>
     setForm((prev) => ({ ...prev, [partKey]: { ...prev[partKey], [field]: value } }));
@@ -98,6 +114,8 @@ export default function CostingPage({ styles }) {
             portionsPerUnit: Number(v.portionsPerUnit) || 0,
           }])
         ),
+        disabledProteins: form.disabledProteins,
+        disabledComplements: form.disabledComplements,
         proteinCostPerKgOverride: form.proteinCostPerKgOverride,
       };
       hydrate(await api.put("/api/staff/costing", payload));
@@ -421,6 +439,46 @@ export default function CostingPage({ styles }) {
                 />
               </div>
             ))}
+          </div>
+
+          <h4 className={ui.subhead}>
+            Ingredientes que manejas
+            <span className={ui.hint}>
+              Apaga los que no vendes: desaparecen de la tabla y de la captura. Esto es
+              permanente — para algo agotado solo hoy, usa la pestaña Tienda.
+            </span>
+          </h4>
+          <div className={ui.toggleGrid}>
+            {Object.entries(data.proteinLabels || {}).map(([key, label]) => {
+              const off = (form.disabledProteins || []).includes(key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={`${ui.ingredientToggle} ${off ? ui.ingredientOff : ""}`}
+                  aria-pressed={!off}
+                  onClick={() => toggleIngredient("disabledProteins", key)}
+                >
+                  <span>{off ? "○" : "●"}</span> {label}
+                </button>
+              );
+            })}
+            {(usage.allKeys || []).map((key) => {
+              const off = (form.disabledComplements || []).includes(key);
+              const freq = usage.frequency?.[key];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={`${ui.ingredientToggle} ${off ? ui.ingredientOff : ""}`}
+                  aria-pressed={!off}
+                  onClick={() => toggleIngredient("disabledComplements", key)}
+                >
+                  <span>{off ? "○" : "●"}</span> {usage.labels?.[key] || key}
+                  {freq === 0 && !off && <em className={ui.neverUsed}>nadie lo pide</em>}
+                </button>
+              );
+            })}
           </div>
 
           <h4 className={ui.subhead}>Combo y reglas</h4>

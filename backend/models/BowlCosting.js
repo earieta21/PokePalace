@@ -45,6 +45,13 @@ const bowlCostingSchema = new mongoose.Schema(
       default: {},
     },
 
+    // Ingredientes que el negocio no maneja. Se ocultan del costeo para no
+    // llenar la tabla de cosas que nunca van a tener costo. Es distinto de
+    // "agotado hoy" (eso vive en StoreSettings.unavailableItems): esto es
+    // permanente, aquello es del día.
+    disabledProteins: { type: [String], default: [] },
+    disabledComplements: { type: [String], default: [] },
+
     // Costo por kg de cada proteína cuando el inventario no lo puede dar solo
     // (p. ej. Tofu se lleva por pieza, no por kg). { tofu: 120 }
     proteinCostPerKgOverride: { type: Map, of: Number, default: {} },

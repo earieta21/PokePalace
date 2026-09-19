@@ -401,3 +401,39 @@
 }
 
 .saveBtn:disabled { opacity: 0.6; cursor: default; }
+
+.toggleGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.ingredientToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.1);
+  color: #a7f3d0;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ingredientOff {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: #6b7280;
+  text-decoration: line-through;
+}
+
+.neverUsed {
+  font-size: 10.5px;
+  font-style: normal;
+  color: #fcd34d;
+  opacity: 0.9;
+}

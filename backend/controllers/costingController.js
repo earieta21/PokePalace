@@ -5,6 +5,7 @@ import {
   COMPLEMENT_KEYS,
   COMPLEMENT_LABELS,
   PROTEIN_KEYS,
+  PROTEIN_LABELS,
   computeBowlCost,
   computeComboCost,
   promoVerdict,
@@ -128,7 +129,10 @@ const buildReport = async (config) => {
   );
   const complementCosts = resolveComplementCosts(inventoryItems, capturedComplements);
 
-  const bowls = PROTEIN_KEYS.map((proteinKey) => {
+  const disabledProteins = new Set(config.disabledProteins || []);
+  const disabledComplements = new Set(config.disabledComplements || []);
+
+  const bowls = PROTEIN_KEYS.filter((key) => !disabledProteins.has(key)).map((proteinKey) => {
     const bowl = computeBowlCost({ config, proteinCosts, proteinKey, complementUsage, complementCosts });
     return { ...bowl, verdict: promoVerdict(bowl, config), sold30d: salesMix[proteinKey] || 0 };
   });
@@ -153,6 +157,8 @@ const buildReport = async (config) => {
       promoEligibleMinMarginPct: config.promoEligibleMinMarginPct,
       proteinCostPerKgOverride: Object.fromEntries(config.proteinCostPerKgOverride || []),
       complementCosts: capturedComplements,
+      disabledProteins: [...disabledProteins],
+      disabledComplements: [...disabledComplements],
       updatedAt: config.updatedAt,
       updatedBy: config.updatedBy,
     },
@@ -163,8 +169,11 @@ const buildReport = async (config) => {
     complementUsage: {
       ...complementUsage,
       labels: COMPLEMENT_LABELS,
-      keys: COMPLEMENT_KEYS,
+      // Solo los que sí se manejan entran a la captura y al costo ponderado.
+      keys: COMPLEMENT_KEYS.filter((key) => !disabledComplements.has(key)),
+      allKeys: COMPLEMENT_KEYS,
     },
+    proteinLabels: Object.fromEntries(PROTEIN_KEYS.map((key) => [key, PROTEIN_LABELS[key]])),
     complementCosts,
   };
 };
@@ -204,6 +213,12 @@ export const updateCosting = async (req, res) => {
       if (req.body?.[field] !== undefined) {
         const value = Number(req.body[field]);
         if (Number.isFinite(value)) config[field] = Math.min(100, Math.max(0, value));
+      }
+    }
+
+    for (const [field, allowed] of [["disabledProteins", PROTEIN_KEYS], ["disabledComplements", COMPLEMENT_KEYS]]) {
+      if (Array.isArray(req.body?.[field])) {
+        config[field] = req.body[field].filter((key) => allowed.includes(key));
       }
     }
 

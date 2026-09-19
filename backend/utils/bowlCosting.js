@@ -182,7 +182,10 @@ export function resolveComplementCosts(inventoryItems = [], captured = {}) {
  * 0%). Sin nada capturado, cae al promedio simple × cantidad.
  */
 export function complementsCost(config, usage, complementCosts) {
-  const withCost = COMPLEMENT_KEYS.filter((key) => (complementCosts?.[key]?.costPerPortion || 0) > 0);
+  const disabled = new Set(config?.disabledComplements || []);
+  const withCost = COMPLEMENT_KEYS.filter(
+    (key) => !disabled.has(key) && (complementCosts?.[key]?.costPerPortion || 0) > 0
+  );
   if (withCost.length === 0 || !usage) return partCost(config?.complements);
 
   let total = 0;
