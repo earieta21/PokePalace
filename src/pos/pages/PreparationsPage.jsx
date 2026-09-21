@@ -1,11 +1,35 @@
 import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
+import {
+  MARINADE_LABELS, SAUCE_LABELS, COMPLEMENT_LABELS, PROTEIN_LABELS,
+} from "../../order/OrderLabels";
 import { createStaffApi } from "../api";
 import ui from "./PreparationsPage.module.css";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
 const UNITS = ["kg", "gr", "lt", "ml", "pz"];
 const TIPOLOGIAS = ["aderezo", "marinado", "mezcla", "otro"];
+
+// Lo que el cliente puede pedir. Amarrar la receta a una de estas llaves es lo
+// que después deja que el costeo del bowl use el costo real en vez de un
+// numero capturado a mano.
+const MENU_GROUPS = [
+  { id: "marinado",    label: "Marinados",         tipologia: "marinado", labels: MARINADE_LABELS },
+  { id: "aderezo",     label: "Aderezos y salsas", tipologia: "aderezo",  labels: SAUCE_LABELS },
+  { id: "complemento", label: "Complementos",      tipologia: "mezcla",   labels: COMPLEMENT_LABELS },
+  { id: "proteina",    label: "Proteínas",         tipologia: "mezcla",   labels: PROTEIN_LABELS },
+];
+
+const MENU_INDEX = new Map(
+  MENU_GROUPS.flatMap((group) =>
+    Object.entries(group.labels).map(([key, label]) => [key, { ...group, key, label }])
+  )
+);
+
+// Marinados y aderezos se hacen todos en casa, asi que los que no tienen
+// receta se listan como pendientes. Los complementos no: el mango se compra
+// mango, no lleva receta.
+const NEEDS_RECIPE = ["marinado", "aderezo"];
 
 const emptyLine = () => ({
   name: "", unit: "kg", presentation: "", recipeAmount: "", unitPrice: "", flatCost: "", inventoryItemId: "",
@@ -70,6 +94,29 @@ export default function PreparationsPage({ styles }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Al elegir a qué va en el menú se rellena el nombre y la tipología, que es
+  // lo que se iba a teclear igual.
+  const pickMenuKey = (key) =>
+    setDraft((prev) => {
+      const meta = MENU_INDEX.get(key);
+      return {
+        ...prev,
+        menuKey: key,
+        name: prev.name.trim() || (meta ? meta.label.toUpperCase() : ""),
+        tipologia: meta ? meta.tipologia : prev.tipologia,
+      };
+    });
+
+  const startFromMenu = (key) => {
+    const meta = MENU_INDEX.get(key);
+    setDraft({
+      ...emptyDraft(),
+      menuKey: key,
+      name: meta ? meta.label.toUpperCase() : "",
+      tipologia: meta?.tipologia || "aderezo",
+    });
+  };
+
   const setLine = (index, field, value) =>
     setDraft((prev) => ({
       ...prev,
@@ -129,6 +176,15 @@ export default function PreparationsPage({ styles }) {
   const batchCost = draft ? draft.ingredients.reduce((sum, l) => sum + lineCost(l), 0) : 0;
   const portions = Number(draft?.yieldPortions) || 0;
 
+  const taken = new Set(data.preparations.map((p) => p.menuKey).filter(Boolean));
+  const pendientes = MENU_GROUPS
+    .filter((group) => NEEDS_RECIPE.includes(group.id))
+    .map((group) => ({
+      ...group,
+      items: Object.entries(group.labels).filter(([key]) => !taken.has(key)),
+    }))
+    .filter((group) => group.items.length > 0);
+
   return (
     <section className={styles?.portalSurface}>
       <div className={ui.page}>
@@ -158,6 +214,9 @@ export default function PreparationsPage({ styles }) {
                       <div>
                         <h3>{prep.name}</h3>
                         <span className={ui.tipologia}>{prep.tipologia}</span>
+                        {MENU_INDEX.has(prep.menuKey) && (
+                          <span className={ui.menuLink}>{MENU_INDEX.get(prep.menuKey).label}</span>
+                        )}
                       </div>
                       <div className={ui.cardActions}>
                         <button type="button" onClick={() => setDraft(toDraft(prep))}>Editar</button>
@@ -214,6 +273,29 @@ export default function PreparationsPage({ styles }) {
                 ))}
               </div>
             )}
+
+            {pendientes.length > 0 && (
+              <section className={ui.pendingBlock}>
+                <h3 className={ui.pendingTitle}>Sin receta todavía</h3>
+                <p className={ui.subtitle}>
+                  Marinados y aderezos que sí se venden pero que aún no están costeados.
+                  Toca uno para capturarlo.
+                </p>
+                {pendientes.map((group) => (
+                  <div key={group.id} className={ui.pendingGroup}>
+                    <span className={ui.pendingLabel}>{group.label}</span>
+                    <div className={ui.chips}>
+                      {group.items.map(([key, label]) => (
+                        <button key={key} type="button" className={ui.chip}
+                          onClick={() => startFromMenu(key)}>
+                          + {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </section>
+            )}
           </>
         )}
 
@@ -228,6 +310,19 @@ export default function PreparationsPage({ styles }) {
               <label>
                 <span>Nombre</span>
                 <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Spicy Mayo" />
+              </label>
+              <label>
+                <span>En el menú <small>a qué le pasa su costo</small></span>
+                <select value={draft.menuKey} onChange={(e) => pickMenuKey(e.target.value)}>
+                  <option value="">— no va en el menú —</option>
+                  {MENU_GROUPS.map((group) => (
+                    <optgroup key={group.id} label={group.label}>
+                      {Object.entries(group.labels).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
               </label>
               <label>
                 <span>Tipología</span>
