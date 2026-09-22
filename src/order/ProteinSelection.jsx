@@ -15,7 +15,6 @@ import tuna from "../assets/protein/tuna.webp";
 import salmon from "../assets/protein/salmon.webp";
 import shrimp from "../assets/protein/shrimp.webp";
 import tofu from "../assets/protein/tofu.jpg";
-import searedTuna from "../assets/protein/searedTuna.webp";
 
 const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
   const { order, updateOrder } = useOrder();
@@ -33,9 +32,6 @@ const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
     { id: "salmon", image: salmon },
     { id: "shrimp", image: shrimp },
     { id: "tofu", image: tofu },
-    // Atún sellado lleva un extra de $20 que la promo (precio plano) no
-    // cobra — se excluye para no prometer un extra que nunca se cobrará.
-    ...(isPromo2x1 ? [] : [{ id: "seared_tuna", image: searedTuna }]),
     // Lo que el negocio no maneja ni se ofrece — no es lo mismo que agotado,
     // que sí se muestra marcado.
   ].filter((protein) => !hiddenIngredients.includes(protein.id));

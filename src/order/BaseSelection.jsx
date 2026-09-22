@@ -6,7 +6,6 @@ import styles from "./steps.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
 
 import whiteRice from "../assets/base/whiteRice.webp";
-import brownRice from "../assets/base/brownRice.webp";
 import quinoa from "../assets/base/quinoa.webp";
 import mixedGreens from "../assets/base/mixedGreens.webp";
 
@@ -21,7 +20,6 @@ const BaseSelection = ({ onNext, onBack, isKiosk = false }) => {
     { id: "white_rice", image: whiteRice },
     { id: "spring_mix", image: mixedGreens },
     { id: "quinoa", image: quinoa },
-    { id: "brown_rice", image: brownRice, comingSoon: true },
   ];
 
   const [selectedBases, setSelectedBases] = useState(() => {
@@ -73,7 +71,7 @@ const BaseSelection = ({ onNext, onBack, isKiosk = false }) => {
           {bases.map((base) => {
             const name = getItemLabel("base", base.id, language);
             const isSelected = selectedBases.includes(base.id);
-            const isUnavailable = base.comingSoon || unavailableItems.includes(base.id);
+            const isUnavailable = unavailableItems.includes(base.id);
             const isSelectionBlocked = isUnavailable && !isSelected;
             return (
             <button
@@ -107,8 +105,8 @@ const BaseSelection = ({ onNext, onBack, isKiosk = false }) => {
                   alignItems: "center", justifyContent: "center",
                   background: "rgba(0,0,0,0.55)", borderRadius: "inherit", zIndex: 2,
                 }}>
-                  <span style={{ background: base.comingSoon ? "#4a7a5a" : "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>
-                    {base.comingSoon ? t("order.comingSoon") : t("order.soldOut")}
+                  <span style={{ background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 999 }}>
+                    {t("order.soldOut")}
                   </span>
                 </div>
               )}
