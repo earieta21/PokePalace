@@ -4,15 +4,19 @@ import { useOrder } from "../order/OrderContext";
 import useIdleTimeout from "./useIdleTimeout";
 import styles from "./KioskWelcome.module.css";
 
-import theOg from "../assets/menu/theOg.webp";
-import skinnyBowl from "../assets/menu/skinnyBowl.webp";
-import quinoaBowl from "../assets/menu/quinoaBowl.webp";
-import citrusOctopus from "../assets/menu/citrusOctopus.webp";
-import pokeBowl from "../assets/poke.webp";
+import bowlsPhoto from "../assets/home/bowls-1200.webp";
+import salmonPhoto from "../assets/home/salmon-1200.webp";
+import shrimpPhoto from "../assets/home/shrimp-1200.webp";
+import freshPhoto from "../assets/home/fresh-1200.webp";
+import veggiePhoto from "../assets/home/veggie-1200.webp";
 
 const SCREENSAVER_IDLE_MS = 25000;
 const SLIDE_INTERVAL_MS = 5000;
-const SLIDES = [theOg, skinnyBowl, quinoaBowl, citrusOctopus, pokeBowl];
+// Fotos reales del producto, no los renders del catálogo. Se quedó fuera
+// agua-1200 (1200x2133): a pantalla completa con background-size cover se
+// recortaría casi entera. Estas cinco van entre 1:1 y 3:4, que aguantan el
+// recorte lo mismo en horizontal que en vertical.
+const SLIDES = [bowlsPhoto, salmonPhoto, shrimpPhoto, freshPhoto, veggiePhoto];
 
 export default function KioskWelcome() {
   const navigate = useNavigate();
