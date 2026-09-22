@@ -132,6 +132,23 @@
 .heroVisual {
   position: relative;
   min-height: 290px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, #f7f0df, #e6ddc9);
+}
+.heroVisual > div {
+  max-width: 350px;
+}
+.heroVisual span {
+  color: #665f50;
+}
+.livePreview {
+  margin: 8px -10px 0;
+}
+.mobileSelection,
+.mobilePrice {
+  display: none;
 }
 .heroVisual img {
   position: absolute;
@@ -272,7 +289,9 @@
   flex-direction: column;
   gap: 13px;
   padding: 20px 0;
-  margin-top: 18px;
+  margin-top: 8px;
+  max-height: 180px;
+  overflow-y: auto;
   border-top: 1px dashed var(--border-md);
 }
 .emptySummary {
@@ -400,7 +419,62 @@
     grid-template-columns: 1fr;
   }
   .bowlPreview {
-    position: static;
+    grid-row: 1;
+    position: sticky;
+    top: 8px;
+    z-index: 35;
+    display: grid;
+    grid-template-columns: 106px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    column-gap: 12px;
+    padding: 12px;
+    box-shadow: 0 5px 20px #183e3214;
+  }
+  .builder {
+    grid-row: 2;
+  }
+  .livePreview {
+    grid-column: 1;
+    grid-row: 1 / 5;
+    width: 106px;
+    margin: 0;
+    align-self: center;
+  }
+  .previewHeading {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .bowlPreview .previewTitle {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 21px;
+    margin: 5px 0;
+  }
+  .bowlPreview .mobileSelection {
+    grid-column: 2;
+    grid-row: 3;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    font-size: 10px;
+    line-height: 1.5;
+    margin: 0;
+    color: var(--text-2);
+  }
+  .bowlPreview .previewHint,
+  .bowlPreview .summary,
+  .bowlPreview .priceBlock,
+  .bowlPreview .previewLink {
+    display: none;
+  }
+  .mobilePrice {
+    display: block;
+    grid-column: 2;
+    grid-row: 4;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 700;
   }
   .stepItem {
     flex-direction: column;
@@ -450,6 +524,9 @@
   }
   .heroVisual {
     min-height: 190px;
+  }
+  .heroVisual > div {
+    max-width: 240px;
   }
   .heroVisual img {
     object-position: center 55%;

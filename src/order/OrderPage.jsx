@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Check, Leaf, ShoppingBag } from "lucide-react";
-import bowlHero from "../assets/order/bowl-hero.webp";
+import LiveBowl from "./LiveBowl";
 
 import BaseSelection from "./BaseSelection";
 import ProteinSelection from "./ProteinSelection";
@@ -108,11 +108,9 @@ function priceLabel(order, t) {
   return `$${price} MXN${isLarge ? ` · ${t("order.largeBowlSuffix")}` : ""}`;
 }
 
-function bowlSummaryParts({ order, language, t }) {
+function bowlSummaryParts({ order, language }) {
   const parts = [];
   const labels = ITEM_LABELS[language] || ITEM_LABELS.es;
-  const countLabel = (count, oneKey, manyKey) =>
-    t(count === 1 ? oneKey : manyKey, { count });
 
   if (order.base) {
     parts.push({
@@ -127,36 +125,29 @@ function bowlSummaryParts({ order, language, t }) {
   if (Array.isArray(order.marinades) && order.marinades.length > 0) {
     parts.push({
       icon: "🧉",
-      text: countLabel(
-        order.marinades.length,
-        "order.marinadeCountOne",
-        "order.marinadeCountMany",
-      ),
+      text: order.marinades.map((id) => labels.marinade[id] || id).join(", "),
     });
   }
   if (Array.isArray(order.complements) && order.complements.length > 0) {
     parts.push({
       icon: "🥗",
-      text: countLabel(
-        order.complements.length,
-        "order.complementCountOne",
-        "order.complementCountMany",
-      ),
+      text: order.complements
+        .map((id) => labels.complement[id] || id)
+        .join(", "),
     });
   }
   if (Array.isArray(order.sauces) && order.sauces.length > 0) {
     parts.push({
       icon: "🥣",
-      text: countLabel(
-        order.sauces.length,
-        "order.sauceCountOne",
-        "order.sauceCountMany",
-      ),
+      text: order.sauces.map((id) => labels.sauce[id] || id).join(", "),
     });
   }
 
   if (order.toppings?.length > 0) {
-    parts.push({ icon: "✦", text: `${order.toppings.length} toppings` });
+    parts.push({
+      icon: "✦",
+      text: order.toppings.map((id) => labels.topping[id] || id).join(", "),
+    });
   }
 
   return parts;
@@ -256,7 +247,7 @@ const OrderPage = () => {
     <ToppingsSelection key="toppings" onNext={finishBowl} onBack={prevStep} />,
   ];
 
-  const summaryParts = bowlSummaryParts({ order, language, t });
+  const summaryParts = bowlSummaryParts({ order, language });
 
   return (
     <main className={styles.page}>
@@ -306,22 +297,7 @@ const OrderPage = () => {
           </span>
         </div>
         <div className={styles.heroVisual}>
-          <img
-            src={bowlHero}
-            alt={
-              language === "en"
-                ? "Poke bowl with salmon, tuna and fresh vegetables"
-                : "Bowl de poke con salmón, atún y vegetales frescos"
-            }
-            width="1200"
-            height="800"
-            fetchPriority="high"
-          />
-          <span className={styles.photoLabel}>
-            {language === "en"
-              ? "A little inspiration for your bowl"
-              : "Un poco de inspiración para tu bowl"}
-          </span>
+          <LiveBowl order={order} language={language} />
         </div>
       </section>
       <div className={styles.head}>
@@ -344,14 +320,29 @@ const OrderPage = () => {
             </span>
             <ShoppingBag size={19} aria-hidden="true" />
           </div>
-          <h2>
-            {language === "en" ? "Looking delicious." : "Esto se pone bueno."}
+          <h2 className={styles.previewTitle}>
+            {language === "en" ? "Your bowl, live." : "Tu bowl, en vivo."}
           </h2>
           <p className={styles.previewHint}>
             {language === "en"
-              ? "Your favorite ingredients, in one bowl."
-              : "Tus ingredientes favoritos, en un solo bowl."}
+              ? "Each ingredient you choose appears here."
+              : "Cada ingrediente que elijas aparece aquí."}
           </p>
+          <div className={styles.livePreview}>
+            <LiveBowl order={order} language={language} compact />
+          </div>
+          <p
+            className={styles.mobileSelection}
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {summaryParts.length
+              ? summaryParts.map((part) => part.text).join(" · ")
+              : language === "en"
+                ? "Choose an ingredient to start."
+                : "Elige un ingrediente para empezar."}
+          </p>
+          <span className={styles.mobilePrice}>{priceLabel(order, t)}</span>
           <div className={styles.summary} aria-live="polite">
             {summaryParts.length === 0 && (
               <p className={styles.emptySummary}>
