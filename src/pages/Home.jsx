@@ -23,7 +23,7 @@ const Home = () => {
   const { t } = useLanguage();
   const { addCatalogItem, reorder, startPromo2x1 } = useOrder();
   const { user, isLoggedIn, token } = useContext(AuthContext);
-  const { promo2x1Active } = useAvailability();
+  const { promo2x1Active, comboPalaceActive } = useAvailability();
 
   // Último pedido completado del cliente — si existe, se ofrece "Ordenar de
   // nuevo" para saltarse el armador. Se limpia al cerrar sesión.
@@ -125,7 +125,10 @@ const Home = () => {
         <HeroSection />
       </section>
 
-      {/* Combo destacado */}
+      {/* Combo destacado — solo lunes, miércoles y viernes, confirmado por
+          el servidor igual que la 2x1 de abajo. Sin esto el banner mandaba
+          al menú los días en que el combo ni aparece ahí. */}
+      {comboPalaceActive && (
       <section className={`${styles.section} ${styles.comboSection}`}>
         <div className={styles.comboCopy}>
           <span className={styles.comboBadge}>NUEVO</span>
@@ -166,6 +169,7 @@ const Home = () => {
           </div>
         </div>
       </section>
+      )}
 
       {/* Promo 2x1 en Bowls — solo martes y jueves, confirmado por el servidor
           (ver /api/settings/availability) para no depender del reloj del
