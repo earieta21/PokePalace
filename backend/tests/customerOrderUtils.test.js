@@ -1,4 +1,9 @@
 import test from "node:test";
+
+// El Combo Palace solo corre lunes, miércoles y viernes y el carrito lo valida
+// contra el reloj (ver resolvePosItems). Fecha fija para no depender del día
+// en que se corra la prueba.
+const LUNES = new Date("2026-09-21T19:00:00Z"); // lunes 12:00 en Tijuana
 import assert from "node:assert/strict";
 import {
   findUnavailableCustomerBowlItems,
@@ -263,7 +268,7 @@ test("el carrito acepta Combo Palace y reemplaza el precio enviado por $289", ()
     comboBowlId: "bowl-quinoa",
     comboDrinkId: "coca-zero",
     comboRiceCakeId: "miel-rice-cake",
-  }]);
+  }], LUNES);
 
   assert.equal(combo.kind, "item");
   assert.equal(combo.price, 289);

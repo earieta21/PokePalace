@@ -312,6 +312,10 @@ export const createOrder = async (req, res) => {
         });
       }
     }
+    // El Combo Palace no necesita revisión aquí: es un artículo del catálogo
+    // del POS, así que sanitizeCustomerCart ya lo pasó por resolvePosItems,
+    // que rechaza el día equivocado. El 2x1 sí la necesita porque es una
+    // línea propia del carrito (kind "promo2x1"), no un artículo de catálogo.
 
     // Espejo del primer bowl (y de los artículos planos) en los campos
     // legado — red de seguridad para cualquier lector que aún no distinga

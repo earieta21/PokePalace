@@ -229,7 +229,9 @@ const priceCustomerBowl = (bowl) => {
 // línea de bowl se valida igual que un pedido de un solo bowl; las líneas de
 // artículo reutilizan `resolvePosItems` (mismo precio/tope/deduplicación que
 // ya usa el POS) para no duplicar esa lógica.
-export function sanitizeCustomerCart(cart) {
+// `now` solo se usa para las promos con día fijo (ver resolvePosItems);
+// en producción es el reloj real y las pruebas le pasan una fecha.
+export function sanitizeCustomerCart(cart, now = new Date()) {
   if (!Array.isArray(cart) || cart.length === 0) {
     throw new TypeError("Tu carrito está vacío");
   }
@@ -276,7 +278,7 @@ export function sanitizeCustomerCart(cart) {
   });
 
   const itemLines = rawItemLines.length > 0
-    ? resolvePosItems(rawItemLines).map((item) => ({
+    ? resolvePosItems(rawItemLines, now).map((item) => ({
         kind: "item",
         catalogId: item.catalogId,
         name: item.name,

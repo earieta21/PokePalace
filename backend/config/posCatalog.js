@@ -1,4 +1,4 @@
-import { isPromo2x1Day } from "../utils/promoSchedule.js";
+import { isComboPalaceDay, isPromo2x1Day } from "../utils/promoSchedule.js";
 import { EXTRA_SCOOP_PRICE, PREMIUM_PROTEIN_PRICES } from "../pricing.js";
 
 // Protein stock is stored in kilograms. A medium bowl contains 100 g total,
@@ -170,7 +170,10 @@ export const normalizePosClientOrderId = (value) => {
 // Legacy POS builds sent { name, price, qty } without an id. Exact canonical
 // names remain accepted so queued orders keep working, but submitted prices
 // are deliberately ignored in every case.
-export const resolvePosItems = (items) => {
+// `now` existe para las promos con día fijo (2x1, Combo Palace): en
+// producción siempre es el reloj real, y las pruebas le pasan una fecha para
+// no depender del día en que se corran.
+export const resolvePosItems = (items, now = new Date()) => {
   if (!Array.isArray(items)) throw new PosOrderValidationError("La lista de productos no es válida");
   if (items.length > 50) throw new PosOrderValidationError("La orden contiene demasiados productos");
 
@@ -189,8 +192,12 @@ export const resolvePosItems = (items) => {
       throw new PosOrderValidationError("Uno de los productos no existe en el catálogo del POS");
     }
 
-    if (catalogItem.catalogId === "promo-2x1-dinein" && !isPromo2x1Day()) {
+    if (catalogItem.catalogId === "promo-2x1-dinein" && !isPromo2x1Day(now)) {
       throw new PosOrderValidationError("La Promo 2x1 solo está disponible los martes y jueves");
+    }
+
+    if (catalogItem.catalogId === "combo-palace" && !isComboPalaceDay(now)) {
+      throw new PosOrderValidationError("El Combo Palace solo está disponible los lunes, miércoles y viernes");
     }
 
     const qty = Number(rawItem.qty ?? 1);

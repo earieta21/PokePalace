@@ -1,4 +1,10 @@
 import { test } from "node:test";
+
+// El Combo Palace solo corre lunes, miércoles y viernes y resolvePosItems lo
+// valida contra el reloj. Estas pruebas le pasan un lunes fijo para no fallar
+// según el día en que se corran.
+const LUNES = new Date("2026-09-21T19:00:00Z"); // lunes 12:00 en Tijuana
+const MARTES = new Date("2026-09-22T19:00:00Z");
 import assert from "node:assert/strict";
 
 import { computeBowlSubtotal, computeExtrasSubtotal } from "../pricing.js";
@@ -97,7 +103,7 @@ test("Combo Palace fija precio, conserva elecciones y descuenta sus componentes"
     comboBowlId: "bowl-the-og",
     comboDrinkId: "agua-del-dia",
     comboRiceCakeId: "choco-rice-cake",
-  }]);
+  }], LUNES);
 
   assert.equal(combo.price, 289);
   assert.equal(combo.qty, 2);
@@ -117,9 +123,22 @@ test("Combo Palace fija precio, conserva elecciones y descuenta sus componentes"
   );
 });
 
+test("Combo Palace solo se puede vender lunes, miércoles y viernes", () => {
+  const elecciones = {
+    catalogId: "combo-palace",
+    qty: 1,
+    comboBowlId: "bowl-the-og",
+    comboDrinkId: "coca-zero",
+    comboRiceCakeId: "cacao-rice-cake",
+  };
+
+  assert.equal(resolvePosItems([elecciones], LUNES)[0].price, 289);
+  assert.throws(() => resolvePosItems([elecciones], MARTES), PosOrderValidationError);
+});
+
 test("Combo Palace rechaza elecciones faltantes o fuera de sus opciones", () => {
   assert.throws(
-    () => resolvePosItems([{ catalogId: "combo-palace", qty: 1 }]),
+    () => resolvePosItems([{ catalogId: "combo-palace", qty: 1 }], LUNES),
     PosOrderValidationError
   );
   assert.throws(
@@ -129,7 +148,7 @@ test("Combo Palace rechaza elecciones faltantes o fuera de sus opciones", () => 
       comboBowlId: "bowl-mediano-rapido",
       comboDrinkId: "coca-zero",
       comboRiceCakeId: "cacao-rice-cake",
-    }]),
+    }], LUNES),
     PosOrderValidationError
   );
 });

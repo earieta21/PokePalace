@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { API_URL } from "../config";
 
-const AvailabilityContext = createContext({ unavailableItems: [], hiddenIngredients: [], promo2x1Active: false });
+const AvailabilityContext = createContext({ unavailableItems: [], hiddenIngredients: [], promo2x1Active: false, comboPalaceActive: false });
 
 export function AvailabilityProvider({ children }) {
   const [unavailableItems, setUnavailableItems] = useState([]);
@@ -11,6 +11,8 @@ export function AvailabilityProvider({ children }) {
   // null hasta que se confirme con el servidor, para no mostrar la promo un
   // instante en un día que no toca mientras carga.
   const [promo2x1Active, setPromo2x1Active] = useState(null);
+  // Igual que la 2x1, pero el Combo Palace corre lunes, miércoles y viernes.
+  const [comboPalaceActive, setComboPalaceActive] = useState(null);
 
   const fetchAvailability = useCallback(() => {
     fetch(`${API_URL}/api/settings/availability`)
@@ -19,6 +21,7 @@ export function AvailabilityProvider({ children }) {
         setUnavailableItems(d.unavailableItems ?? []);
         setHiddenIngredients(d.hiddenIngredients ?? []);
         setPromo2x1Active(Boolean(d.promo2x1Active));
+        setComboPalaceActive(Boolean(d.comboPalaceActive));
       })
       .catch(() => {});
   }, []);
@@ -30,7 +33,7 @@ export function AvailabilityProvider({ children }) {
   }, [fetchAvailability]);
 
   return (
-    <AvailabilityContext.Provider value={{ unavailableItems, hiddenIngredients, promo2x1Active, refetch: fetchAvailability }}>
+    <AvailabilityContext.Provider value={{ unavailableItems, hiddenIngredients, promo2x1Active, comboPalaceActive, refetch: fetchAvailability }}>
       {children}
     </AvailabilityContext.Provider>
   );

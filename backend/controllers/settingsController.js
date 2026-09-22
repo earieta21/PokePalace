@@ -1,6 +1,6 @@
 import BowlCosting from "../models/BowlCosting.js";
 import StoreSettings from "../models/StoreSettings.js";
-import { isPromo2x1Day } from "../utils/promoSchedule.js";
+import { isComboPalaceDay, isPromo2x1Day } from "../utils/promoSchedule.js";
 
 export const getAvailability = async (req, res) => {
   try {
@@ -17,9 +17,11 @@ export const getAvailability = async (req, res) => {
         ...(costing?.disabledProteins ?? []),
         ...(costing?.disabledComplements ?? []),
       ],
-      // La promo 2x1 solo corre martes/jueves — el frontend usa esto para
-      // mostrar/ocultar la sección sin que cada pantalla calcule el día.
+      // La promo 2x1 solo corre martes/jueves y el Combo Palace lunes,
+      // miércoles y viernes — el frontend usa esto para mostrar/ocultar cada
+      // sección sin que cada pantalla calcule el día por su cuenta.
       promo2x1Active: isPromo2x1Day(),
+      comboPalaceActive: isComboPalaceDay(),
     });
   } catch {
     res.status(500).json({ msg: "Error al obtener disponibilidad" });

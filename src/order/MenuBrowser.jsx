@@ -23,7 +23,7 @@ const CATEGORY_ICONS = {
 // cambian los destinos de navegación.
 const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId = "" }) => {
   const { order, addCatalogItem, addComboToCart, updateCartItemQty, startNewBowl } = useOrder();
-  const { unavailableItems } = useAvailability();
+  const { unavailableItems, comboPalaceActive } = useAvailability();
   const [activeCombo, setActiveCombo] = useState(null);
   const [comboSelection, setComboSelection] = useState({
     comboBowlId: "",
@@ -46,12 +46,16 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
 
   useEffect(() => {
     if (openedInitialCombo.current || !initialComboId) return;
+    // comboPalaceActive nace en null mientras carga la disponibilidad — hay
+    // que esperar la respuesta o un enlace viejo abriría el armador en un
+    // día en que el combo no corre.
+    if (comboPalaceActive !== true) return;
     const item = CUSTOMER_CATALOG_BY_ID[initialComboId];
     if (!item?.isCombo) return;
     openedInitialCombo.current = true;
     setActiveCombo(item);
     setComboSelection(defaultComboSelection(item));
-  }, [initialComboId]);
+  }, [initialComboId, comboPalaceActive]);
 
   const cartCount = order.cart.reduce((sum, line) => sum + line.qty, 0);
   const cartSubtotal = order.cart.reduce((sum, line) => sum + line.price * line.qty, 0);
@@ -125,7 +129,15 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
         </button>
 
         {CUSTOMER_CATALOG_CATEGORIES.map((category) => {
-          const items = CUSTOMER_CATALOG.filter((item) => item.category === category);
+          const items = CUSTOMER_CATALOG.filter((item) => {
+            if (item.category !== category) return false;
+            // El Combo Palace solo corre lunes, miércoles y viernes. Como es
+            // el único artículo de su categoría, esconderlo deja la sección
+            // vacía y el `return null` de abajo la quita entera. El servidor
+            // también lo rechaza fuera de esos días, esto es solo UX.
+            if (item.isCombo && comboPalaceActive !== true) return false;
+            return true;
+          });
           if (items.length === 0) return null;
           return (
             <div key={category} className={styles.section}>

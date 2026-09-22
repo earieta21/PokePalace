@@ -26,6 +26,9 @@ import ui from "./POSPage.module.css";
 const CUSTOM_BOWL_ID = "custom-bowl";
 
 const MENU = [
+  // Solo lunes, miércoles y viernes — se oculta los demás días vía
+  // comboPalaceActive (ver visibleMenu más abajo) y el servidor también lo
+  // rechaza (isComboPalaceDay en backend/config/posCatalog.js).
   { id: 25, name: "Combo Palace", price: COMBO_PALACE_PRICE, category: "Promos", icon: "👑", needsCombo: true },
   // Venta rapida sin ingredientes especificos - para cuando no da tiempo de
   // capturar el bowl personalizado completo (ej. fila larga). needsProtein
@@ -73,7 +76,7 @@ const IVA = 0; // IVA incluido en precio
 
 export default function POSPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
-  const { promo2x1Active } = useAvailability();
+  const { promo2x1Active, comboPalaceActive } = useAvailability();
   const api = createStaffApi(staffToken);
   const pendingSaleRef = useRef(null);
   const cartRef = useRef(null);
@@ -299,6 +302,7 @@ export default function POSPage({ styles }) {
   const cartItemCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const visibleMenu = MENU.filter((item) => {
     if (item.promo2x1 && !promo2x1Active) return false;
+    if (item.needsCombo && !comboPalaceActive) return false;
     const matchesCategory = menuCategory === "Todos" || item.category === menuCategory;
     const matchesSearch = normalizeSearch(item.name).includes(normalizeSearch(menuSearch.trim()));
     return matchesCategory && matchesSearch;
