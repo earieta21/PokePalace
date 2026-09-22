@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowUpRight, Check, Leaf, ShoppingBag } from "lucide-react";
+import bowlHero from "../assets/order/bowl-hero.webp";
 
 import BaseSelection from "./BaseSelection";
 import ProteinSelection from "./ProteinSelection";
@@ -9,7 +11,11 @@ import SauceSelection from "./SauceSelection";
 import ToppingsSelection from "./ToppingsSelection";
 import { useOrder } from "./OrderContext";
 import { ITEM_LABELS, getBaseLabel } from "./OrderLabels";
-import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, PROMO_2X1_BOWLS_PRICE } from "./pricing";
+import {
+  BOWL_BASE_PRICE,
+  LARGE_BOWL_UPCHARGE,
+  PROMO_2X1_BOWLS_PRICE,
+} from "./pricing";
 import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./OrderPage.module.css";
@@ -25,29 +31,50 @@ const STEP_NAME_KEYS = [
   "summary.toppings",
 ];
 
-/* Barra de progreso: antes eran 6 círculos numerados; ahora una línea que
-   se llena con el nombre del paso encima — se lee de un vistazo y aguanta
-   mejor en pantallas angostas. */
+// Step names remain visible so customers can see the whole bowl-building flow.
 function StepProgress({ step, t }) {
   const currentStepName = t(STEP_NAME_KEYS[step]);
   const pct = ((step + 1) / TOTAL_STEPS) * 100;
   return (
-    <div
-      role="progressbar"
-      aria-valuemin={1}
-      aria-valuemax={TOTAL_STEPS}
-      aria-valuenow={step + 1}
-      aria-label={t("order.progressLabel", { step: step + 1, total: TOTAL_STEPS, name: currentStepName })}
-    >
+    <div className={styles.progress}>
       <div className={styles.progressRow}>
         <span className={styles.stepLabel}>{currentStepName}</span>
         <span className={styles.stepCount}>
           {step + 1} / {TOTAL_STEPS}
         </span>
       </div>
-      <div className={styles.track}>
+      <div
+        className={styles.track}
+        role="progressbar"
+        aria-valuemin={1}
+        aria-valuemax={TOTAL_STEPS}
+        aria-valuenow={step + 1}
+        aria-label={t("order.progressLabel", {
+          step: step + 1,
+          total: TOTAL_STEPS,
+          name: currentStepName,
+        })}
+      >
         <div className={styles.fill} style={{ width: `${pct}%` }} />
       </div>
+      <ol className={styles.stepList}>
+        {STEP_NAME_KEYS.map((key, index) => (
+          <li
+            key={key}
+            className={`${styles.stepItem} ${index === step ? styles.currentStep : ""} ${index < step ? styles.completedStep : ""}`}
+            aria-current={index === step ? "step" : undefined}
+          >
+            <span className={styles.stepNumber}>
+              {index < step ? (
+                <Check size={15} aria-hidden="true" />
+              ) : (
+                String(index + 1).padStart(2, "0")
+              )}
+            </span>
+            <span>{t(key)}</span>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -55,10 +82,14 @@ function StepProgress({ step, t }) {
 function PausedBanner({ message, t }) {
   return (
     <div className={styles.paused}>
-      <span aria-hidden="true" className={styles.pausedIcon}>⏸</span>
+      <span aria-hidden="true" className={styles.pausedIcon}>
+        ⏸
+      </span>
       <div>
         <p className={styles.pausedTitle}>{t("order.pausedTitle")}</p>
-        <p className={styles.pausedText}>{message || t("order.pausedFallback")}</p>
+        <p className={styles.pausedText}>
+          {message || t("order.pausedFallback")}
+        </p>
       </div>
     </div>
   );
@@ -66,56 +97,87 @@ function PausedBanner({ message, t }) {
 
 function priceLabel(order, t) {
   if (order.promo2x1) {
-    const stageLabel = order.promo2x1.stage === 1 ? "Bowl 1 de 2" : "Bowl 2 de 2";
+    const stageLabel =
+      order.promo2x1.stage === 1 ? "Bowl 1 de 2" : "Bowl 2 de 2";
     return `${stageLabel} · $${PROMO_2X1_BOWLS_PRICE} MXN por los 2`;
   }
   const isLarge = Array.isArray(order.proteins) && order.proteins.length >= 3;
-  const price = isLarge ? BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE : BOWL_BASE_PRICE;
+  const price = isLarge
+    ? BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE
+    : BOWL_BASE_PRICE;
   return `$${price} MXN${isLarge ? ` · ${t("order.largeBowlSuffix")}` : ""}`;
 }
 
-function bowlSummaryParts({ order, step, language, t }) {
-  if (step === 0) return [];
-
+function bowlSummaryParts({ order, language, t }) {
   const parts = [];
   const labels = ITEM_LABELS[language] || ITEM_LABELS.es;
-  const countLabel = (count, oneKey, manyKey) => t(count === 1 ? oneKey : manyKey, { count });
+  const countLabel = (count, oneKey, manyKey) =>
+    t(count === 1 ? oneKey : manyKey, { count });
 
   if (order.base) {
-    parts.push({ icon: "🍚", text: getBaseLabel(order.bases, order.base, language) });
+    parts.push({
+      icon: "🍚",
+      text: getBaseLabel(order.bases, order.base, language),
+    });
   }
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
     const names = order.proteins.map((id) => labels.protein[id] || id);
     parts.push({ icon: "🐟", text: names.join(", ") });
   }
-  if (step >= 2 && Array.isArray(order.marinades) && order.marinades.length > 0) {
+  if (Array.isArray(order.marinades) && order.marinades.length > 0) {
     parts.push({
       icon: "🧉",
-      text: countLabel(order.marinades.length, "order.marinadeCountOne", "order.marinadeCountMany"),
+      text: countLabel(
+        order.marinades.length,
+        "order.marinadeCountOne",
+        "order.marinadeCountMany",
+      ),
     });
   }
-  if (step >= 3 && Array.isArray(order.complements) && order.complements.length > 0) {
+  if (Array.isArray(order.complements) && order.complements.length > 0) {
     parts.push({
       icon: "🥗",
-      text: countLabel(order.complements.length, "order.complementCountOne", "order.complementCountMany"),
+      text: countLabel(
+        order.complements.length,
+        "order.complementCountOne",
+        "order.complementCountMany",
+      ),
     });
   }
-  if (step >= 4 && Array.isArray(order.sauces) && order.sauces.length > 0) {
+  if (Array.isArray(order.sauces) && order.sauces.length > 0) {
     parts.push({
       icon: "🥣",
-      text: countLabel(order.sauces.length, "order.sauceCountOne", "order.sauceCountMany"),
+      text: countLabel(
+        order.sauces.length,
+        "order.sauceCountOne",
+        "order.sauceCountMany",
+      ),
     });
+  }
+
+  if (order.toppings?.length > 0) {
+    parts.push({ icon: "✦", text: `${order.toppings.length} toppings` });
   }
 
   return parts;
 }
 
 const OrderPage = () => {
-  const { order, updateOrder, addBowlToCart, confirmPromoBowl, cancelPromo2x1 } = useOrder();
+  const {
+    order,
+    updateOrder,
+    addBowlToCart,
+    confirmPromoBowl,
+    cancelPromo2x1,
+  } = useOrder();
   const { language, t } = useLanguage();
   const [step, setStep] = useState(() => {
     const savedStep = Number(order.draftStep);
-    return Number.isInteger(savedStep) && savedStep >= 0 && savedStep <= LAST_STEP ? savedStep : 0;
+    return Number.isInteger(savedStep) &&
+      savedStep >= 0 &&
+      savedStep <= LAST_STEP
+      ? savedStep
+      : 0;
   });
   const navigate = useNavigate();
 
@@ -127,10 +189,13 @@ const OrderPage = () => {
       .catch(() => {});
   }, []);
 
-  const setOrderStep = useCallback((nextStep) => {
-    setStep(nextStep);
-    updateOrder("draftStep", nextStep);
-  }, [updateOrder]);
+  const setOrderStep = useCallback(
+    (nextStep) => {
+      setStep(nextStep);
+      updateOrder("draftStep", nextStep);
+    },
+    [updateOrder],
+  );
 
   // En el stage 2 de la promo 2x1 la proteína ya quedó fija con el primer
   // bowl (compartida entre los 2) — se salta el paso 1 (proteína) para no
@@ -181,23 +246,109 @@ const OrderPage = () => {
     <BaseSelection key="base" onNext={nextStep} onBack={prevStep} />,
     <ProteinSelection key="protein" onNext={nextStep} onBack={prevStep} />,
     <MarinadeSelection key="marinade" onNext={nextStep} onBack={prevStep} />,
-    <ComplementsSelection key="complements" onNext={nextStep} onBack={prevStep} />,
+    <ComplementsSelection
+      key="complements"
+      onNext={nextStep}
+      onBack={prevStep}
+    />,
     <SauceSelection key="sauce" onNext={nextStep} onBack={prevStep} />,
     <ToppingsSelection key="toppings" onNext={finishBowl} onBack={prevStep} />,
   ];
 
-  const summaryParts = bowlSummaryParts({ order, step, language, t });
+  const summaryParts = bowlSummaryParts({ order, language, t });
 
   return (
-    <div>
+    <main className={styles.page}>
+      <div className={styles.topbar}>
+        <Link to="/" className={styles.wordmark}>
+          POKE <span>PALACE</span>
+        </Link>
+        <Link to="/menu" className={styles.menuLink}>
+          {language === "en" ? "Explore the menu" : "Explorar el menú"}{" "}
+          <ArrowUpRight size={16} aria-hidden="true" />
+        </Link>
+      </div>
+      <section className={styles.hero} aria-labelledby="build-bowl-title">
+        <div className={styles.heroCopy}>
+          <p className={styles.eyebrow}>
+            <Leaf size={15} aria-hidden="true" />{" "}
+            {language === "en"
+              ? "FRESH INGREDIENTS. YOUR WAY."
+              : "INGREDIENTES FRESCOS. A TU GUSTO."}
+          </p>
+          <h1 id="build-bowl-title">
+            {language === "en" ? "Your bowl." : "Tu bowl."}
+            <br />
+            <em>{language === "en" ? "Your rules." : "Tus reglas."}</em>
+          </h1>
+          <p className={styles.heroDescription}>
+            {language === "en"
+              ? "Mix your favorites, discover new flavors and make every bite your own."
+              : "Mezcla tus favoritos, descubre nuevos sabores y haz tuya cada cucharada."}
+          </p>
+          <span className={styles.heroNote}>
+            {language === "en"
+              ? "6 steps to your perfect combination"
+              : "6 pasos para tu combinación perfecta"}
+          </span>
+        </div>
+        <div className={styles.heroVisual}>
+          <img
+            src={bowlHero}
+            alt={
+              language === "en"
+                ? "Poke bowl with salmon, tuna and fresh vegetables"
+                : "Bowl de poke con salmón, atún y vegetales frescos"
+            }
+            width="1200"
+            height="800"
+            fetchPriority="high"
+          />
+          <span className={styles.photoLabel}>
+            {language === "en"
+              ? "A little inspiration for your bowl"
+              : "Un poco de inspiración para tu bowl"}
+          </span>
+        </div>
+      </section>
       <div className={styles.head}>
-        {storeStatus?.ordersPaused && <PausedBanner message={storeStatus.pausedMessage} t={t} />}
+        {storeStatus?.ordersPaused && (
+          <PausedBanner message={storeStatus.pausedMessage} t={t} />
+        )}
         <StepProgress step={step} t={t} />
-        <div className={styles.metaRow}>
-          <div className={styles.summary}>
+      </div>
+      <div className={styles.builderLayout}>
+        <div className={styles.builder}>{steps[step]}</div>
+        <aside
+          className={styles.bowlPreview}
+          aria-label={
+            language === "en" ? "Your bowl so far" : "Tu bowl hasta ahora"
+          }
+        >
+          <div className={styles.previewHeading}>
+            <span className={styles.eyebrow}>
+              {language === "en" ? "YOUR CREATION" : "TU CREACIÓN"}
+            </span>
+            <ShoppingBag size={19} aria-hidden="true" />
+          </div>
+          <h2>
+            {language === "en" ? "Looking delicious." : "Esto se pone bueno."}
+          </h2>
+          <p className={styles.previewHint}>
+            {language === "en"
+              ? "Your favorite ingredients, in one bowl."
+              : "Tus ingredientes favoritos, en un solo bowl."}
+          </p>
+          <div className={styles.summary} aria-live="polite">
+            {summaryParts.length === 0 && (
+              <p className={styles.emptySummary}>
+                {language === "en"
+                  ? "Start with a base. Your combination will appear here."
+                  : "Empieza por la base. Aquí verás cómo va quedando tu combinación."}
+              </p>
+            )}
             {summaryParts.map((p, i) => (
               <React.Fragment key={i}>
-                {i > 0 && <span aria-hidden="true" className={styles.summarySep}>›</span>}
                 <span className={styles.summaryItem}>
                   <span aria-hidden="true">{p.icon}</span>
                   <span>{p.text}</span>
@@ -205,11 +356,34 @@ const OrderPage = () => {
               </React.Fragment>
             ))}
           </div>
-          <span className={styles.price}>{priceLabel(order, t)}</span>
-        </div>
+          <div className={styles.priceBlock}>
+            <span className={styles.priceCaption}>
+              {order.promo2x1
+                ? language === "en"
+                  ? "Promotion"
+                  : "Promoción"
+                : language === "en"
+                  ? "Bowl base price"
+                  : "Precio base del bowl"}
+            </span>
+            <span className={styles.price}>{priceLabel(order, t)}</span>
+            {!order.promo2x1 && (
+              <small>
+                {language === "en"
+                  ? "Extras are added in your cart."
+                  : "Los extras se suman en tu carrito."}
+              </small>
+            )}
+          </div>
+          <Link to="/menu" className={styles.previewLink}>
+            {language === "en"
+              ? "Prefer a house bowl?"
+              : "¿Prefieres un bowl de la casa?"}{" "}
+            <ArrowUpRight size={15} aria-hidden="true" />
+          </Link>
+        </aside>
       </div>
-      {steps[step]}
-    </div>
+    </main>
   );
 };
 
