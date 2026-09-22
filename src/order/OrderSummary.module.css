@@ -21,32 +21,12 @@
   margin-bottom: 4px;
 }
 
-.badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  background: var(--accent-bg);
-  border: 1px solid var(--accent-border);
-  color: var(--accent);
-  margin-bottom: 10px;
-}
-
 .title {
   margin: 0 0 4px;
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.4px;
   color: var(--text);
-}
-
-.subtitle {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--text-2);
 }
 
 /* Section rows */
@@ -103,6 +83,30 @@
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
+}
+
+/* Contenido del bowl en 2 renglones: lo que lo define (base y proteína) en
+   negro, y todo lo demás junto en una línea gris. Antes iba un renglón por
+   categoría con su etiqueta y era demasiado texto para lo poco que se lee. */
+.detailMain {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.detailExtras {
+  margin: 3px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+.promoBowl {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
 }
 
 /* Chips */
@@ -180,19 +184,25 @@
   font-weight: 600;
 }
 
+/* Los 50 puntos de bienvenida son lo único del checkout que pelea por
+   atención, así que van en verde sólido con la lima de la home. El resto
+   del formulario se dejó en gris a propósito para que este bloque gane.
+   El verde y la lima son fijos en ambos temas: en modo oscuro --accent
+   aclara y el texto blanco encima se quedaba sin contraste. */
 .signupPrompt {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 16px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: var(--accent-bg);
-  border: 1px solid var(--accent-border);
+  gap: 16px;
+  margin: 18px 0 4px;
+  padding: 20px;
+  border-radius: 18px;
+  background: #183e32;
+  box-shadow: var(--shadow-sm);
 }
 
 .signupPromptIcon {
-  font-size: 22px;
+  font-size: 32px;
+  line-height: 1;
   flex-shrink: 0;
 }
 
@@ -203,28 +213,53 @@
 
 .signupPromptTitle {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 22px;
   font-weight: 800;
-  color: var(--text);
+  letter-spacing: -0.4px;
+  line-height: 1.15;
+  color: #e1eba8;
 }
 
 .signupPromptSubtitle {
-  margin: 2px 0 0;
-  font-size: 12px;
+  margin: 4px 0 0;
+  font-size: 13.5px;
   line-height: 1.4;
-  color: var(--text-2);
+  color: rgba(255, 247, 232, 0.82);
 }
 
 .signupPromptButton {
   flex-shrink: 0;
-  padding: 9px 16px;
+  padding: 13px 22px;
   border-radius: var(--radius-md);
-  background: var(--accent);
-  color: #fff;
-  font-size: 12.5px;
-  font-weight: 700;
+  background: #e1eba8;
+  color: #183e32;
+  font-size: 14.5px;
+  font-weight: 800;
   text-decoration: none;
   white-space: nowrap;
+}
+
+.signupPromptButton:hover {
+  background: #eef5c4;
+}
+
+/* El código promocional arranca como un enlace y solo abre el campo si
+   el cliente lo pide — casi nadie trae código. */
+.promoToggle {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.promoToggle:hover {
+  color: var(--accent);
 }
 
 .checkoutSection {
@@ -237,12 +272,6 @@
   font-size: 16px;
   font-weight: 700;
   color: var(--text);
-}
-
-.checkoutSubtitle {
-  margin: 0 0 16px;
-  font-size: 13px;
-  color: var(--text-2);
 }
 
 .checkoutGrid {
@@ -524,15 +553,6 @@
   border-top: 1px solid var(--border);
 }
 
-.promoLabel {
-  margin: 0 0 10px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--text-3);
-}
-
 .promoRow {
   display: flex;
   gap: 8px;
@@ -682,6 +702,15 @@
 
   .checkoutGrid {
     grid-template-columns: 1fr;
+  }
+
+  .signupPrompt {
+    flex-wrap: wrap;
+  }
+
+  .signupPromptButton {
+    width: 100%;
+    text-align: center;
   }
 
   .paymentOption {

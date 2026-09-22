@@ -43,6 +43,9 @@ const OrderSummary = ({
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoError, setPromoError] = useState("");
   const [promoApplied, setPromoApplied] = useState(null);
+  // El campo de código arranca escondido: la mayoría no trae código y
+  // tenerlo abierto solo agrega ruido al checkout.
+  const [showPromo, setShowPromo] = useState(Boolean(order?.promoCode));
 
   // Save favorite state — solo tiene sentido cuando el carrito es 1 solo
   // bowl (los favoritos siguen siendo de un bowl, no de un carrito entero).
@@ -257,14 +260,19 @@ const OrderSummary = ({
     const complementsLabels = getListLabels(labels.complement, line.complements);
     const saucesLabels = getListLabels(labels.sauce, line.sauces);
     const toppingsLabels = getListLabels(labels.topping, line.toppings);
-    const rows = [
-      { icon: "🍚", title: t("summary.base"), value: getBaseLabel(line.bases, line.base, language) },
-      { icon: "🐟", title: t("summary.protein"), value: proteinLabels.join(", ") },
-      marinadesLabels.length > 0 && { icon: "🧉", title: t("summary.marinades"), value: marinadesLabels.join(", ") },
-      complementsLabels.length > 0 && { icon: "🥗", title: t("summary.complements"), value: complementsLabels.join(", ") },
-      saucesLabels.length > 0 && { icon: "🥣", title: t("summary.sauces"), value: saucesLabels.join(", ") },
-      toppingsLabels.length > 0 && { icon: "🌿", title: t("summary.toppings"), value: toppingsLabels.join(", ") },
-    ].filter(Boolean);
+    // Lo que de verdad define el bowl (base y proteina) va en grande; el
+    // resto se junta en una sola linea gris. Antes eran 6 renglones con su
+    // propia etiqueta y el cliente no los leia.
+    const headline = [
+      getBaseLabel(line.bases, line.base, language),
+      proteinLabels.join(", "),
+    ].filter(Boolean).join(" \u00b7 ");
+    const extras = [
+      ...marinadesLabels,
+      ...complementsLabels,
+      ...saucesLabels,
+      ...toppingsLabels,
+    ].join(" \u00b7 ");
 
     return (
       <div className={styles.section}>
@@ -285,12 +293,8 @@ const OrderSummary = ({
             </button>
           </div>
         </div>
-        {rows.map((row) => (
-          <p key={row.title} className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
-            <span aria-hidden="true">{row.icon}</span>
-            <strong>{row.title}:</strong> {row.value}
-          </p>
-        ))}
+        <p className={styles.detailMain}>{headline}</p>
+        {extras && <p className={styles.detailExtras}>{extras}</p>}
       </div>
     );
   };
@@ -307,13 +311,8 @@ const OrderSummary = ({
               2x1 en Bowls
               <span className={styles.subTitleCount}>· ${line.price.toFixed(2)}</span>
             </h3>
-            <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
-              <span aria-hidden="true">🐟</span>
-              <strong>Proteína (los 2 bowls):</strong> {proteinLabel}
-            </p>
-            <p className={styles.detail} style={{ fontStyle: "italic" }}>
-              Solo para comer en el restaurante — no aplica para llevar.
-            </p>
+            <p className={styles.detailMain}>{proteinLabel}</p>
+            <p className={styles.detailExtras}>Una proteína para los 2 bowls · solo para comer aquí</p>
           </div>
           <button className={styles.editButton} onClick={() => removeCartLine(line.cartId)} type="button">
             {t("summary.remove")}
@@ -321,45 +320,21 @@ const OrderSummary = ({
         </div>
         {blockedByFulfillment && (
           <p className={styles.submitError} role="alert" style={{ marginTop: 8 }}>
-            Elegiste “Recoger en restaurante”. Para incluir 2x1 en Bowls cambia a “Comer en restaurante” arriba, o quita este artículo.
+            Cambia la entrega a “Comer en restaurante” para conservar el 2x1.
           </p>
         )}
         {(line.bowls || []).map((bowl, index) => {
-          const complementsLabels = getListLabels(labels.complement, bowl.complements);
-          const saucesLabels = getListLabels(labels.sauce, bowl.sauces);
-          const toppingsLabels = getListLabels(labels.topping, bowl.toppings);
-          const marinadesLabels = getListLabels(labels.marinade, bowl.marinades);
+          const title = `Bowl ${index + 1} \u00b7 ${getBaseLabel(bowl.bases, bowl.base, language)}`;
+          const extras = [
+            ...getListLabels(labels.marinade, bowl.marinades),
+            ...getListLabels(labels.complement, bowl.complements),
+            ...getListLabels(labels.sauce, bowl.sauces),
+            ...getListLabels(labels.topping, bowl.toppings),
+          ].join(" \u00b7 ");
           return (
-            <div key={index} style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border, #eee)" }}>
-              <p className={styles.detail} style={{ fontWeight: 700 }}>Bowl {index + 1}</p>
-              <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
-                <span aria-hidden="true">🍚</span>
-                <strong>{t("summary.base")}:</strong> {getBaseLabel(bowl.bases, bowl.base, language)}
-              </p>
-              {marinadesLabels.length > 0 && (
-                <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
-                  <span aria-hidden="true">🧉</span>
-                  <strong>{t("summary.marinades")}:</strong> {marinadesLabels.join(", ")}
-                </p>
-              )}
-              {complementsLabels.length > 0 && (
-                <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
-                  <span aria-hidden="true">🥗</span>
-                  <strong>{t("summary.complements")}:</strong> {complementsLabels.join(", ")}
-                </p>
-              )}
-              {saucesLabels.length > 0 && (
-                <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
-                  <span aria-hidden="true">🥣</span>
-                  <strong>{t("summary.sauces")}:</strong> {saucesLabels.join(", ")}
-                </p>
-              )}
-              {toppingsLabels.length > 0 && (
-                <p className={styles.detail} style={{ display: "flex", gap: 6, alignItems: "baseline" }}>
-                  <span aria-hidden="true">🌿</span>
-                  <strong>{t("summary.toppings")}:</strong> {toppingsLabels.join(", ")}
-                </p>
-              )}
+            <div key={index} className={styles.promoBowl}>
+              <p className={styles.detailMain}>{title}</p>
+              {extras && <p className={styles.detailExtras}>{extras}</p>}
             </div>
           );
         })}
@@ -414,11 +389,7 @@ const OrderSummary = ({
     <div className={styles.wrapper}>
       <div className={styles.container}>
         <div className={styles.header}>
-          <div className={styles.badge}>{t("summary.badge")}</div>
           <h2 className={styles.title}>{t("summary.title")}</h2>
-          <p className={styles.subtitle}>
-            {t("summary.subtitle")}
-          </p>
         </div>
 
         {cart.length === 0 ? (
@@ -532,9 +503,6 @@ const OrderSummary = ({
         <div className={styles.checkoutSection}>
           <div>
             <h3 className={styles.checkoutTitle}>{t("summary.checkoutTitle")}</h3>
-            <p className={styles.checkoutSubtitle}>
-              {t("summary.checkoutSubtitle")}
-            </p>
           </div>
 
           <div className={styles.checkoutGrid}>
@@ -654,8 +622,12 @@ const OrderSummary = ({
 
         {/* Promo code */}
         <div className={styles.promoSection}>
-          <p className={styles.promoLabel}>{t("summary.promoLabel")}</p>
-          {!promoApplied ? (
+          {!promoApplied && !showPromo && (
+            <button className={styles.promoToggle} type="button" onClick={() => setShowPromo(true)}>
+              {t("summary.promoToggle")}
+            </button>
+          )}
+          {!promoApplied ? (showPromo && (
             <div className={styles.promoRow}>
               <input
                 className={styles.promoInput}
@@ -675,7 +647,7 @@ const OrderSummary = ({
                 {promoLoading ? t("summary.promoChecking") : t("summary.promoApply")}
               </button>
             </div>
-          ) : (
+          )) : (
             <div className={styles.promoApplied}>
               <span className={styles.promoSuccess}>
                 {promoApplied.code} — {promoApplied.discountType === "percent"
