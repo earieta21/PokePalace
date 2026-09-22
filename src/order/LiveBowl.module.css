@@ -1,0 +1,42 @@
+.visual {
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  min-width: 0;
+}
+.bowl {
+  display: block;
+  width: 100%;
+  max-width: 390px;
+  height: auto;
+  overflow: visible;
+}
+.caption {
+  font-size: 9px;
+  color: var(--text-2);
+  text-align: center;
+  padding: 0 8px 10px;
+}
+.compact .bowl {
+  max-width: 270px;
+}
+.arrival {
+  animation: ingredient-arrive 320ms ease-out both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes ingredient-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-9px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arrival {
+    animation: none;
+  }
+}
