@@ -1,191 +1,447 @@
-/* Cabecera del armador (progreso, precio, resumen) — antes vivía como
-   estilos inline dentro de OrderPage.jsx. Mismo lenguaje que steps.module.css
-   y que el home: antetítulos en mayúsculas espaciadas, verde profundo,
-   líneas finas en vez de cajas con sombra. */
-
-.head {
-  --step-ink: #183e32;
-  --step-lime: #e1eba8;
-  --step-hairline: rgba(24, 62, 50, 0.13);
-
-  width: min(1040px, calc(100% - 32px));
+﻿.page {
+  --order-ink: #244637;
+  --order-soft: #edf0e5;
+  width: min(1240px, calc(100% - 64px));
   margin: 0 auto;
-  padding: 18px 2px 0;
+  padding: 28px 0 110px;
 }
-
-:global([data-theme="dark"]) .head {
-  --step-ink: #dce89e;
-  --step-lime: #5C9E70;
-  --step-hairline: rgba(255, 255, 255, 0.1);
-}
-
-/* ── progreso ── */
-
-.progressRow {
+.topbar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 9px;
+  gap: 20px;
+  margin-bottom: 24px;
 }
-
-.stepLabel {
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 1.8px;
-  text-transform: uppercase;
-  color: var(--step-ink);
+.wordmark {
+  color: var(--order-ink);
+  font-size: 17px;
+  font-weight: 850;
+  letter-spacing: -0.7px;
+  text-decoration: none;
 }
-
-.stepCount {
-  font-size: 10px;
+.wordmark span {
+  font-weight: 450;
+}
+.menuLink,
+.previewLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--order-ink);
+  text-decoration: none;
+  font-size: 12px;
   font-weight: 650;
-  letter-spacing: 1.2px;
-  color: var(--text-2);
-  white-space: nowrap;
 }
-
-.track {
-  height: 2px;
-  border-radius: 2px;
-  background: var(--step-hairline);
+.menuLink:hover,
+.previewLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.page a:focus-visible {
+  outline: 3px solid #a65c3d;
+  outline-offset: 5px;
+  border-radius: 3px;
+}
+.hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #e9eddf;
+  border-radius: 24px;
   overflow: hidden;
 }
-
+.heroCopy {
+  padding: 32px 42px;
+  align-self: center;
+}
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 1.8px;
+  color: var(--order-ink);
+}
+.hero h1 {
+  margin: 17px 0 14px;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: clamp(42px, 4.7vw, 64px);
+  line-height: 1;
+  letter-spacing: -2px;
+  font-weight: 400;
+  color: #244637;
+}
+.hero h1 em {
+  color: #64754c;
+  font-weight: 400;
+}
+.heroDescription {
+  max-width: 330px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.75;
+  color: #52614f;
+}
+.heroNote {
+  display: inline-block;
+  margin-top: 22px;
+  padding-top: 12px;
+  border-top: 1px solid #c6ceb8;
+  color: #52614f;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+}
+.heroVisual {
+  position: relative;
+  min-height: 290px;
+}
+.heroVisual img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photoLabel {
+  position: absolute;
+  left: 20px;
+  bottom: 18px;
+  max-width: calc(100% - 40px);
+  padding: 7px 12px;
+  background: #fffaf0e8;
+  border-radius: 30px;
+  color: #5c604f;
+  font-size: 9px;
+}
+.head {
+  margin: 26px 0;
+}
+.progress {
+  background: var(--bg-card);
+  border: 1px solid var(--border-md);
+  border-radius: 16px;
+  padding: 18px 24px;
+}
+.progressRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.stepLabel,
+.stepCount {
+  font-size: 10px;
+  color: var(--order-ink);
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.stepCount {
+  color: var(--text-2);
+}
+.track {
+  height: 3px;
+  border-radius: 3px;
+  background: var(--bg-muted);
+  overflow: hidden;
+}
 .fill {
   height: 100%;
-  background: var(--step-ink);
-  border-radius: 2px;
-  transition: width 260ms ease;
+  background: #7a925a;
+  transition: width 250ms ease;
 }
-
-/* ── precio + resumen ── */
-
-.metaRow {
+.stepList {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 16px 0 0;
+  list-style: none;
+}
+.stepItem {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
-  min-height: 24px;
+  gap: 9px;
+  color: var(--text-2);
+  font-size: 11px;
 }
-
+.stepNumber {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-md);
+  border-radius: 50%;
+  font-size: 10px;
+}
+.currentStep {
+  color: var(--order-ink);
+  font-weight: 750;
+}
+.currentStep .stepNumber {
+  background: #244637;
+  color: #fff;
+  border-color: #244637;
+}
+.completedStep .stepNumber {
+  background: var(--order-soft);
+  color: var(--order-ink);
+  border-color: transparent;
+}
+.builderLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  align-items: start;
+  gap: 28px;
+}
+.builder {
+  min-width: 0;
+}
+.bowlPreview {
+  position: sticky;
+  top: 24px;
+  padding: 25px;
+  border: 1px solid var(--border-md);
+  border-radius: 18px;
+  background: var(--bg-card);
+  color: var(--order-ink);
+}
+.previewHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+.bowlPreview h2 {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1.18;
+  letter-spacing: -0.6px;
+  margin: 18px 0 8px;
+}
+.previewHint,
+.emptySummary {
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 0;
+}
 .summary {
   display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  flex-direction: column;
+  gap: 13px;
+  padding: 20px 0;
+  margin-top: 18px;
+  border-top: 1px dashed var(--border-md);
 }
-
-.summary::-webkit-scrollbar {
-  display: none;
+.emptySummary {
+  border: 1px dashed var(--border-md);
+  border-radius: 10px;
+  padding: 16px;
 }
-
 .summaryItem {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 550;
+  gap: 10px;
+  align-items: baseline;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.priceBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border-md);
+}
+.priceCaption {
+  color: var(--text-2);
+  font-size: 10px;
+}
+.price {
+  color: var(--order-ink);
+  font-size: 19px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+.priceBlock small {
+  font-size: 10px;
   color: var(--text-2);
 }
-
-.summarySep {
-  flex-shrink: 0;
+.previewLink {
   font-size: 10px;
-  color: var(--step-hairline);
+  padding-top: 12px;
 }
-
-.price {
-  flex-shrink: 0;
-  padding: 5px 13px;
-  border-radius: 999px;
-  background: var(--step-lime);
-  color: #183e32;
-  font-size: 11.5px;
-  font-weight: 750;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
-}
-
-:global([data-theme="dark"]) .price {
-  color: #111512;
-}
-
-/* ── aviso de pedidos pausados ── */
-
 .paused {
   display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  margin-top: 14px;
-  padding: 13px 16px;
-  border: 1px solid rgba(176, 101, 64, 0.28);
+  gap: 12px;
+  padding: 15px;
+  margin-bottom: 16px;
+  background: #b0654012;
+  border: 1px solid #b0654047;
   border-radius: 12px;
-  background: rgba(176, 101, 64, 0.07);
 }
-
 .pausedIcon {
-  font-size: 17px;
-  line-height: 1.2;
+  font-size: 18px;
 }
-
 .pausedTitle {
   margin: 0;
-  font-size: 12px;
-  font-weight: 750;
-  letter-spacing: 0.3px;
   color: #8a3d1d;
+  font-size: 13px;
+  font-weight: 750;
 }
-
 .pausedText {
-  margin: 3px 0 0;
-  font-size: 11.5px;
-  line-height: 1.55;
+  margin: 4px 0 0;
+  font-size: 12px;
   color: var(--text-2);
 }
-
+:global([data-theme="dark"]) .page {
+  --order-ink: #dce89e;
+  --order-soft: #303b2a;
+}
+:global([data-theme="dark"]) .hero {
+  background: #26372b;
+}
+:global([data-theme="dark"]) .hero h1 {
+  color: #f5f3e8;
+}
+:global([data-theme="dark"]) .hero h1 em {
+  color: #c6d49d;
+}
+:global([data-theme="dark"]) .heroDescription,
+:global([data-theme="dark"]) .heroNote {
+  color: #c0cbb9;
+}
 :global([data-theme="dark"]) .pausedTitle {
   color: #e8b79a;
 }
-
-/* ── kiosco ── */
-
-.headKiosk {
-  width: min(1800px, calc(100% - 32px));
-  padding-top: 26px;
+@media (max-width: 1000px) {
+  .page {
+    width: calc(100% - 40px);
+  }
+  .builderLayout {
+    grid-template-columns: minmax(0, 1fr) 240px;
+    gap: 18px;
+  }
+  .bowlPreview {
+    padding: 20px;
+  }
+  .heroCopy {
+    padding: 30px;
+  }
+  .stepItem {
+    gap: 6px;
+    font-size: 10px;
+  }
 }
-
-.headKiosk .stepLabel,
-.headKiosk .stepCount {
-  font-size: 14px;
-  letter-spacing: 2.2px;
-}
-
-.headKiosk .track {
-  height: 3px;
-}
-
-.headKiosk .summaryItem {
-  font-size: 15px;
-}
-
-.headKiosk .price {
-  font-size: 16px;
-  padding: 9px 20px;
-}
-
-@media (max-width: 480px) {
-  .metaRow {
+@media (max-width: 760px) {
+  .page {
+    width: calc(100% - 32px);
+    padding-top: 20px;
+  }
+  .heroCopy {
+    padding: 25px;
+  }
+  .hero h1 {
+    font-size: 44px;
+  }
+  .heroDescription {
+    font-size: 12px;
+  }
+  .heroVisual {
+    min-height: 270px;
+  }
+  .heroNote {
+    font-size: 9px;
+    margin-top: 15px;
+  }
+  .builderLayout {
+    grid-template-columns: 1fr;
+  }
+  .bowlPreview {
+    position: static;
+  }
+  .stepItem {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+    gap: 7px;
+    font-size: 9px;
+  }
+  .progress {
+    padding: 16px 12px;
   }
   .summary {
-    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .emptySummary {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 480px) {
+  .topbar {
+    margin-bottom: 18px;
+    gap: 12px;
+  }
+  .wordmark {
+    font-size: 15px;
+  }
+  .menuLink {
+    font-size: 10px;
+  }
+  .hero {
+    grid-template-columns: 1fr;
+    border-radius: 18px;
+  }
+  .heroCopy {
+    padding: 26px;
+  }
+  .hero h1 {
+    font-size: 46px;
+  }
+  .hero h1 br {
+    display: none;
+  }
+  .hero h1 em {
+    display: block;
+  }
+  .heroDescription {
+    max-width: 270px;
+  }
+  .heroVisual {
+    min-height: 190px;
+  }
+  .heroVisual img {
+    object-position: center 55%;
+  }
+  .photoLabel {
+    bottom: 12px;
+    font-size: 8px;
+  }
+  .head {
+    margin: 20px 0;
+  }
+  .stepList {
+    column-gap: 3px;
+  }
+  .stepItem {
+    font-size: 8px;
+    letter-spacing: -0.15px;
+  }
+  .stepNumber {
+    width: 25px;
+    height: 25px;
+  }
+  .eyebrow {
+    font-size: 8px;
+    letter-spacing: 1.3px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fill {
+    transition: none;
   }
 }

@@ -31,11 +31,11 @@
   --step-ink: #dce89e;
   --step-ink-soft: #c2d1c7;
   --step-cream: #111512;
-  --step-lime: #5C9E70;
-  --step-lime-soft: #7CBF8C;
+  --step-lime: #5c9e70;
+  --step-lime-soft: #7cbf8c;
   --step-hairline: rgba(255, 255, 255, 0.1);
-  --step-surface: #1B1F1C;
-  --step-surface-2: #1E2320;
+  --step-surface: #1b1f1c;
+  --step-surface-2: #1e2320;
 }
 
 /* ── encabezado del paso ── */
@@ -115,7 +115,9 @@
   background: var(--step-surface);
   text-align: left;
   cursor: pointer;
-  transition: border-color 180ms ease, box-shadow 180ms ease;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .card:hover {
@@ -157,7 +159,11 @@
 .imageOverlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 55%, rgba(24, 62, 50, 0.08) 100%);
+  background: linear-gradient(
+    180deg,
+    transparent 55%,
+    rgba(24, 62, 50, 0.08) 100%
+  );
 }
 
 /* Marca de seleccionado. Cinco pasos la dibujan con ::after (una palomita),
@@ -294,7 +300,9 @@
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
 }
 
 .stepperBtn:hover:not(:disabled) {
@@ -385,7 +393,10 @@
   font-weight: 750;
   letter-spacing: 0.3px;
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .nextButton {
@@ -456,6 +467,115 @@
 }
 
 /* ── kiosco: mismo diseño, todo más grande para pantalla táctil de pie ── */
+
+/* Web builder: compact ingredient tiles inside the page's two-column layout. */
+.container:not(.containerKiosk) {
+  width: 100%;
+  margin: 0;
+  padding: 26px;
+  border-radius: 18px;
+  background: var(--bg-card);
+}
+.container:not(.containerKiosk) .header {
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+}
+.container:not(.containerKiosk) .title {
+  font-size: clamp(28px, 3vw, 36px);
+}
+.container:not(.containerKiosk) .selectionInfo {
+  background: var(--step-lime-soft);
+  border: none;
+  border-radius: 8px;
+  color: #244637;
+  font-size: 11px;
+}
+.container:not(.containerKiosk) .grid {
+  gap: 14px;
+}
+.container:not(.containerKiosk) .card {
+  position: relative;
+  border-radius: 12px;
+  background: var(--step-surface-2);
+  padding-bottom: 10px;
+}
+.container:not(.containerKiosk) .card:disabled {
+  cursor: not-allowed;
+}
+.container:not(.containerKiosk) .card:not(:disabled):hover {
+  border-color: var(--step-ink);
+}
+.container:not(.containerKiosk) .selected {
+  background: var(--step-lime-soft);
+  box-shadow: 0 0 0 2px var(--step-ink);
+}
+.container:not(.containerKiosk) .selected .name,
+.container:not(.containerKiosk) .selected .description {
+  color: #244637;
+}
+.container:not(.containerKiosk) .imageWrap {
+  aspect-ratio: 1.25;
+}
+.container:not(.containerKiosk) .name {
+  padding: 12px 13px 4px;
+  font-size: 13px;
+}
+.container:not(.containerKiosk) .description {
+  padding: 0 13px 4px;
+  font-size: 10px;
+}
+.container:not(.containerKiosk) .actions {
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  padding: 12px 0 0;
+  margin-top: 22px;
+}
+.container:not(.containerKiosk) .nextButton {
+  border-radius: 30px;
+  min-width: 150px;
+}
+.container:not(.containerKiosk) .backButton {
+  border-radius: 30px;
+}
+.nextButton:focus-visible,
+.backButton:focus-visible,
+.skipBtn:focus-visible,
+.stepperBtn:focus-visible {
+  outline: 3px solid #b06540;
+  outline-offset: 4px;
+}
+@media (max-width: 1000px) and (min-width: 761px) {
+  .container:not(.containerKiosk) {
+    padding: 20px;
+  }
+  .container:not(.containerKiosk) .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .container:not(.containerKiosk) {
+    padding: 20px 15px;
+  }
+  .container:not(.containerKiosk) .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .container:not(.containerKiosk) .name {
+    font-size: 12px;
+  }
+  .container:not(.containerKiosk) .nextButton {
+    min-width: 120px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .image,
+  .stepperBtn,
+  .nextButton,
+  .backButton,
+  .skipBtn {
+    transition: none;
+  }
+}
 
 .containerKiosk {
   width: min(1800px, calc(100% - 32px));
