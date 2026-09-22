@@ -4,6 +4,7 @@ import { useOrder } from "../order/OrderContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { PROMO_2X1_BOWLS_PRICE } from "../order/pricing";
 import { bowlDraftPrice, bowlSummaryParts } from "../order/bowlDraftSummary";
+import LiveBowl from "../order/LiveBowl";
 import useIdleTimeout from "./useIdleTimeout";
 import styles from "./KioskOrderPage.module.css";
 
@@ -155,6 +156,12 @@ export default function KioskOrderPage() {
       </div>
 
       <div className={styles.summaryBar}>
+        {/* El mismo dibujo del bowl que se arma solo en la web — el kiosco es
+            justo donde más se aprecia, que el cliente vea caer cada
+            ingrediente mientras elige. */}
+        <div className={styles.summaryBowl}>
+          <LiveBowl order={order} language={language} compact />
+        </div>
         <span className={styles.summaryEyebrow}>
           {language === "en" ? "YOUR BOWL" : "TU BOWL"}
         </span>

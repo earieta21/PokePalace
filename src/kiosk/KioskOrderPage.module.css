@@ -174,9 +174,14 @@
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 15px 22px;
+  padding: 12px 22px;
   background: #fff;
   border-bottom: 1px solid var(--kiosk-hairline);
+}
+
+.summaryBowl {
+  flex-shrink: 0;
+  width: 190px;
 }
 
 .summaryEyebrow {
@@ -245,6 +250,10 @@
 
   .summaryBar {
     flex-wrap: wrap;
+  }
+
+  .summaryBowl {
+    width: 120px;
   }
 
   .price {
