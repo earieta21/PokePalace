@@ -1305,6 +1305,263 @@
 }
 
 /* ══════════════════════════════
+   SALES DASHBOARD
+══════════════════════════════ */
+.salesToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.salesToolbar .btnGhost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.salesToolbar .btnGhost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.salesError {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(180, 40, 40, 0.18);
+  border-radius: var(--p-radius-sm);
+  background: rgba(180, 40, 40, 0.06);
+  color: #8b1a1a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.salesHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.36fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.salesHero > div {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid rgba(45, 106, 79, 0.16);
+  border-radius: var(--p-radius);
+  background:
+    linear-gradient(135deg, rgba(45, 106, 79, 0.1), rgba(82, 183, 136, 0.03)),
+    var(--p-surface);
+  box-shadow: var(--p-shadow);
+}
+
+.salesHero strong {
+  display: block;
+  margin: 3px 0 6px;
+  color: var(--p-g0);
+  font-family: "DM Mono", monospace;
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.salesHero span,
+.salesHeroMeta span {
+  display: block;
+  color: var(--p-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.salesHeroMeta {
+  align-content: center;
+}
+
+.salesHeroMeta strong {
+  font-size: 20px;
+}
+
+.salesEyebrow {
+  margin: 0;
+  color: var(--p-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+.salesMetricCard {
+  min-height: 118px;
+}
+
+.salesGridMain {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 20px;
+}
+
+.salesCardHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.salesCardHeader .cardTitle {
+  margin: 0;
+}
+
+.salesCardHeader span {
+  flex-shrink: 0;
+  color: var(--p-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.salesDayChart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 9px;
+  min-height: 190px;
+  align-items: end;
+}
+
+.salesDayColumn {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 28px 126px auto auto;
+  gap: 5px;
+  text-align: center;
+}
+
+.salesDayColumn span {
+  align-self: end;
+  color: var(--p-muted);
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.salesDayBar {
+  display: flex;
+  align-items: end;
+  min-height: 126px;
+  border-radius: 7px;
+  background: rgba(45, 106, 79, 0.08);
+  overflow: hidden;
+}
+
+.salesDayBar i {
+  display: block;
+  width: 100%;
+  border-radius: 7px 7px 0 0;
+  background: linear-gradient(180deg, var(--p-g3), var(--p-g2));
+  transition: height 180ms ease;
+}
+
+.salesDayColumn strong {
+  color: var(--p-ink);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: capitalize;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.salesDayColumn small {
+  color: var(--p-muted);
+  font-size: 10.5px;
+}
+
+.salesActionList {
+  display: grid;
+  gap: 10px;
+}
+
+.salesAction {
+  padding: 12px;
+  border: 1px solid rgba(45, 106, 79, 0.12);
+  border-radius: var(--p-radius-sm);
+  background: rgba(45, 106, 79, 0.035);
+}
+
+.salesAction strong {
+  display: block;
+  color: var(--p-g1);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.salesAction p {
+  margin: 5px 0 0;
+  color: var(--p-muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.salesMixGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.salesMixList {
+  display: grid;
+  gap: 9px;
+}
+
+.salesMixItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(45, 106, 79, 0.08);
+}
+
+.salesMixItem:last-child {
+  border-bottom: none;
+}
+
+.salesMixItem span {
+  min-width: 0;
+  color: var(--p-ink);
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.salesMixItem strong {
+  color: var(--p-g2);
+  font-family: "DM Mono", monospace;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.salesMixItem small {
+  grid-column: 1 / -1;
+  color: var(--p-muted);
+  font-size: 11.5px;
+}
+
+.salesEmpty {
+  margin: 0;
+  padding: 10px 0;
+  color: var(--p-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ══════════════════════════════
    RESPONSIVE
 ══════════════════════════════ */
 @media (max-width: 900px) {
@@ -1354,6 +1611,12 @@
     grid-template-columns: 1fr;
   }
 
+  .salesHero,
+  .salesGridMain,
+  .salesMixGrid {
+    grid-template-columns: 1fr;
+  }
+
   .prepName {
     width: 120px;
   }
@@ -1370,5 +1633,48 @@
 
   .formRow {
     grid-template-columns: 1fr;
+  }
+
+  .salesToolbar {
+    width: 100%;
+  }
+
+  .salesToolbar .btnGhost {
+    flex: 1;
+    min-width: 0;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .salesHero > div {
+    padding: 18px;
+  }
+
+  .salesHero strong {
+    font-size: 25px;
+  }
+
+  .salesDayChart {
+    gap: 6px;
+  }
+
+  .salesDayColumn {
+    grid-template-rows: 22px 104px auto auto;
+  }
+
+  .salesDayColumn span {
+    font-size: 9px;
+  }
+
+  .salesDayBar {
+    min-height: 104px;
+  }
+
+  .barRow {
+    gap: 7px;
+  }
+
+  .barLabel {
+    width: 92px;
   }
 }

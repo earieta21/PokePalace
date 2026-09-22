@@ -1358,3 +1358,60 @@
 }
 
 .bowlPanel { scroll-margin-top: 88px; }
+
+/* ---- Barra de fases ---- */
+
+.phaseNav {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.phaseNav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1px solid var(--p-border);
+  border-radius: 12px;
+  background: var(--p-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.phaseNav button:hover { border-color: #24563c66; }
+
+.phaseActive {
+  border-color: #24563c !important;
+  background: #f1f7f3 !important;
+  box-shadow: inset 0 0 0 1px #24563c33;
+}
+
+.phaseNumber {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #e3e8e4;
+  color: #4a5a50;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.phaseActive .phaseNumber { background: #24563c; color: #fff; }
+
+.phaseText { display: flex; flex-direction: column; min-width: 0; }
+.phaseText strong { font-size: 13.5px; color: #1a1a1a; }
+.phaseText small { font-size: 11.5px; color: #6b7a70; }
+
+@media (max-width: 700px) {
+  .phaseNav button { padding: 9px 10px; gap: 7px; }
+  .phaseText strong { font-size: 12.5px; }
+  .phaseText small { display: none; }
+}

@@ -24,10 +24,13 @@ import staffFiscalRoutes from "./routes/staffFiscal.js";
 import staffCashCutRoutes from "./routes/staffCashCuts.js";
 import staffAuditLogRoutes from "./routes/staffAuditLog.js";
 import staffCustomersRoutes from "./routes/staffCustomers.js";
+import staffCostingRoutes from "./routes/staffCosting.js";
+import staffPreparationRoutes from "./routes/staffPreparations.js";
 import staffConsumptionRoutes from "./routes/staffConsumption.js";
 import staffFixedExpenseRoutes from "./routes/staffFixedExpenses.js";
 import whatsappRoutes from "./routes/whatsapp.js";
 import telegramFinanceRoutes from "./routes/telegramFinance.js";
+import kioskPairingRoutes from "./routes/kioskPairing.js";
 import { logServerError } from "./controllers/monitorController.js";
 import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
 import { startOrderChangeStream } from "./utils/orderEvents.js";
@@ -102,9 +105,12 @@ app.use("/api/staff/fiscal",   staffFiscalRoutes);
 app.use("/api/staff/cash-cuts",staffCashCutRoutes);
 app.use("/api/staff/audit-log",staffAuditLogRoutes);
 app.use("/api/staff/customers",staffCustomersRoutes);
+app.use("/api/staff/costing", staffCostingRoutes);
+app.use("/api/staff/preparations", staffPreparationRoutes);
 app.use("/api/staff/consumption",staffConsumptionRoutes);
 app.use("/api/staff/fixed-expenses",staffFixedExpenseRoutes);
 app.use("/api/telegram",       telegramFinanceRoutes);
+app.use("/api/kiosk-pairing",  kioskPairingRoutes);
 
 app.get("/", (req, res) => {
   if (process.env.RENDER_GIT_COMMIT) res.set("X-App-Revision", process.env.RENDER_GIT_COMMIT);

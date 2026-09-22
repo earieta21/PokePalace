@@ -1,11 +1,22 @@
+import BowlCosting from "../models/BowlCosting.js";
 import StoreSettings from "../models/StoreSettings.js";
 import { isPromo2x1Day } from "../utils/promoSchedule.js";
 
 export const getAvailability = async (req, res) => {
   try {
-    const doc = await StoreSettings.findOne({ key: "main" });
+    const [doc, costing] = await Promise.all([
+      StoreSettings.findOne({ key: "main" }),
+      // Los ingredientes que el negocio no maneja se apagan una sola vez en
+      // Costeo; aquí se exponen para que el armador ni los ofrezca. Es
+      // distinto de `unavailableItems`, que es lo agotado del día.
+      BowlCosting.findById("bowl-costing").select("disabledProteins disabledComplements"),
+    ]);
     res.json({
       unavailableItems: doc?.unavailableItems ?? [],
+      hiddenIngredients: [
+        ...(costing?.disabledProteins ?? []),
+        ...(costing?.disabledComplements ?? []),
+      ],
       // La promo 2x1 solo corre martes/jueves — el frontend usa esto para
       // mostrar/ocultar la sección sin que cada pantalla calcule el día.
       promo2x1Active: isPromo2x1Day(),

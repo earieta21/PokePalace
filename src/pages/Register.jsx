@@ -40,6 +40,7 @@ export default function Register() {
           <p className={styles.subTitle}>
             {t("auth.registerSubtitle")}
           </p>
+          <p className={styles.bonusBadge}>{t("auth.registerBonus")}</p>
         </div>
 
         {error && <div className={styles.error}>{error}</div>}

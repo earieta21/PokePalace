@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useAvailability } from "../context/AvailabilityContext";
 import { BASE_LABELS, PROTEIN_LABELS, COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS, getBaseLabel } from "../order/OrderLabels";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, PREMIUM_PROTEIN_PRICES, COMPLEMENT_FREE_LIMIT, EXTRA_COMPLEMENT_PRICE, computeExtrasSubtotal } from "../order/pricing";
 import ui from "./CustomBowlBuilder.module.css";
 
-const GROUPS = [
+const ALL_GROUPS = [
   { key: "bases", title: "Base", hint: "Elige 1 base o 2 para mitad y mitad, sin costo extra.", max: 2, labels: BASE_LABELS, ids: ["white_rice", "spring_mix", "quinoa"] },
   { key: "proteins", title: "Proteínas", hint: `1 o 2: mediano · 3: grande (+$${LARGE_BOWL_UPCHARGE}).`, max: 3, labels: PROTEIN_LABELS, ids: ["tuna", "salmon", "shrimp", "tofu", "seared_tuna"] },
   { key: "complements", title: "Complementos", hint: `${COMPLEMENT_FREE_LIMIT} incluidos. Cada adicional cuesta $${EXTRA_COMPLEMENT_PRICE}.`, max: 11, labels: COMPLEMENT_LABELS, ids: ["shredded_carrots", "seaweed", "edamame", "red_onion", "cucumber", "mango", "pineapple", "beet", "surimi", "spicy_surimi", "avocado"] },
@@ -14,6 +15,17 @@ const GROUPS = [
 const emptyDraft = () => ({ base: null, bases: [], proteins: [], marinades: [], complements: [], sauces: [], toppings: [] });
 
 export default function CustomBowlBuilder({ onAdd, onCancel, initialBowl }) {
+  // Lo que el negocio no maneja tampoco se le ofrece a caja: si el cajero no
+  // lo puede servir, no debe poder capturarlo.
+  const { hiddenIngredients } = useAvailability();
+  const GROUPS = useMemo(
+    () => ALL_GROUPS.map((group) => ({
+      ...group,
+      ids: group.ids.filter((id) => !hiddenIngredients.includes(id)),
+    })),
+    [hiddenIngredients]
+  );
+
   const [draft, setDraft] = useState(() => {
     const bases = initialBowl?.bases?.length ? [...initialBowl.bases] : initialBowl?.base ? [initialBowl.base] : [];
     return { ...emptyDraft(), ...initialBowl, bases, base: bases[0] || null };

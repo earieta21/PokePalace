@@ -269,6 +269,7 @@ export const createOrder = async (req, res) => {
       pointsToRedeem,
       paymentMethod,
       fulfillment,
+      fromKiosk,
     } = req.body;
     // Whitelist explícito: "delivery" sigue deshabilitado (no se cobra por
     // otra razón, ver OrderSummary.jsx) y cualquier otro valor manipulado
@@ -323,7 +324,9 @@ export const createOrder = async (req, res) => {
     const cleanCustomer = typeof customer === "string" ? customer.trim() : "";
     const cleanPhone = typeof phone === "string" ? phone.trim() : "";
     const cleanNotes = typeof notes === "string" ? notes.trim() : "";
-    if (!cleanCustomer || !cleanPhone) {
+    // El kiosco no pide teléfono — el cliente está parado ahí mismo, no hace
+    // falta poder contactarlo después (SMS/WhatsApp ya no aplican sin uno).
+    if (!cleanCustomer || (!cleanPhone && !fromKiosk)) {
       return res.status(400).json({ msg: "Agrega tu nombre y teléfono para confirmar" });
     }
 

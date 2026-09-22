@@ -1,10 +1,13 @@
 import React, { useContext, useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useOrder } from "./OrderContext";
 import { AuthContext } from "../context/AuthContext";
 import { API_URL } from "../config";
 import { PREMIUM_PROTEIN_PRICES, computeCartPricing } from "./pricing";
 import { useLanguage } from "../i18n/LanguageContext";
 import { comboPalaceSelectionLabels } from "../data/comboPalace";
+import KioskPairingQr from "../kiosk/KioskPairingQr";
+import kioskPairStyles from "../kiosk/KioskPairingQr.module.css";
 import styles from "./OrderSummary.module.css";
 
 import {
@@ -22,9 +25,13 @@ const OrderSummary = ({
   saving = false,
   submitError = "",
   showOnlinePayment = false,
+  isKiosk = false,
+  pairing = null,
+  onPaired,
 }) => {
   const { order, startNewBowl, editCartBowl, removeCartLine, updateCartItemQty } = useOrder();
   const { isLoggedIn, token } = useContext(AuthContext);
+  const location = useLocation();
   const { language, t } = useLanguage();
   const labels = ITEM_LABELS[language] || ITEM_LABELS.es;
 
@@ -488,6 +495,39 @@ const OrderSummary = ({
           </div>
         )}
 
+        {isKiosk && (
+          pairing
+            ? (
+              <div className={kioskPairStyles.paired}>
+                <span className={kioskPairStyles.pairedIcon} aria-hidden="true">✅</span>
+                <div>
+                  <p className={kioskPairStyles.pairedTitle}>¡Hola, {pairing.name}!</p>
+                  <p className={kioskPairStyles.pairedSubtitle}>
+                    Este pedido acumula puntos en tu cuenta.
+                  </p>
+                </div>
+              </div>
+            )
+            : <KioskPairingQr onPaired={onPaired} />
+        )}
+
+        {!isKiosk && !isLoggedIn && (
+          <div className={styles.signupPrompt}>
+            <span className={styles.signupPromptIcon} aria-hidden="true">🎁</span>
+            <div className={styles.signupPromptText}>
+              <p className={styles.signupPromptTitle}>{t("summary.signupPromptTitle")}</p>
+              <p className={styles.signupPromptSubtitle}>{t("summary.signupPromptSubtitle")}</p>
+            </div>
+            <Link
+              className={styles.signupPromptButton}
+              to="/register"
+              state={{ from: location.pathname + location.search }}
+            >
+              {t("summary.signupPromptCta")}
+            </Link>
+          </div>
+        )}
+
         {/* Checkout form */}
         <div className={styles.checkoutSection}>
           <div>
@@ -510,18 +550,20 @@ const OrderSummary = ({
               />
             </label>
 
-            <label className={styles.field}>
-              <span>{t("summary.phone")}</span>
-              <input
-                name="phone"
-                value={order.phone || ""}
-                onChange={(e) => order.updateCheckout("phone", e.target.value)}
-                placeholder={t("summary.phonePlaceholder")}
-                autoComplete="tel"
-                inputMode="tel"
-                required
-              />
-            </label>
+            {!isKiosk && (
+              <label className={styles.field}>
+                <span>{t("summary.phone")}</span>
+                <input
+                  name="phone"
+                  value={order.phone || ""}
+                  onChange={(e) => order.updateCheckout("phone", e.target.value)}
+                  placeholder={t("summary.phonePlaceholder")}
+                  autoComplete="tel"
+                  inputMode="tel"
+                  required
+                />
+              </label>
+            )}
 
             <label className={styles.field}>
               <span>{t("summary.fulfillment")}</span>

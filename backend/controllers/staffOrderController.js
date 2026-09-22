@@ -1067,23 +1067,19 @@ export const getAnalytics = async (req, res) => {
         .reduce((s, o) => s + o.total, 0);
 
       days.push({
+        dateKey,
         day: new Intl.DateTimeFormat("en-US", {
           weekday: "short",
           timeZone: RESTAURANT_TIME_ZONE,
         }).format(start),
+        dayLabel: new Intl.DateTimeFormat("es-MX", {
+          weekday: "short",
+          timeZone: RESTAURANT_TIME_ZONE,
+        }).format(start).replace(".", ""),
         orders: dayOrders.length,
         revenue: parseFloat(rev.toFixed(2)),
       });
     }
-
-    // Top proteins (from bowl orders)
-    const proteinAgg = await Order.aggregate([
-      { $match: { status: { $ne: "cancelled" }, proteins: { $exists: true, $ne: [] } } },
-      { $unwind: "$proteins" },
-      { $group: { _id: "$proteins", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 5 },
-    ]);
 
     // Peak hours (last 30 days)
     const thirtyDaysAgo = startOfDateKey(
@@ -1091,8 +1087,19 @@ export const getAnalytics = async (req, res) => {
       RESTAURANT_TIME_ZONE
     );
 
+    const last30Match = { createdAt: { $gte: thirtyDaysAgo }, status: { $ne: "cancelled" } };
+
+    // Top proteins (from bowl orders, last 30 days)
+    const proteinAgg = await Order.aggregate([
+      { $match: { ...last30Match, proteins: { $exists: true, $ne: [] } } },
+      { $unwind: "$proteins" },
+      { $group: { _id: "$proteins", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+    ]);
+
     const hourAgg = await Order.aggregate([
-      { $match: { createdAt: { $gte: thirtyDaysAgo }, status: { $ne: "cancelled" } } },
+      { $match: last30Match },
       {
         $group: {
           _id: { $hour: { date: "$createdAt", timezone: RESTAURANT_TIME_ZONE } },
@@ -1112,7 +1119,7 @@ export const getAnalytics = async (req, res) => {
 
     // Top POS items (flat items array)
     const posItemAgg = await Order.aggregate([
-      { $match: { source: "pos", status: { $ne: "cancelled" }, items: { $not: { $size: 0 } } } },
+      { $match: { ...last30Match, source: "pos", items: { $not: { $size: 0 } } } },
       { $unwind: "$items" },
       {
         $group: {
@@ -1135,12 +1142,98 @@ export const getAnalytics = async (req, res) => {
 
     // Cómo nos conocieron (solo órdenes POS donde se preguntó)
     const referralAgg = await Order.aggregate([
-      { $match: { source: "pos", status: { $ne: "cancelled" }, referralSource: { $ne: null } } },
+      { $match: { ...last30Match, source: "pos", referralSource: { $ne: null } } },
       { $group: { _id: "$referralSource", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
 
-    res.json({ days, topProteins: proteinAgg, peakHours, topPosItems: posItemAgg, referralSources: referralAgg });
+    const sourceAgg = await Order.aggregate([
+      { $match: last30Match },
+      {
+        $group: {
+          _id: "$source",
+          count: { $sum: 1 },
+          revenue: {
+            $sum: {
+              $cond: [
+                { $eq: ["$paymentStatus", "paid"] },
+                { $ifNull: ["$total", 0] },
+                0,
+              ],
+            },
+          },
+        },
+      },
+      { $sort: { revenue: -1, count: -1 } },
+    ]);
+
+    const fulfillmentAgg = await Order.aggregate([
+      { $match: last30Match },
+      { $group: { _id: "$fulfillment", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+
+    const paymentMethodAgg = await Order.aggregate([
+      { $match: last30Match },
+      {
+        $group: {
+          _id: "$paymentMethod",
+          count: { $sum: 1 },
+          revenue: {
+            $sum: {
+              $cond: [
+                { $eq: ["$paymentStatus", "paid"] },
+                { $ifNull: ["$total", 0] },
+                0,
+              ],
+            },
+          },
+        },
+      },
+      { $sort: { revenue: -1, count: -1 } },
+    ]);
+
+    const cashierAgg = await Order.aggregate([
+      {
+        $match: {
+          ...last30Match,
+          source: "pos",
+          staffId: { $ne: null },
+          paymentStatus: "paid",
+        },
+      },
+      {
+        $group: {
+          _id: "$staffId",
+          count: { $sum: 1 },
+          revenue: { $sum: { $ifNull: ["$total", 0] } },
+        },
+      },
+      { $sort: { revenue: -1, count: -1 } },
+      { $limit: 5 },
+      { $lookup: { from: "staffusers", localField: "_id", foreignField: "_id", as: "staff" } },
+      { $unwind: { path: "$staff", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          count: 1,
+          revenue: 1,
+          name: { $ifNull: ["$staff.name", "Sin asignar"] },
+        },
+      },
+    ]);
+
+    res.json({
+      days,
+      topProteins: proteinAgg,
+      peakHours,
+      topPosItems: posItemAgg,
+      referralSources: referralAgg,
+      sourceMix: sourceAgg,
+      fulfillmentMix: fulfillmentAgg,
+      paymentMethods: paymentMethodAgg,
+      cashierSales: cashierAgg,
+    });
   } catch (err) {
     res.status(500).json({ message: "Error fetching analytics", err: err.message });
   }
