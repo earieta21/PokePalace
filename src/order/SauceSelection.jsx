@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
 import { getItemDescription, getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
-import styles from "./SauceSelection.module.css";
+import styles from "./steps.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
 
 import garlicSiracha from "../assets/dressings/garlicSiracha.webp";

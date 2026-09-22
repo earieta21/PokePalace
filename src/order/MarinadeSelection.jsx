@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
 import { getItemDescription, getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
-import styles from "./MarinadeSelection.module.css";
+import styles from "./steps.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
 
 import citrico from "../assets/marinades/citrico.webp";

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
-import styles from "./ComplementsSelection.module.css";
+import styles from "./steps.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
 import { COMPLEMENT_FREE_LIMIT, EXTRA_COMPLEMENT_PRICE, PROMO_2X1_MAX_COMPLEMENTS } from "./pricing";
 

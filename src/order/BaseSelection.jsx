@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useOrder } from "./OrderContext";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
-import styles from "./BaseSelection.module.css";
+import styles from "./steps.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
 
 import whiteRice from "../assets/base/whiteRice.webp";

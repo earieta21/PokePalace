@@ -1,0 +1,191 @@
+/* Cabecera del armador (progreso, precio, resumen) — antes vivía como
+   estilos inline dentro de OrderPage.jsx. Mismo lenguaje que steps.module.css
+   y que el home: antetítulos en mayúsculas espaciadas, verde profundo,
+   líneas finas en vez de cajas con sombra. */
+
+.head {
+  --step-ink: #183e32;
+  --step-lime: #e1eba8;
+  --step-hairline: rgba(24, 62, 50, 0.13);
+
+  width: min(1040px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 18px 2px 0;
+}
+
+:global([data-theme="dark"]) .head {
+  --step-ink: #dce89e;
+  --step-lime: #5C9E70;
+  --step-hairline: rgba(255, 255, 255, 0.1);
+}
+
+/* ── progreso ── */
+
+.progressRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 9px;
+}
+
+.stepLabel {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--step-ink);
+}
+
+.stepCount {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 1.2px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.track {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--step-hairline);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: var(--step-ink);
+  border-radius: 2px;
+  transition: width 260ms ease;
+}
+
+/* ── precio + resumen ── */
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  min-height: 24px;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.summary::-webkit-scrollbar {
+  display: none;
+}
+
+.summaryItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 550;
+  color: var(--text-2);
+}
+
+.summarySep {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--step-hairline);
+}
+
+.price {
+  flex-shrink: 0;
+  padding: 5px 13px;
+  border-radius: 999px;
+  background: var(--step-lime);
+  color: #183e32;
+  font-size: 11.5px;
+  font-weight: 750;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+:global([data-theme="dark"]) .price {
+  color: #111512;
+}
+
+/* ── aviso de pedidos pausados ── */
+
+.paused {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-top: 14px;
+  padding: 13px 16px;
+  border: 1px solid rgba(176, 101, 64, 0.28);
+  border-radius: 12px;
+  background: rgba(176, 101, 64, 0.07);
+}
+
+.pausedIcon {
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.pausedTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.3px;
+  color: #8a3d1d;
+}
+
+.pausedText {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+:global([data-theme="dark"]) .pausedTitle {
+  color: #e8b79a;
+}
+
+/* ── kiosco ── */
+
+.headKiosk {
+  width: min(1800px, calc(100% - 32px));
+  padding-top: 26px;
+}
+
+.headKiosk .stepLabel,
+.headKiosk .stepCount {
+  font-size: 14px;
+  letter-spacing: 2.2px;
+}
+
+.headKiosk .track {
+  height: 3px;
+}
+
+.headKiosk .summaryItem {
+  font-size: 15px;
+}
+
+.headKiosk .price {
+  font-size: 16px;
+  padding: 9px 20px;
+}
+
+@media (max-width: 480px) {
+  .metaRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .summary {
+    width: 100%;
+  }
+}

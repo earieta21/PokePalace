@@ -12,6 +12,7 @@ import { ITEM_LABELS, getBaseLabel } from "./OrderLabels";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, PROMO_2X1_BOWLS_PRICE } from "./pricing";
 import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
+import styles from "./OrderPage.module.css";
 
 const TOTAL_STEPS = 6;
 const LAST_STEP = TOTAL_STEPS - 1;
@@ -24,8 +25,12 @@ const STEP_NAME_KEYS = [
   "summary.toppings",
 ];
 
+/* Barra de progreso: antes eran 6 círculos numerados; ahora una línea que
+   se llena con el nombre del paso encima — se lee de un vistazo y aguanta
+   mejor en pantallas angostas. */
 function StepProgress({ step, t }) {
   const currentStepName = t(STEP_NAME_KEYS[step]);
+  const pct = ((step + 1) / TOTAL_STEPS) * 100;
   return (
     <div
       role="progressbar"
@@ -33,123 +38,44 @@ function StepProgress({ step, t }) {
       aria-valuemax={TOTAL_STEPS}
       aria-valuenow={step + 1}
       aria-label={t("order.progressLabel", { step: step + 1, total: TOTAL_STEPS, name: currentStepName })}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        padding: "14px 20px 4px",
-        maxWidth: 960,
-        margin: "0 auto",
-      }}
     >
-      {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-        <React.Fragment key={i}>
-          <div
-            title={t(STEP_NAME_KEYS[i])}
-            aria-hidden="true"
-            style={{
-              width: 28, height: 28,
-              borderRadius: "50%",
-              flexShrink: 0,
-              background: i <= step ? "var(--accent)" : "transparent",
-              border: `2px solid ${i <= step ? "var(--accent)" : "#d1d5db"}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: i <= step ? "#fff" : "#9ca3af",
-              fontSize: "11.5px", fontWeight: 700,
-              transition: "all 200ms ease",
-            }}
-          >
-            {i < step ? "✓" : i + 1}
-          </div>
-          {i < TOTAL_STEPS - 1 && (
-            <div style={{
-              flex: 1, height: 2,
-              background: i < step ? "var(--accent)" : "#e5e7eb",
-              transition: "background 200ms ease",
-            }} />
-          )}
-        </React.Fragment>
-      ))}
+      <div className={styles.progressRow}>
+        <span className={styles.stepLabel}>{currentStepName}</span>
+        <span className={styles.stepCount}>
+          {step + 1} / {TOTAL_STEPS}
+        </span>
+      </div>
+      <div className={styles.track}>
+        <div className={styles.fill} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
 
 function PausedBanner({ message, t }) {
   return (
-    <div style={{
-      maxWidth: 960, margin: "0 auto", padding: "0 20px 4px",
-    }}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 10,
-        background: "#fef2f2", border: "1px solid #fecaca",
-        borderRadius: 12, padding: "12px 16px", marginTop: 10,
-      }}>
-        <span aria-hidden="true" style={{ fontSize: 20 }}>⏸</span>
-        <div>
-          <p style={{ margin: 0, fontWeight: 700, fontSize: 13.5, color: "#991b1b" }}>
-            {t("order.pausedTitle")}
-          </p>
-          <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "#b91c1c" }}>
-            {message || t("order.pausedFallback")}
-          </p>
-        </div>
+    <div className={styles.paused}>
+      <span aria-hidden="true" className={styles.pausedIcon}>⏸</span>
+      <div>
+        <p className={styles.pausedTitle}>{t("order.pausedTitle")}</p>
+        <p className={styles.pausedText}>{message || t("order.pausedFallback")}</p>
       </div>
     </div>
   );
 }
 
-function PriceChip({ order, t }) {
+function priceLabel(order, t) {
   if (order.promo2x1) {
     const stageLabel = order.promo2x1.stage === 1 ? "Bowl 1 de 2" : "Bowl 2 de 2";
-    return (
-      <div style={{
-        display: "flex",
-        justifyContent: "flex-end",
-        padding: "2px 20px 4px",
-        maxWidth: 960,
-        margin: "0 auto",
-      }}>
-        <span style={{
-          background: "var(--accent-bg)",
-          border: "1px solid var(--accent-border)",
-          color: "var(--accent)",
-          borderRadius: 999,
-          padding: "4px 12px",
-          fontSize: 13,
-          fontWeight: 700,
-        }}>
-          {stageLabel} · ${PROMO_2X1_BOWLS_PRICE} MXN por los 2 🎉
-        </span>
-      </div>
-    );
+    return `${stageLabel} · $${PROMO_2X1_BOWLS_PRICE} MXN por los 2`;
   }
-
   const isLarge = Array.isArray(order.proteins) && order.proteins.length >= 3;
   const price = isLarge ? BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE : BOWL_BASE_PRICE;
-  return (
-    <div style={{
-      display: "flex",
-      justifyContent: "flex-end",
-      padding: "2px 20px 4px",
-      maxWidth: 960,
-      margin: "0 auto",
-    }}>
-      <span style={{
-        background: "var(--accent-bg)",
-        border: "1px solid var(--accent-border)",
-        color: "var(--accent)",
-        borderRadius: 999,
-        padding: "4px 12px",
-        fontSize: 13,
-        fontWeight: 700,
-      }}>
-        ${price} MXN{isLarge ? ` · ${t("order.largeBowlSuffix")}` : ""}
-      </span>
-    </div>
-  );
+  return `$${price} MXN${isLarge ? ` · ${t("order.largeBowlSuffix")}` : ""}`;
 }
 
-function BowlMiniSummary({ order, step, language, t }) {
-  if (step === 0) return null;
+function bowlSummaryParts({ order, step, language, t }) {
+  if (step === 0) return [];
 
   const parts = [];
   const labels = ITEM_LABELS[language] || ITEM_LABELS.es;
@@ -181,34 +107,7 @@ function BowlMiniSummary({ order, step, language, t }) {
     });
   }
 
-  if (parts.length === 0) return null;
-
-  return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 4,
-      padding: "4px 20px 6px",
-      overflowX: "auto",
-      scrollbarWidth: "none",
-      msOverflowStyle: "none",
-      maxWidth: 960,
-      margin: "0 auto",
-    }}>
-      {parts.map((p, i) => (
-        <React.Fragment key={i}>
-          {i > 0 && <span style={{ color: "#d1d5db", fontSize: "10px", flexShrink: 0 }}>›</span>}
-          <span style={{
-            fontSize: "11.5px", fontWeight: 500, color: "var(--text-2)",
-            whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 3,
-          }}>
-            <span aria-hidden="true">{p.icon}</span>
-            <span>{p.text}</span>
-          </span>
-        </React.Fragment>
-      ))}
-    </div>
-  );
+  return parts;
 }
 
 const OrderPage = () => {
@@ -287,12 +186,28 @@ const OrderPage = () => {
     <ToppingsSelection key="toppings" onNext={finishBowl} onBack={prevStep} />,
   ];
 
+  const summaryParts = bowlSummaryParts({ order, step, language, t });
+
   return (
     <div>
-      {storeStatus?.ordersPaused && <PausedBanner message={storeStatus.pausedMessage} t={t} />}
-      <StepProgress step={step} t={t} />
-      <PriceChip order={order} t={t} />
-      <BowlMiniSummary order={order} step={step} language={language} t={t} />
+      <div className={styles.head}>
+        {storeStatus?.ordersPaused && <PausedBanner message={storeStatus.pausedMessage} t={t} />}
+        <StepProgress step={step} t={t} />
+        <div className={styles.metaRow}>
+          <div className={styles.summary}>
+            {summaryParts.map((p, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <span aria-hidden="true" className={styles.summarySep}>›</span>}
+                <span className={styles.summaryItem}>
+                  <span aria-hidden="true">{p.icon}</span>
+                  <span>{p.text}</span>
+                </span>
+              </React.Fragment>
+            ))}
+          </div>
+          <span className={styles.price}>{priceLabel(order, t)}</span>
+        </div>
+      </div>
       {steps[step]}
     </div>
   );

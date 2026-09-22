@@ -8,7 +8,7 @@ import {
 } from "./pricing";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
-import styles from "./ProteinSelection.module.css";
+import styles from "./steps.module.css";
 import { useAvailability } from "../context/AvailabilityContext";
 
 import tuna from "../assets/protein/tuna.webp";
@@ -137,7 +137,7 @@ const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
           <button
             key={protein.id}
             type="button"
-            className={`${styles.card} ${
+            className={`${styles.card} ${styles.cardNumbered} ${
               isSelected ? styles.selected : ""
             }`}
             onClick={() => !isSelectionBlocked && handleSelection(protein.id)}
