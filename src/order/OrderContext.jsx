@@ -451,9 +451,22 @@ export const OrderProvider = ({ children }) => {
     localStorage.removeItem(ORDER_STORAGE_KEY);
   }, []);
 
+  // Hay un bowl a medio armar: el cliente ya eligió algo pero todavía no lo
+  // confirmó al carrito. Sirve para ofrecerle continuar en vez de borrarle
+  // el avance cuando vuelve a entrar al armador.
+  const hasBowlDraft = useMemo(() => (
+    (order.bases?.length || 0) > 0
+    || (order.proteins?.length || 0) > 0
+    || (order.marinades?.length || 0) > 0
+    || (order.complements?.length || 0) > 0
+    || (order.sauces?.length || 0) > 0
+    || (order.toppings?.length || 0) > 0
+  ), [order]);
+
   const value = useMemo(
     () => ({
       order: { ...order, updateCheckout },
+      hasBowlDraft,
       updateOrder,
       addBowlToCart,
       startPromo2x1,
@@ -470,8 +483,8 @@ export const OrderProvider = ({ children }) => {
       resetOrder,
     }),
     [
-      order, updateOrder, addBowlToCart, startPromo2x1, cancelPromo2x1, confirmPromoBowl, startNewBowl,
-      editCartBowl, addCatalogItem, addComboToCart,
+      order, hasBowlDraft, updateOrder, addBowlToCart, startPromo2x1, cancelPromo2x1, confirmPromoBowl,
+      startNewBowl, editCartBowl, addCatalogItem, addComboToCart,
       updateCartItemQty, removeCartLine, loadFavorite, reorder, resetOrder, updateCheckout,
     ]
   );

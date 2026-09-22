@@ -22,7 +22,7 @@ const CATEGORY_ICONS = {
 // kiosco (`src/kiosk/KioskMenuPage.jsx`) — mismo carrito (OrderContext), solo
 // cambian los destinos de navegación.
 const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId = "" }) => {
-  const { order, addCatalogItem, addComboToCart, updateCartItemQty, startNewBowl } = useOrder();
+  const { order, hasBowlDraft, addCatalogItem, addComboToCart, updateCartItemQty, startNewBowl } = useOrder();
   const { unavailableItems, comboPalaceActive } = useAvailability();
   const [activeCombo, setActiveCombo] = useState(null);
   const [comboSelection, setComboSelection] = useState({
@@ -64,7 +64,10 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
     order.cart.find((l) => l.kind === "item" && l.catalogId === catalogId)?.qty || 0;
 
   const handleBuildBowl = () => {
-    startNewBowl();
+    // Si hay un bowl a medio armar se continúa donde se quedó: startNewBowl
+    // lo borraría junto con el paso guardado, que es justo lo que hacía
+    // sentir que volver a entrar era empezar de cero.
+    if (!hasBowlDraft) startNewBowl();
     onBuildBowl();
   };
 
@@ -122,8 +125,12 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
           <span className={styles.buildBowlBadge}>¡Personalízalo!</span>
           <span className={styles.buildBowlIcon} aria-hidden="true">🍚</span>
           <span className={styles.buildBowlText}>
-            <strong>Arma tu propio bowl</strong>
-            <span className={styles.buildBowlHint}>Elige base, proteínas, marinados y más</span>
+            <strong>{hasBowlDraft ? "Continuar tu bowl" : "Arma tu propio bowl"}</strong>
+            <span className={styles.buildBowlHint}>
+              {hasBowlDraft
+                ? "Tienes un bowl a medio armar — sigue donde lo dejaste"
+                : "Elige base, proteínas, marinados y más"}
+            </span>
           </span>
           <span className={styles.buildBowlArrow} aria-hidden="true">→</span>
         </button>
@@ -288,7 +295,10 @@ const MenuBrowser = ({ onBuildBowl, onGoToCart, isKiosk = false, initialComboId 
         </div>
       )}
 
-      {cartCount > 0 && (
+      {/* En la web del cliente el carrito vive en CartBar, fijo en todas las
+          pantallas. Aquí solo queda para el kiosco, que usa otro layout y no
+          monta esa barra. */}
+      {isKiosk && cartCount > 0 && (
         <button type="button" className={styles.cartBar} onClick={onGoToCart}>
           <span className={styles.cartBarCount}>{cartCount} artículo{cartCount === 1 ? "" : "s"}</span>
           <span>Ver carrito — {formatPrice(cartSubtotal)}</span>

@@ -171,6 +171,7 @@ const OrderPage = () => {
     cancelPromo2x1,
   } = useOrder();
   const { language, t } = useLanguage();
+  const cartCount = (order.cart || []).reduce((sum, line) => sum + line.qty, 0);
   const [step, setStep] = useState(() => {
     const savedStep = Number(order.draftStep);
     return Number.isInteger(savedStep) &&
@@ -263,10 +264,22 @@ const OrderPage = () => {
         <Link to="/" className={styles.wordmark}>
           POKE <span>PALACE</span>
         </Link>
-        <Link to="/menu" className={styles.menuLink}>
-          {language === "en" ? "Explore the menu" : "Explorar el menú"}{" "}
-          <ArrowUpRight size={16} aria-hidden="true" />
-        </Link>
+        <div className={styles.topbarLinks}>
+          <Link to="/menu" className={styles.menuLink}>
+            {language === "en" ? "Explore the menu" : "Explorar el menú"}{" "}
+            <ArrowUpRight size={16} aria-hidden="true" />
+          </Link>
+          {/* La barra global de carrito (CartBar) no se monta aquí porque
+              chocaría con los botones pegados al fondo del armador, así que
+              el acceso al carrito vive en esta barra de arriba. */}
+          {cartCount > 0 && (
+            <Link to="/summary" className={styles.cartLink}>
+              <ShoppingBag size={15} aria-hidden="true" />
+              {language === "en" ? "Cart" : "Carrito"}
+              <span className={styles.cartLinkCount}>{cartCount}</span>
+            </Link>
+          )}
+        </div>
       </div>
       <section className={styles.hero} aria-labelledby="build-bowl-title">
         <div className={styles.heroCopy}>

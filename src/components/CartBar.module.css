@@ -1,0 +1,106 @@
+/* Barra de carrito fija, visible en toda la app del cliente. Antes el
+   carrito solo se podía ver al llegar al checkout: el cliente armaba un
+   bowl, salía, volvía a entrar y sentía que había empezado de cero porque
+   no había nada que le dijera que su bowl seguía guardado. */
+
+.bar {
+  position: fixed;
+  left: 50%;
+  /* La navegación inferior (Navbar.module.css) vive fija en bottom:16px con
+     64px de alto — esta barra va arriba de esa o la app la tapa entera.
+     Mismo cálculo que .cartBar en MenuBrowser.module.css. */
+  bottom: calc(90px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(500px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 18px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: #183e32;
+  color: #fff7e8;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  z-index: 30;
+}
+
+.bar:hover {
+  background: #1f4e3f;
+}
+
+.icon {
+  position: relative;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #e1eba8;
+  color: #183e32;
+}
+
+/* El número de artículos monta sobre el icono para que se lea de un
+   vistazo cuántas cosas hay guardadas sin ocupar ancho. */
+.count {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 2px solid #183e32;
+  background: #fff7e8;
+  color: #183e32;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.labelTitle {
+  font-size: 14.5px;
+  font-weight: 800;
+}
+
+.labelHint {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 247, 232, 0.72);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.total {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #e1eba8;
+}
+
+@media (max-width: 520px) {
+  .bar {
+    padding: 12px 15px;
+    gap: 10px;
+  }
+
+  .labelTitle {
+    font-size: 13.5px;
+  }
+}

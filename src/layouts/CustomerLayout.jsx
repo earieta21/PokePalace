@@ -3,6 +3,7 @@ import Footer from "../components/Footer";
 import { Outlet } from "react-router-dom";
 import ErrorBoundary from "../components/ErrorBoundary";
 import ActiveOrderBanner from "../components/ActiveOrderBanner";
+import CartBar from "../components/CartBar";
 import PwaInstallPrompt from "../components/PwaInstallPrompt";
 
 export default function CustomerLayout() {
@@ -16,6 +17,7 @@ export default function CustomerLayout() {
         <Outlet />
       </ErrorBoundary>
       <Footer />
+      <CartBar />
       <ActiveOrderBanner />
       <PwaInstallPrompt />
     </>
