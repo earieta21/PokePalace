@@ -1,0 +1,255 @@
+/* Marco del armador en el kiosco: la misma barra de progreso y el mismo
+   resumen en vivo que ya tenía la app web, pero dimensionado para una
+   pantalla táctil de pie. Antes el kiosco solo pintaba el paso, sin nada
+   alrededor — el cliente no sabía en qué paso iba, cuántos faltaban, ni qué
+   llevaba elegido, y los dos botones flotantes eran estilos sueltos.
+
+   Paleta fija (no usa los tokens del tema) porque KioskLayout fuerza
+   data-theme="light": el kiosco siempre se ve igual. */
+
+.page {
+  --kiosk-ink: #183e32;
+  --kiosk-ink-soft: #2c5845;
+  --kiosk-lime: #e1eba8;
+  --kiosk-cream: #fff7e8;
+  --kiosk-hairline: rgba(24, 62, 50, 0.14);
+
+  min-height: 100vh;
+  background: #faf7f0;
+  padding-bottom: 24px;
+}
+
+/* ── barra superior ── */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 22px;
+  background: var(--kiosk-ink);
+  color: var(--kiosk-cream);
+}
+
+.wordmark {
+  font-size: 19px;
+  font-weight: 850;
+  letter-spacing: -0.7px;
+}
+
+.wordmark span {
+  font-weight: 400;
+}
+
+.promoPill {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--kiosk-lime);
+  color: var(--kiosk-ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.cancelBtn {
+  flex-shrink: 0;
+  padding: 12px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 247, 232, 0.4);
+  background: transparent;
+  color: var(--kiosk-cream);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  background: rgba(255, 247, 232, 0.12);
+}
+
+/* ── progreso: nombre del paso, contador, barra que se llena y la lista
+      completa para que el cliente vea todo el camino ── */
+
+.progress {
+  padding: 20px 22px 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--kiosk-hairline);
+}
+
+.progressRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.stepLabel {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--kiosk-ink);
+}
+
+.stepCount {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--kiosk-ink-soft);
+}
+
+.track {
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(24, 62, 50, 0.1);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--kiosk-ink);
+  transition: width 0.28s ease;
+}
+
+.stepList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: rgba(24, 62, 50, 0.42);
+}
+
+.stepNumber {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.currentStep {
+  color: var(--kiosk-ink);
+}
+
+.currentStep .stepNumber {
+  background: var(--kiosk-ink);
+  border-color: var(--kiosk-ink);
+  color: var(--kiosk-cream);
+}
+
+.completedStep {
+  color: var(--kiosk-ink-soft);
+}
+
+.completedStep .stepNumber {
+  background: var(--kiosk-lime);
+  border-color: var(--kiosk-lime);
+  color: var(--kiosk-ink);
+}
+
+/* ── resumen en vivo ── */
+
+.summaryBar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 15px 22px;
+  background: #fff;
+  border-bottom: 1px solid var(--kiosk-hairline);
+}
+
+.summaryEyebrow {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.1px;
+  color: rgba(24, 62, 50, 0.5);
+}
+
+.summaryList {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+}
+
+.summaryItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14.5px;
+  font-weight: 650;
+  color: var(--kiosk-ink);
+}
+
+.emptySummary {
+  margin: 0;
+  font-size: 14.5px;
+  color: rgba(24, 62, 50, 0.5);
+}
+
+.price {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.priceAmount {
+  font-size: 22px;
+  font-weight: 850;
+  letter-spacing: -0.5px;
+  color: var(--kiosk-ink);
+}
+
+.priceCaption {
+  font-size: 11.5px;
+  font-weight: 650;
+  color: rgba(24, 62, 50, 0.55);
+}
+
+/* En tabletas verticales la barra superior y el resumen se apilan para que
+   nada se apriete. */
+@media (max-width: 820px) {
+  .topbar {
+    flex-wrap: wrap;
+  }
+
+  .promoPill {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .summaryBar {
+    flex-wrap: wrap;
+  }
+
+  .price {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+  }
+}

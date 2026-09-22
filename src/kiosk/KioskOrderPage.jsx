@@ -1,8 +1,11 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOrder } from "../order/OrderContext";
+import { useLanguage } from "../i18n/LanguageContext";
 import { PROMO_2X1_BOWLS_PRICE } from "../order/pricing";
+import { bowlDraftPrice, bowlSummaryParts } from "../order/bowlDraftSummary";
 import useIdleTimeout from "./useIdleTimeout";
+import styles from "./KioskOrderPage.module.css";
 
 import BaseSelection from "../order/BaseSelection";
 import ProteinSelection from "../order/ProteinSelection";
@@ -12,10 +15,22 @@ import SauceSelection from "../order/SauceSelection";
 import ToppingsSelection from "../order/ToppingsSelection";
 
 const IDLE_TIMEOUT_MS = 60000;
-const LAST_STEP = 5;
+const TOTAL_STEPS = 6;
+const LAST_STEP = TOTAL_STEPS - 1;
+// Mismas claves que usa el armador de la web, para que el kiosco nombre los
+// pasos exactamente igual.
+const STEP_NAME_KEYS = [
+  "summary.base",
+  "summary.protein",
+  "summary.marinades",
+  "summary.complements",
+  "summary.sauces",
+  "summary.toppings",
+];
 
 export default function KioskOrderPage() {
   const { order, updateOrder, resetOrder, addBowlToCart, confirmPromoBowl } = useOrder();
+  const { language, t } = useLanguage();
   const [step, setStep] = useState(() => {
     const savedStep = Number(order.draftStep);
     return Number.isInteger(savedStep) && savedStep >= 0 && savedStep <= LAST_STEP ? savedStep : 0;
@@ -77,47 +92,100 @@ export default function KioskOrderPage() {
     <ToppingsSelection key="toppings" onNext={finishBowl} onBack={prevStep} isKiosk />,
   ];
 
+  const summaryParts = bowlSummaryParts(order, language);
+  const price = bowlDraftPrice(order);
+  const pct = ((step + 1) / TOTAL_STEPS) * 100;
+
   return (
-    <div style={{ position: "relative" }}>
-      <button
-        type="button"
-        onClick={goToWelcome}
-        style={{
-          position: "fixed",
-          top: 14,
-          right: 14,
-          zIndex: 50,
-          padding: "9px 16px",
-          borderRadius: 999,
-          border: "1px solid #ddd",
-          background: "#fff",
-          color: "#555",
-          fontWeight: 700,
-          fontSize: 12.5,
-          cursor: "pointer",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-        }}
-      >
-        Cancelar pedido
-      </button>
-      {order.promo2x1 && (
-        <div
-          style={{
-            position: "fixed",
-            top: 14,
-            left: 14,
-            zIndex: 50,
-            padding: "9px 16px",
-            borderRadius: 999,
-            background: "#14315c",
-            color: "#fff",
-            fontWeight: 800,
-            fontSize: 12.5,
-          }}
-        >
-          {order.promo2x1.stage === 1 ? "Bowl 1 de 2" : "Bowl 2 de 2"} · 2x1 en Bowls · ${PROMO_2X1_BOWLS_PRICE} MXN por los 2 🎉
+    <div className={styles.page}>
+      <div className={styles.topbar}>
+        <span className={styles.wordmark}>
+          POKE <span>PALACE</span>
+        </span>
+
+        {order.promo2x1 ? (
+          <span className={styles.promoPill}>
+            🎉 {order.promo2x1.stage === 1 ? "Bowl 1 de 2" : "Bowl 2 de 2"} · 2x1 en Bowls
+            {" · "}${PROMO_2X1_BOWLS_PRICE} MXN por los 2
+          </span>
+        ) : (
+          <span className={styles.spacer} />
+        )}
+
+        <button type="button" className={styles.cancelBtn} onClick={goToWelcome}>
+          Cancelar pedido
+        </button>
+      </div>
+
+      <div className={styles.progress}>
+        <div className={styles.progressRow}>
+          <span className={styles.stepLabel}>{t(STEP_NAME_KEYS[step])}</span>
+          <span className={styles.stepCount}>
+            {step + 1} / {TOTAL_STEPS}
+          </span>
         </div>
-      )}
+        <div
+          className={styles.track}
+          role="progressbar"
+          aria-valuemin={1}
+          aria-valuemax={TOTAL_STEPS}
+          aria-valuenow={step + 1}
+          aria-label={t("order.progressLabel", {
+            step: step + 1,
+            total: TOTAL_STEPS,
+            name: t(STEP_NAME_KEYS[step]),
+          })}
+        >
+          <div className={styles.fill} style={{ width: `${pct}%` }} />
+        </div>
+        <ol className={styles.stepList}>
+          {STEP_NAME_KEYS.map((key, index) => (
+            <li
+              key={key}
+              className={`${styles.stepItem} ${index === step ? styles.currentStep : ""} ${index < step ? styles.completedStep : ""}`}
+              aria-current={index === step ? "step" : undefined}
+            >
+              <span className={styles.stepNumber}>
+                {index < step ? "✓" : String(index + 1).padStart(2, "0")}
+              </span>
+              <span>{t(key)}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className={styles.summaryBar}>
+        <span className={styles.summaryEyebrow}>
+          {language === "en" ? "YOUR BOWL" : "TU BOWL"}
+        </span>
+        <div className={styles.summaryList} aria-live="polite">
+          {summaryParts.length === 0 ? (
+            <p className={styles.emptySummary}>
+              {language === "en"
+                ? "Start with a base — your bowl will show up here."
+                : "Empieza por la base — aquí verás cómo va quedando."}
+            </p>
+          ) : (
+            summaryParts.map((part) => (
+              <span key={part.icon} className={styles.summaryItem}>
+                <span aria-hidden="true">{part.icon}</span>
+                <span>{part.text}</span>
+              </span>
+            ))
+          )}
+        </div>
+        <span className={styles.price}>
+          <span className={styles.priceAmount}>${price.amount} MXN</span>
+          <span className={styles.priceCaption}>
+            {price.isPromo
+              ? language === "en" ? "for both bowls" : "por los 2 bowls"
+              : price.isLarge
+                ? language === "en" ? "Large bowl" : "Bowl grande"
+                : language === "en" ? "Medium bowl" : "Bowl mediano"}
+          </span>
+        </span>
+      </div>
+
       {steps[step]}
     </div>
   );

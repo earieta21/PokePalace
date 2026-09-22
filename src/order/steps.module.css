@@ -46,21 +46,12 @@
   margin-bottom: 26px;
 }
 
-/* Antetítulo suelto, sin píldora — igual que los eyebrows del home. */
+/* El "Paso 1 de 6" que traen los 6 pasos ya lo dice la barra de progreso,
+   tanto en la web (OrderPage.module.css) como en el kiosco
+   (KioskOrderPage.module.css) — repetirlo arriba del título sobra. El
+   elemento se deja en el JSX porque los lectores de pantalla no lo pierden:
+   la barra lo anuncia con aria-label. */
 .badge {
-  display: block;
-  margin-bottom: 12px;
-  color: var(--step-ink);
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 1.8px;
-  text-transform: uppercase;
-}
-
-/* En la web la barra de progreso (OrderPage.module.css) ya dice el paso y
-   el número, así que este "Paso 1 de 6" sobraría. El kiosco no tiene esa
-   barra, ahí sí se muestra. */
-.container:not(.containerKiosk) .badge {
   display: none;
 }
 
@@ -579,12 +570,13 @@
 
 .containerKiosk {
   width: min(1800px, calc(100% - 32px));
-  padding: 42px 42px calc(42px + 130px + env(safe-area-inset-bottom));
+  padding: 42px 42px calc(42px + 88px + env(safe-area-inset-bottom));
 }
 
-.containerKiosk .badge {
-  font-size: 13px;
-  letter-spacing: 2.2px;
+/* El kiosco no monta la navegación inferior de la app, así que los botones
+   no tienen por qué dejarle 80px libres abajo — ahí quedaban de hueco. */
+.containerKiosk .actions {
+  bottom: calc(14px + env(safe-area-inset-bottom));
 }
 
 .containerKiosk .title {
