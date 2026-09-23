@@ -1,1 +1,7 @@
+# Un archivo que no existe bajo /assets debe dar 404 de verdad.
+# Sin esta regla caía en el catch-all de abajo y Netlify respondía 200
+# con index.html: el navegador recibía HTML donde esperaba CSS o JS, y
+# el service worker llegaba a guardar ese HTML bajo la URL del .css.
+/assets/*  /assets/:splat  404
+
 /* /index.html 200

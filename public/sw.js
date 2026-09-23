@@ -1,4 +1,4 @@
-const CACHE = "pokepalace-v7";
+const CACHE = "pokepalace-v8";
 const SHELL = ["/", "/index.html", "/manifest.json", "/icons/icon-192.png"];
 
 // ── Install: pre-cache app shell ──────────────────────────────────────────────
@@ -60,8 +60,18 @@ self.addEventListener("fetch", (e) => {
   if (url.pathname.startsWith("/assets/")) {
     e.respondWith(
       caches.open(CACHE).then(async (cache) => {
+        // Netlify responde 200 con index.html a cualquier archivo que no
+        // exista. Esa respuesta pasaba el response.ok de abajo y se guardaba
+        // en cache bajo la URL del .css — desde entonces el navegador recibía
+        // HTML donde esperaba CSS y tiraba "Refused to apply style ... MIME
+        // type text/html" en cada recarga, para siempre. Por eso el HTML se
+        // descarta aquí, tanto al leer como al guardar.
+        const isHtml = (res) =>
+          (res.headers.get("content-type") || "").includes("text/html");
+
         const cached = await cache.match(request);
-        if (cached) return cached;
+        if (cached && !isHtml(cached)) return cached;
+        if (cached) await cache.delete(request);
         // Un solo fallo de red dejaba esta promesa rechazada, el navegador
         // daba el archivo por imposible de cargar y Vite reportaba "Unable to
         // preload CSS" — con eso se caía la pantalla entera al ErrorBoundary.
@@ -71,7 +81,9 @@ self.addEventListener("fetch", (e) => {
         for (let attempt = 0; attempt < 2; attempt += 1) {
           try {
             const response = await fetch(request);
-            if (response.ok) cache.put(request, response.clone()).catch(() => {});
+            if (response.ok && !isHtml(response)) {
+              cache.put(request, response.clone()).catch(() => {});
+            }
             return response;
           } catch (error) {
             lastError = error;
