@@ -1,374 +1,598 @@
 .home {
-  width: min(1100px, calc(100% - 28px));
+  width: min(1200px, calc(100% - 48px));
   margin: 0 auto;
-  padding-top: 16px;
-  padding-bottom: 100px;
+  padding-bottom: 52px;
 }
-
-.section {
-  margin-bottom: 32px;
-}
-
-.title {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--text);
-  margin: 0 0 4px;
-}
-
-.subtitle {
-  font-size: 13.5px;
-  color: var(--text-2);
-  margin: 0 0 16px;
-}
-
-/* Combo Palace destacado */
-.comboSection {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
-  min-height: 360px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at 84% 14%, rgba(255, 190, 92, 0.25), transparent 35%),
-    linear-gradient(125deg, #102b1a 0%, #184b2b 58%, #287848 100%);
-  box-shadow: 0 22px 54px rgba(12, 49, 27, 0.22);
-}
-
-.comboCopy {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 40px 28px 40px 40px;
-}
-
-.comboBadge {
-  align-self: flex-start;
-  padding: 6px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffe1a8;
-  font-size: 10.5px;
-  font-weight: 850;
-  letter-spacing: 0.55px;
-}
-
-.comboEyebrow {
-  margin: 22px 0 2px;
-  color: #8ee1a8;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-}
-
-.comboTitle {
-  margin: 0;
-  color: #fff;
-  font-family: "DM Serif Display", serif;
-  font-size: clamp(36px, 5vw, 58px);
-  font-weight: 400;
-  line-height: 1;
-  letter-spacing: -1px;
-}
-
-.comboDescription {
-  max-width: 470px;
-  margin: 14px 0 18px;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 15px;
-  line-height: 1.55;
-}
-
-.comboIncludes {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.comboIncludes span {
-  padding: 7px 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.comboActionRow {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin-top: 24px;
-}
-
-.comboActionRow strong {
-  color: #fff;
-  font-size: 24px;
-  letter-spacing: -0.4px;
-}
-
-.comboButton {
-  padding: 12px 18px;
-  border: 0;
-  border-radius: 13px;
-  background: #fff;
-  color: #174a2a;
-  font-size: 13px;
-  font-weight: 850;
-  cursor: pointer;
-  box-shadow: 0 8px 20px rgba(5, 25, 12, 0.2);
-  transition: transform 140ms ease, box-shadow 140ms ease;
-}
-
-.comboButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 26px rgba(5, 25, 12, 0.28);
-}
-
-.comboVisual {
-  position: relative;
-  min-height: 360px;
-}
-
-.comboVisual::before {
-  content: "";
-  position: absolute;
-  inset: 44px 28px 38px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.07);
-  transform: rotate(-8deg);
-}
-
-.comboPhoto {
-  position: absolute;
-  overflow: hidden;
-  border: 5px solid rgba(255, 255, 255, 0.95);
-  border-radius: 22px;
-  background: #fff;
-  box-shadow: 0 18px 38px rgba(4, 28, 13, 0.32);
-}
-
-.comboPhoto img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.comboPhoto span {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(15, 50, 27, 0.88);
-  color: #fff;
-  font-size: 9.5px;
-  font-weight: 800;
-}
-
-.comboPhotoBowl {
-  z-index: 2;
-  top: 42px;
-  left: 2%;
-  width: 64%;
-  height: 230px;
-  transform: rotate(-5deg);
-}
-
-.comboPhotoDrink {
-  z-index: 3;
-  top: 70px;
-  right: 5%;
-  width: 31%;
-  height: 205px;
-  transform: rotate(7deg);
-}
-
-.comboPhotoDrink img,
-.comboPhotoSnack img {
-  object-fit: contain;
-  padding: 8px;
-}
-
-.comboPhotoSnack {
-  z-index: 4;
-  right: 19%;
-  bottom: 24px;
-  width: 30%;
-  height: 135px;
-  transform: rotate(-2deg);
-}
-
-@media (max-width: 760px) {
-  .comboSection {
-    grid-template-columns: 1fr;
-  }
-
-  .comboCopy {
-    padding: 30px 24px 12px;
-  }
-
-  .comboVisual {
-    min-height: 280px;
-  }
-
-  .comboVisual::before {
-    inset: 24px 18px 22px;
-  }
-
-  .comboPhotoBowl {
-    top: 24px;
-    left: 8%;
-    height: 190px;
-  }
-
-  .comboPhotoDrink {
-    top: 40px;
-    right: 7%;
-    height: 180px;
-  }
-
-  .comboPhotoSnack {
-    right: 22%;
-    bottom: 14px;
-    height: 115px;
-  }
-}
-
-@media (max-width: 430px) {
-  .comboActionRow {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .comboButton {
-    width: 100%;
-  }
-}
-
-/* Promo 2x1 en Bowls — mismo layout que Combo Palace, tinte distinto para
-   diferenciarla a simple vista, y 2 fotos de bowl en vez de bowl/bebida/rice
-   cake (por eso necesita sus propias clases de posición). */
-.promo2x1Section {
-  background:
-    radial-gradient(circle at 84% 14%, rgba(140, 220, 255, 0.22), transparent 35%),
-    linear-gradient(125deg, #14213d 0%, #1d3a63 58%, #2c5c94 100%);
-}
-
-.promo2x1Section .comboEyebrow {
-  color: #8ecbff;
-}
-
-.promo2x1Section .comboButton {
-  color: #14315c;
-}
-
-.promo2x1PhotoLeft {
-  z-index: 2;
-  top: 42px;
-  left: 4%;
-  width: 46%;
-  height: 230px;
-  transform: rotate(-5deg);
-}
-
-.promo2x1PhotoRight {
-  z-index: 3;
-  top: 70px;
-  right: 6%;
-  width: 46%;
-  height: 230px;
-  transform: rotate(5deg);
-}
-
-@media (max-width: 760px) {
-  .promo2x1PhotoLeft {
-    top: 24px;
-    left: 6%;
-    height: 190px;
-  }
-
-  .promo2x1PhotoRight {
-    top: 40px;
-    right: 8%;
-    height: 190px;
-  }
-}
-
-.welcomeCard {
+.masthead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+  min-height: 96px;
+  gap: 20px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+}
+.brand > span {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 27px;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.brand small {
+  display: block;
+  font-family: Inter, sans-serif;
+  font-size: 7px;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+  margin-top: 7px;
+}
+.location,
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  font-weight: 650;
+}
+.location {
+  color: var(--text-2);
+}
+.home a:focus-visible,
+.home button:focus-visible {
+  outline: 3px solid #b06540;
+  outline-offset: 5px;
+}
+.values {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 60px;
+  padding: 25px 10px;
+  border-bottom: 1px solid var(--border-md);
+  color: var(--text-2);
+}
+.values span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+}
+.values svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.section {
+  margin: 64px 0;
+}
+.sectionHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 26px;
+}
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  font-weight: 750;
+  margin: 0 0 12px;
+}
+.sectionHeading .eyebrow {
+  color: var(--accent);
+}
+.home h2 {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: clamp(30px, 3.3vw, 43px);
+  font-weight: 400;
+  letter-spacing: -1.1px;
+  line-height: 1.15;
+}
+.textLink {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-md);
+  white-space: nowrap;
+}
+.photoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+}
+.photoWrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  aspect-ratio: 1.06;
+  background: var(--bg-muted);
+}
+.photoWrap img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 250ms ease;
+}
+.photoCard:last-child img {
+  object-position: 50% 44%;
+}
+.photoCard:hover img {
+  transform: scale(1.025);
+}
+.roundArrow {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  background: #fff8ec;
+  color: #183e32;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+}
+.cardTag {
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 1.5px;
+  color: var(--accent);
+  margin: 20px 0 8px;
+}
+.photoCard h3 {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.5px;
+}
+.cardDescription {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.7;
+  margin: 9px 0 0;
+}
+.photoNote {
+  font-size: 11px;
+  color: var(--text-2);
+  margin: 22px 0 0;
+}
+.howSection {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  background: #183e32;
+  color: #fff7e8;
+  border-radius: 20px;
+  overflow: hidden;
+}
+.prepPhoto,
+.drinkPhoto {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+.prepPhoto img,
+.drinkPhoto img {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  object-fit: cover;
+}
+.prepPhoto img {
+  object-position: 50% 58%;
+}
+.prepPhoto span,
+.drinkPhoto span {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: rgba(22, 47, 33, 0.86);
+  color: #fff7e8;
+  font-size: 12px;
+}
+.howCopy {
+  padding: 44px 48px;
+}
+.howCopy > .eyebrow {
+  color: #dbe89d;
+}
+.steps {
+  list-style: none;
+  display: grid;
+  gap: 20px;
+  padding: 0;
+  margin: 30px 0;
+}
+.steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+.steps li > span {
+  border: 1px solid #6c8976;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  font-size: 10px;
+  color: #dce89e;
+}
+.steps h3 {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.steps p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #c2d1c7;
+  margin: 4px 0 0;
+}
+.lightBtn,
+.primaryBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  min-height: 46px;
+  padding: 13px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 750;
+}
+.lightBtn {
+  background: #e1eba8;
+  color: #183e32;
+}
+.primaryBtn {
+  background: #183e32;
+  color: #fff7e8;
+}
+.primaryBtn:hover {
+  background: #2c5845;
+}
+.lightBtn:hover {
+  background: #eef5c9;
+}
+.promo {
+  background: #e7edbe;
+  color: #1c3b2d;
+  border-radius: 16px;
+  margin-top: 32px;
+  padding: 30px 34px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 40px;
+  align-items: center;
+}
+.promo h2 {
+  font-size: 34px;
+}
+.promo p:not(.eyebrow) {
+  max-width: 650px;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 14px 0 0;
+}
+.promoAction {
+  display: grid;
+  gap: 12px;
+  text-align: center;
+}
+.promoAction strong,
+.comboAction > strong {
+  font-size: 34px;
+  letter-spacing: -1px;
+  white-space: nowrap;
+}
+.promoAction small,
+.comboAction small {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.recipes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.recipe {
   background: var(--bg-card);
   border: 1px solid var(--border-md);
-  border-radius: var(--radius-md);
-  padding: 16px 20px;
-}
-
-.welcomeGreeting {
-  font-size: 16px;
-  font-weight: 700;
   color: var(--text);
-  margin: 0;
+  padding: 25px;
+  text-align: left;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
 }
-
-.welcomeSub {
+.recipe:hover {
+  border-color: var(--accent);
+}
+.recipeNumber {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--text-2);
+  margin-bottom: 18px;
+}
+.recipe h3 {
+  font-size: 23px;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-weight: 400;
+}
+.recipe > p {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.8;
+  color: var(--text-2);
+  margin: 12px 0 22px;
+  flex: 1;
+}
+.recipeBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--border-md);
+  padding-top: 18px;
+  width: 100%;
+}
+.recipeBottom strong {
+  font-size: 20px;
+}
+.recipeBottom small {
+  font-size: 9px;
+  font-weight: 400;
+}
+.recipeBottom > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.combo {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #edcbb3;
+  color: #263e2e;
+}
+.comboCopy {
+  padding: 50px;
+}
+.comboCopy > p:not(.eyebrow) {
+  font-size: 14px;
+  line-height: 1.8;
+  max-width: 370px;
+  margin: 20px 0;
+}
+.comboIncludes {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+.comboIncludes span {
+  padding: 7px 9px;
+  border: 1px solid #bb9c81;
+  border-radius: 6px;
+}
+.comboIncludes b {
+  font-weight: 400;
+}
+.comboAction {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+.drinkPhoto img {
+  object-position: 50% 50%;
+}
+.closing {
+  padding: 60px 0 10px;
+  text-align: center;
+}
+.closing > svg {
+  color: var(--accent);
+  display: block;
+  margin: 0 auto 15px;
+}
+.closing h2 {
+  font-size: 33px;
+}
+.closing p {
   font-size: 13px;
+  color: var(--text-2);
+  margin: 12px 0;
+}
+.closing .textLink {
+  margin: 0 auto;
+}
+.dealsLink {
+  display: block;
+  font-size: 11px;
+  color: var(--text-2);
+  margin-top: 18px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.welcomeCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-md);
+  padding: 18px 22px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+.welcomeCard p {
+  font-size: 12px;
   color: var(--text-2);
   margin: 4px 0 0;
 }
-
-.menuCtaRow {
-  display: flex;
-  gap: 10px;
-  margin-top: 16px;
-  flex-wrap: wrap;
+@media (max-width: 1000px) {
+  .values {
+    gap: 24px;
+  }
+  .howCopy {
+    padding: 34px;
+  }
+  .comboCopy {
+    padding: 34px;
+  }
+  .recipe {
+    padding: 20px;
+  }
 }
-
-.primaryBtn {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  padding: 11px 20px;
-  border-radius: var(--radius-md);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 150ms ease, transform 150ms ease;
+@media (max-width: 760px) {
+  .home {
+    width: calc(100% - 28px);
+  }
+  .masthead {
+    min-height: 78px;
+  }
+  .brand > span {
+    font-size: 24px;
+  }
+  .location {
+    font-size: 10px;
+    gap: 5px;
+  }
+  .location > svg:last-child {
+    display: none;
+  }
+  .values {
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 22px 6px;
+  }
+  .values span {
+    font-size: 10px;
+  }
+  .section {
+    margin: 44px 0;
+  }
+  .sectionHeading {
+    align-items: flex-start;
+    gap: 18px;
+  }
+  .sectionHeading .textLink {
+    font-size: 10px;
+  }
+  .howSection {
+    grid-template-columns: 1fr;
+  }
+  .prepPhoto {
+    aspect-ratio: 1.6;
+  }
+  .howCopy {
+    padding: 30px 26px;
+  }
+  .combo {
+    grid-template-columns: 1fr;
+  }
+  .drinkPhoto {
+    aspect-ratio: 1.35;
+  }
+  .comboCopy {
+    padding: 32px 26px;
+  }
+  .promo {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 26px;
+  }
+  .promoAction {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .recipes {
+    gap: 12px;
+  }
+  .recipe {
+    padding: 17px;
+  }
+  .recipe h3 {
+    font-size: 20px;
+  }
+  .recipeBottom {
+    flex-wrap: wrap;
+  }
 }
-
-.primaryBtn:hover {
-  opacity: 0.88;
-  transform: translateY(-1px);
+@media (max-width: 620px) {
+  .photoGrid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .photoWrap {
+    aspect-ratio: 1.3;
+  }
+  .photoCard h3 {
+    font-size: 28px;
+  }
+  .cardTag {
+    margin-top: 16px;
+  }
+  .cardDescription {
+    font-size: 13px;
+  }
+  .recipes {
+    grid-template-columns: 1fr;
+  }
+  .recipe {
+    padding: 24px;
+  }
+  .recipeNumber {
+    margin-bottom: 10px;
+  }
+  .recipe > p {
+    margin: 10px 0 16px;
+  }
+  .recipeBottom {
+    flex-wrap: nowrap;
+  }
+  .recipe h3 {
+    font-size: 26px;
+  }
+  .sectionHeading {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .home h2 {
+    font-size: 33px;
+  }
+  .photoNote {
+    line-height: 1.7;
+  }
+  .location {
+    max-width: 108px;
+    line-height: 1.5;
+  }
+  .location > svg {
+    flex-shrink: 0;
+  }
+  .values {
+    column-gap: 22px;
+    row-gap: 12px;
+  }
+  .welcomeCard {
+    flex-wrap: wrap;
+  }
 }
-
-.secondaryBtn {
-  background: var(--bg-card);
-  border: 1px solid var(--border-md);
-  color: var(--text-2);
-  padding: 11px 20px;
-  border-radius: var(--radius-md);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 150ms ease;
+@media (prefers-reduced-motion: reduce) {
+  .photoWrap img {
+    transition: none;
+  }
 }
-
-.secondaryBtn:hover {
-  background: var(--bg-muted);
-}
-
-/* background decoration — very subtle */
-.bgGlow { display: none; }
-.bgNoise { display: none; }

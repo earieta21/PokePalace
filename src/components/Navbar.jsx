@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   FaHome,
   FaShoppingCart,
@@ -13,9 +13,10 @@ import styles from "./Navbar.module.css";
 const Navbar = () => {
   const { language, t, toggleLanguage } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+  const isHome = useLocation().pathname === "/";
 
   return (
-    <nav className={styles.navbar} aria-label="Main navigation">
+    <nav className={`${styles.navbar} ${isHome ? styles.homeNavbar : ""}`} aria-label="Main navigation">
       <NavLink
         to="/"
         end

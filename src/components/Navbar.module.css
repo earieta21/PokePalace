@@ -120,6 +120,30 @@
   background: var(--accent-bg);
 }
 
+/* Keep Home controls in one compact bar, clear of the food photography. */
+.homeNavbar {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) 44px 44px;
+  gap: 4px;
+}
+
+.homeNavbar .themeButton,
+.homeNavbar .languageButton {
+  position: static;
+  min-width: 40px;
+  width: 40px;
+  height: 40px;
+  box-shadow: none;
+  border-color: transparent;
+}
+
+.homeNavbar .link {
+  color: var(--text-2);
+}
+
+.homeNavbar .active {
+  color: var(--accent);
+}
+
 @media (max-width: 420px) {
   .navbar {
     height: 60px;
