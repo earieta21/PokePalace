@@ -34,7 +34,7 @@ const MAX_TOOL_ITERATIONS = 4;
 const MENU_CATALOG_IDS = [
   "bowl-the-og", "bowl-skinny", "bowl-quinoa",
   "mineral-water", "coca-zero", "coca-cola-regular", "bottled-water", "agua-del-dia",
-  "cacao-rice-cake", "choco-rice-cake", "miel-rice-cake",
+  "choco-rice-cake", "miel-rice-cake",
 ];
 
 export function whatsappAgentConfigured() {

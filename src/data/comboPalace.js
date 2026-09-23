@@ -13,7 +13,6 @@ export const COMBO_PALACE_OPTIONS = Object.freeze({
     Object.freeze({ id: "agua-del-dia", label: "Agua del día" }),
   ]),
   riceCakes: Object.freeze([
-    Object.freeze({ id: "cacao-rice-cake", label: "Cacao Rice Cake" }),
     Object.freeze({ id: "choco-rice-cake", label: "Choco Rice Cake" }),
     Object.freeze({ id: "miel-rice-cake", label: "Miel Rice Cake" }),
   ]),

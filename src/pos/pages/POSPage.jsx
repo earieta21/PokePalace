@@ -52,7 +52,6 @@ const MENU = [
   { id: 24, name: "Coca-Cola",               price:  35, category: "Bebidas", icon: "🥤" },
   { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
   { id: 15, name: "Agua del día",              price:  35, category: "Bebidas", icon: "🥤", rewardDrink: true },
-  { id: 16, name: "Cacao Rice Cake",          price:  30, category: "Rice Cakes", icon: "🍫" },
   { id: 17, name: "Choco Rice Cake",          price:  35, category: "Rice Cakes", icon: "🍫", rewardSnack: true },
   { id: 23, name: "Miel Rice Cake",           price:  35, category: "Rice Cakes", icon: "🍯" },
   // Porción extra (40 g) de cualquier proteína ya en el bowl. El precio

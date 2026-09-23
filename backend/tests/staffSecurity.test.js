@@ -82,6 +82,9 @@ test("el agua del día cuesta 35 pesos", () => {
   assert.equal(item.price, 35);
 });
 
+// El cacao ya no se vende, pero su entrada sigue en el catálogo a
+// propósito: las órdenes viejas y las colas offline la traen y sin ella no
+// resolverían nombre ni precio. Esta prueba protege justo eso.
 test("los rice cakes del POS cobran sus precios de catálogo", () => {
   const [cacao, choco] = resolvePosItems([
     { catalogId: "cacao-rice-cake", qty: 1 },
@@ -129,7 +132,7 @@ test("Combo Palace solo se puede vender lunes, miércoles y viernes", () => {
     qty: 1,
     comboBowlId: "bowl-the-og",
     comboDrinkId: "coca-zero",
-    comboRiceCakeId: "cacao-rice-cake",
+    comboRiceCakeId: "miel-rice-cake",
   };
 
   assert.equal(resolvePosItems([elecciones], LUNES)[0].price, 289);

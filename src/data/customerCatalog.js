@@ -6,7 +6,6 @@ import cocaZero from "../assets/menu/products/coca-zero.jpg";
 import cocaColaRegular from "../assets/menu/products/coca-cola-regular.jpg";
 import bottledWater from "../assets/menu/products/bottled-water.jpg";
 import aguaDelDia from "../assets/menu/products/agua-del-dia.webp";
-import cacaoRiceCake from "../assets/menu/products/cacao-rice-cake.jpg";
 import chocoRiceCake from "../assets/menu/products/choco-rice-cake.jpg";
 import honeyRiceCake from "../assets/menu/products/honey-rice-cake.jpg";
 import { COMBO_PALACE_OPTIONS, COMBO_PALACE_PRICE } from "./comboPalace";
@@ -112,16 +111,6 @@ export const CUSTOMER_CATALOG = Object.freeze([
     categoryKey: "drinks",
     icon: "🥤",
     image: aguaDelDia,
-    imageFit: "contain",
-  },
-  {
-    catalogId: "cacao-rice-cake",
-    name: "Cacao Rice Cake",
-    price: 30,
-    category: "Extras",
-    categoryKey: "extras",
-    icon: "🍫",
-    image: cacaoRiceCake,
     imageFit: "contain",
   },
   {

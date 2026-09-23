@@ -91,6 +91,9 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: { agua_natural: 1 },
   },
   {
+    // Descontinuado: ya no se ofrece en el menú, ni en el POS, ni como
+    // opción del Combo Palace. La entrada se queda para que las órdenes
+    // viejas y las colas offline sigan resolviendo su nombre y su precio.
     catalogId: "cacao-rice-cake", legacyId: 16, name: "Cacao Rice Cake", price: 30, category: "extras",
     inventoryRecipe: {},
   },
@@ -128,7 +131,7 @@ export const COMBO_PALACE_DRINK_IDS = new Set([
   "mineral-water", "coca-zero", "coca-cola-regular", "agua-del-dia",
 ]);
 export const COMBO_PALACE_RICE_CAKE_IDS = new Set([
-  "cacao-rice-cake", "choco-rice-cake", "miel-rice-cake",
+  "choco-rice-cake", "miel-rice-cake",
 ]);
 
 const sanitizeComboPalaceSelections = (rawItem, itemName = "Combo Palace") => {
