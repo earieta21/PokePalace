@@ -30,7 +30,7 @@ const lazyWithReload = (factory, key) =>
         try { sessionStorage.removeItem(`chunk-reload:${key}`); } catch { /* modo privado */ }
         return mod;
       })
-      .catch((error) => {
+      .catch(async (error) => {
         let alreadyReloaded = true;
         try {
           const flag = `chunk-reload:${key}`;
@@ -38,6 +38,17 @@ const lazyWithReload = (factory, key) =>
           if (!alreadyReloaded) sessionStorage.setItem(flag, "1");
         } catch { /* sin sessionStorage no se reintenta */ }
         if (alreadyReloaded) throw error;
+        // El service worker guarda los archivos de /assets con estrategia
+        // cache-first: si una entrada quedó a medias, la vuelve a servir rota
+        // en cada intento y recargar por sí solo no arregla nada. Por eso se
+        // borran los caches antes de recargar — es la única forma de salir de
+        // un cache envenenado, que es justo lo que traía atorado al kiosco.
+        try {
+          if (typeof caches !== "undefined") {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((name) => caches.delete(name)));
+          }
+        } catch { /* sin Cache API: se recarga de todos modos */ }
         window.location.reload();
         // La página se está recargando: esta promesa no debe resolver nunca,
         // así React no alcanza a pintar nada mas.
