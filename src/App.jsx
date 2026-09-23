@@ -12,30 +12,63 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
+// Cada deploy le pone un hash nuevo al nombre de cada archivo. Una pestaña
+// que quedó abierta desde antes del deploy sigue pidiendo el nombre viejo,
+// que ya no existe, y la pagina truena con "Failed to fetch dynamically
+// imported module" o "Unable to preload CSS" — que es exactamente lo que
+// estaba pasando en /menu y /order. Recargar una vez trae el index.html
+// nuevo con los nombres correctos.
+//
+// La marca en sessionStorage evita el bucle: si después de recargar el
+// archivo sigue sin aparecer, el error se deja pasar al ErrorBoundary en vez
+// de recargar para siempre. Se limpia al primer import exitoso para que un
+// segundo deploy en la misma sesión tambien se recupere solo.
+const lazyWithReload = (factory, key) =>
+  lazy(() =>
+    factory()
+      .then((mod) => {
+        try { sessionStorage.removeItem(`chunk-reload:${key}`); } catch { /* modo privado */ }
+        return mod;
+      })
+      .catch((error) => {
+        let alreadyReloaded = true;
+        try {
+          const flag = `chunk-reload:${key}`;
+          alreadyReloaded = Boolean(sessionStorage.getItem(flag));
+          if (!alreadyReloaded) sessionStorage.setItem(flag, "1");
+        } catch { /* sin sessionStorage no se reintenta */ }
+        if (alreadyReloaded) throw error;
+        window.location.reload();
+        // La página se está recargando: esta promesa no debe resolver nunca,
+        // así React no alcanza a pintar nada mas.
+        return new Promise(() => {});
+      }),
+  );
+
 // Customer pages — lazy loaded
-const MenuPage         = lazy(() => import("./pages/MenuPage"));
-const OrderPage        = lazy(() => import("./order/OrderPage"));
-const RewardsDeals     = lazy(() => import("./pages/Promotions"));
-const EarnPoints       = lazy(() => import("./pages/EarnPoints"));
-const MoreOptions      = lazy(() => import("./more/MoreOptions"));
-const MiCuenta         = lazy(() => import("./pages/MiCuenta"));
-const OrderSummaryPage = lazy(() => import("./pages/OrderSummaryPage"));
-const OrderTracking    = lazy(() => import("./pages/OrderTracking"));
-const LocationPage     = lazy(() => import("./pages/LocationPage"));
-const QrCodePage       = lazy(() => import("./pages/QrCodePage"));
-const ClaimRewardPage  = lazy(() => import("./pages/ClaimRewardPage"));
-const PrivacyPolicy    = lazy(() => import("./pages/PrivacyPolicy"));
-const TermsOfService   = lazy(() => import("./pages/TermsOfService"));
-const KioskPair        = lazy(() => import("./pages/KioskPair"));
+const MenuPage         = lazyWithReload(() => import("./pages/MenuPage"), "MenuPage");
+const OrderPage        = lazyWithReload(() => import("./order/OrderPage"), "OrderPage");
+const RewardsDeals     = lazyWithReload(() => import("./pages/Promotions"), "Promotions");
+const EarnPoints       = lazyWithReload(() => import("./pages/EarnPoints"), "EarnPoints");
+const MoreOptions      = lazyWithReload(() => import("./more/MoreOptions"), "MoreOptions");
+const MiCuenta         = lazyWithReload(() => import("./pages/MiCuenta"), "MiCuenta");
+const OrderSummaryPage = lazyWithReload(() => import("./pages/OrderSummaryPage"), "OrderSummaryPage");
+const OrderTracking    = lazyWithReload(() => import("./pages/OrderTracking"), "OrderTracking");
+const LocationPage     = lazyWithReload(() => import("./pages/LocationPage"), "LocationPage");
+const QrCodePage       = lazyWithReload(() => import("./pages/QrCodePage"), "QrCodePage");
+const ClaimRewardPage  = lazyWithReload(() => import("./pages/ClaimRewardPage"), "ClaimRewardPage");
+const PrivacyPolicy    = lazyWithReload(() => import("./pages/PrivacyPolicy"), "PrivacyPolicy");
+const TermsOfService   = lazyWithReload(() => import("./pages/TermsOfService"), "TermsOfService");
+const KioskPair        = lazyWithReload(() => import("./pages/KioskPair"), "KioskPair");
 
 // Kiosk & staff — lazy loaded (never used by regular customers)
-const KioskLayout      = lazy(() => import("./kiosk/KioskLayout"));
-const KioskWelcome     = lazy(() => import("./kiosk/KioskWelcome"));
-const KioskMenuPage    = lazy(() => import("./kiosk/KioskMenuPage"));
-const KioskOrderPage   = lazy(() => import("./kiosk/KioskOrderPage"));
-const KioskSummaryPage = lazy(() => import("./kiosk/KioskSummaryPage"));
-const KioskDonePage    = lazy(() => import("./kiosk/KioskDonePage"));
-const UnifiedStaffApp  = lazy(() => import("./staff/UnifiedStaffApp"));
+const KioskLayout      = lazyWithReload(() => import("./kiosk/KioskLayout"), "KioskLayout");
+const KioskWelcome     = lazyWithReload(() => import("./kiosk/KioskWelcome"), "KioskWelcome");
+const KioskMenuPage    = lazyWithReload(() => import("./kiosk/KioskMenuPage"), "KioskMenuPage");
+const KioskOrderPage   = lazyWithReload(() => import("./kiosk/KioskOrderPage"), "KioskOrderPage");
+const KioskSummaryPage = lazyWithReload(() => import("./kiosk/KioskSummaryPage"), "KioskSummaryPage");
+const KioskDonePage    = lazyWithReload(() => import("./kiosk/KioskDonePage"), "KioskDonePage");
+const UnifiedStaffApp  = lazyWithReload(() => import("./staff/UnifiedStaffApp"), "UnifiedStaffApp");
 
 // Providers
 import { OrderProvider } from "./order/OrderContext";
