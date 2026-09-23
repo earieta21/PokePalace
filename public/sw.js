@@ -1,4 +1,4 @@
-const CACHE = "pokepalace-v6";
+const CACHE = "pokepalace-v7";
 const SHELL = ["/", "/index.html", "/manifest.json", "/icons/icon-192.png"];
 
 // ── Install: pre-cache app shell ──────────────────────────────────────────────
@@ -62,9 +62,22 @@ self.addEventListener("fetch", (e) => {
       caches.open(CACHE).then(async (cache) => {
         const cached = await cache.match(request);
         if (cached) return cached;
-        const response = await fetch(request);
-        if (response.ok) cache.put(request, response.clone());
-        return response;
+        // Un solo fallo de red dejaba esta promesa rechazada, el navegador
+        // daba el archivo por imposible de cargar y Vite reportaba "Unable to
+        // preload CSS" — con eso se caía la pantalla entera al ErrorBoundary.
+        // Con el wifi del local al kiosco le pasaba seguido. Un reintento
+        // cubre el corte de un instante.
+        let lastError;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const response = await fetch(request);
+            if (response.ok) cache.put(request, response.clone()).catch(() => {});
+            return response;
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw lastError;
       })
     );
     return;
