@@ -51,7 +51,9 @@
   text-align: left;
   box-shadow: 0 14px 34px rgba(13, 27, 15, 0.16);
   animation: buildBowlGlow 2600ms ease-in-out infinite;
-  transition: transform 150ms ease, box-shadow 150ms ease;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .buildBowlCard:hover {
@@ -60,13 +62,18 @@
 }
 
 @keyframes buildBowlGlow {
-  0%, 100% {
+  0%,
+  100% {
     border-color: rgba(82, 183, 136, 0.55);
-    box-shadow: 0 14px 34px rgba(13, 27, 15, 0.16), 0 0 0 0 rgba(82, 183, 136, 0.35);
+    box-shadow:
+      0 14px 34px rgba(13, 27, 15, 0.16),
+      0 0 0 0 rgba(82, 183, 136, 0.35);
   }
   50% {
     border-color: rgba(82, 183, 136, 1);
-    box-shadow: 0 14px 34px rgba(13, 27, 15, 0.16), 0 0 0 8px rgba(82, 183, 136, 0);
+    box-shadow:
+      0 14px 34px rgba(13, 27, 15, 0.16),
+      0 0 0 8px rgba(82, 183, 136, 0);
   }
 }
 
@@ -121,7 +128,12 @@
 .buildBowlOverlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, rgba(10, 22, 15, 0.88) 0%, rgba(10, 22, 15, 0.72) 42%, rgba(10, 22, 15, 0.28) 100%);
+  background: linear-gradient(
+    100deg,
+    rgba(10, 22, 15, 0.88) 0%,
+    rgba(10, 22, 15, 0.72) 42%,
+    rgba(10, 22, 15, 0.28) 100%
+  );
 }
 
 .buildBowlIcon {
@@ -190,7 +202,10 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   box-shadow: 0 8px 22px rgba(13, 27, 15, 0.06);
-  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    border-color 150ms ease;
 }
 
 .card:hover {
@@ -220,7 +235,12 @@
 .cardPhotoOverlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.06) 0%, rgba(0, 0, 0, 0.02) 55%, rgba(0, 0, 0, 0.16) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.06) 0%,
+    rgba(0, 0, 0, 0.02) 55%,
+    rgba(0, 0, 0, 0.16) 100%
+  );
 }
 
 .cardIconOnly {
@@ -311,7 +331,9 @@
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 120ms ease, background 120ms ease;
+  transition:
+    transform 120ms ease,
+    background 120ms ease;
 }
 
 .addBtn:hover {
@@ -465,7 +487,10 @@
   color: var(--text);
   text-align: left;
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
 }
 
 .comboOption:hover {
@@ -593,8 +618,434 @@
 }
 
 .cartBarCount {
-  background: rgba(255,255,255,0.22);
+  background: rgba(255, 255, 255, 0.22);
   padding: 3px 10px;
   border-radius: 999px;
   font-size: 12px;
+}
+
+/* Touch menu: the customer website keeps its existing compact cards. */
+.kiosk.wrapper {
+  padding: 32px 0 calc(130px + env(safe-area-inset-bottom));
+}
+.kiosk .container {
+  width: min(1160px, calc(100% - 56px));
+}
+.kiosk .header {
+  border: 0;
+  padding: 0;
+  margin-bottom: 26px;
+}
+.kioskEyebrow {
+  display: block;
+  margin: 0 0 10px;
+  color: #856047;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 2px;
+}
+.kiosk .title {
+  color: #183e32;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -1.3px;
+  margin-bottom: 12px;
+}
+.kiosk .subtitle {
+  color: #627063;
+  font-size: 15px;
+}
+.kioskHero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  border: 0;
+  border-radius: 22px;
+  padding: 0;
+  background: #183e32;
+  color: #fff8eb;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+}
+.kioskHeroCopy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 36px 40px;
+}
+.kioskHeroCopy .kioskEyebrow {
+  color: #dce7a3;
+}
+.kioskHeroCopy > strong {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: clamp(30px, 3.6vw, 44px);
+  font-weight: 400;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  max-width: 330px;
+}
+.kioskHeroDescription {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.7;
+  color: #d0d9cb;
+  margin: 16px 0;
+  max-width: 330px;
+}
+.kioskHeroPrice {
+  font-size: 21px;
+  font-weight: 650;
+  margin-top: auto;
+}
+.kioskHeroPrice small {
+  font-size: 11px;
+  font-weight: 400;
+}
+.kioskHeroAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 50px;
+  padding: 13px 20px;
+  margin-top: 18px;
+  border-radius: 10px;
+  background: #e5edb4;
+  color: #183e32;
+  font-size: 14px;
+  font-weight: 750;
+}
+.kioskHero:hover .kioskHeroAction {
+  background: #f0f5d4;
+}
+.kioskHeroPhoto {
+  position: relative;
+  min-width: 0;
+}
+.kioskHeroPhoto img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 56%;
+}
+.kioskHeroPhoto > span {
+  position: absolute;
+  bottom: 18px;
+  right: 18px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: #fff8eb;
+  color: #183e32;
+  font-size: 11px;
+  font-weight: 600;
+}
+.categoryNav {
+  display: flex;
+  gap: 12px;
+  padding: 24px 0;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.categoryNav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  min-height: 48px;
+  padding: 12px 20px;
+  border: 1px solid #d8dccc;
+  border-radius: 999px;
+  color: #183e32;
+  background: #fffdf7;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.categoryNav a:hover {
+  background: #e5edb4;
+  border-color: #bac8a3;
+}
+.kiosk .section {
+  margin-bottom: 38px;
+  scroll-margin-top: 22px;
+}
+.kiosk .sectionTitle {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 31px;
+  font-weight: 400;
+  color: #183e32;
+  margin-bottom: 18px;
+  letter-spacing: -0.6px;
+}
+.kiosk .grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.kiosk .card {
+  border: 1px solid #e1e3d7;
+  background: #fffdf8;
+  border-radius: 18px;
+  box-shadow: none;
+}
+.kiosk .card:hover {
+  transform: none;
+  border-color: #b4c3a6;
+  box-shadow: none;
+}
+.kiosk .cardPhotoWrap {
+  height: auto;
+  aspect-ratio: 1.65;
+  background: #f0f1e8;
+}
+.kiosk .cardPhoto {
+  display: block;
+}
+.kiosk .cardPhotoContain {
+  padding: 18px;
+  background: #f1f2eb;
+}
+.kiosk .cardPhotoOverlay {
+  display: none;
+}
+.kiosk .cardWithPhoto .cardBody {
+  padding: 20px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+.kiosk .cardBodyText {
+  flex: 1;
+}
+.kiosk .cardName {
+  color: #183e32;
+  font-size: 20px;
+  font-weight: 650;
+}
+.kiosk .cardDescription {
+  max-width: none;
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 9px 0 0;
+  color: #64705f;
+}
+.kiosk .cardPrice {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font-size: 18px;
+  margin-top: 14px;
+  color: #183e32;
+}
+.kiosk .addBtn {
+  min-height: 48px;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #183e32;
+}
+.kiosk .addBtn:hover {
+  background: #2c5845;
+}
+.kiosk .stepper {
+  justify-content: space-between;
+  min-height: 48px;
+  border: 1px solid #d5ddc9;
+  border-radius: 10px;
+  background: #eef2df;
+}
+.kiosk .stepperBtn {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 9px;
+  color: #183e32;
+  background: transparent;
+  font-size: 23px;
+}
+.kiosk .stepperCount {
+  font-size: 17px;
+}
+.kiosk .comboAddWrap {
+  align-items: stretch;
+}
+.kiosk .comboCount {
+  font-size: 12px;
+}
+.kiosk .cartBar {
+  width: min(800px, calc(100% - 32px));
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  min-height: 72px;
+  padding: 15px 22px;
+  border-radius: 16px;
+  background: #183e32;
+  color: #fff9ec;
+  box-shadow: 0 8px 36px #183e3233;
+}
+.kiosk .cartBar > span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.kiosk .cartBarCount {
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: #ffffff18;
+  font-size: 13px;
+}
+.kioskPaymentNote {
+  text-align: center;
+  color: #687363;
+  font-size: 13px;
+  padding: 16px 0;
+}
+.kiosk .comboClose {
+  width: 48px;
+  height: 48px;
+}
+.kiosk .comboOption {
+  min-height: 60px;
+}
+.kiosk .comboOptionText strong {
+  font-size: 13px;
+}
+.kiosk .comboOptionText small {
+  font-size: 11px;
+}
+.kiosk .comboConfirm {
+  min-height: 52px;
+  background: #183e32;
+}
+@media (max-width: 900px) {
+  .kioskHeroCopy {
+    padding: 28px;
+  }
+  .kiosk .grid {
+    gap: 14px;
+  }
+  .kiosk .cardWithPhoto .cardBody {
+    padding: 16px;
+  }
+}
+@media (max-width: 700px) {
+  .kiosk .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 620px) {
+  .kiosk.wrapper {
+    padding-top: 24px;
+  }
+  .kiosk .container {
+    width: calc(100% - 32px);
+  }
+  .kiosk .subtitle {
+    font-size: 13px;
+  }
+  .kioskHero {
+    grid-template-columns: 1fr;
+  }
+  .kioskHeroPhoto {
+    grid-row: 1;
+    aspect-ratio: 1.9;
+  }
+  .kioskHeroCopy {
+    padding: 26px;
+  }
+  .kioskHeroCopy > strong {
+    max-width: none;
+  }
+  .kioskHeroDescription {
+    margin: 12px 0;
+  }
+  .kioskHeroAction {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .categoryNav {
+    gap: 8px;
+  }
+  .categoryNav a {
+    flex: 1;
+    gap: 10px;
+    padding: 12px 14px;
+    font-size: 12px;
+  }
+  .kiosk .cardName {
+    font-size: 16px;
+  }
+  .kiosk .cardDescription {
+    font-size: 12px;
+  }
+  .kiosk .cardPhotoWrap {
+    aspect-ratio: 1.15;
+  }
+  .kiosk .cardWithPhoto .cardBody {
+    padding: 14px;
+  }
+  .kiosk .cardPrice {
+    font-size: 15px;
+  }
+  .kiosk .cartBar {
+    padding: 12px;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .kiosk .cartBarCount {
+    font-size: 11px;
+    gap: 6px;
+    padding: 8px;
+  }
+  .kiosk .cartBar > span:last-child {
+    gap: 6px;
+  }
+  .kiosk .cartBar > span:last-child svg {
+    width: 16px;
+  }
+}
+.kiosk .cardPhotoWrap {
+  overflow: hidden;
+}
+.kiosk .cardPhoto {
+  position: absolute;
+  inset: 0;
+}
+.kiosk .kioskComboCard {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.6fr) 1fr;
+  background: #ecefd8;
+}
+.kiosk .kioskComboCard .cardPhotoWrap {
+  aspect-ratio: auto;
+  min-height: 230px;
+}
+.kiosk .kioskComboCard .cardBody {
+  padding: 28px;
+}
+.kiosk .kioskComboCard .cardName {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 30px;
+  font-weight: 400;
+}
+.kiosk .kioskComboCard .comboAddWrap {
+  max-width: 280px;
+}
+@media (max-width: 620px) {
+  .kiosk .kioskComboCard {
+    grid-template-columns: 1fr;
+  }
+  .kiosk .kioskComboCard .cardPhotoWrap {
+    min-height: 0;
+    aspect-ratio: 1.8;
+  }
+  .kiosk .kioskComboCard .cardBody {
+    padding: 20px;
+  }
+  .kiosk .kioskComboCard .comboAddWrap {
+    max-width: none;
+  }
 }

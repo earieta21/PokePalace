@@ -1,0 +1,158 @@
+﻿.page {
+  min-height: 100dvh;
+  background: #f7f4ec;
+  color: #183e32;
+}
+.header,
+.steps,
+.promo {
+  width: min(1160px, calc(100% - 56px));
+  margin: 0 auto;
+}
+.header {
+  min-height: 98px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand > span {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 29px;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+.brand small {
+  display: block;
+  margin-top: 8px;
+  font:
+    650 8px Inter,
+    sans-serif;
+  letter-spacing: 2px;
+}
+.cancel {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #d7d9ca;
+  border-radius: 12px;
+  background: transparent;
+  color: #42564b;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.steps {
+  display: flex;
+  list-style: none;
+  gap: 32px;
+  padding: 16px 0 22px;
+  border-bottom: 1px solid #dcded0;
+}
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  color: #677267;
+}
+.steps li[aria-current] {
+  color: #183e32;
+  font-weight: 750;
+}
+.steps span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d5d9ca;
+  border-radius: 50%;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.steps li[aria-current] span {
+  background: #183e32;
+  color: #fff9ec;
+  border-color: #183e32;
+}
+.promo {
+  margin-top: 24px;
+  padding: 20px 24px;
+  border-radius: 16px;
+  background: #e4ecb9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.promo strong {
+  font-size: 18px;
+}
+.promo p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+.promo button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 12px 18px;
+  background: #183e32;
+  color: #fff9ec;
+  border: 0;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.page button:focus-visible,
+.page a:focus-visible {
+  outline: 3px solid #aa5934;
+  outline-offset: 4px;
+}
+@media (max-width: 620px) {
+  .header,
+  .steps,
+  .promo {
+    width: calc(100% - 32px);
+  }
+  .header {
+    min-height: 84px;
+    gap: 10px;
+  }
+  .brand > span {
+    font-size: 23px;
+  }
+  .brand > svg {
+    display: none;
+  }
+  .cancel {
+    font-size: 11px;
+    padding: 9px 11px;
+  }
+  .steps {
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .steps li {
+    flex-direction: column;
+    gap: 7px;
+    font-size: 10px;
+    text-align: center;
+  }
+  .promo {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 18px;
+  }
+}
