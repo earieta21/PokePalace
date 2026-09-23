@@ -1,0 +1,10 @@
+.git
+.netlify
+.tmp
+tmp
+output
+dist
+node_modules
+backend/node_modules
+deploy-*.zip
+*.log
