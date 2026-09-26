@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import { computeCartPricing } from "../pricing.js";
 import { sendEmail, orderConfirmationEmail } from "../utils/notify.js";
 import { createPaymentLink, getPaymentLinkStatus, isValidWebhookAuth } from "../utils/openpay.js";
+import { deductInventory, restoreInventoryForOrder } from "../services/orderInventory.js";
 import { expireStalePoints } from "../utils/loyalty.js";
 import { isPromo2x1Day } from "../utils/promoSchedule.js";
 import {
@@ -634,6 +635,7 @@ const releasePromoUseOnce = async (order) => {
 export const reconcileOnlineOrderCancellation = async (order) => {
   // POS cancellation has its own staff-side inventory/reward reconciliation.
   if (!isCustomerManagedOrder(order)) return order;
+  if (!await restoreInventoryForOrder(order)) throw new Error("No se pudo devolver el inventario");
   if (order.cancellationReversedAt) return Order.findById(order._id);
 
   await refundRedeemedPointsOnce(order);
@@ -779,23 +781,30 @@ export const getOrderById = async (req, res) => {
    server-to-server a Openpay para confirmar el estado real antes de marcar
    el pedido como pagado. */
 export const paymentWebhook = async (req, res) => {
-  res.sendStatus(200); // Openpay solo necesita el 200; el resto es best-effort.
-
   try {
-    if (!isValidWebhookAuth(req.headers.authorization)) return;
+    if (!isValidWebhookAuth(req.headers.authorization)) return res.sendStatus(200);
 
     const paymentRequestId = req.body?.transaction?.id;
-    if (!paymentRequestId) return;
+    if (!paymentRequestId) return res.sendStatus(200);
 
     const order = await Order.findOne({ paymentRequestId });
-    if (!order || order.paymentStatus === "paid") return;
+    if (!order) return res.sendStatus(200);
 
-    const status = await getPaymentLinkStatus(paymentRequestId);
+    const status = order.paymentStatus === "paid"
+      ? { status: "completed" } : await getPaymentLinkStatus(paymentRequestId);
+    if (!status) return res.sendStatus(503);
     if (status?.status === "completed") {
       order.paymentStatus = "paid";
       await order.save();
+      if (order.status === "cancelled") {
+        if (!await restoreInventoryForOrder(order)) return res.sendStatus(503);
+      } else if (!await deductInventory(order)) {
+        return res.sendStatus(503);
+      }
     }
+    return res.sendStatus(200);
   } catch (err) {
     console.error("paymentWebhook error:", err.message);
+    return res.sendStatus(503);
   }
 };

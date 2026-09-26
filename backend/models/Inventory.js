@@ -19,6 +19,10 @@ const inventorySchema = new mongoose.Schema(
     cost:     { type: Number, default: 0 },
     supplier: { type: String, default: "" },
     menuKeys: { type: [String], default: [] }, // e.g. ["salmon","citrus_marinade"] — matched on order pay
+    quantityPerPortion: {
+      type: Number, default: null, min: 0.000001,
+      validate: { validator: (value) => value == null || Number.isFinite(value), message: "Cantidad por porción inválida" },
+    },
     lastRestockAt: { type: Date, default: null },
     lastRestockBy: { type: String, default: null }, // nombre del staff que hizo la última recepción
     // Request IDs make shipment receiving permanently idempotent. Keeping the

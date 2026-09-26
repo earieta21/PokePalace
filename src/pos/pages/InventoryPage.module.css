@@ -27,6 +27,37 @@
   margin-bottom: 16px;
 }
 
+.saleSettings {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--p-border);
+  border-radius: 6px;
+  display: grid;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.saleSettings legend { font-weight: 700; }
+.saleSettings summary { cursor: pointer; white-space: normal; }
+.saleOptions { display: grid; gap: 8px; max-height: 180px; overflow-y: auto; margin-top: 12px; }
+.saleOptions label, .pendingFilter { display: flex; align-items: center; gap: 8px; white-space: normal; }
+.saleOptions input, .pendingFilter input { flex: 0 0 auto; width: 16px; height: 16px; }
+.portionField { display: grid; gap: 6px; white-space: normal; }
+.portionField input { width: 100%; box-sizing: border-box; min-width: 0; padding: 8px; border: 1px solid var(--p-border); border-radius: 4px; }
+.saleReady { color: #236540 !important; white-space: normal; }
+.salePending { color: #9b4a10 !important; white-space: normal; }
+.pendingFilter { font-size: 12px; }
+.movementDialog { width: min(760px, calc(100vw - 32px)); max-height: 85vh; box-sizing: border-box; padding: 20px; border: 1px solid var(--p-border); border-radius: 8px; color: var(--p-ink); background: white; }
+.movementDialog::backdrop { background: rgb(0 0 0 / 40%); }
+.movementHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.movementHeading h2 { font-size: 18px; margin: 0; overflow-wrap: anywhere; }
+.movementHeading button { display: grid; place-items: center; flex: 0 0 32px; height: 32px; border: 0; background: transparent; cursor: pointer; }
+.movementTableWrap { overflow-x: auto; }
+.movementDialog small { display: block; max-width: 240px; white-space: normal; margin-top: 4px; }
+
 .headerActions {
   display: flex;
   align-items: center;
@@ -912,6 +943,7 @@
 .inventoryTable th:first-child,
 .inventoryTable td:first-child {
   width: 27%;
+  min-width: 240px;
 }
 
 .loadingCell {
@@ -990,6 +1022,7 @@
 
 .itemEditMeta {
   margin-top: 6px;
+  flex-wrap: wrap;
 }
 
 .itemEditMeta select,
