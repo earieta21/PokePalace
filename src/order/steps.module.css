@@ -111,8 +111,14 @@
     box-shadow 180ms ease;
 }
 
-.card:hover {
-  border-color: rgba(24, 62, 50, 0.3);
+/* Solo con ratón. En la tablet del kiosco el :hover se queda pegado después
+   de cada toque, y como `.card:hover` le gana en especificidad a `.selected`,
+   la tarjeta elegida se quedaba con este borde en vez del verde de abajo.
+   El :not() evita además que el hover pise la selección cuando sí hay ratón. */
+@media (hover: hover) {
+  .card:not(.selected):hover {
+    border-color: rgba(24, 62, 50, 0.3);
+  }
 }
 
 .card:focus-visible {
@@ -143,8 +149,10 @@
   transition: transform 250ms ease;
 }
 
-.card:hover .image {
-  transform: scale(1.025);
+@media (hover: hover) {
+  .card:hover .image {
+    transform: scale(1.025);
+  }
 }
 
 .imageOverlay {
@@ -493,8 +501,12 @@
 .container:not(.containerKiosk) .card:disabled {
   cursor: not-allowed;
 }
-.container:not(.containerKiosk) .card:not(:disabled):hover {
-  border-color: var(--step-ink);
+/* Misma razón que arriba: en el teléfono, al deseleccionar una tarjeta el
+   :hover se queda pegado y la dejaba con el borde de elegida. */
+@media (hover: hover) {
+  .container:not(.containerKiosk) .card:not(:disabled):hover {
+    border-color: var(--step-ink);
+  }
 }
 .container:not(.containerKiosk) .selected {
   background: var(--step-lime-soft);
