@@ -262,3 +262,126 @@
     gap: 8px;
   }
 }
+
+/* En el iPad horizontal el resumen ocupa un lateral y solo se desplaza
+   la zona de ingredientes. dvh sigue el espacio real que deja Safari. */
+@media (orientation: landscape) and (min-width: 960px) and (min-height: 500px) {
+  .page {
+    display: grid;
+    grid-template-columns: 236px minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: "top top" "progress progress" "summary ingredients";
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .topbar {
+    grid-area: top;
+    padding: 10px 20px;
+    gap: 14px;
+  }
+  .cancelBtn {
+    min-height: 44px;
+    padding: 10px 20px;
+  }
+  .progress {
+    grid-area: progress;
+    padding: 12px 20px;
+  }
+  .progressRow {
+    margin-bottom: 7px;
+  }
+  .stepLabel {
+    font-size: 18px;
+  }
+  .stepCount {
+    font-size: 13px;
+  }
+  .track {
+    height: 5px;
+  }
+  .stepList {
+    margin-top: 10px;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .stepItem {
+    font-size: 12px;
+    color: #64776c;
+  }
+  .currentStep {
+    color: var(--kiosk-ink);
+  }
+  .completedStep {
+    color: var(--kiosk-ink-soft);
+  }
+  .stepNumber {
+    width: 23px;
+    height: 23px;
+  }
+  .summaryBar {
+    grid-area: summary;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 20px 18px 0;
+    border: 0;
+    border-right: 1px solid var(--kiosk-hairline);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+  .summaryBowl {
+    width: 100%;
+  }
+  .summaryEyebrow {
+    order: -1;
+    color: #526e5e;
+  }
+  .summaryList {
+    flex: 1 0 auto;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 10px;
+  }
+  .summaryItem {
+    align-items: flex-start;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .summaryItem > span:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .emptySummary {
+    font-size: 13px;
+    line-height: 1.65;
+    color: #526e5e;
+  }
+  .price {
+    position: sticky;
+    bottom: 0;
+    align-items: flex-start;
+    padding: 16px 0;
+    background: #fff;
+    border-top: 1px solid var(--kiosk-hairline);
+    z-index: 1;
+  }
+  .priceAmount {
+    font-size: 26px;
+  }
+  .priceCaption {
+    color: #526e5e;
+  }
+}
+@media (orientation: landscape) and (min-width: 1180px) and (min-height: 500px) {
+  .page {
+    grid-template-columns: 270px minmax(0, 1fr);
+  }
+  .summaryBar {
+    padding: 22px 24px 0;
+  }
+}

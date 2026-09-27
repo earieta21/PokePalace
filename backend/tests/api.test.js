@@ -1180,7 +1180,7 @@ test("cancelar una venta POS revierte inventario, puntos y premio una sola vez",
   });
   const inventory = await Inventory.create({
     item: `CI Security Agua del Dia ${Date.now()}`,
-    unit: "porciÃ³n",
+    unit: "porciones",
     qty: 2,
     minQty: 0,
     menuKeys: ["agua_natural"],

@@ -497,14 +497,17 @@ const addItemDemand = (demand, item) => {
 export const getPosInventoryDemand = (order = {}) => {
   const demand = new Map();
 
-  addBowlDemand(demand, order);
+  // Customer orders keep legacy copies of the first bowl and product lines.
+  // A populated cart is authoritative; counting both doubles that inventory.
+  const cart = Array.isArray(order.cartItems) ? order.cartItems : [];
+  if (!cart.length) addBowlDemand(demand, order);
   if (order.rewardExtraTopping) addDemand(demand, order.rewardExtraTopping);
 
-  for (const item of Array.isArray(order.items) ? order.items : []) {
+  for (const item of !cart.length && Array.isArray(order.items) ? order.items : []) {
     addItemDemand(demand, item);
   }
 
-  for (const line of Array.isArray(order.cartItems) ? order.cartItems : []) {
+  for (const line of cart) {
     if (line?.kind === "item") addItemDemand(demand, line);
     else addBowlDemand(demand, line || {});
   }

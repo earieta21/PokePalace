@@ -113,8 +113,14 @@
     box-shadow 180ms ease;
 }
 
-.card:hover {
-  border-color: rgba(24, 62, 50, 0.3);
+/* Solo con ratón. En la tablet del kiosco el :hover se queda pegado después
+   de cada toque, y como `.card:hover` le gana en especificidad a `.selected`,
+   la tarjeta elegida se quedaba con este borde en vez del verde de abajo.
+   El :not() evita además que el hover pise la selección cuando sí hay ratón. */
+@media (hover: hover) {
+  .card:not(.selected):hover {
+    border-color: rgba(24, 62, 50, 0.3);
+  }
 }
 
 .card:focus-visible {
@@ -145,8 +151,10 @@
   transition: transform 250ms ease;
 }
 
-.card:hover .image {
-  transform: scale(1.025);
+@media (hover: hover) {
+  .card:hover .image {
+    transform: scale(1.025);
+  }
 }
 
 .imageOverlay {
@@ -495,8 +503,12 @@
 .container:not(.containerKiosk) .card:disabled {
   cursor: not-allowed;
 }
-.container:not(.containerKiosk) .card:not(:disabled):hover {
-  border-color: var(--step-ink);
+/* Misma razón que arriba: en el teléfono, al deseleccionar una tarjeta el
+   :hover se queda pegado y la dejaba con el borde de elegida. */
+@media (hover: hover) {
+  .container:not(.containerKiosk) .card:not(:disabled):hover {
+    border-color: var(--step-ink);
+  }
 }
 .container:not(.containerKiosk) .selected {
   background: var(--step-lime-soft);
@@ -739,5 +751,104 @@
 @media (max-width: 360px) {
   .containerKiosk .grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Armador horizontal: fotos compactas, resumen independiente y acciones
+   pegadas al borde inferior del panel, sin el espacio de la navbar web. */
+@media (orientation: landscape) and (min-width: 960px) and (min-height: 500px) {
+  .containerKiosk {
+    grid-area: ingredients;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    margin: 14px 16px;
+    padding: 22px 20px 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scroll-padding: 16px 0 90px;
+  }
+  .containerKiosk .header {
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+  }
+  .containerKiosk .title {
+    font-size: 32px;
+  }
+  .containerKiosk .subtitle {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .containerKiosk .selectionInfo {
+    font-size: 13px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+  }
+  .containerKiosk .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .containerKiosk .card {
+    display: flex;
+    flex-direction: column;
+  }
+  .containerKiosk .imageWrap {
+    aspect-ratio: 1.8;
+    flex-shrink: 0;
+  }
+  .containerKiosk .image {
+    position: absolute;
+    inset: 0;
+  }
+  .containerKiosk .name {
+    font-size: 16px;
+    padding: 12px 12px 5px;
+  }
+  .containerKiosk .description,
+  .containerKiosk .itemDesc {
+    font-size: 12px;
+    padding: 0 12px 12px;
+  }
+  .containerKiosk .premiumPrice {
+    font-size: 12px;
+  }
+  .containerKiosk .selected .imageWrap::after,
+  .containerKiosk .selectedBadge {
+    width: 30px;
+    height: 30px;
+    font-size: 15px;
+  }
+  .containerKiosk .actions {
+    bottom: 0;
+    min-height: 76px;
+    margin-top: 16px;
+    padding: 12px 0;
+    background: var(--step-surface);
+    border-top: 1px solid var(--step-hairline);
+  }
+  .containerKiosk .nextButton,
+  .containerKiosk .backButton,
+  .containerKiosk .skipBtn {
+    min-height: 50px;
+    padding: 14px 22px;
+    font-size: 14px;
+  }
+  .containerKiosk .extraScoopSection {
+    margin-top: 18px;
+    padding: 16px;
+  }
+  .containerKiosk .extraScoopTitle {
+    font-size: 23px;
+  }
+  .containerKiosk .extraScoopHint {
+    font-size: 13px;
+  }
+  .containerKiosk .extraScoopName {
+    font-size: 14px;
+  }
+}
+@media (orientation: landscape) and (min-width: 1180px) and (min-height: 500px) {
+  .containerKiosk .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

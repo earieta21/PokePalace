@@ -1,4 +1,6 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useMemo, useCallback, useRef } from "react";
+import { RefreshCw, History, X, Plus, Download, Package, Truck, Search, Pencil, Trash2, MoreHorizontal, AlertTriangle, CircleCheck, SlidersHorizontal, Utensils, GlassWater, SprayCan, Boxes, Archive } from "lucide-react";
+import { consumptionRate, inventoryConsumptionStatus, PROTEIN_KEYS } from "../../../backend/utils/inventoryConsumption.js";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { downloadCSV } from "../../utils/csv";
@@ -17,7 +19,8 @@ const INVENTORY_SECTIONS = [
   { name: "Otros", icon: "📦", categories: ["Equipo", "Oficina", "Otro"] },
 ];
 const SECTION_NAMES = INVENTORY_SECTIONS.map((section) => section.name);
-const UNITS = ["kg", "g", "pz", "L", "ml", "paq", "botellas", "manojos", "bolsas", "latas", "cajas", "rollos", "gal"];
+const SECTION_ICONS = { Todos: Package, Comida: Utensils, Bebidas: GlassWater, Limpieza: SprayCan, Empaque: Boxes, Otros: Archive };
+const UNITS = ["kg", "g", "pz", "L", "ml", "paq", "botellas", "manojos", "bolsas", "latas", "cajas", "rollos", "gal", "porciones", "vasos"];
 const LEGACY_CATEGORY_LABELS = {
   Grains: "Granos",
   Proteins: "Proteínas",
@@ -46,13 +49,14 @@ const CLEANING_PRODUCTS = [
 const BEVERAGE_PRODUCTS = [
   { name: "Topochico", category: "Aguas", unit: "botellas", key: "topochico" },
   { name: "Coca-Zero", category: "Refrescos", unit: "latas", key: "coca_zero" },
+  { name: "Coca-Cola", category: "Refrescos", unit: "latas", key: "coca_cola" },
   { name: "Botella de Agua", category: "Aguas", unit: "botellas", key: "botella_de_agua" },
   { name: "Agua del día", category: "Aguas", unit: "L", key: "agua_natural" },
 ];
 
 const EMPTY_FORM = {
   item: "", section: "Comida", category: "Proteínas", unit: "kg",
-  qty: "", minQty: "", cost: "", supplier: "", menuKeys: [],
+  qty: "", minQty: "", cost: "", supplier: "", menuKeys: [], quantityPerPortion: "",
   registerExpense: true,
   // "unit": el costo capturado es por kg/pieza/etc. "total": se capturó lo
   // que costó toda la compra y la app calcula el costo por unidad sola —
@@ -74,6 +78,52 @@ const MENU_GROUPS = [
 const MENU_ITEMS = MENU_GROUPS.flatMap(({ labels, group, category, unit }) =>
   Object.entries(labels).map(([key, label]) => ({ key, label, group, category, unit }))
 );
+const SALE_OPTIONS = [...MENU_ITEMS, ...BEVERAGE_PRODUCTS.map((product) => ({ key: product.key, label: product.name }))];
+const MOVEMENT_LABELS = {
+  sale_deduction: "Venta", sale_reversal: "Cancelación de venta", restock: "Recepción",
+  restock_batch: "Recepción", manual_adjustment: "Ajuste manual", internal_consumption: "Consumo interno",
+  internal_consumption_reversal: "Devolución de consumo", waste: "Merma", count_adjustment: "Conteo físico",
+};
+
+function SaleSettings({ value, onChange }) {
+  const [linkSearch, setLinkSearch] = useState("");
+  const keys = value.menuKeys || [];
+  const proteinOnly = keys.length > 0 && keys.every((key) => PROTEIN_KEYS.has(key));
+  const status = inventoryConsumptionStatus(value);
+  const unknownKeys = keys.filter((key) => !SALE_OPTIONS.some((option) => option.key === key));
+  const options = [...SALE_OPTIONS, ...unknownKeys.map((key) => ({ key, label: key }))]
+    .filter((option) => option.label.toLocaleLowerCase("es").includes(linkSearch.toLocaleLowerCase("es")))
+    .sort((a, b) => Number(keys.includes(b.key)) - Number(keys.includes(a.key)));
+  return (
+    <fieldset className={ui.saleSettings}>
+      <legend>Consumo por venta</legend>
+      <details>
+        <summary>Productos vinculados ({keys.length})</summary>
+        <input className={ui.linkSearch} type="search" aria-label="Buscar vínculo de venta" placeholder="Buscar ingrediente o bebida…" value={linkSearch} onChange={(event) => setLinkSearch(event.target.value)} />
+        <div className={ui.saleOptions}>
+          {options.map((option) => (
+            <label key={option.key}>
+              <input type="checkbox" checked={keys.includes(option.key)} onChange={(event) => onChange({
+                menuKeys: event.target.checked ? [...keys, option.key] : keys.filter((key) => key !== option.key),
+              })} />
+              {option.label}
+            </label>
+          ))}
+          {options.length === 0 && <span>Sin coincidencias</span>}
+        </div>
+      </details>
+      {!proteinOnly && keys.length > 0 && (
+        <label className={ui.portionField}>
+          Cantidad por porción ({value.unit})
+          <input type="number" min="0.000001" step="any" value={value.quantityPerPortion ?? ""}
+            placeholder={String(keys.length === 1 ? consumptionRate({ ...value, quantityPerPortion: null }, keys[0]) ?? "Sin configurar" : "Sin configurar")}
+            onChange={(event) => onChange({ quantityPerPortion: event.target.value })} />
+        </label>
+      )}
+      <span className={status.ready ? ui.saleReady : ui.salePending}>{status.label}</span>
+    </fieldset>
+  );
+}
 
 function statusOf(item) {
   if (item.qty <= 0)           return "critical";
@@ -109,17 +159,22 @@ const parseKeys = (str) =>
 
 export default function InventoryPage({ styles, role }) {
   const { staffToken } = useContext(StaffAuthContext);
-  const api = createStaffApi(staffToken);
+  const api = useMemo(() => createStaffApi(staffToken), [staffToken]);
 
   const [items, setItems]     = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
   const [notice, setNotice]   = useState("");
+  const [movementItem, setMovementItem] = useState(null);
+  const [movements, setMovements] = useState([]);
+  const [movementLoading, setMovementLoading] = useState(false);
+  const [movementError, setMovementError] = useState("");
+  const movementDialog = useRef(null);
   const [filter, setFilter]   = useState("Todos");
   const [sectionFilter, setSectionFilter] = useState("Todos");
   const [stockFilter, setStockFilter] = useState("Todos");
+  const [pendingOnly, setPendingOnly] = useState(false);
   const [search, setSearch]   = useState("");
-  const [showGuide, setShowGuide] = useState(true);
 
   // Registrar en Finanzas el valor de existencias que ya estaban cargadas
   // (nunca pasaron por "Recibir mercancía") — solo dueño/admin.
@@ -146,6 +201,12 @@ export default function InventoryPage({ styles, role }) {
     minQty: "", cost: "", supplier: "", menuKeys: "",
   });
   const [editSaving, setEditSaving] = useState(false);
+  const editDialog = useRef(null);
+  const editingItem = items.find((item) => item._id === editing);
+  useEffect(() => {
+    if (editing) editDialog.current?.showModal();
+    else editDialog.current?.close();
+  }, [editing]);
 
   // Advanced (optional) fields collapsed by default to keep the fast-add flow short
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -166,15 +227,35 @@ export default function InventoryPage({ styles, role }) {
   const [receiveSaving, setReceiveSaving] = useState(false);
   const [receiveRequestId, setReceiveRequestId] = useState("");
 
-  const load = () => {
-    setLoading(true);
-    api.get("/api/staff/inventory")
-      .then((d) => setItems(d.items ?? []))
+  const load = useCallback((quiet = false) => {
+    if (!quiet) setLoading(true);
+    return api.get("/api/staff/inventory")
+      .then((d) => { setItems(d.items ?? []); setError(""); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  };
+  }, [api]);
 
-  useEffect(() => { load(); }, [staffToken]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") load(true); };
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, [load]);
+
+  useEffect(() => {
+    if (!movementItem) return undefined;
+    let active = true;
+    movementDialog.current?.showModal();
+    setMovements([]);
+    setMovementLoading(true);
+    setMovementError("");
+    api.get(`/api/staff/inventory/${movementItem._id}/movements?limit=100`)
+      .then((data) => { if (active) setMovements(data.movements || []); })
+      .catch((err) => { if (active) setMovementError(err.message); })
+      .finally(() => { if (active) setMovementLoading(false); });
+    return () => { active = false; };
+  }, [api, movementItem]);
 
   const backfillExpenses = async () => {
     if (backfilling) return;
@@ -229,9 +310,10 @@ export default function InventoryPage({ styles, role }) {
   const visible = items.filter((row) => {
     const matchSection = sectionFilter === "Todos" || sectionOf(row) === sectionFilter;
     const matchCat    = filter === "Todos" || categoryOf(row) === filter;
-    const matchStock  = stockFilter === "Todos" || statusOf(row) !== "ok";
+    const matchStock = stockFilter === "Todos" || (stockFilter === "Agotado" ? statusOf(row) === "critical" : statusOf(row) !== "ok");
     const matchSearch = row.item.toLowerCase().includes(search.toLowerCase());
-    return matchSection && matchCat && matchStock && matchSearch;
+    return matchSection && matchCat && matchStock && matchSearch
+      && (!pendingOnly || (["Comida", "Bebidas"].includes(sectionOf(row)) && !inventoryConsumptionStatus(row).ready));
   });
 
   const activeCategories = sectionFilter === "Todos"
@@ -242,13 +324,15 @@ export default function InventoryPage({ styles, role }) {
       ])];
   const filterCategories = ["Todos", ...activeCategories];
   const editCategoryOptions = [...new Set([editForm.category, ...categoriesFor(editForm.section)].filter(Boolean))];
-  const hasActiveFilters = sectionFilter !== "Todos" || filter !== "Todos" || stockFilter !== "Todos" || search.trim();
+  const pendingCount = items.filter((item) => ["Comida", "Bebidas"].includes(sectionOf(item)) && !inventoryConsumptionStatus(item).ready).length;
+  const hasActiveFilters = pendingOnly || sectionFilter !== "Todos" || filter !== "Todos" || stockFilter !== "Todos" || search.trim();
 
   const clearFilters = () => {
     setSectionFilter("Todos");
     setFilter("Todos");
     setStockFilter("Todos");
     setSearch("");
+    setPendingOnly(false);
   };
 
   const chooseFormSection = (section) => {
@@ -256,7 +340,7 @@ export default function InventoryPage({ styles, role }) {
       ...previous,
       section,
       category: categoriesFor(section)[0],
-      menuKeys: section === "Comida" ? previous.menuKeys : [],
+      menuKeys: previous.menuKeys,
     }));
     if (section !== "Comida") setMenuSearch("");
   };
@@ -280,6 +364,7 @@ export default function InventoryPage({ styles, role }) {
       category: product.category,
       unit: product.unit,
       menuKeys: [product.key],
+      quantityPerPortion: "",
     }));
   };
 
@@ -372,6 +457,7 @@ export default function InventoryPage({ styles, role }) {
         cost:     effectiveUnitCost,
         supplier: form.supplier,
         menuKeys: form.menuKeys,
+        quantityPerPortion: form.quantityPerPortion === "" ? null : Number(form.quantityPerPortion),
         registerExpense: form.registerExpense,
       });
       setItems((prev) => [...prev, created]);
@@ -400,6 +486,7 @@ export default function InventoryPage({ styles, role }) {
     setEditing(row._id);
     setEditForm({
       qty:      String(row.qty),
+      originalQty: row.qty,
       section:  sectionOf(row),
       category: categoryOf(row),
       unit:     row.unit,
@@ -407,6 +494,7 @@ export default function InventoryPage({ styles, role }) {
       cost:     String(row.cost ?? 0),
       supplier: row.supplier || "",
       menuKeys: (row.menuKeys || []).join(", "),
+      quantityPerPortion: row.quantityPerPortion ?? "",
     });
   };
 
@@ -414,7 +502,7 @@ export default function InventoryPage({ styles, role }) {
     setEditSaving(true);
     try {
       const { item: updated } = await api.patch(`/api/staff/inventory/${row._id}`, {
-        qty:      parseFloat(editForm.qty) || 0,
+        ...(Number(editForm.qty) !== editForm.originalQty ? { qty: Number(editForm.qty), expectedQty: editForm.originalQty } : {}),
         section:  editForm.section,
         category: editForm.category,
         unit:     editForm.unit,
@@ -422,6 +510,7 @@ export default function InventoryPage({ styles, role }) {
         cost:     parseFloat(editForm.cost) || 0,
         supplier: editForm.supplier.trim(),
         menuKeys: parseKeys(editForm.menuKeys),
+        quantityPerPortion: editForm.quantityPerPortion === "" ? null : Number(editForm.quantityPerPortion),
       });
       setItems((prev) => prev.map((i) => (i._id === updated._id ? updated : i)));
       setEditing(null);
@@ -527,76 +616,78 @@ export default function InventoryPage({ styles, role }) {
 
   return (
     <div className={ui.inventoryRoot}>
-      <div className={`${styles.pageHeader} ${ui.pageHeader}`}>
-        <div>
-          <h1 className={styles.pageTitle}>Inventario</h1>
-          <p className={styles.pageSubtitle}>Consulta existencias, recibe mercancía y detecta lo que hace falta.</p>
+      <dialog ref={movementDialog} className={ui.movementDialog} onClose={() => setMovementItem(null)} aria-labelledby="inventory-movements-title">
+        <div className={ui.movementHeading}>
+          <h2 id="inventory-movements-title">Movimientos: {movementItem?.item}</h2>
+          <button type="button" aria-label="Cerrar movimientos" title="Cerrar" onClick={() => movementDialog.current.close()}><X size={18} /></button>
         </div>
+        {movementLoading ? <p>Cargando movimientos…</p> : movementError ? <p role="alert">{movementError}</p> : (
+          <>
+            {movements.length === 0 ? <p>Sin movimientos registrados.</p> : (
+              <div className={ui.movementTableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Fecha</th><th>Movimiento</th><th>Cambio</th><th>Existencia</th></tr></thead>
+                  <tbody>{movements.map((movement) => (
+                    <tr key={movement._id}>
+                      <td>{new Date(movement.createdAt).toLocaleString("es-MX")}</td>
+                      <td>{MOVEMENT_LABELS[movement.type] || movement.type}<small>{movement.actorName}</small>{movement.reason && <small>{movement.reason}</small>}</td>
+                      <td>{movement.delta > 0 ? "+" : ""}{Number(movement.delta.toFixed(6))}</td>
+                      <td>{Number(movement.qtyBefore.toFixed(6))} → {Number(movement.qtyAfter.toFixed(6))}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
+            {movements.length === 100 && <p>Últimos 100 movimientos.</p>}
+          </>
+        )}
+      </dialog>
+      <dialog ref={editDialog} className={ui.editDialog} onClose={() => setEditing(null)} aria-labelledby="inventory-edit-title">
+        <form onSubmit={(event) => { event.preventDefault(); if (editingItem) saveEdit(editingItem); }}>
+          <div className={ui.movementHeading}>
+            <div><span className={ui.eyebrow}>Editar artículo</span><h2 id="inventory-edit-title">{editingItem?.item}</h2></div>
+            <button type="button" title="Cerrar" aria-label="Cerrar edición" onClick={() => setEditing(null)} disabled={editSaving}><X size={20} /></button>
+          </div>
+          <div className={ui.editBody}>
+          {error && <p className={ui.errorNotice} role="alert">{error}</p>}
+          <div className={ui.editGrid}>
+            <label>Existencia actual<input type="number" min="0" step="any" required value={editForm.qty} onChange={(event) => setEditForm((p) => ({ ...p, qty: event.target.value }))} /></label>
+            <label>Unidad<select value={editForm.unit} onChange={(event) => setEditForm((p) => ({ ...p, unit: event.target.value }))}>{[...new Set([...UNITS, editForm.unit])].map((unit) => <option key={unit}>{unit}</option>)}</select></label>
+            <label>Sección<select value={editForm.section} onChange={(event) => setEditForm((p) => ({ ...p, section: event.target.value, category: categoriesFor(event.target.value)[0] }))}>{SECTION_NAMES.map((section) => <option key={section}>{section}</option>)}</select></label>
+            <label>Categoría<select value={editForm.category} onChange={(event) => setEditForm((p) => ({ ...p, category: event.target.value }))}>{editCategoryOptions.map((category) => <option key={category}>{category}</option>)}</select></label>
+            <label>Existencia mínima<input type="number" min="0" step="any" required value={editForm.minQty} onChange={(event) => setEditForm((p) => ({ ...p, minQty: event.target.value }))} /></label>
+            <label>Costo por unidad ($)<input type="number" min="0" step="0.01" required value={editForm.cost} onChange={(event) => setEditForm((p) => ({ ...p, cost: event.target.value }))} /></label>
+            <label className={ui.fullWidth}>Proveedor<input value={editForm.supplier || ""} onChange={(event) => setEditForm((p) => ({ ...p, supplier: event.target.value }))} /></label>
+          </div>
+          <SaleSettings key={editing} value={{ ...editForm, menuKeys: parseKeys(editForm.menuKeys) }} onChange={(changes) => setEditForm((p) => ({ ...p, ...changes, ...(changes.menuKeys ? { menuKeys: changes.menuKeys.join(", ") } : {}) }))} />
+          </div>
+          <div className={ui.dialogActions}>
+            <button type="button" className={styles.btnGhost} onClick={() => setEditing(null)} disabled={editSaving}>Cancelar</button>
+            <button type="submit" className={styles.btnPrimary} disabled={editSaving}>{editSaving ? "Guardando…" : "Guardar cambios"}</button>
+          </div>
+        </form>
+      </dialog>
+      <header className={ui.pageHeader}>
+        <div className={ui.pageIdentity}><span className={ui.pageIcon}><Package size={24} /></span><div><span className={ui.eyebrow}>Control del local</span><h1>Inventario</h1></div></div>
         <div className={ui.headerActions}>
-          <button className={styles.btnGhost} onClick={() => setShowGuide((visible) => !visible)}>
-            ? Cómo funciona
+          <button className={styles.btnGhost} onClick={() => load()} disabled={loading} title="Actualizar inventario" aria-label="Actualizar inventario"><RefreshCw size={17} /></button>
+          <button className={styles.btnGhost} onClick={exportCSV} disabled={loading || visible.length === 0} title="Exportar inventario" aria-label="Exportar inventario"><Download size={17} /></button>
+          <details className={ui.moreActions}>
+            <summary aria-label="Más opciones" title="Más opciones"><MoreHorizontal size={20} /></summary>
+            <div>
+              {canBackfillExpenses && <button type="button" onClick={backfillExpenses} disabled={backfilling}>{backfilling ? "Registrando…" : "Registrar existencias en Finanzas"}</button>}
+              {canResetInventory && <button type="button" className={ui.dangerButton} onClick={resetInventoryValues} disabled={resetting || loading || !items.length}>{resetting ? "Reiniciando…" : "Reiniciar cantidades y costos"}</button>}
+              {!canBackfillExpenses && !canResetInventory && <span>Sin acciones adicionales</span>}
+            </div>
+          </details>
+          <button className={styles.btnGhost} onClick={() => { if (receiving) closeReceiving(); else setReceiving(true); if (showForm) closeAddForm(); }}>
+            <Truck size={17} />{receiving ? "Cerrar recepción" : "Recibir mercancía"}
           </button>
-          <button className={styles.btnGhost} onClick={load} title="Volver a cargar los datos">↻ Actualizar</button>
-          <button className={styles.btnGhost} onClick={exportCSV} disabled={loading || visible.length === 0} title="Descargar la vista actual">
-            ↓ Exportar
-          </button>
-          {canBackfillExpenses && (
-            <button
-              className={styles.btnGhost}
-              onClick={backfillExpenses}
-              disabled={backfilling}
-              title="Registra en Finanzas el valor de existencias que nunca pasaron por Recibir mercancía"
-            >
-              {backfilling ? "Registrando…" : "$ Registrar existencias en Finanzas"}
-            </button>
-          )}
-          {canResetInventory && (
-            <button
-              className={`${styles.btnGhost} ${ui.dangerButton}`}
-              onClick={resetInventoryValues}
-              disabled={resetting || loading || items.length === 0}
-              title="Pone cantidad y costo en 0 en todo el inventario, sin borrar artículos ni sus vínculos al menú"
-            >
-              {resetting ? "Reiniciando…" : "⟳ Reiniciar cantidades y costos"}
-            </button>
-          )}
-          <button
-            className={receiving ? styles.btnGhost : `${styles.btnPrimary} ${ui.receiveButton}`}
-            onClick={() => {
-              if (receiving) closeReceiving();
-              else setReceiving(true);
-              if (showForm) closeAddForm();
-            }}
-          >
-            {receiving ? "Cerrar recepción" : "▣ Recibir mercancía"}
-          </button>
-          <button
-            className={styles.btnPrimary}
-            onClick={() => {
-              if (showForm) closeAddForm();
-              else setShowForm(true);
-              closeReceiving();
-            }}
-          >
-            {showForm ? "Cerrar formulario" : "+ Nuevo artículo"}
+          <button className={styles.btnPrimary} onClick={() => { if (showForm) closeAddForm(); else setShowForm(true); closeReceiving(); }}>
+            {showForm ? <X size={17} /> : <Plus size={17} />}{showForm ? "Cerrar formulario" : "Nuevo artículo"}
           </button>
         </div>
-      </div>
-
-      {showGuide && (
-        <section className={ui.guide} aria-label="Guía rápida del inventario">
-          <div className={ui.guideIntro}>
-            <span className={ui.guideEyebrow}>Guía rápida</span>
-            <strong>Tu inventario en tres pasos</strong>
-            <button type="button" onClick={() => setShowGuide(false)} aria-label="Ocultar guía">×</button>
-          </div>
-          <div className={ui.guideSteps}>
-            <div className={ui.guideStep}><span>1</span><p><strong>Elige una sección</strong>Separa comida, bebidas, limpieza y empaques.</p></div>
-            <div className={ui.guideStep}><span>2</span><p><strong>Busca o filtra</strong>Encuentra rápido el artículo que necesitas.</p></div>
-            <div className={ui.guideStep}><span>3</span><p><strong>Actualiza existencias</strong>Edita una cantidad o registra una entrega.</p></div>
-          </div>
-        </section>
-      )}
+      </header>
 
       {notice && (
         <div className={ui.successNotice} role="status">
@@ -611,9 +702,6 @@ export default function InventoryPage({ styles, role }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
             <div>
               <p className={styles.cardTitle}>Recibir mercancía</p>
-              <p style={{ fontSize: 12, color: "var(--p-muted)", margin: "2px 0 0" }}>
-                Captura lo que llegó — se suma a lo que ya tienes, no lo reemplaza.
-              </p>
             </div>
             {pendingReceiveCount > 0 && (
               <span style={{ background: "#4A7A5A", color: "#fff", fontSize: 12, fontWeight: 700, borderRadius: 999, padding: "4px 12px" }}>
@@ -623,7 +711,7 @@ export default function InventoryPage({ styles, role }) {
           </div>
 
           <label className={ui.receiveSearch}>
-            <span>1. Busca el artículo que llegó</span>
+            <span>Buscar artículo</span>
             <input className={styles.input} placeholder="Escribe el nombre…" value={receiveSearch} onChange={(e) => setReceiveSearch(e.target.value)} />
           </label>
 
@@ -713,10 +801,7 @@ export default function InventoryPage({ styles, role }) {
 
           <div className={ui.receiveFooter}>
             <span>
-              2. Si el precio cambió, captura el costo de esta compra (si lo dejas en blanco se usa el costo anterior).
-              Toca el botón junto al costo (ej. "/lata") para cambiarlo a "lo que pagué en total" — útil si compraste
-              un paquete (ej. 12 latas por $180): pones cantidad 12 y ahí el total $180, y se calcula solo el costo
-              por lata. Revisa las cantidades y guarda la recepción — el gasto se anota solo en Finanzas.
+              {pendingReceiveCount} artículos en esta recepción
             </span>
             <button className={styles.btnPrimary} disabled={pendingReceiveCount === 0 || receiveSaving} onClick={submitReceiving}>
               {receiveSaving ? "Guardando…" : `Guardar recepción${pendingReceiveCount > 0 ? ` (${pendingReceiveCount})` : ""}`}
@@ -730,7 +815,7 @@ export default function InventoryPage({ styles, role }) {
 
       {/* ── Add item form ── */}
       {showForm && (
-        <div className={styles.card} style={{ marginBottom: 20 }}>
+        <div className={`${styles.card} ${ui.actionPanel}`}>
           <p className={styles.cardTitle}>Nuevo artículo</p>
           <form onSubmit={handleAdd}>
             {formError && (
@@ -879,6 +964,9 @@ export default function InventoryPage({ styles, role }) {
             )}
 
             {/* Optional details, collapsed by default */}
+            {["Comida", "Bebidas"].includes(form.section) && (
+              <SaleSettings value={form} onChange={(changes) => setForm((previous) => ({ ...previous, ...changes }))} />
+            )}
             <button
               type="button"
               aria-expanded={showAdvanced}
@@ -962,90 +1050,28 @@ export default function InventoryPage({ styles, role }) {
         </div>
       )}
 
-      {!loading && (
-        <div className={ui.summaryGrid}>
-          <button type="button" className={!hasActiveFilters ? ui.summaryActive : ""} onClick={clearFilters}>
-            <span className={ui.summaryIcon}>▦</span>
-            <span><small>Total de artículos</small><strong>{items.length}</strong><em>Ver inventario completo</em></span>
-          </button>
-          <button
-            type="button"
-            className={`${ui.warningSummary} ${stockFilter === "Bajo" && sectionFilter === "Todos" && filter === "Todos" && !search.trim() ? ui.summaryActive : ""}`}
-            onClick={() => { setSectionFilter("Todos"); setFilter("Todos"); setStockFilter("Bajo"); setSearch(""); }}
-          >
-            <span className={ui.summaryIcon}>!</span>
-            <span><small>Necesitan atención</small><strong>{lowCount}</strong><em>{lowCount ? "Ver faltantes" : "Todo está abastecido"}</em></span>
-          </button>
-          <div className={ui.summaryValue}>
-            <span className={ui.summaryIcon}>$</span>
-            <span><small>Valor del inventario</small><strong>${totalValue.toFixed(0)}</strong><em>Según costos registrados</em></span>
-          </div>
-        </div>
-      )}
-
-      {error && <p style={{ color: "red", fontSize: 13, marginBottom: 12 }}>{error}</p>}
-
-      {!loading && (
-        <section className={ui.sectionsBlock}>
-          <div className={ui.sectionTitle}>
-            <div><span>Paso 1</span><strong>¿Qué quieres consultar?</strong></div>
-            <small>Selecciona una sección para ver sus categorías.</small>
-          </div>
-          <div className={ui.sectionGrid}>
-            {[{ name: "Todos", icon: "▦" }, ...INVENTORY_SECTIONS].map((section) => {
-              const sectionItems = section.name === "Todos"
-                ? items
-                : items.filter((item) => sectionOf(item) === section.name);
-              const sectionLow = sectionItems.filter((item) => statusOf(item) !== "ok").length;
-              const selected = sectionFilter === section.name;
-              return (
-                <button
-                  key={section.name}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => { setSectionFilter(section.name); setFilter("Todos"); }}
-                  className={selected ? ui.sectionCardActive : ""}
-                >
-                  <span className={ui.sectionIcon}>{section.icon}</span>
-                  <span className={ui.sectionCardText}>
-                    <strong>{section.name === "Todos" ? "Todo" : section.name}</strong>
-                    <small>{sectionItems.length} artículo{sectionItems.length !== 1 ? "s" : ""}</small>
-                  </span>
-                  {sectionLow > 0 && <span className={ui.sectionAlert} title={`${sectionLow} con bajo stock`}>{sectionLow}</span>}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      <section className={ui.filterPanel}>
-        <div className={ui.listHeading}>
-          <div>
-            <span>Paso 2</span>
-            <h2>{sectionFilter === "Todos" ? "Todos los artículos" : sectionFilter}</h2>
-            <p>{visible.length} resultado{visible.length !== 1 ? "s" : ""}{stockFilter === "Bajo" ? " que necesitan atención" : ""}</p>
-          </div>
-          <label className={ui.searchBox}>
-            <span>⌕</span>
-            <input placeholder="Buscar por nombre…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </label>
-        </div>
-
-        <div className={ui.filterRow}>
-          {sectionFilter !== "Todos" && (
-            <div className={ui.categoryChips} aria-label="Filtrar por categoría">
-              {filterCategories.map((cat) => (
-                <button key={cat} type="button" aria-pressed={filter === cat} onClick={() => setFilter(cat)}>{cat}</button>
-              ))}
-            </div>
-          )}
-          <button type="button" className={`${ui.attentionFilter} ${stockFilter === "Bajo" ? ui.attentionFilterActive : ""}`} onClick={() => setStockFilter((current) => current === "Bajo" ? "Todos" : "Bajo")}>
-            <span>!</span> Solo bajo stock
-          </button>
-          {hasActiveFilters && <button type="button" className={ui.clearFilters} onClick={clearFilters}>Limpiar filtros</button>}
-        </div>
+      <div className={ui.summaryGrid} aria-label="Resumen de inventario">
+        <button type="button" onClick={clearFilters}><Package size={18} /><span><small>Artículos</small><strong>{loading ? "—" : items.length}</strong></span></button>
+        <button type="button" className={ui.warningSummary} onClick={() => { clearFilters(); setStockFilter("Bajo"); }}><AlertTriangle size={18} /><span><small>Stock bajo</small><strong>{loading ? "—" : lowCount}</strong></span></button>
+        <button type="button" className={ui.setupSummary} onClick={() => { clearFilters(); setPendingOnly(true); }}><SlidersHorizontal size={18} /><span><small>Por configurar</small><strong>{loading ? "—" : pendingCount}</strong></span></button>
+        <div className={ui.summaryValue}><span><small>Valor en existencia</small><strong>{loading ? "—" : totalValue.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 })}</strong></span></div>
+      </div>
+      {error && !editing && <p className={ui.errorNotice} role="alert">{error}</p>}
+      <nav className={ui.sectionGrid} aria-label="Secciones del inventario">
+        {["Todos", ...SECTION_NAMES].map((name) => {
+          const Icon = SECTION_ICONS[name];
+          const count = name === "Todos" ? items.length : items.filter((item) => sectionOf(item) === name).length;
+          return <button key={name} type="button" aria-pressed={sectionFilter === name} onClick={() => { setSectionFilter(name); setFilter("Todos"); }}><Icon size={16} />{name}<span>{count}</span></button>;
+        })}
+      </nav>
+      <section className={ui.filterPanel} aria-label="Filtros de inventario">
+        <label className={ui.searchBox}><Search size={18} /><input aria-label="Buscar artículo" placeholder="Buscar artículo…" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
+        <select className={ui.filterSelect} aria-label="Filtrar por categoría" value={filter} onChange={(event) => setFilter(event.target.value)}>{filterCategories.map((cat) => <option key={cat} value={cat}>{cat === "Todos" ? "Todas las categorías" : cat}</option>)}</select>
+        <select className={ui.filterSelect} aria-label="Filtrar por existencia" value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}><option value="Todos">Todo el stock</option><option value="Bajo">Stock bajo</option><option value="Agotado">Agotados</option></select>
+        <label className={ui.pendingFilter}><input type="checkbox" checked={pendingOnly} onChange={(event) => setPendingOnly(event.target.checked)} />Descuento por configurar ({pendingCount})</label>
+        {hasActiveFilters && <button type="button" className={ui.clearFilters} onClick={clearFilters} title="Limpiar filtros" aria-label="Limpiar filtros"><X size={17} /></button>}
       </section>
+      <div className={ui.resultsLine}><span>{visible.length} artículos{sectionFilter !== "Todos" ? ` · ${sectionFilter}` : ""}</span><span><CircleCheck size={13} /> Control de existencias</span></div>
 
       {/* ── Table ── */}
       <div className={styles.tableWrap}>
@@ -1082,89 +1108,26 @@ export default function InventoryPage({ styles, role }) {
                 </td>
               </tr>
             ) : visible.map((row) => {
-              const status    = statusOf(row);
-              const { cls, label } = STATUS_CFG[status];
-              const isEditing = editing === row._id;
-
+              const { cls, label } = STATUS_CFG[statusOf(row)];
+              const consumption = inventoryConsumptionStatus(row);
+              const Icon = SECTION_ICONS[sectionOf(row)] || Package;
               return (
-                <tr key={row._id} className={status === "critical" ? ui.criticalRow : status === "low" ? ui.lowRow : ""}>
+                <tr key={row._id} className={statusOf(row) === "critical" ? ui.criticalRow : statusOf(row) === "low" ? ui.lowRow : ""}>
                   <td className={ui.itemCell}>
-                    <strong>{row.item}</strong>
-                    {isEditing ? (
-                      <div className={ui.itemEditMeta}>
-                        <select
-                          value={editForm.section}
-                          aria-label="Sección"
-                          onChange={(e) => {
-                            const section = e.target.value;
-                            setEditForm((previous) => ({
-                              ...previous,
-                              section,
-                              category: categoriesFor(section)[0],
-                              menuKeys: section === "Comida" ? previous.menuKeys : "",
-                            }));
-                          }}
-                        >
-                          {SECTION_NAMES.map((section) => <option key={section} value={section}>{section}</option>)}
-                        </select>
-                        <select value={editForm.category} aria-label="Categoría" onChange={(e) => setEditForm((previous) => ({ ...previous, category: e.target.value }))}>
-                          {editCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
-                        </select>
-                      </div>
-                    ) : (
-                      <>
-                        <small>{sectionOf(row)} · {categoryOf(row)}{(row.menuKeys || []).length > 0 ? " · Vinculado al menú" : ""}</small>
-                        {row.lastRestockAt && (
-                          <small className={ui.restockMeta}>
-                            Agregado {fmtRestock(row.lastRestockAt)}{row.lastRestockBy ? ` · ${row.lastRestockBy}` : ""}
-                          </small>
-                        )}
-                      </>
-                    )}
+                    <div className={ui.itemIdentity}><span className={ui.itemIcon}><Icon size={18} /></span><div><strong>{row.item}</strong><small>{sectionOf(row)} · {categoryOf(row)}</small></div></div>
+                    {["Comida", "Bebidas"].includes(sectionOf(row)) && <small className={consumption.ready ? ui.saleReady : ui.salePending}>{consumption.label}</small>}
+                    {row.lastRestockAt && <small className={ui.restockMeta}>Recepción {fmtRestock(row.lastRestockAt)}</small>}
                   </td>
-                  <td>
-                    {isEditing ? (
-                      <div className={ui.quantityEdit}>
-                        <input type="number" min="0" step="0.01" aria-label="Cantidad" value={editForm.qty} onChange={(e) => setEditForm((p) => ({ ...p, qty: e.target.value }))} onKeyDown={(e) => e.key === "Escape" && setEditing(null)} autoFocus />
-                        <select value={editForm.unit} aria-label="Unidad" onChange={(e) => setEditForm((p) => ({ ...p, unit: e.target.value }))}>
-                          {UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-                        </select>
-                      </div>
-                    ) : <span className={ui.quantity}><strong>{row.qty}</strong> {row.unit}</span>}
-                  </td>
-                  <td>
-                    {isEditing ? (
-                      <input className={ui.compactInput} type="number" min="0" step="0.01" aria-label="Cantidad mínima" value={editForm.minQty} onChange={(e) => setEditForm((p) => ({ ...p, minQty: e.target.value }))} />
-                    ) : <span className={styles.tdMono}>{row.minQty ?? 0} {row.unit}</span>}
-                  </td>
-                  <td>
-                    {isEditing ? (
-                      <div className={ui.moneyEdit}><span>$</span><input type="number" min="0" step="0.01" aria-label="Costo por unidad" title="Precio de UNA unidad (kg, pieza, litro…) — no el total pagado por toda la compra" placeholder="por unidad" value={editForm.cost} onChange={(e) => setEditForm((p) => ({ ...p, cost: e.target.value }))} /></div>
-                    ) : row.cost > 0 ? `$${Number(row.cost).toFixed(2)}` : <span className={ui.mutedValue}>—</span>}
-                  </td>
-                  <td><span className={`${styles.badge} ${styles[cls]}`}>{label}</span></td>
-                  <td>
-                    {isEditing ? (
-                      <input className={ui.supplierInput} aria-label="Proveedor" placeholder="Sin proveedor" value={editForm.supplier} onChange={(e) => setEditForm((p) => ({ ...p, supplier: e.target.value }))} />
-                    ) : row.supplier || <span className={ui.mutedValue}>Sin proveedor</span>}
-                  </td>
-                  <td>
-                    <div className={ui.rowActions}>
-                      {isEditing ? (
-                        <>
-                          <button className={styles.btnPrimary} onClick={() => saveEdit(row)} disabled={editSaving}>
-                            {editSaving ? "…" : "Guardar"}
-                          </button>
-                          <button className={styles.btnGhost} onClick={() => setEditing(null)}>Cancelar</button>
-                        </>
-                      ) : (
-                        <>
-                          <button className={styles.btnGhost} onClick={() => startEdit(row)}>Editar</button>
-                          <button className={ui.deleteButton} onClick={() => handleDelete(row)} aria-label={`Eliminar ${row.item}`} title="Eliminar artículo">×</button>
-                        </>
-                      )}
-                    </div>
-                  </td>
+                  <td data-label="Existencia"><span className={ui.quantity}><strong>{Number(row.qty).toLocaleString("es-MX", { maximumFractionDigits: 6 })}</strong> {row.unit}</span></td>
+                  <td data-label="Mínimo">{row.minQty ?? 0} {row.unit}</td>
+                  <td data-label="Costo unitario">{row.cost > 0 ? `$${Number(row.cost).toFixed(2)}` : <span className={ui.mutedValue}>Sin costo</span>}</td>
+                  <td className={ui.statusCell}><span className={`${styles.badge} ${styles[cls]}`}>{label}</span></td>
+                  <td data-label="Proveedor">{row.supplier || <span className={ui.mutedValue}>Sin proveedor</span>}</td>
+                  <td className={ui.actionsCell}><div className={ui.rowActions}>
+                    <button className={styles.btnGhost} onClick={() => { setError(""); startEdit(row); }} title="Editar artículo" aria-label={`Editar ${row.item}`}><Pencil size={16} /></button>
+                    <button className={styles.btnGhost} onClick={() => setMovementItem(row)} title="Movimientos" aria-label={`Movimientos de ${row.item}`}><History size={16} /></button>
+                    <button className={ui.deleteButton} onClick={() => handleDelete(row)} title="Eliminar artículo" aria-label={`Eliminar ${row.item}`}><Trash2 size={16} /></button>
+                  </div></td>
                 </tr>
               );
             })}

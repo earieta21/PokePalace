@@ -17,7 +17,7 @@ const EXPENSE_CATEGORY_BY_SECTION = {
 
 const INVENTORY_EDITABLE_FIELDS = [
   "item", "section", "category", "unit", "qty", "minQty",
-  "cost", "supplier", "menuKeys",
+  "cost", "supplier", "menuKeys", "quantityPerPortion",
 ];
 
 const pickInventoryFields = (body = {}) => Object.fromEntries(
@@ -111,10 +111,16 @@ export const updateItem = async (req, res) => {
     const before = await Inventory.findById(req.params.id).lean();
     if (!before) return res.status(404).json({ message: "Item not found" });
 
-    const item = await Inventory.findByIdAndUpdate(req.params.id, updateData, {
+    // A stock count captured before a concurrent sale must not erase it.
+    const filter = { _id: req.params.id };
+    if (Object.prototype.hasOwnProperty.call(updateData, "qty")) {
+      filter.qty = req.body.expectedQty ?? before.qty;
+    }
+    const item = await Inventory.findOneAndUpdate(filter, updateData, {
       new: true,
       runValidators: true,
     });
+    if (!item) return res.status(409).json({ message: "La existencia cambió durante la edición. Actualiza el inventario y vuelve a capturar el conteo." });
 
     const changedFields = diffFields(before, item.toObject(), Object.keys(updateData));
     const actor = actorFromStaff(req.staff);
@@ -152,15 +158,18 @@ export const restockItem = async (req, res) => {
     if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ message: "Cantidad inválida" });
     }
-    const existing = await Inventory.findById(req.params.id);
+    const existing = await Inventory.findOneAndUpdate(
+      { _id: req.params.id },
+      { $inc: { qty: amount }, $set: {
+        lastRestockAt: new Date(),
+        lastRestockBy: req.staff?.name || req.staff?.email || "Staff",
+      } },
+      { new: true, runValidators: true }
+    );
     if (!existing) return res.status(404).json({ message: "Item not found" });
 
-    const qtyBefore = existing.qty;
-    const nextQty = Math.max(0, existing.qty + amount);
-    existing.qty = nextQty;
-    existing.lastRestockAt = new Date();
-    existing.lastRestockBy = req.staff?.name || req.staff?.email || "Staff";
-    await existing.save();
+    const qtyBefore = existing.qty - amount;
+    const nextQty = existing.qty;
 
     // Recibir mercancía es una compra: se anota sola en Finanzas
     // (salvo que el cliente lo desactive con registerExpense: false).
@@ -252,7 +261,7 @@ export const restockBatch = async (req, res) => {
           });
 
       if (!replayed) {
-        const qtyBefore = existingById.get(itemId)?.qty ?? Math.max(0, item.qty - amount);
+        const qtyBefore = item.qty - amount;
         await recordInventoryMovement({
           itemId: item._id, itemName: item.item, type: "restock_batch",
           delta: item.qty - qtyBefore, qtyBefore, qtyAfter: item.qty,
