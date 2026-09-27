@@ -55,9 +55,10 @@ const MENU = [
   { id: 17, name: "Choco Rice Cake",          price:  35, category: "Rice Cakes", icon: "🍫", rewardSnack: true },
   { id: 23, name: "Miel Rice Cake",           price:  35, category: "Rice Cakes", icon: "🍯" },
   // Porción extra (40 g) de cualquier proteína ya en el bowl. El precio
-  // mostrado aquí es el base ($40) — si en el picker se elige atún sellado,
-  // confirmProteinPick suma el upcharge de PREMIUM_PROTEIN_PRICES ($20 más,
-  // $60 total), igual que valida resolvePosItems en el servidor.
+  // mostrado aquí es el base ($40); el upcharge de la proteína elegida lo
+  // suma confirmProteinPick, igual que resolvePosItems en el servidor —
+  // con atún sellado son $60. Lo mismo aplica a los bowls de venta rápida
+  // de arriba: la proteína premium sube el precio ahí también.
   { id: 27, name: "Extra de proteína",        price: EXTRA_SCOOP_PRICE, category: "Bowls", icon: "🍤", needsProtein: true, extraProtein: true },
 ];
 
@@ -207,9 +208,10 @@ export default function POSPage({ styles }) {
     setProteinPickerItem(null);
     if (!item) return;
     const proteinLabel = QUICK_PROTEINS.find((p) => p.id === proteinId)?.label || "";
-    const price = item.extraProtein
-      ? EXTRA_SCOOP_PRICE + (PREMIUM_PROTEIN_PRICES[proteinId] || 0)
-      : item.price;
+    // Mismo cálculo que resolvePosItems en el servidor, que es quien cobra.
+    // La promo 2x1 va a precio plano y no suma el upcharge.
+    const upcharge = item.promo2x1 ? 0 : (PREMIUM_PROTEIN_PRICES[proteinId] || 0);
+    const price = item.price + upcharge;
     addItem({
       ...item,
       price,
@@ -978,7 +980,7 @@ export default function POSPage({ styles }) {
                   }}
                 >
                   {p.label}
-                  {proteinPickerItem?.extraProtein && PREMIUM_PROTEIN_PRICES[p.id]
+                  {!proteinPickerItem?.promo2x1 && PREMIUM_PROTEIN_PRICES[p.id]
                     ? ` (+$${PREMIUM_PROTEIN_PRICES[p.id]})`
                     : ""}
                 </button>

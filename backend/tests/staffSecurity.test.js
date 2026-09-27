@@ -98,6 +98,37 @@ test("los rice cakes del POS cobran sus precios de catálogo", () => {
   assert.deepEqual(getPosInventoryDemand({ items: [cacao, choco] }), {});
 });
 
+test("una proteina premium sube el precio del bowl de venta rapida", () => {
+  const [normal] = resolvePosItems([
+    { catalogId: "bowl-mediano-rapido", qty: 1, protein: "tuna" },
+  ]);
+  const [premium] = resolvePosItems([
+    { catalogId: "bowl-mediano-rapido", qty: 1, protein: "seared_tuna" },
+  ]);
+  // El atun sellado cuesta $20 extra. Antes el POS cobraba los dos igual y
+  // el mismo bowl salia $20 mas barato en caja que pedido en linea.
+  assert.equal(normal.price, 230);
+  assert.equal(premium.price, 250);
+
+  const [grande] = resolvePosItems([
+    { catalogId: "bowl-grande-rapido", qty: 1, protein: "seared_tuna" },
+  ]);
+  assert.equal(grande.price, 270);
+
+  const [scoop] = resolvePosItems([
+    { catalogId: "extra-protein-scoop", qty: 1, protein: "seared_tuna" },
+  ]);
+  assert.equal(scoop.price, 60);
+});
+
+test("la promo 2x1 se queda a precio plano aunque lleve proteina premium", () => {
+  const [promo] = resolvePosItems(
+    [{ catalogId: "promo-2x1-dinein", qty: 1, protein: "seared_tuna" }],
+    MARTES,
+  );
+  assert.equal(promo.price, 250);
+});
+
 test("Combo Palace fija precio, conserva elecciones y descuenta sus componentes", () => {
   const [combo] = resolvePosItems([{
     catalogId: "combo-palace",

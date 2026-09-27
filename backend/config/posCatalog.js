@@ -241,11 +241,19 @@ export const resolvePosItems = (items, now = new Date()) => {
       throw new PosOrderValidationError(`Cantidad inválida para ${catalogItem.name}`);
     }
 
-    // El extra de proteína cobra el upcharge de la proteína elegida (hoy
-    // solo atún sellado) encima del precio base de un scoop extra.
-    const price = catalogItem.catalogId === "extra-protein-scoop"
-      ? EXTRA_SCOOP_PRICE + (PREMIUM_PROTEIN_PRICES[protein] || 0)
-      : catalogItem.price;
+    // El upcharge de la proteína elegida (hoy solo atún sellado, +$20) se
+    // cobra en TODO lo que se vende con una proteína: los bowls de venta
+    // rápida y el extra de proteína. Antes solo lo sumaba el extra, así que
+    // un "Bowl mediano (Atún Sellado)" cobrado en caja se iba en $230
+    // mientras el mismo bowl pedido en línea cobraba $250.
+    //
+    // La promo 2x1 queda fuera a propósito: se cobra a precio plano por los
+    // 2 bowls, igual que en el armador en línea, donde el atún sellado ni se
+    // ofrece dentro de la promo.
+    const proteinUpcharge = protein && catalogItem.catalogId !== "promo-2x1-dinein"
+      ? PREMIUM_PROTEIN_PRICES[protein] || 0
+      : 0;
+    const price = catalogItem.price + proteinUpcharge;
 
     resolved.set(mapKey, {
       catalogId: catalogItem.catalogId,
