@@ -27,7 +27,9 @@
   padding: 34px 34px calc(30px + 110px + env(safe-area-inset-bottom));
 }
 
-:global([data-theme="dark"]) .container {
+/* El kiosco tiene su propio tema claro: el tema del documento no debe
+   invertir sus superficies mientras los textos conservan tinta oscura. */
+:global([data-theme="dark"]) .container:not(.containerKiosk) {
   --step-ink: #dce89e;
   --step-ink-soft: #c2d1c7;
   --step-cream: #111512;
@@ -349,7 +351,7 @@
   font-weight: 600;
 }
 
-:global([data-theme="dark"]) .error {
+:global([data-theme="dark"]) .container:not(.containerKiosk) .error {
   color: #e8b79a;
 }
 
@@ -664,4 +666,90 @@
 
 .containerKiosk .stepperCount {
   font-size: 17px;
+}
+
+/* Estas reglas van después de los tamaños táctiles del kiosco para que
+   no vuelvan a imponerse las tres columnas y el relleno de escritorio. */
+@media (max-width: 820px) {
+  .containerKiosk {
+    padding: 26px 24px calc(26px + env(safe-area-inset-bottom));
+  }
+
+  .containerKiosk .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .containerKiosk .title {
+    font-size: clamp(28px, 5vw, 38px);
+  }
+
+  .containerKiosk .actions,
+  .containerKiosk .rightActions {
+    flex-wrap: wrap;
+  }
+
+  .containerKiosk .rightActions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 540px) {
+  .containerKiosk {
+    width: calc(100% - 24px);
+    padding: 22px 14px calc(22px + env(safe-area-inset-bottom));
+  }
+
+  .containerKiosk .grid {
+    gap: 12px;
+  }
+
+  .containerKiosk .header {
+    padding-bottom: 18px;
+    margin-bottom: 18px;
+  }
+
+  .containerKiosk .subtitle,
+  .containerKiosk .selectionInfo {
+    font-size: 14px;
+  }
+
+  .containerKiosk .selectionInfo {
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+
+  .containerKiosk .name {
+    font-size: 16px;
+    padding: 12px 12px 5px;
+    overflow-wrap: anywhere;
+  }
+
+  .containerKiosk .description,
+  .containerKiosk .itemDesc {
+    font-size: 13px;
+    padding: 0 12px 14px;
+  }
+
+  .containerKiosk .nextButton,
+  .containerKiosk .backButton,
+  .containerKiosk .skipBtn {
+    min-height: 50px;
+    padding: 14px 18px;
+    font-size: 14px;
+  }
+
+  .containerKiosk .extraScoopSection {
+    padding: 16px 12px;
+  }
+
+  .containerKiosk .extraScoopRow {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 360px) {
+  .containerKiosk .grid {
+    grid-template-columns: 1fr;
+  }
 }
