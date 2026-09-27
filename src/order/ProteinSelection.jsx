@@ -15,6 +15,7 @@ import tuna from "../assets/protein/tuna.webp";
 import salmon from "../assets/protein/salmon.webp";
 import shrimp from "../assets/protein/shrimp.webp";
 import tofu from "../assets/protein/tofu.jpg";
+import searedTuna from "../assets/protein/searedTuna.webp";
 
 const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
   const { order, updateOrder } = useOrder();
@@ -32,6 +33,11 @@ const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
     { id: "salmon", image: salmon },
     { id: "shrimp", image: shrimp },
     { id: "tofu", image: tofu },
+    // El atún sellado cuesta $20 extra (PREMIUM_PROTEIN_PRICES), que la
+    // tarjeta muestra y el servidor cobra. Se excluye de la promo 2x1
+    // porque esa se cobra a precio plano y el extra nunca se sumaría: sería
+    // prometer un cargo que no llega, o regalar el atún sellado.
+    ...(isPromo2x1 ? [] : [{ id: "seared_tuna", image: searedTuna }]),
     // Lo que el negocio no maneja ni se ofrece — no es lo mismo que agotado,
     // que sí se muestra marcado.
   ].filter((protein) => !hiddenIngredients.includes(protein.id));
