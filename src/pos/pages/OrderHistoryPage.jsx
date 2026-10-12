@@ -8,6 +8,7 @@ import {
 import { REFERRAL_SOURCE_LABELS } from "../../data/referralSources.js";
 import Receipt, { PAYMENT_METHOD_LABELS } from "../Receipt.jsx";
 import { comboPalaceSelectionSummary } from "../../data/comboPalace";
+import { DELIVERY_PLATFORM_LABELS } from "../../data/deliveryPlatforms.js";
 
 const STATUS_CFG = {
   completed: { cls: "badgeGreen", label: "Completado" },
@@ -149,6 +150,7 @@ function OrderDetailModal({ order, styles, onClose, onPrint }) {
           {order.fulfillment && (
             <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: "rgba(0,0,0,0.06)", color: "var(--p-muted)" }}>
               {FULFILLMENT_LABEL[order.fulfillment] ?? order.fulfillment}
+              {order.deliveryPlatform ? ` · ${DELIVERY_PLATFORM_LABELS[order.deliveryPlatform] ?? order.deliveryPlatform}` : ""}
             </span>
           )}
         </div>

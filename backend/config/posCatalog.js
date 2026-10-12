@@ -361,6 +361,47 @@ export const sanitizePosReferralSource = (referralSource, referralSourceOther) =
   return { referralSource, referralSourceOther: cleanOther };
 };
 
+// Plataforma por la que entró un pedido de delivery. Los ids deben coincidir
+// con src/data/deliveryPlatforms.js. Las "app" cobran ellas al cliente y nos
+// liquidan después: se registran con paymentMethod "delivery_app".
+export const DELIVERY_PLATFORMS = new Set(["uber_eats", "didi_food", "rappi", "propio"]);
+export const DELIVERY_APP_PLATFORMS = new Set(["uber_eats", "didi_food", "rappi"]);
+const POS_FULFILLMENTS = new Set(["pickup", "dine_in", "delivery"]);
+const POS_PAYMENT_METHODS = new Set(["card_terminal", "cash", "pay_at_pickup", "delivery_app"]);
+
+export const sanitizePosDelivery = ({ fulfillment, deliveryPlatform, paymentMethod }) => {
+  const safeFulfillment = fulfillment === undefined || fulfillment === null || fulfillment === ""
+    ? "pickup"
+    : fulfillment;
+  if (!POS_FULFILLMENTS.has(safeFulfillment)) {
+    throw new PosOrderValidationError("Selecciona un tipo de entrega válido");
+  }
+  const safePaymentMethod = paymentMethod === undefined || paymentMethod === null || paymentMethod === ""
+    ? "card_terminal"
+    : paymentMethod;
+  if (!POS_PAYMENT_METHODS.has(safePaymentMethod)) {
+    throw new PosOrderValidationError("Selecciona una forma de pago válida");
+  }
+
+  // Ventas en cola offline de antes de esta función llegan como delivery sin
+  // plataforma: se aceptan con null para no perderlas.
+  let safePlatform = null;
+  if (safeFulfillment === "delivery" && deliveryPlatform !== undefined && deliveryPlatform !== null && deliveryPlatform !== "") {
+    if (typeof deliveryPlatform !== "string" || !DELIVERY_PLATFORMS.has(deliveryPlatform)) {
+      throw new PosOrderValidationError("Selecciona una plataforma de delivery válida");
+    }
+    safePlatform = deliveryPlatform;
+  }
+  const isApp = DELIVERY_APP_PLATFORMS.has(safePlatform);
+  if (safePaymentMethod === "delivery_app" && !isApp) {
+    throw new PosOrderValidationError("\"Pagado en la app\" solo aplica a pedidos de Uber Eats, DiDi Food o Rappi");
+  }
+  if (isApp && safePaymentMethod !== "delivery_app") {
+    throw new PosOrderValidationError("Los pedidos de apps de delivery se registran como \"Pagado en la app\"");
+  }
+  return { fulfillment: safeFulfillment, deliveryPlatform: safePlatform, paymentMethod: safePaymentMethod };
+};
+
 const sanitizeChoiceList = (name, value) => {
   const rule = BOWL_RULES[name];
   const list = value === undefined ? [] : value;

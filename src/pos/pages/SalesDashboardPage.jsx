@@ -2,6 +2,7 @@ import { useState, useEffect, useContext, useCallback, useMemo } from "react";
 import { Download, RefreshCw } from "lucide-react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { REFERRAL_SOURCE_LABELS } from "../../data/referralSources.js";
+import { DELIVERY_PLATFORM_LABELS } from "../../data/deliveryPlatforms.js";
 import { downloadCSV } from "../../utils/csv";
 import { createStaffApi } from "../api";
 
@@ -20,6 +21,7 @@ const PAYMENT_LABEL = {
   card_terminal: "Terminal",
   online: "Pago online",
   pay_at_pickup: "Pendiente",
+  delivery_app: "App delivery",
 };
 const PROTEIN_LABEL = {
   salmon: "Salmón",
@@ -117,6 +119,7 @@ export default function SalesDashboardPage({ styles }) {
   const referralSources = analytics?.referralSources ?? EMPTY_LIST;
   const sourceMix = analytics?.sourceMix ?? EMPTY_LIST;
   const fulfillmentMix = analytics?.fulfillmentMix ?? EMPTY_LIST;
+  const deliveryPlatforms = analytics?.deliveryPlatforms ?? EMPTY_LIST;
   const paymentMethods = analytics?.paymentMethods ?? EMPTY_LIST;
   const cashierSales = analytics?.cashierSales ?? EMPTY_LIST;
 
@@ -149,6 +152,9 @@ export default function SalesDashboardPage({ styles }) {
   const maxHour = Math.max(...peakHours.map((h) => h.count ?? 0), 1);
   const maxProtein = Math.max(...topProteins.map((p) => p.count ?? 0), 1);
   const maxPOS = Math.max(...topPosItems.map((p) => p.count ?? 0), 1);
+  const maxDeliveryRevenue = Math.max(...deliveryPlatforms.map((p) => p.revenue ?? 0), 1);
+  const deliveryOrders = deliveryPlatforms.reduce((sum, p) => sum + (p.count ?? 0), 0);
+  const deliveryRevenue = deliveryPlatforms.reduce((sum, p) => sum + (p.revenue ?? 0), 0);
   const maxReferral = Math.max(...referralSources.map((r) => r.count ?? 0), 1);
   const maxCashierRevenue = Math.max(...cashierSales.map((c) => c.revenue ?? 0), 1);
   const sourceTotal = sourceMix.reduce((sum, item) => sum + (item.count ?? 0), 0);
@@ -439,6 +445,30 @@ export default function SalesDashboardPage({ styles }) {
             </div>
           )}
         </div>
+      </div>
+
+      <div className={styles.card} style={{ marginBottom: 20 }}>
+        <div className={styles.salesCardHeader}>
+          <p className={styles.cardTitle}>Delivery por plataforma</p>
+          <span>Últimos 30 días · {fmtNumber(deliveryOrders)} órdenes · {fmtMXN(deliveryRevenue)}</span>
+        </div>
+        {loading ? (
+          <EmptyState styles={styles}>Cargando...</EmptyState>
+        ) : (
+          <BarList
+            styles={styles}
+            items={deliveryPlatforms}
+            max={maxDeliveryRevenue}
+            getLabel={(p) => DELIVERY_PLATFORM_LABELS[p._id] || "Sin plataforma"}
+            getValue={(p) => p.revenue ?? 0}
+            getMeta={(p) => {
+              const ticket = p.count ? (p.revenue ?? 0) / p.count : 0;
+              const pct = deliveryOrders ? Math.round((p.count / deliveryOrders) * 100) : 0;
+              return `${fmtMXN(p.revenue).replace(" MXN", "")} · ${p.count} · ${pct}% · ticket ${fmtMXN(ticket).replace(" MXN", "")}`;
+            }}
+            valueWidth={220}
+          />
+        )}
       </div>
 
       <div className={styles.card}>

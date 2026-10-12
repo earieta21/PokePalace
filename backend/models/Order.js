@@ -103,7 +103,9 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["pay_at_pickup", "cash", "card_terminal", "online"],
+      // delivery_app: lo cobró Uber Eats/DiDi Food/Rappi y nos lo liquidan
+      // ellos — no entra al corte de caja ni a la terminal.
+      enum: ["pay_at_pickup", "cash", "card_terminal", "online", "delivery_app"],
       default: "pay_at_pickup",
     },
     paymentStatus: {
@@ -124,6 +126,15 @@ const orderSchema = new mongoose.Schema(
     // en backend/config/posCatalog.js. Opcional — null si no se preguntó.
     referralSource:      { type: String, default: null },
     referralSourceOther: { type: String, default: null },
+
+    // Plataforma de un pedido de delivery capturado en el POS. Ver
+    // DELIVERY_PLATFORMS en backend/config/posCatalog.js. null si no es
+    // delivery (o si es una venta de antes de esta función).
+    deliveryPlatform: {
+      type: String,
+      enum: ["uber_eats", "didi_food", "rappi", "propio", null],
+      default: null,
+    },
 
     // Pricing — always computed server-side, never trusted from the client
     subtotal: { type: Number, default: null },

@@ -3,6 +3,7 @@ import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { PROTEIN_LABELS, BASE_LABELS } from "../../order/OrderLabels";
 import { comboPalaceSelectionSummary } from "../../data/comboPalace";
+import { DELIVERY_PLATFORM_LABELS } from "../../data/deliveryPlatforms.js";
 
 const STATUS_CFG = {
   pending:   { cls: "badgeYellow", label: "Nuevo" },
@@ -172,6 +173,7 @@ export default function ActiveOrdersPage({ styles }) {
                   <p className={styles.orderCardCustomer}>{cliente}</p>
                   <p className={styles.orderCardItems}>
                     {FULFILLMENT_LABEL[order.fulfillment] ?? "Recoger"}
+                    {order.deliveryPlatform ? ` · ${DELIVERY_PLATFORM_LABELS[order.deliveryPlatform] ?? order.deliveryPlatform}` : ""}
                     {order.phone ? ` · ${order.phone}` : ""}
                   </p>
                   <p className={styles.orderCardItems}>{itemSummary(order)}</p>

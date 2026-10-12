@@ -14,6 +14,7 @@ import Receipt from "../Receipt.jsx";
 import MemberQrScanner from "../MemberQrScanner.jsx";
 import { getRewardById, REWARDS } from "../../data/rewardsCatalog.js";
 import { REFERRAL_SOURCES } from "../../data/referralSources.js";
+import { DELIVERY_PLATFORMS, DELIVERY_PLATFORM_LABELS, isDeliveryApp } from "../../data/deliveryPlatforms.js";
 import { getBaseLabel, COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, PREMIUM_PROTEIN_PRICES } from "../../order/pricing.js";
 import {
@@ -91,6 +92,7 @@ export default function POSPage({ styles }) {
   const [phone, setPhone]       = useState("");
   const [notes, setNotes]       = useState("");
   const [fulfillment, setFulfillment] = useState("pickup");
+  const [deliveryPlatform, setDeliveryPlatform] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("card_terminal");
   // El POS se recorre en 3 fases para no tener todo encima a la vez. La
   // navegación es libre a propósito: en hora pico el cajero salta entre pasos
@@ -258,6 +260,7 @@ export default function POSPage({ styles }) {
     setPhone("");
     setNotes("");
     setFulfillment("pickup");
+    setDeliveryPlatform("");
     setPaymentMethod("card_terminal");
     setReferralSource("");
     setReferralSourceOther("");
@@ -326,8 +329,24 @@ export default function POSPage({ styles }) {
   const total = Math.max(0, subtotal + iva - rewardDiscount);
   const cashAmount = Number(cashReceived);
   const cashShort = paymentMethod === "cash" && cashReceived !== "" && (!Number.isFinite(cashAmount) || cashAmount < total);
+  const missingDeliveryPlatform = fulfillment === "delivery" && !deliveryPlatform;
   const rewardsMultiplier = (rewardsCustomer?.lifetimePoints ?? 0) >= 300 ? 2 : 1;
   const rewardsPointsPreview = Math.floor(total / 10) * rewardsMultiplier;
+
+  // Uber Eats/DiDi Food/Rappi ya le cobraron al cliente: la venta se marca
+  // "Pagado en la app" para que no se sume a la terminal ni al corte de caja.
+  const chooseFulfillment = (value) => {
+    setFulfillment(value);
+    if (value !== "delivery") {
+      setDeliveryPlatform("");
+      if (paymentMethod === "delivery_app") setPaymentMethod("card_terminal");
+    }
+  };
+  const chooseDeliveryPlatform = (id) => {
+    setDeliveryPlatform(id);
+    if (isDeliveryApp(id)) setPaymentMethod("delivery_app");
+    else if (paymentMethod === "delivery_app") setPaymentMethod("card_terminal");
+  };
 
   const searchRewardsCustomers = async () => {
     const query = customerLookup.trim();
@@ -428,6 +447,11 @@ export default function POSPage({ styles }) {
 
   const handleCobrar = async () => {
     if (cart.length === 0 || saving || cashShort || mode === "bowl") return;
+    if (missingDeliveryPlatform) {
+      setError("Elige la plataforma del delivery (Uber Eats, DiDi Food, Rappi o propio).");
+      setPhase(2);
+      return;
+    }
     if (reward?.type === "extra_topping" && !rewardTopping) {
       setError("Selecciona el topping extra elegido por el cliente.");
       return;
@@ -451,6 +475,7 @@ export default function POSPage({ styles }) {
       phone: phone.trim(),
       notes: notes.trim(),
       fulfillment,
+      deliveryPlatform: fulfillment === "delivery" ? deliveryPlatform : null,
       paymentMethod,
       referralSource: referralSource || null,
       referralSourceOther: referralSource === "otro" ? referralSourceOther.trim() : null,
@@ -506,6 +531,7 @@ export default function POSPage({ styles }) {
     setPhone("");
     setNotes("");
     setFulfillment("pickup");
+    setDeliveryPlatform("");
     setPaymentMethod("card_terminal");
     setReferralSource("");
     setPhase(1);
@@ -570,7 +596,7 @@ export default function POSPage({ styles }) {
       <nav className={ui.phaseNav} aria-label="Pasos de la orden">
         {[
           [1, "Productos", cart.length > 0 ? `${cart.length} en la orden` : "Elige qué lleva"],
-          [2, "Cliente", rewardsCustomer ? rewardsCustomer.name : "Puntos y referido"],
+          [2, "Cliente", deliveryPlatform ? DELIVERY_PLATFORM_LABELS[deliveryPlatform] : missingDeliveryPlatform ? "Falta plataforma" : rewardsCustomer ? rewardsCustomer.name : "Puntos y referido"],
           [3, "Cobrar", cart.length > 0 ? `$${total.toLocaleString("es-MX")}` : "Sin productos"],
         ].map(([number, label, detail]) => (
           <button
@@ -676,10 +702,21 @@ export default function POSPage({ styles }) {
             {[
             ["pickup", "Para llevar"], ["dine_in", "En restaurante"], ["delivery", "Delivery"],
             ].map(([value, label]) => (
-            <button key={value} type="button" aria-pressed={fulfillment === value} onClick={() => setFulfillment(value)}>{label}</button>
+            <button key={value} type="button" aria-pressed={fulfillment === value} onClick={() => chooseFulfillment(value)}>{label}</button>
             ))}
             </div>
             </div>
+
+            {fulfillment === "delivery" && (
+            <div className={ui.optionGroup}>
+            <span>Plataforma de delivery</span>
+            <div className={`${ui.optionButtons} ${ui.platformButtons}`}>
+            {DELIVERY_PLATFORMS.map(({ id, label }) => (
+            <button key={id} type="button" aria-pressed={deliveryPlatform === id} onClick={() => chooseDeliveryPlatform(id)}>{label}</button>
+            ))}
+            </div>
+            </div>
+            )}
 
             {/* Rewards y notas siguen plegables: son opcionales y abrirlos
                 siempre volveria a llenar la pantalla, que es justo lo que se
@@ -836,7 +873,9 @@ export default function POSPage({ styles }) {
             <div className={ui.optionGroup}>
             <span>Forma de pago</span>
             <div className={ui.optionButtons}>
-            {[
+            {isDeliveryApp(deliveryPlatform) ? (
+            <button type="button" className={ui.optionFull} aria-pressed="true">Pagado en {DELIVERY_PLATFORM_LABELS[deliveryPlatform]}</button>
+            ) : [
             ["card_terminal", "Tarjeta"], ["cash", "Efectivo"], ["pay_at_pickup", "Pendiente"],
             ].map(([value, label]) => (
             <button key={value} type="button" aria-pressed={paymentMethod === value} onClick={() => setPaymentMethod(value)}>{label}</button>
@@ -884,8 +923,8 @@ export default function POSPage({ styles }) {
           {paymentMethod === "cash" && cart.length > 0 && <div className={ui.cashPanel}><label htmlFor="pos-cash">Efectivo recibido <small>Opcional · calcula el cambio</small></label><input id="pos-cash" type="number" min="0" step="0.01" inputMode="decimal" value={cashReceived} onChange={(event) => setCashReceived(event.target.value)} placeholder={String(total)} /><p role="status">{cashReceived !== "" ? cashShort ? `Faltan $${Math.max(0, total - (cashAmount || 0)).toLocaleString("es-MX")}` : `Cambio: $${(cashAmount - total).toLocaleString("es-MX", { maximumFractionDigits: 2 })}` : "Ingresa el monto que te entregó el cliente."}</p></div>}
           {mode === "bowl" && <p className={ui.bowlNotice}>Agrega o guarda el bowl antes de cobrar. Si no lo necesitas, pulsa Cancelar.</p>}
 
-          <button className={ui.chargeButton} onClick={handleCobrar} disabled={cart.length === 0 || saving || cashShort || mode === "bowl" || (reward?.type === "extra_topping" && !rewardTopping)} type="button">
-          {saving ? "Enviando orden…" : cart.length === 0 ? "Agrega productos para cobrar" : paymentMethod === "pay_at_pickup" ? `Guardar sin cobrar · $${total.toLocaleString("es-MX")}` : `Cobrar $${total.toLocaleString("es-MX")} MXN`}
+          <button className={ui.chargeButton} onClick={handleCobrar} disabled={cart.length === 0 || saving || cashShort || mode === "bowl" || missingDeliveryPlatform || (reward?.type === "extra_topping" && !rewardTopping)} type="button">
+          {saving ? "Enviando orden…" : cart.length === 0 ? "Agrega productos para cobrar" : missingDeliveryPlatform ? "Elige la plataforma del delivery" : paymentMethod === "delivery_app" ? `Registrar pedido ${DELIVERY_PLATFORM_LABELS[deliveryPlatform]} · $${total.toLocaleString("es-MX")}` : paymentMethod === "pay_at_pickup" ? `Guardar sin cobrar · $${total.toLocaleString("es-MX")}` : `Cobrar $${total.toLocaleString("es-MX")} MXN`}
           </button>
           </div>
         </section>

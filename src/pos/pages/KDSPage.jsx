@@ -12,6 +12,7 @@ import {
 } from "../../order/OrderLabels";
 import { orderTimingLabel } from "../orderTiming.js";
 import { comboPalaceSelectionSummary } from "../../data/comboPalace";
+import { DELIVERY_PLATFORM_LABELS } from "../../data/deliveryPlatforms.js";
 
 const STATUS_CFG = {
   pending:   { cls: "badgeYellow", label: "Nuevo" },
@@ -30,6 +31,7 @@ const PAYMENT_LABEL = {
   cash: "Efectivo",
   card_terminal: "Tarjeta",
   online: "Online",
+  delivery_app: "Pagado en app",
 };
 
 function orderLines(order) {
@@ -410,6 +412,7 @@ export default function KDSPage({ styles, role }) {
                   <p style={{ fontSize: 11, color: "var(--p-muted)", marginBottom: 6 }}>{cliente}</p>
                   <p style={{ fontSize: 11, color: "var(--p-muted)", marginBottom: 8 }}>
                     {FULFILLMENT_LABEL[order.fulfillment] ?? "Recoger"}
+                    {order.deliveryPlatform ? ` · ${DELIVERY_PLATFORM_LABELS[order.deliveryPlatform] ?? order.deliveryPlatform}` : ""}
                     {order.phone ? ` · ${order.phone}` : ""}
                     {order.paymentMethod ? ` · ${PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod}` : ""}
                   </p>

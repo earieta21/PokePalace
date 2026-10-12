@@ -809,6 +809,14 @@
   font-weight: 700;
 }
 
+.platformButtons {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.optionButtons .optionFull {
+  grid-column: 1 / -1;
+}
+
 .optionButtons button[aria-pressed="true"] {
   border-color: var(--p-g2);
   background: #e8f3eb;

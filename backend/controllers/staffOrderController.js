@@ -18,6 +18,7 @@ import {
   sanitizePosBowl,
   sanitizePosRewardTopping,
   sanitizePosReferralSource,
+  sanitizePosDelivery,
 } from "../config/posCatalog.js";
 import {
   RESTAURANT_TIME_ZONE,
@@ -533,7 +534,7 @@ export const createPosOrder = async (req, res) => {
     const {
       items, customer, phone, notes, fulfillment, paymentMethod, rewardCode, customerUserId,
       base, bases, proteins, marinades, complements, sauces, toppings, extraScoopProteins,
-      clientOrderId, rewardTopping, referralSource, referralSourceOther,
+      clientOrderId, rewardTopping, referralSource, referralSourceOther, deliveryPlatform,
     } = req.body;
 
     try {
@@ -575,6 +576,7 @@ export const createPosOrder = async (req, res) => {
     let safeRewardTopping = null;
     let safeReferralSource = null;
     let safeReferralSourceOther = null;
+    let safeDelivery;
     try {
       safeItems = resolvePosItems(items === undefined ? [] : items);
       const wantsCustomBowl = base !== undefined || bases !== undefined || proteins !== undefined;
@@ -586,6 +588,7 @@ export const createPosOrder = async (req, res) => {
       }
       ({ referralSource: safeReferralSource, referralSourceOther: safeReferralSourceOther } =
         sanitizePosReferralSource(referralSource, referralSourceOther));
+      safeDelivery = sanitizePosDelivery({ fulfillment, deliveryPlatform, paymentMethod });
     } catch (validationError) {
       if (validationError instanceof PosOrderValidationError) {
         return res.status(400).json({ message: validationError.message });
@@ -692,7 +695,7 @@ export const createPosOrder = async (req, res) => {
       }
     }
 
-    const resolvedPaymentMethod = paymentMethod || "card_terminal";
+    const resolvedPaymentMethod = safeDelivery.paymentMethod;
     const paymentStatus = resolvedPaymentMethod === "pay_at_pickup" ? "pending" : "paid";
     const cleanNotes = typeof notes === "string" ? notes.trim().slice(0, 500) : "";
     const orderNotes = [cleanNotes, rewardInstruction].filter(Boolean).join("\n") || null;
@@ -705,7 +708,8 @@ export const createPosOrder = async (req, res) => {
       customer: customer || linkedCustomer?.name || "Walk-in",
       phone: phone || linkedCustomer?.phone || null,
       notes: orderNotes,
-      fulfillment: fulfillment || "pickup",
+      fulfillment: safeDelivery.fulfillment,
+      deliveryPlatform: safeDelivery.deliveryPlatform,
       paymentMethod: resolvedPaymentMethod,
       paymentStatus,
       source: "pos",
@@ -929,6 +933,28 @@ export const getAnalytics = async (req, res) => {
       { $sort: { count: -1 } },
     ]);
 
+    // Delivery por plataforma (Uber Eats, DiDi Food, Rappi, propio). Las
+    // órdenes delivery de antes de capturar plataforma caen en _id: null.
+    const deliveryPlatformAgg = await Order.aggregate([
+      { $match: { ...last30Match, fulfillment: "delivery" } },
+      {
+        $group: {
+          _id: "$deliveryPlatform",
+          count: { $sum: 1 },
+          revenue: {
+            $sum: {
+              $cond: [
+                { $eq: ["$paymentStatus", "paid"] },
+                { $ifNull: ["$total", 0] },
+                0,
+              ],
+            },
+          },
+        },
+      },
+      { $sort: { revenue: -1, count: -1 } },
+    ]);
+
     const paymentMethodAgg = await Order.aggregate([
       { $match: last30Match },
       {
@@ -987,6 +1013,7 @@ export const getAnalytics = async (req, res) => {
       referralSources: referralAgg,
       sourceMix: sourceAgg,
       fulfillmentMix: fulfillmentAgg,
+      deliveryPlatforms: deliveryPlatformAgg,
       paymentMethods: paymentMethodAgg,
       cashierSales: cashierAgg,
     });

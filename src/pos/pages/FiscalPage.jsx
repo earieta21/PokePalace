@@ -10,6 +10,7 @@ const METODO_LABEL = {
   card_terminal: "Tarjeta (terminal)",
   online: "Pago en línea (Openpay)",
   pay_at_pickup: "Pagar al recoger",
+  delivery_app: "Apps de delivery (liquidación)",
 };
 
 const MES_LABEL = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];

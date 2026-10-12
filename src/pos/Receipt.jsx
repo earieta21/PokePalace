@@ -2,11 +2,13 @@ import { createPortal } from "react-dom";
 import { PROTEIN_LABELS } from "../order/OrderLabels.jsx";
 import { comboPalaceSelectionSummary } from "../data/comboPalace.js";
 import ui from "./Receipt.module.css";
+import { DELIVERY_PLATFORM_LABELS } from "../data/deliveryPlatforms.js";
 
 export const PAYMENT_METHOD_LABELS = {
   card_terminal: "Tarjeta",
   cash: "Efectivo",
   pay_at_pickup: "Pendiente de pago",
+  delivery_app: "Pagado en la app",
 };
 
 // Shared print target for the POS (cobro) and el historial de órdenes
@@ -63,6 +65,7 @@ export default function Receipt({ order }) {
         {discount > 0 && <div><span>Premio aplicado</span><span>−${discount.toLocaleString("es-MX")}</span></div>}
         <div><strong>Total</strong><strong>${(order.total ?? 0).toLocaleString("es-MX")}</strong></div>
         <div><span>Pago</span><span>{PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}</span></div>
+        {order.deliveryPlatform && <div><span>Delivery</span><span>{DELIVERY_PLATFORM_LABELS[order.deliveryPlatform] || order.deliveryPlatform}</span></div>}
       </div>
 
       <div className={ui.receiptFooter}>
