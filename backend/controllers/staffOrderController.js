@@ -19,6 +19,7 @@ import {
   sanitizePosRewardTopping,
   sanitizePosReferralSource,
   sanitizePosDelivery,
+  DELIVERY_APP_PLATFORMS,
 } from "../config/posCatalog.js";
 import {
   RESTAURANT_TIME_ZONE,
@@ -277,7 +278,7 @@ const KITCHEN_PRIVATE_ORDER_FIELDS = [
   "paymentStatus", "subtotal", "tax", "total", "discountAmount",
   "promoCode", "pointsRedeemed", "loyaltyPointsEarned", "rewardCode",
   "rewardRedemption", "paymentRequestId", "paymentRequestUrl",
-  "referralSource", "referralSourceOther",
+  "referralSource", "referralSourceOther", "deliveryCommissionRate", "deliveryCommission",
 ];
 
 const orderResponseForRole = (order, role) => {
@@ -603,7 +604,7 @@ export const createPosOrder = async (req, res) => {
     }
 
     const storeSettings = await StoreSettings.findOne({ key: "main" })
-      .select("unavailableItems")
+      .select("unavailableItems deliveryCommissions")
       .lean();
     const unavailableSelections = getUnavailablePosSelections({
       items: safeItems,
@@ -696,6 +697,10 @@ export const createPosOrder = async (req, res) => {
     }
 
     const resolvedPaymentMethod = safeDelivery.paymentMethod;
+    const commissionRate = storeSettings?.deliveryCommissions?.[safeDelivery.deliveryPlatform] || 0;
+    const deliveryCommission = commissionRate > 0
+      ? { rate: commissionRate, amount: Math.round(total * commissionRate) / 100 }
+      : null;
     const paymentStatus = resolvedPaymentMethod === "pay_at_pickup" ? "pending" : "paid";
     const cleanNotes = typeof notes === "string" ? notes.trim().slice(0, 500) : "";
     const orderNotes = [cleanNotes, rewardInstruction].filter(Boolean).join("\n") || null;
@@ -710,6 +715,8 @@ export const createPosOrder = async (req, res) => {
       notes: orderNotes,
       fulfillment: safeDelivery.fulfillment,
       deliveryPlatform: safeDelivery.deliveryPlatform,
+      deliveryCommissionRate: deliveryCommission?.rate ?? null,
+      deliveryCommission: deliveryCommission?.amount ?? null,
       paymentMethod: resolvedPaymentMethod,
       paymentStatus,
       source: "pos",
@@ -935,12 +942,40 @@ export const getAnalytics = async (req, res) => {
 
     // Delivery por plataforma (Uber Eats, DiDi Food, Rappi, propio). Las
     // órdenes delivery de antes de capturar plataforma caen en _id: null.
+    // La comisión usa la tasa congelada en la orden; si no tiene (ventas de
+    // antes de configurar la tasa), se estima con la tasa actual.
+    const commissionSettings = await StoreSettings.findOne({ key: "main" })
+      .select("deliveryCommissions")
+      .lean();
+    const currentCommissionRate = {
+      $switch: {
+        branches: [...DELIVERY_APP_PLATFORMS].map((platform) => ({
+          case: { $eq: ["$deliveryPlatform", platform] },
+          then: commissionSettings?.deliveryCommissions?.[platform] || 0,
+        })),
+        default: 0,
+      },
+    };
     const deliveryPlatformAgg = await Order.aggregate([
       { $match: { ...last30Match, fulfillment: "delivery" } },
       {
         $group: {
           _id: "$deliveryPlatform",
           count: { $sum: 1 },
+          commission: {
+            $sum: {
+              $cond: [
+                { $eq: ["$paymentStatus", "paid"] },
+                {
+                  $ifNull: [
+                    "$deliveryCommission",
+                    { $divide: [{ $multiply: [{ $ifNull: ["$total", 0] }, currentCommissionRate] }, 100] },
+                  ],
+                },
+                0,
+              ],
+            },
+          },
           revenue: {
             $sum: {
               $cond: [

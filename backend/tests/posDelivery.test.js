@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { sanitizePosDelivery, PosOrderValidationError } from "../config/posCatalog.js";
+import { sanitizePosDelivery, sanitizeDeliveryCommissions, PosOrderValidationError } from "../config/posCatalog.js";
 
 test("delivery por app se registra como pagado en la app", () => {
   assert.deepEqual(
@@ -43,4 +43,13 @@ test("valores desconocidos se rechazan y los vacíos usan los defaults", () => {
   assert.deepEqual(sanitizePosDelivery({}), { fulfillment: "pickup", deliveryPlatform: null, paymentMethod: "card_terminal" });
   // Venta delivery encolada offline antes de capturar plataforma.
   assert.equal(sanitizePosDelivery({ fulfillment: "delivery", paymentMethod: "cash" }).deliveryPlatform, null);
+});
+
+test("comisiones de delivery: porcentajes válidos por app", () => {
+  assert.deepEqual(sanitizeDeliveryCommissions({ uber_eats: "30", didi_food: 25.555 }), { uber_eats: 30, didi_food: 25.56 });
+  assert.throws(() => sanitizeDeliveryCommissions({ propio: 10 }), PosOrderValidationError);
+  assert.throws(() => sanitizeDeliveryCommissions({ rappi: 75 }), PosOrderValidationError);
+  assert.throws(() => sanitizeDeliveryCommissions({ rappi: -1 }), PosOrderValidationError);
+  assert.throws(() => sanitizeDeliveryCommissions({ rappi: "" }), PosOrderValidationError);
+  assert.throws(() => sanitizeDeliveryCommissions(null), PosOrderValidationError);
 });

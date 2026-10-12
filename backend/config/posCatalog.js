@@ -366,6 +366,28 @@ export const sanitizePosReferralSource = (referralSource, referralSourceOther) =
 // liquidan después: se registran con paymentMethod "delivery_app".
 export const DELIVERY_PLATFORMS = new Set(["uber_eats", "didi_food", "rappi", "propio"]);
 export const DELIVERY_APP_PLATFORMS = new Set(["uber_eats", "didi_food", "rappi"]);
+export const MAX_DELIVERY_COMMISSION = 60;
+
+// Valida { uber_eats: 30, ... } -> porcentajes 0..MAX con 2 decimales. Las
+// plataformas omitidas no se tocan.
+export const sanitizeDeliveryCommissions = (input) => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new PosOrderValidationError("Envía las comisiones por plataforma");
+  }
+  const clean = {};
+  for (const [platform, value] of Object.entries(input)) {
+    if (!DELIVERY_APP_PLATFORMS.has(platform)) {
+      throw new PosOrderValidationError(`Plataforma desconocida: ${platform}`);
+    }
+    const rate = Number(value);
+    if (value === null || value === "" || !Number.isFinite(rate) || rate < 0 || rate > MAX_DELIVERY_COMMISSION) {
+      throw new PosOrderValidationError(`La comisión debe estar entre 0% y ${MAX_DELIVERY_COMMISSION}%`);
+    }
+    clean[platform] = Math.round(rate * 100) / 100;
+  }
+  return clean;
+};
+
 const POS_FULFILLMENTS = new Set(["pickup", "dine_in", "delivery"]);
 const POS_PAYMENT_METHODS = new Set(["card_terminal", "cash", "pay_at_pickup", "delivery_app"]);
 

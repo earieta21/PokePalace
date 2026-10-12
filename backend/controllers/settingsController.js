@@ -1,6 +1,15 @@
 import BowlCosting from "../models/BowlCosting.js";
 import StoreSettings from "../models/StoreSettings.js";
 import { isComboPalaceDay, isPromo2x1Day } from "../utils/promoSchedule.js";
+import {
+  DELIVERY_APP_PLATFORMS,
+  PosOrderValidationError,
+  sanitizeDeliveryCommissions,
+} from "../config/posCatalog.js";
+
+const commissionsResponse = (doc) => Object.fromEntries(
+  [...DELIVERY_APP_PLATFORMS].map((platform) => [platform, doc?.deliveryCommissions?.[platform] ?? 0])
+);
 
 export const getAvailability = async (req, res) => {
   try {
@@ -39,6 +48,38 @@ export const setAvailability = async (req, res) => {
     res.json({ unavailableItems: doc.unavailableItems });
   } catch {
     res.status(500).json({ msg: "Error al actualizar disponibilidad" });
+  }
+};
+
+export const getDeliveryCommissions = async (req, res) => {
+  try {
+    const doc = await StoreSettings.findOne({ key: "main" }).select("deliveryCommissions").lean();
+    res.json({ deliveryCommissions: commissionsResponse(doc) });
+  } catch {
+    res.status(500).json({ msg: "Error al obtener las comisiones de delivery" });
+  }
+};
+
+export const setDeliveryCommissions = async (req, res) => {
+  let clean;
+  try {
+    clean = sanitizeDeliveryCommissions(req.body?.deliveryCommissions);
+  } catch (error) {
+    if (error instanceof PosOrderValidationError) return res.status(400).json({ msg: error.message });
+    throw error;
+  }
+  try {
+    const update = Object.fromEntries(
+      Object.entries(clean).map(([platform, rate]) => [`deliveryCommissions.${platform}`, rate])
+    );
+    const doc = await StoreSettings.findOneAndUpdate(
+      { key: "main" },
+      { $set: update },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).lean();
+    res.json({ deliveryCommissions: commissionsResponse(doc) });
+  } catch {
+    res.status(500).json({ msg: "Error al guardar las comisiones de delivery" });
   }
 };
 

@@ -2,7 +2,9 @@ import { useState, useEffect, useContext, useCallback, useMemo } from "react";
 import { Download, RefreshCw } from "lucide-react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { REFERRAL_SOURCE_LABELS } from "../../data/referralSources.js";
-import { DELIVERY_PLATFORM_LABELS } from "../../data/deliveryPlatforms.js";
+import { DELIVERY_PLATFORMS, DELIVERY_PLATFORM_LABELS } from "../../data/deliveryPlatforms.js";
+
+const DELIVERY_APPS = DELIVERY_PLATFORMS.filter((platform) => platform.app);
 import { downloadCSV } from "../../utils/csv";
 import { createStaffApi } from "../api";
 
@@ -94,6 +96,10 @@ export default function SalesDashboardPage({ styles }) {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [commissions, setCommissions] = useState(null);
+  const [commissionDraft, setCommissionDraft] = useState(null);
+  const [commissionSaving, setCommissionSaving] = useState(false);
+  const [commissionError, setCommissionError] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -101,16 +107,38 @@ export default function SalesDashboardPage({ styles }) {
     Promise.all([
       api.get("/api/staff/orders/stats"),
       api.get("/api/staff/orders/analytics"),
+      api.get("/api/settings/delivery-commissions").catch(() => null),
     ])
-      .then(([s, a]) => {
+      .then(([s, a, c]) => {
         setStats(s);
         setAnalytics(a);
+        setCommissions(c?.deliveryCommissions ?? null);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [api]);
 
   useEffect(() => { load(); }, [load]);
+
+  const saveCommissions = async (event) => {
+    event.preventDefault();
+    setCommissionSaving(true);
+    setCommissionError("");
+    try {
+      const data = await api.patch("/api/settings/delivery-commissions", {
+        deliveryCommissions: Object.fromEntries(
+          Object.entries(commissionDraft).map(([id, value]) => [id, value === "" ? 0 : Number(value)])
+        ),
+      });
+      setCommissions(data.deliveryCommissions);
+      setCommissionDraft(null);
+      load();
+    } catch (e) {
+      setCommissionError(e.message);
+    } finally {
+      setCommissionSaving(false);
+    }
+  };
 
   const days = analytics?.days ?? EMPTY_LIST;
   const peakHours = analytics?.peakHours ?? EMPTY_LIST;
@@ -152,9 +180,12 @@ export default function SalesDashboardPage({ styles }) {
   const maxHour = Math.max(...peakHours.map((h) => h.count ?? 0), 1);
   const maxProtein = Math.max(...topProteins.map((p) => p.count ?? 0), 1);
   const maxPOS = Math.max(...topPosItems.map((p) => p.count ?? 0), 1);
-  const maxDeliveryRevenue = Math.max(...deliveryPlatforms.map((p) => p.revenue ?? 0), 1);
   const deliveryOrders = deliveryPlatforms.reduce((sum, p) => sum + (p.count ?? 0), 0);
   const deliveryRevenue = deliveryPlatforms.reduce((sum, p) => sum + (p.revenue ?? 0), 0);
+  const deliveryCommission = deliveryPlatforms.reduce((sum, p) => sum + (p.commission ?? 0), 0);
+  const missingCommissionRates = commissions
+    ? DELIVERY_APPS.filter(({ id }) => !commissions[id]).map(({ label }) => label)
+    : [];
   const maxReferral = Math.max(...referralSources.map((r) => r.count ?? 0), 1);
   const maxCashierRevenue = Math.max(...cashierSales.map((c) => c.revenue ?? 0), 1);
   const sourceTotal = sourceMix.reduce((sum, item) => sum + (item.count ?? 0), 0);
@@ -450,24 +481,89 @@ export default function SalesDashboardPage({ styles }) {
       <div className={styles.card} style={{ marginBottom: 20 }}>
         <div className={styles.salesCardHeader}>
           <p className={styles.cardTitle}>Delivery por plataforma</p>
-          <span>Últimos 30 días · {fmtNumber(deliveryOrders)} órdenes · {fmtMXN(deliveryRevenue)}</span>
+          <span>Últimos 30 días · {fmtNumber(deliveryOrders)} órdenes · neto {fmtMXN(deliveryRevenue - deliveryCommission)}</span>
         </div>
         {loading ? (
           <EmptyState styles={styles}>Cargando...</EmptyState>
+        ) : deliveryPlatforms.length === 0 ? (
+          <EmptyState styles={styles}>Sin pedidos de delivery en el periodo.</EmptyState>
         ) : (
-          <BarList
-            styles={styles}
-            items={deliveryPlatforms}
-            max={maxDeliveryRevenue}
-            getLabel={(p) => DELIVERY_PLATFORM_LABELS[p._id] || "Sin plataforma"}
-            getValue={(p) => p.revenue ?? 0}
-            getMeta={(p) => {
-              const ticket = p.count ? (p.revenue ?? 0) / p.count : 0;
-              const pct = deliveryOrders ? Math.round((p.count / deliveryOrders) * 100) : 0;
-              return `${fmtMXN(p.revenue).replace(" MXN", "")} · ${p.count} · ${pct}% · ticket ${fmtMXN(ticket).replace(" MXN", "")}`;
-            }}
-            valueWidth={220}
-          />
+          <div className={styles.tableWrap} style={{ boxShadow: "none" }}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Plataforma</th>
+                  <th>Órdenes</th>
+                  <th>Ventas</th>
+                  <th>Comisión</th>
+                  <th>Neto</th>
+                  <th>Ticket prom.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deliveryPlatforms.map((p) => {
+                  const revenue = p.revenue ?? 0;
+                  const commission = p.commission ?? 0;
+                  const pct = deliveryOrders ? Math.round((p.count / deliveryOrders) * 100) : 0;
+                  return (
+                    <tr key={p._id || "none"}>
+                      <td>{DELIVERY_PLATFORM_LABELS[p._id] || "Sin plataforma"}</td>
+                      <td>{fmtNumber(p.count)} <span className={styles.tdMuted}>· {pct}%</span></td>
+                      <td>{fmtMXN(revenue).replace(" MXN", "")}</td>
+                      <td>{commission > 0 ? `−${fmtMXN(commission).replace(" MXN", "")}` : "—"}</td>
+                      <td><strong>{fmtMXN(revenue - commission).replace(" MXN", "")}</strong></td>
+                      <td>{fmtMXN(p.count ? revenue / p.count : 0).replace(" MXN", "")}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {commissions && !commissionDraft && (
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginTop: 12 }}>
+            <span className={styles.tdMuted}>
+              Comisiones: {DELIVERY_APPS.map(({ id, label }) => `${label} ${commissions[id] ?? 0}%`).join(" · ")}
+              {missingCommissionRates.length > 0 && ` — falta configurar ${missingCommissionRates.join(", ")}`}
+            </span>
+            <button
+              type="button"
+              className={styles.btnGhost}
+              onClick={() => setCommissionDraft(Object.fromEntries(DELIVERY_APPS.map(({ id }) => [id, String(commissions[id] ?? 0)])))}
+            >
+              Editar comisiones
+            </button>
+          </div>
+        )}
+        {commissionDraft && (
+          <form onSubmit={saveCommissions} style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 10, marginTop: 12 }}>
+            {DELIVERY_APPS.map(({ id, label }) => (
+              <label key={id} style={{ display: "grid", gap: 4, fontSize: 12, fontWeight: 700, flex: "1 1 110px" }}>
+                {label} (%)
+                <input
+                  className={styles.input}
+                  type="number"
+                  min="0"
+                  max="60"
+                  step="0.1"
+                  inputMode="decimal"
+                  value={commissionDraft[id]}
+                  onChange={(event) => setCommissionDraft((draft) => ({ ...draft, [id]: event.target.value }))}
+                />
+              </label>
+            ))}
+            <button type="submit" className={styles.btnPrimary} disabled={commissionSaving}>
+              {commissionSaving ? "Guardando…" : "Guardar"}
+            </button>
+            <button type="button" className={styles.btnGhost} onClick={() => { setCommissionDraft(null); setCommissionError(""); }}>
+              Cancelar
+            </button>
+            <small className={styles.tdMuted} style={{ flexBasis: "100%" }}>
+              Se aplica a las ventas nuevas. Los pedidos que se registraron sin comisión configurada se estiman con esta tasa.
+            </small>
+            {commissionError && <p role="alert" style={{ flexBasis: "100%", margin: 0, color: "#8b1a1a", fontSize: 12 }}>{commissionError}</p>}
+          </form>
         )}
       </div>
 

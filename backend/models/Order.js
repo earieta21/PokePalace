@@ -135,6 +135,11 @@ const orderSchema = new mongoose.Schema(
       enum: ["uber_eats", "didi_food", "rappi", "propio", null],
       default: null,
     },
+    // Comisión de la app (% y MXN) congelada al momento de la venta. null si
+    // no es pedido de app o si aún no había tasa configurada — en ese caso
+    // las analíticas la estiman con la tasa actual.
+    deliveryCommissionRate: { type: Number, default: null },
+    deliveryCommission:     { type: Number, default: null },
 
     // Pricing — always computed server-side, never trusted from the client
     subtotal: { type: Number, default: null },
