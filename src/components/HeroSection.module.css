@@ -1,4 +1,5 @@
 .hero {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
   overflow: hidden;
@@ -229,5 +230,143 @@
   .secondary {
     font-size: 12px;
     gap: 8px;
+  }
+}
+
+/* Halloween (src/data/seasonalTheme.js) — noche morada con acentos naranja.
+   Solo cambia colores y agrega decoración; el layout es el mismo. */
+.halloween {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 138, 43, 0.16), transparent 34%),
+    #1d1426;
+  color: #f6ead7;
+}
+.halloween .content {
+  position: relative;
+  z-index: 1;
+}
+.halloween .eyebrow span {
+  background: #ff8a2b;
+  box-shadow: 0 0 10px rgba(255, 138, 43, 0.8);
+}
+.halloween .content h1 em {
+  color: #ff8a2b;
+}
+.halloween .description,
+.halloween .finePrint {
+  color: #cdbfd8;
+}
+.halloween .primary {
+  background: #ff7a1a;
+  color: #1d1426;
+}
+.halloween .primary:hover {
+  background: #ff9a4d;
+}
+.halloween .secondary {
+  border-bottom-color: #8c6fa3;
+}
+.halloween .primary:focus-visible,
+.halloween .secondary:focus-visible {
+  outline-color: #ffb36b;
+}
+.halloween .prices {
+  border-top-color: #4a3657;
+}
+.halloween .prices > div + div {
+  border-left-color: #4a3657;
+}
+.halloween .photoLabel {
+  background: rgba(29, 20, 38, 0.88);
+}
+.halloween .photoLabel svg {
+  color: #ff8a2b;
+}
+
+.spooky {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+.moon {
+  position: absolute;
+  top: 34px;
+  right: calc(50% + 40px);
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 36%, #ffd9a8, #ff9d4a 62%, #f07a24);
+  box-shadow: 0 0 46px rgba(255, 138, 43, 0.45);
+  opacity: 0.92;
+}
+.bat {
+  position: absolute;
+  fill: #0d0912;
+  animation: batFloat 6s ease-in-out infinite;
+}
+/* Dos murciélagos cruzando la luna. */
+.batOne {
+  top: 52px;
+  right: calc(50% + 58px);
+  width: 54px;
+}
+.batTwo {
+  top: 104px;
+  right: calc(50% + 22px);
+  width: 32px;
+  animation-delay: -2s;
+  animation-duration: 7s;
+}
+.pumpkin {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  width: 64px;
+  transform: rotate(8deg);
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+}
+.pumpkinBody {
+  fill: #e8691a;
+}
+.pumpkinMid {
+  fill: #ff8a2b;
+}
+.pumpkinStem {
+  fill: #4f7a3a;
+}
+.pumpkinFace {
+  fill: #2a1405;
+}
+@keyframes batFloat {
+  0%, 100% { transform: translate(0, 0) rotate(-4deg) scaleX(1); }
+  25% { transform: translate(-6px, -5px) rotate(2deg) scaleX(0.82); }
+  50% { transform: translate(-10px, 2px) rotate(5deg) scaleX(1); }
+  75% { transform: translate(-3px, 5px) rotate(-2deg) scaleX(0.82); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bat {
+    animation: none;
+  }
+}
+/* En pantallas angostas la columna de texto no tiene espacio libre arriba:
+   la luna y sus murciélagos se quitan y queda solo la calabaza sobre la foto. */
+@media (max-width: 1000px) {
+  .moon,
+  .batOne,
+  .batTwo {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .spooky {
+    bottom: auto;
+    height: 140px;
+  }
+}
+@media (max-width: 480px) {
+  .pumpkin {
+    width: 50px;
   }
 }
