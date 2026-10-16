@@ -743,6 +743,115 @@
   font-size: 11px;
   font-weight: 600;
 }
+/* Halloween en el kiosco (src/data/seasonalTheme.js): solo la tarjeta de
+   "Arma tu bowl" y el encabezado; productos y promos quedan igual. */
+.kioskEyebrowHalloween {
+  color: #b4531a;
+}
+.kioskHeroHalloween {
+  background:
+    radial-gradient(circle at 85% 10%, rgba(255, 138, 43, 0.18), transparent 40%),
+    #1d1426;
+  color: #f6ead7;
+}
+.kioskHeroHalloween .kioskHeroCopy {
+  position: relative;
+}
+.kioskHeroHalloween .kioskHeroCopy .kioskEyebrow {
+  color: #ff8a2b;
+}
+.kioskHeroHalloween .kioskHeroDescription {
+  color: #cdbfd8;
+}
+.kioskHeroHalloween .kioskHeroAction {
+  background: #ff7a1a;
+  color: #1d1426;
+}
+.kioskHeroHalloween:hover .kioskHeroAction {
+  background: #ff9a4d;
+}
+.kioskHeroHalloween .kioskHeroPhoto > span {
+  background: #1d1426;
+  color: #ffd2a1;
+}
+.kioskSpooky {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.kioskMoon {
+  position: absolute;
+  top: 28px;
+  right: 34px;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 36%, #ffd9a8, #ff9d4a 62%, #f07a24);
+  box-shadow: 0 0 44px rgba(255, 138, 43, 0.45);
+  opacity: 0.92;
+}
+.kioskBat {
+  position: absolute;
+  fill: #0d0912;
+  animation: kioskBatFloat 6s ease-in-out infinite;
+}
+.kioskBatOne {
+  top: 46px;
+  right: 50px;
+  width: 50px;
+}
+.kioskBatTwo {
+  top: 96px;
+  right: 22px;
+  width: 30px;
+  animation-delay: -2s;
+  animation-duration: 7s;
+}
+.kioskPumpkin {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: 62px;
+  transform: rotate(-8deg);
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+}
+@keyframes kioskBatFloat {
+  0%, 100% { transform: translate(0, 0) rotate(-4deg) scaleX(1); }
+  25% { transform: translate(-6px, -5px) rotate(2deg) scaleX(0.82); }
+  50% { transform: translate(-10px, 2px) rotate(5deg) scaleX(1); }
+  75% { transform: translate(-3px, 5px) rotate(-2deg) scaleX(0.82); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kioskBat {
+    animation: none;
+  }
+}
+/* Con la columna de texto angosta el título ocupa todo el ancho: la luna
+   baja a la esquina libre junto al botón, y en celular se quita. */
+@media (max-width: 1000px) {
+  .kioskMoon {
+    top: auto;
+    bottom: 26px;
+    right: 26px;
+    width: 64px;
+    height: 64px;
+  }
+  .kioskBatOne {
+    top: auto;
+    bottom: 50px;
+    right: 38px;
+    width: 40px;
+  }
+  .kioskBatTwo {
+    display: none;
+  }
+}
+@media (max-width: 620px) {
+  .kioskSpooky {
+    display: none;
+  }
+}
 .categoryNav {
   display: flex;
   gap: 12px;

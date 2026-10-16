@@ -10,6 +10,8 @@ import buildBowlBg from "../assets/poke.webp";
 import kioskBowlPhoto from "../assets/home/fresh-1200.webp";
 import { ArrowRight, ShoppingBag } from "lucide-react";
 import { BOWL_BASE_PRICE } from "./pricing";
+import { useHalloweenTheme } from "../data/seasonalTheme";
+import { Bat, Pumpkin } from "../components/HalloweenDecor";
 import styles from "./MenuBrowser.module.css";
 
 const formatPrice = (value) => `$${Number(value).toLocaleString("es-MX")} MXN`;
@@ -139,6 +141,9 @@ const MenuBrowser = ({
   // Si alguna categoría se quedó sin opciones disponibles (todo agotado), no
   // hay combo válido que armar — se avisa en vez de dejar confirmar algo que
   // el servidor va a rechazar de todos modos.
+  // El tema de temporada solo decora el kiosco; el menú del sitio no cambia.
+  const halloween = useHalloweenTheme() && isKiosk;
+
   const comboFullyUnavailable =
     activeCombo && comboGroups.some((group) => group.options.length === 0);
 
@@ -147,7 +152,9 @@ const MenuBrowser = ({
       <div className={styles.container}>
         <div className={styles.header}>
           {isKiosk && (
-            <p className={styles.kioskEyebrow}>HECHO AL MOMENTO, PARA TI</p>
+            <p className={`${styles.kioskEyebrow} ${halloween ? styles.kioskEyebrowHalloween : ""}`}>
+              {halloween ? "TEMPORADA DE HALLOWEEN" : "HECHO AL MOMENTO, PARA TI"}
+            </p>
           )}
           {isKiosk ? (
             <h1 className={styles.title}>¿Qué se te antoja hoy?</h1>
@@ -164,11 +171,18 @@ const MenuBrowser = ({
         {isKiosk ? (
           <button
             type="button"
-            className={styles.kioskHero}
+            className={`${styles.kioskHero} ${halloween ? styles.kioskHeroHalloween : ""}`}
             onClick={handleBuildBowl}
           >
             <span className={styles.kioskHeroCopy}>
-              <span className={styles.kioskEyebrow}>TU BOWL, TUS REGLAS</span>
+              {halloween && (
+                <span className={styles.kioskSpooky} aria-hidden="true">
+                  <span className={styles.kioskMoon} />
+                  <Bat className={`${styles.kioskBat} ${styles.kioskBatOne}`} />
+                  <Bat className={`${styles.kioskBat} ${styles.kioskBatTwo}`} />
+                </span>
+              )}
+              <span className={styles.kioskEyebrow}>{halloween ? "TU BOWL, DE MIEDO" : "TU BOWL, TUS REGLAS"}</span>
               <strong>
                 {hasBowlDraft ? "Tu bowl te espera." : "Arma tu propio bowl."}
               </strong>
@@ -191,7 +205,8 @@ const MenuBrowser = ({
                 alt="Bowl de Poke Palace con ingredientes frescos"
                 fetchPriority="high"
               />
-              <span>Así empieza algo rico.</span>
+              {halloween && <Pumpkin className={styles.kioskPumpkin} />}
+              <span>{halloween ? "Dulce o bowl." : "Así empieza algo rico."}</span>
             </span>
           </button>
         ) : (
