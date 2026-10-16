@@ -16,6 +16,8 @@ import { API_URL } from "../config";
 import { downloadCSV } from "../utils/csv";
 import { tijuanaDateKey } from "../utils/date";
 import RewardQrCode from "../components/RewardQrCode";
+import { Bat, Pumpkin } from "../components/HalloweenDecor";
+import { useHalloweenTheme } from "../data/seasonalTheme";
 import shellStyles from "./UnifiedStaffApp.module.css";
 
 // POS pages — unchanged, work via StaffAuthContext.Provider
@@ -31,7 +33,8 @@ import InventoryPage from "../pos/pages/InventoryPage";
 import WastePage from "../pos/pages/WastePage";
 import ConsumptionPage from "../pos/pages/ConsumptionPage";
 import CustomersPage from "../pos/pages/CustomersPage";
-import CostingPage from "../pos/pages/CostingPage";
+import CostingPage from "../pos/pages/CostingPage";
+
 import PreparationsPage from "../pos/pages/PreparationsPage";
 import posStyles from "../pos/EmployeePortal.module.css";
 
@@ -162,7 +165,8 @@ const TAB_META = {
   mermas:  { label: "Mermas", title: "Registro de merma", icon: Trash2 },
   corte:   { label: "Corte", title: "Corte de caja", icon: Wallet },
   fin:     { label: "Finanzas", title: "Finanzas", icon: BarChart3 },
-  costeo:  { label: "Costeo", title: "Costeo de bowls", icon: Calculator },
+  costeo:  { label: "Costeo", title: "Costeo de bowls", icon: Calculator },
+
   recetas: { label: "Recetas", title: "Recetas estándar", icon: ChefHat },
   fiscal:  { label: "Fiscal", title: "Asistente fiscal (SAT)", icon: Landmark },
   disponibilidad: { label: "Tienda", title: "Disponibilidad de la tienda", icon: ToggleRight },
@@ -213,6 +217,9 @@ export default function UnifiedStaffApp() {
   const [announcements, setAnnouncements] = useState([]);
 
   const [tab, setTab] = useState(null); // set after login based on role
+  // Solo decora el marco (menú, barra superior, PIN, saludo); el contenido
+  // de POS, cocina, inventario, etc. conserva sus colores de trabajo.
+  const halloween = useHalloweenTheme();
   const [now, setNow] = useState(Date.now());
   const [lowStockCount, setLowStockCount] = useState(0);
   const [clockError, setClockError] = useState("");
@@ -458,14 +465,15 @@ export default function UnifiedStaffApp() {
     return data.record;
   }
 
-  if (!me) return <PinLogin onLogin={handleLogin} />;
+  if (!me) return <PinLogin onLogin={handleLogin} halloween={halloween} />;
 
   const isWideTab = ["pos", "cocina", "hist", "resumen", "ventas", "inv", "fin", "panel"].includes(tab);
 
   return (
     <StaffAuthContext.Provider value={staffContextValue}>
-      <div className={shellStyles.shell}>
+      <div className={`${shellStyles.shell} ${halloween ? shellStyles.halloween : ""}`}>
         <StaffSidebar
+          halloween={halloween}
           me={me}
           tabs={myTabs}
           tab={tab}
@@ -480,9 +488,15 @@ export default function UnifiedStaffApp() {
           <header className={shellStyles.topbar}>
             <div className={shellStyles.topbarInner}>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
-                <Leaf className="w-4 h-4 text-emerald-400" />
-              </div>
+              {halloween ? (
+                <div className="w-8 h-8 rounded-xl bg-orange-500/15 flex items-center justify-center shrink-0">
+                  <Pumpkin className="w-5 h-5" />
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+                  <Leaf className="w-4 h-4 text-emerald-400" />
+                </div>
+              )}
               <div>
                 <p className={shellStyles.topbarEyebrow}>{tabGroupLabel(tab)}</p>
                 <p className={shellStyles.topbarTitle}>{TAB_META[tab]?.title || TAB_META[tab]?.label}</p>
@@ -514,7 +528,7 @@ export default function UnifiedStaffApp() {
 
           {/* Main content */}
           <main className={`${shellStyles.main} ${isWideTab ? shellStyles.mainWide : shellStyles.mainStandard} ${posStyles.staffEmbed}`}>
-            {tab === "inicio"  && <HomeTab me={me} now={now} openEntry={openEntry} time={time} schedule={schedule} checklist={checklist} onClockIn={clockIn} onClockOut={clockOut} onBreakStart={startBreak} onBreakEnd={endBreak} clockError={clockError} clockBusy={clockBusy} />}
+            {tab === "inicio"  && <HomeTab halloween={halloween} me={me} now={now} openEntry={openEntry} time={time} schedule={schedule} checklist={checklist} onClockIn={clockIn} onClockOut={clockOut} onBreakStart={startBreak} onBreakEnd={endBreak} clockError={clockError} clockBusy={clockBusy} />}
             {tab === "consumo" && <ConsumptionPage styles={posStyles} staffUser={{ id: me.id, name: me.name, role: me.role }} employees={employees} />}
             {tab === "tareas"  && <TasksTab employees={employees} checklist={checklist} onToggle={toggleTask} />}
             {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
@@ -533,7 +547,8 @@ export default function UnifiedStaffApp() {
             {tab === "mermas"  && <WastePage styles={posStyles} />}
             {tab === "corte"   && <CashCutPage styles={posStyles} />}
             {tab === "fin"     && <FinancePage styles={posStyles} />}
-            {tab === "costeo"  && <CostingPage styles={posStyles} />}
+            {tab === "costeo"  && <CostingPage styles={posStyles} />}
+
             {tab === "recetas" && <PreparationsPage styles={posStyles} />}
             {tab === "fiscal"  && <FiscalPage styles={posStyles} />}
           </main>
@@ -560,15 +575,23 @@ function NavIndicator({ id, openEntry, lowStockCount, compact = false }) {
   return null;
 }
 
-function StaffSidebar({ me, tabs, tab, setTab, openEntry, lowStockCount, onLogout }) {
+function StaffSidebar({ halloween, me, tabs, tab, setTab, openEntry, lowStockCount, onLogout }) {
   return (
     <aside className={shellStyles.sidebar} aria-label="Navegación de Staff">
       <div className={shellStyles.brand}>
-        <span className={shellStyles.brandMark}><Leaf aria-hidden="true" /></span>
+        <span className={shellStyles.brandMark}>
+          {halloween ? <Pumpkin className={shellStyles.brandPumpkin} /> : <Leaf aria-hidden="true" />}
+        </span>
         <span>
           <strong>Poke Palace</strong>
-          <small>Centro de trabajo</small>
+          <small>{halloween ? "Temporada de Halloween" : "Centro de trabajo"}</small>
         </span>
+        {halloween && (
+          <span className={shellStyles.brandBats} aria-hidden="true">
+            <Bat className={shellStyles.brandBatOne} />
+            <Bat className={shellStyles.brandBatTwo} />
+          </span>
+        )}
       </div>
 
       <nav className={shellStyles.sidebarNav}>
@@ -619,7 +642,7 @@ function StaffSidebar({ me, tabs, tab, setTab, openEntry, lowStockCount, onLogou
 /* ============================================================================
    PIN LOGIN
    ========================================================================== */
-function PinLogin({ onLogin }) {
+function PinLogin({ onLogin, halloween }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -638,20 +661,35 @@ function PinLogin({ onLogin }) {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
-      <div className="px-6 pt-10 pb-8 text-center relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/50 to-transparent pointer-events-none" />
-        <div className="relative">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-900/30">
-            <Leaf className="w-7 h-7 text-emerald-400" />
+      <div className="px-6 pt-10 pb-8 text-center relative overflow-hidden">
+        <div className={`absolute inset-0 bg-gradient-to-b ${halloween ? "from-purple-950/70" : "from-emerald-950/50"} to-transparent pointer-events-none`} />
+        {halloween && (
+          <div className={shellStyles.pinSpooky} aria-hidden="true">
+            <span className={shellStyles.pinMoon} />
+            <Bat className={shellStyles.pinBatOne} />
+            <Bat className={shellStyles.pinBatTwo} />
           </div>
+        )}
+        <div className="relative">
+          {halloween ? (
+            <div className="w-14 h-14 rounded-2xl bg-orange-500/15 border border-orange-400/30 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-950/30">
+              <Pumpkin className="w-9 h-9" />
+            </div>
+          ) : (
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-900/30">
+              <Leaf className="w-7 h-7 text-emerald-400" />
+            </div>
+          )}
           <h1 className="text-3xl font-black tracking-tight text-white">Poke Palace</h1>
-          <p className="text-emerald-400 text-xs uppercase tracking-[0.3em] mt-1">Portal de Personal</p>
+          <p className={`${halloween ? "text-orange-400" : "text-emerald-400"} text-xs uppercase tracking-[0.3em] mt-1`}>
+            {halloween ? "Portal de Personal · Halloween" : "Portal de Personal"}
+          </p>
         </div>
       </div>
 
       <div className="flex-1 px-6 max-w-xs mx-auto w-full flex flex-col items-center">
-          <div className="w-20 h-20 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mb-4 shadow-xl shadow-emerald-950/30">
-            <ShieldCheck className="w-9 h-9 text-emerald-400" />
+          <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-4 shadow-xl ${halloween ? "bg-orange-500/15 border border-orange-400/30 shadow-orange-950/30" : "bg-emerald-500/20 border border-emerald-500/30 shadow-emerald-950/30"}`}>
+            <ShieldCheck className={`w-9 h-9 ${halloween ? "text-orange-400" : "text-emerald-400"}`} />
           </div>
           <p className="font-bold text-lg text-white mb-1">Acceso privado</p>
           <p className="text-xs text-slate-400 mb-6 text-center">Ingresa tu PIN de 4 dígitos. Tu nombre aparecerá después de verificarlo.</p>
@@ -659,7 +697,7 @@ function PinLogin({ onLogin }) {
             {[0,1,2,3].map((i) => (
               <div key={i} className={`w-5 h-5 rounded-full border-2 transition-all duration-150 ${
                 error ? "bg-rose-500 border-rose-500 scale-110"
-                : pin.length > i ? "bg-emerald-500 border-transparent scale-110"
+                : pin.length > i ? `${halloween ? "bg-orange-500" : "bg-emerald-500"} border-transparent scale-110`
                 : "border-slate-600"}`} />
             ))}
           </div>
@@ -695,7 +733,7 @@ function PinKey({ children, onClick, subtle, ariaLabel }) {
    ========================================================================== */
 const FORGOT_CLOCKOUT_HOURS = 13;
 
-function HomeTab({ me, now, openEntry, time, schedule, checklist, onClockIn, onClockOut, onBreakStart, onBreakEnd, clockError, clockBusy }) {
+function HomeTab({ halloween, me, now, openEntry, time, schedule, checklist, onClockIn, onClockOut, onBreakStart, onBreakEnd, clockError, clockBusy }) {
   const [confirmOut, setConfirmOut] = useState(false);
   const todayEntries = time.filter((t) => sid(t.employeeId) === sid(me.id) && t.date === todayKey());
 
@@ -727,7 +765,11 @@ function HomeTab({ me, now, openEntry, time, schedule, checklist, onClockIn, onC
         <p className="text-slate-400 text-sm capitalize">
           {new Date(now).toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })}
         </p>
-        <h2 className="text-2xl font-black tracking-tight">¡Hola, {me.name.split(" ")[0]}!</h2>
+        <h2 className="text-2xl font-black tracking-tight flex items-center gap-2">
+          ¡Hola, {me.name.split(" ")[0]}!
+          {halloween && <Pumpkin className="w-7 h-7" />}
+        </h2>
+        {halloween && <p className="text-orange-300/90 text-sm mt-0.5">Feliz temporada de Halloween en Poke Palace.</p>}
       </div>
 
       {forgotToClockOut && (
