@@ -58,3 +58,101 @@
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.035); opacity: 0.85; }
 }
+
+/* Halloween (src/data/seasonalTheme.js): luna con murciélagos arriba y dos
+   calabazas abajo, lejos del texto y del botón. */
+.spooky {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.moon {
+  position: absolute;
+  top: 6%;
+  right: 8%;
+  width: clamp(90px, 14vw, 150px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 36%, #ffd9a8, #ff9d4a 62%, #f07a24);
+  box-shadow: 0 0 60px rgba(255, 138, 43, 0.45);
+  opacity: 0.92;
+}
+
+.bat {
+  position: absolute;
+  fill: #0d0912;
+  animation: batFloat 6s ease-in-out infinite;
+}
+
+.batOne {
+  top: calc(6% + 26px);
+  right: calc(8% + 30px);
+  width: clamp(50px, 7vw, 72px);
+}
+
+.batTwo {
+  top: calc(6% + 90px);
+  right: calc(8% - 10px);
+  width: clamp(30px, 4vw, 42px);
+  animation-delay: -2s;
+  animation-duration: 7s;
+}
+
+.batThree {
+  top: 10%;
+  left: 9%;
+  width: clamp(36px, 5vw, 52px);
+  fill: #4a3657;
+  animation-delay: -4s;
+}
+
+.pumpkin {
+  position: absolute;
+  bottom: 5%;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.4));
+}
+
+.pumpkinLeft {
+  left: 6%;
+  width: clamp(70px, 10vw, 110px);
+  transform: rotate(-8deg);
+}
+
+.pumpkinRight {
+  right: 7%;
+  width: clamp(50px, 7vw, 76px);
+  transform: rotate(10deg);
+}
+
+.screensaverHalloween {
+  background: linear-gradient(180deg, rgba(29, 20, 38, 0.15) 0%, rgba(29, 20, 38, 0.2) 50%, rgba(29, 20, 38, 0.85) 100%);
+}
+
+.screensaverPumpkin {
+  width: 84px;
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.45));
+}
+
+.screensaverSeason {
+  margin: -4px 0 6px;
+  color: #ffd2a1;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85), 0 0 2px rgba(0, 0, 0, 0.9);
+}
+
+@keyframes batFloat {
+  0%, 100% { transform: translate(0, 0) rotate(-4deg) scaleX(1); }
+  25% { transform: translate(-6px, -5px) rotate(2deg) scaleX(0.82); }
+  50% { transform: translate(-10px, 2px) rotate(5deg) scaleX(1); }
+  75% { transform: translate(-3px, 5px) rotate(-2deg) scaleX(0.82); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bat {
+    animation: none;
+  }
+}

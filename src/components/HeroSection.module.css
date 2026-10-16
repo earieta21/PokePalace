@@ -327,18 +327,6 @@
   transform: rotate(8deg);
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
 }
-.pumpkinBody {
-  fill: #e8691a;
-}
-.pumpkinMid {
-  fill: #ff8a2b;
-}
-.pumpkinStem {
-  fill: #4f7a3a;
-}
-.pumpkinFace {
-  fill: #2a1405;
-}
 @keyframes batFloat {
   0%, 100% { transform: translate(0, 0) rotate(-4deg) scaleX(1); }
   25% { transform: translate(-6px, -5px) rotate(2deg) scaleX(0.82); }
