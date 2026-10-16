@@ -6,6 +6,7 @@ import { createStaffApi } from "../api";
 import { downloadCSV } from "../../utils/csv";
 import { tijuanaDateKey } from "../../utils/date";
 import ui from "./InventoryPage.module.css";
+import DisposablesPanel from "./DisposablesPanel";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
   COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS,
@@ -175,6 +176,9 @@ export default function InventoryPage({ styles, role }) {
   const [stockFilter, setStockFilter] = useState("Todos");
   const [pendingOnly, setPendingOnly] = useState(false);
   const [search, setSearch]   = useState("");
+  // "inventario" (con costos, ligado a ventas y Finanzas) o "desechables"
+  // (solo conteo por paquete/pieza, sin precios).
+  const [view, setView] = useState("inventario");
 
   // Registrar en Finanzas el valor de existencias que ya estaban cargadas
   // (nunca pasaron por "Recibir mercancía") — solo dueño/admin.
@@ -602,6 +606,27 @@ export default function InventoryPage({ styles, role }) {
     }
   };
 
+  // Un ingrediente del menú puede descontar de varios artículos a propósito
+  // (agua del día: litros de agua + un vaso). Pero si dos artículos con la
+  // misma unidad comparten vínculo (p. ej. dos "Salmón" en kg), cada venta
+  // se descuenta de los dos — se avisa para que se revise.
+  const duplicateLinks = useMemo(() => {
+    const byKey = new Map();
+    for (const item of items) {
+      for (const key of new Set(item.menuKeys || [])) {
+        const groupKey = `${key}::${String(item.unit || "").trim().toLowerCase()}`;
+        byKey.set(groupKey, [...(byKey.get(groupKey) || []), item]);
+      }
+    }
+    return [...byKey.entries()]
+      .filter(([, linked]) => linked.length > 1)
+      .map(([groupKey, linked]) => ({
+        key: groupKey,
+        label: SALE_OPTIONS.find((option) => option.key === groupKey.split("::")[0])?.label || groupKey.split("::")[0],
+        names: linked.map((item) => item.item),
+      }));
+  }, [items]);
+
   const totalValue = items.reduce((sum, item) => sum + (Number(item.qty) || 0) * (Number(item.cost) || 0), 0);
   const lowCount   = items.filter((i) => statusOf(i) !== "ok").length;
 
@@ -616,6 +641,12 @@ export default function InventoryPage({ styles, role }) {
 
   return (
     <div className={ui.inventoryRoot}>
+      <div className={ui.viewTabs} role="tablist" aria-label="Vista de inventario">
+        {[["inventario", "Inventario"], ["desechables", "Desechables"]].map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={view === id} className={view === id ? ui.viewTabActive : ""} onClick={() => setView(id)}>{label}</button>
+        ))}
+      </div>
+      {view === "desechables" ? <DisposablesPanel styles={styles} ui={ui} /> : (<>
       <dialog ref={movementDialog} className={ui.movementDialog} onClose={() => setMovementItem(null)} aria-labelledby="inventory-movements-title">
         <div className={ui.movementHeading}>
           <h2 id="inventory-movements-title">Movimientos: {movementItem?.item}</h2>
@@ -693,6 +724,16 @@ export default function InventoryPage({ styles, role }) {
         <div className={ui.successNotice} role="status">
           <span>✓</span>{notice}
           <button type="button" onClick={() => setNotice("")} aria-label="Cerrar notificación">×</button>
+        </div>
+      )}
+
+      {duplicateLinks.length > 0 && (
+        <div className={ui.errorNotice} role="alert">
+          <AlertTriangle size={16} />
+          <span>
+            Estos ingredientes se descuentan de más de un artículo con la misma unidad, así que cada venta los resta doble:{" "}
+            {duplicateLinks.map((d) => `${d.label} (${d.names.join(", ")})`).join("; ")}. Deja el vínculo solo en uno.
+          </span>
         </div>
       )}
 
@@ -1134,6 +1175,7 @@ export default function InventoryPage({ styles, role }) {
           </tbody>
         </table>
       </div>
+      </>)}
     </div>
   );
 }

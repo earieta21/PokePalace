@@ -88,7 +88,7 @@
 .rowActions button:hover { color: var(--p-g2); background: #edf5f0; }
 .rowActions .deleteButton { border-color: transparent; }
 .rowActions .deleteButton:hover, .dangerButton { color: #b44140 !important; }
-.movementDialog, .editDialog { width: min(760px, calc(100vw - 32px)); max-height: 88vh; padding: 24px; border: 1px solid var(--p-border); border-radius: 8px; color: var(--p-ink); background: white; }
+.movementDialog, .editDialog { margin: auto; width: min(760px, calc(100vw - 32px)); max-height: 88vh; padding: 24px; border: 1px solid var(--p-border); border-radius: 8px; color: var(--p-ink); background: white; }
 .editDialog { width: min(570px, calc(100vw - 24px)); overflow: hidden; }
 .editDialog form { display: flex; flex-direction: column; max-height: calc(88dvh - 48px); }
 .editDialog .movementHeading, .editDialog .dialogActions { flex-shrink: 0; }
@@ -208,3 +208,6 @@
   .receiveInfo { flex-basis: 100%; }
   .receiveFooter > span { flex-basis: 100%; }
 }
+.viewTabs { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 18px; border: 1px solid var(--p-border); border-radius: 8px; background: var(--p-bg); }
+.viewTabs button { min-height: 36px; padding: 6px 16px; border: 0; border-radius: 6px; background: transparent; color: var(--p-muted); font-size: 13px; font-weight: 600; }
+.viewTabs .viewTabActive { background: #fff; color: var(--p-ink); box-shadow: 0 1px 2px #202a301f; }
