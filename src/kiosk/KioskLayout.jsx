@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import ErrorBoundary from "../components/ErrorBoundary";
+import { useHalloweenTheme } from "../data/seasonalTheme";
 
 const DEFAULT_MANIFEST = "/manifest.json";
 const KIOSK_MANIFEST = "/manifest-kiosk.json";
@@ -21,10 +22,33 @@ function useKioskManifest() {
   }, []);
 }
 
+// Noche de Halloween: tokens del tema oscuro con tinte morado. Los módulos
+// del kiosco que usan colores fijos se ajustan con :global(.kioskHalloween).
+const HALLOWEEN_TOKENS = {
+  "--bg": "#17111e",
+  "--bg-card": "#221a2c",
+  "--bg-muted": "#2c2238",
+  "--bg-subtle": "#1d1626",
+  "--text": "#f6ead7",
+  "--text-2": "#cdbfd8",
+  "--text-3": "#9d8fae",
+  "--accent": "#ff8a2b",
+  "--accent-2": "#ffa45c",
+  "--accent-bg": "rgba(255, 138, 43, 0.14)",
+  "--accent-border": "rgba(255, 138, 43, 0.4)",
+  "--border": "rgba(255, 255, 255, 0.08)",
+  "--border-md": "rgba(255, 255, 255, 0.14)",
+  minHeight: "100dvh",
+  background: "#17111e",
+  color: "#f6ead7",
+  colorScheme: "dark",
+};
+
 // Full-screen, no customer Navbar — a walk-in using the counter tablet
 // should never be able to wander into login/account/promotions pages.
 export default function KioskLayout() {
   useKioskManifest();
+  const halloween = useHalloweenTheme();
 
   return (
     <ErrorBoundary
@@ -64,7 +88,11 @@ export default function KioskLayout() {
         </div>
       )}
     >
-      <div data-theme="light" style={{ minHeight: "100dvh", background: "#fff", colorScheme: "light" }}>
+      <div
+        data-theme={halloween ? "dark" : "light"}
+        className={halloween ? "kioskHalloween" : undefined}
+        style={halloween ? HALLOWEEN_TOKENS : { minHeight: "100dvh", background: "#fff", colorScheme: "light" }}
+      >
         <Outlet />
       </div>
     </ErrorBoundary>

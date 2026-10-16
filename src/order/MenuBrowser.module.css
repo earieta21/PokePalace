@@ -1158,3 +1158,67 @@
     max-width: none;
   }
 }
+
+/* Kiosco en Halloween (KioskLayout pone .kioskHalloween): todo el menú en
+   noche morada con acento naranja, no solo la tarjeta de arriba. */
+:global(.kioskHalloween) .kiosk .title,
+:global(.kioskHalloween) .kiosk .sectionTitle,
+:global(.kioskHalloween) .kiosk .cardName,
+:global(.kioskHalloween) .kiosk .cardPrice {
+  color: #f6ead7;
+}
+:global(.kioskHalloween) .kiosk .subtitle,
+:global(.kioskHalloween) .kiosk .cardDescription,
+:global(.kioskHalloween) .kioskPaymentNote {
+  color: #cdbfd8;
+}
+:global(.kioskHalloween) .kioskEyebrowHalloween {
+  color: #ff8a2b;
+}
+:global(.kioskHalloween) .kioskHeroHalloween {
+  border: 1px solid rgba(255, 138, 43, 0.3);
+}
+:global(.kioskHalloween) .kiosk .categoryNav a {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: #221a2c;
+  color: #f6ead7;
+}
+:global(.kioskHalloween) .kiosk .categoryNav a:hover {
+  border-color: #ff8a2b;
+  background: #2c2238;
+}
+:global(.kioskHalloween) .kiosk .card {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #221a2c;
+}
+:global(.kioskHalloween) .kiosk .card:hover {
+  border-color: rgba(255, 138, 43, 0.55);
+}
+:global(.kioskHalloween) .kiosk .cardPhotoWrap,
+:global(.kioskHalloween) .kiosk .cardPhotoContain {
+  background: #2c2238;
+}
+:global(.kioskHalloween) .kiosk .addBtn,
+:global(.kioskHalloween) .kiosk .comboConfirm {
+  background: #ff7a1a;
+  color: #1d1426;
+}
+:global(.kioskHalloween) .kiosk .addBtn:hover {
+  background: #ff9a4d;
+}
+:global(.kioskHalloween) .kiosk .stepper {
+  border-color: rgba(255, 138, 43, 0.45);
+  background: #2c2238;
+}
+:global(.kioskHalloween) .kiosk .stepperBtn,
+:global(.kioskHalloween) .kiosk .stepperCount {
+  color: #f6ead7;
+}
+:global(.kioskHalloween) .kiosk .cartBar {
+  background: #ff7a1a;
+  color: #1d1426;
+  box-shadow: 0 8px 36px rgba(0, 0, 0, 0.5);
+}
+:global(.kioskHalloween) .kiosk .cartBarCount {
+  background: rgba(29, 20, 38, 0.16);
+}

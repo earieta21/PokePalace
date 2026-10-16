@@ -156,3 +156,43 @@
     padding: 18px;
   }
 }
+
+/* Halloween (KioskLayout pone .kioskHalloween). */
+:global(.kioskHalloween) .page {
+  background: #17111e;
+  color: #f6ead7;
+}
+:global(.kioskHalloween) .cancel {
+  border-color: rgba(246, 234, 215, 0.25);
+  color: #f6ead7;
+}
+:global(.kioskHalloween) .steps {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+:global(.kioskHalloween) .steps li {
+  color: #a997b8;
+}
+:global(.kioskHalloween) .steps li[aria-current] {
+  color: #f6ead7;
+}
+:global(.kioskHalloween) .steps span {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+:global(.kioskHalloween) .steps li[aria-current] span {
+  background: #ff8a2b;
+  border-color: #ff8a2b;
+  color: #1d1426;
+}
+:global(.kioskHalloween) .promo {
+  background: #2c2238;
+  border: 1px solid rgba(255, 138, 43, 0.45);
+  color: #f6ead7;
+}
+:global(.kioskHalloween) .promo button {
+  background: #ff7a1a;
+  color: #1d1426;
+}
+:global(.kioskHalloween) .page button:focus-visible,
+:global(.kioskHalloween) .page a:focus-visible {
+  outline-color: #ffb36b;
+}

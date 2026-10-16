@@ -385,3 +385,59 @@
     padding: 22px 24px 0;
   }
 }
+
+/* Halloween (KioskLayout pone .kioskHalloween): noche morada con acento
+   naranja. Va al final para ganarle también a las reglas de orientación. */
+:global(.kioskHalloween) .page {
+  --kiosk-hairline: rgba(255, 255, 255, 0.1);
+  background: #17111e;
+}
+:global(.kioskHalloween) .topbar {
+  background: #0f0a14;
+  color: #f6ead7;
+}
+:global(.kioskHalloween) .promoPill {
+  background: #ff8a2b;
+  color: #1d1426;
+}
+:global(.kioskHalloween) .cancelBtn {
+  border-color: rgba(246, 234, 215, 0.35);
+  color: #f6ead7;
+}
+:global(.kioskHalloween) .progress,
+:global(.kioskHalloween) .summaryBar,
+:global(.kioskHalloween) .price {
+  background: #221a2c;
+}
+:global(.kioskHalloween) .track {
+  background: rgba(255, 255, 255, 0.12);
+}
+:global(.kioskHalloween) .fill {
+  background: #ff8a2b;
+}
+:global(.kioskHalloween) .stepLabel,
+:global(.kioskHalloween) .summaryItem,
+:global(.kioskHalloween) .priceAmount,
+:global(.kioskHalloween) .currentStep {
+  color: #f6ead7;
+}
+:global(.kioskHalloween) .stepCount,
+:global(.kioskHalloween) .completedStep {
+  color: #cdbfd8;
+}
+:global(.kioskHalloween) .stepItem:not(.currentStep):not(.completedStep),
+:global(.kioskHalloween) .summaryEyebrow,
+:global(.kioskHalloween) .emptySummary,
+:global(.kioskHalloween) .priceCaption {
+  color: #a997b8;
+}
+:global(.kioskHalloween) .currentStep .stepNumber {
+  background: #ff8a2b;
+  border-color: #ff8a2b;
+  color: #1d1426;
+}
+:global(.kioskHalloween) .completedStep .stepNumber {
+  background: rgba(255, 138, 43, 0.22);
+  border-color: rgba(255, 138, 43, 0.5);
+  color: #ffb36b;
+}

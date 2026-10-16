@@ -852,3 +852,19 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* Kiosco en Halloween (KioskLayout pone .kioskHalloween): superficies de
+   noche morada y acento naranja; los textos ya toman los tokens oscuros. */
+:global(.kioskHalloween) .containerKiosk {
+  --step-ink: #ff8a2b;
+  --step-ink-soft: #ffa45c;
+  --step-cream: #1d1426;
+  --step-lime: #4a2f1c;
+  --step-lime-soft: #5a3a22;
+  --step-hairline: rgba(255, 255, 255, 0.1);
+  --step-surface: #221a2c;
+  --step-surface-2: #2c2238;
+}
+:global(.kioskHalloween) .containerKiosk .selected {
+  box-shadow: 0 0 0 3px rgba(255, 138, 43, 0.35);
+}

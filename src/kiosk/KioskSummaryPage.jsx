@@ -141,9 +141,11 @@ export default function KioskSummaryPage() {
           zIndex: 50,
           padding: "9px 16px",
           borderRadius: 999,
-          border: "1px solid #ddd",
-          background: "#fff",
-          color: "#555",
+          // Tokens del tema: en Halloween el kiosco va en oscuro y un botón
+          // blanco fijo quedaba como parche.
+          border: "1px solid var(--border-md)",
+          background: "var(--bg-card)",
+          color: "var(--text-2)",
           fontWeight: 700,
           fontSize: 12.5,
           cursor: "pointer",
