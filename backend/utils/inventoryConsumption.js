@@ -1,7 +1,7 @@
 // Protein demand is expressed in kg; all other recipe demand is in servings.
 export const PROTEIN_KEYS = new Set(["tuna", "salmon", "shrimp", "tofu", "octopus", "seared_tuna"]);
 const INDIVIDUAL_UNITS = new Set(["pz", "pc", "pieza", "piezas", "botellas", "bottles", "latas", "porciones", "vasos"]);
-const DRINK_KEYS = new Set(["topochico", "coca_zero", "coca_cola", "botella_de_agua", "agua_natural"]);
+const DRINK_KEYS = new Set(["topochico", "coca_zero", "coca_cola", "botella_de_agua", "agua_natural", "celsius", "bloom"]);
 // One 16 US fl oz serving, rounded to the stock ledger's six decimals.
 export const AGUA_DEL_DIA_PORTION_LITERS = 0.473176;
 

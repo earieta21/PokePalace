@@ -16,7 +16,7 @@ import { getRewardById, REWARDS } from "../../data/rewardsCatalog.js";
 import { REFERRAL_SOURCES } from "../../data/referralSources.js";
 import { DELIVERY_PLATFORMS, DELIVERY_PLATFORM_LABELS, isDeliveryApp } from "../../data/deliveryPlatforms.js";
 import { getBaseLabel, COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
-import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, PREMIUM_PROTEIN_PRICES } from "../../order/pricing.js";
+import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, EXTRA_COMPLEMENT_PRICE, PREMIUM_PROTEIN_PRICES } from "../../order/pricing.js";
 import {
   COMBO_PALACE_OPTIONS,
   COMBO_PALACE_PRICE,
@@ -53,6 +53,8 @@ const MENU = [
   { id: 24, name: "Coca-Cola",               price:  35, category: "Bebidas", icon: "🥤" },
   { id: 14, name: "Botella de Agua",         price:  20, category: "Bebidas", icon: "💧" },
   { id: 15, name: "Agua del día",              price:  35, category: "Bebidas", icon: "🥤", rewardDrink: true },
+  { id: 29, name: "Celsius",                 price:  55, category: "Bebidas", icon: "⚡" },
+  { id: 30, name: "Bloom",                   price:  55, category: "Bebidas", icon: "🌸" },
   { id: 17, name: "Choco Rice Cake",          price:  35, category: "Rice Cakes", icon: "🍫", rewardSnack: true },
   { id: 23, name: "Miel Rice Cake",           price:  35, category: "Rice Cakes", icon: "🍯" },
   // Porción extra (40 g) de cualquier proteína ya en el bowl. El precio
@@ -61,6 +63,10 @@ const MENU = [
   // con atún sellado son $60. Lo mismo aplica a los bowls de venta rápida
   // de arriba: la proteína premium sube el precio ahí también.
   { id: 27, name: "Extra de proteína",        price: EXTRA_SCOOP_PRICE, category: "Bowls", icon: "🍤", needsProtein: true, extraProtein: true },
+  // Porción extra de un complemento, al mismo precio que el armador cobra
+  // por cada complemento adicional. El cajero elige cuál (needsComplement)
+  // para que cocina sepa qué servir y se descuente del inventario.
+  { id: 28, name: "Extra de complemento",     price: EXTRA_COMPLEMENT_PRICE, category: "Bowls", icon: "🥒", needsComplement: true },
 ];
 
 const MENU_CATEGORIES = ["Todos", "Promos", "Bowls", "Bebidas", "Rice Cakes"];
@@ -71,13 +77,19 @@ const QUICK_PROTEINS = ["tuna", "salmon", "shrimp", "tofu", "seared_tuna"].map((
   id, label: PROTEIN_LABELS[id],
 }));
 
+// Mismos complementos que ofrece el armador del POS (CustomBowlBuilder).
+const QUICK_COMPLEMENTS = [
+  "shredded_carrots", "seaweed", "edamame", "red_onion", "cucumber", "mango",
+  "pineapple", "beet", "surimi", "spicy_surimi", "avocado",
+].map((id) => ({ id, label: COMPLEMENT_LABELS[id] || id }));
+
 const normalizeSearch = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 const IVA = 0; // IVA incluido en precio
 
 export default function POSPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
-  const { promo2x1Active, comboPalaceActive } = useAvailability();
+  const { promo2x1Active, comboPalaceActive, unavailableItems = [], hiddenIngredients = [] } = useAvailability();
   const api = createStaffApi(staffToken);
   const pendingSaleRef = useRef(null);
   const cartRef = useRef(null);
@@ -198,6 +210,7 @@ export default function POSPage({ styles }) {
   };
 
   const [proteinPickerItem, setProteinPickerItem] = useState(null);
+  const [complementPickerItem, setComplementPickerItem] = useState(null);
   const [comboPickerItem, setComboPickerItem] = useState(null);
   const [comboSelection, setComboSelection] = useState({
     comboBowlId: "",
@@ -220,6 +233,19 @@ export default function POSPage({ styles }) {
       protein: proteinId,
       name: `${item.name} (${proteinLabel})`,
       cartKey: `${item.id}-${proteinId}`,
+    });
+  };
+
+  const confirmComplementPick = (complementId) => {
+    const item = complementPickerItem;
+    setComplementPickerItem(null);
+    if (!item) return;
+    const complementLabel = QUICK_COMPLEMENTS.find((c) => c.id === complementId)?.label || complementId;
+    addItem({
+      ...item,
+      complement: complementId,
+      name: `${item.name} (${complementLabel})`,
+      cartKey: `${item.id}-${complementId}`,
     });
   };
 
@@ -268,6 +294,7 @@ export default function POSPage({ styles }) {
     setReward(null);
     setRewardTopping("");
     setProteinPickerItem(null);
+    setComplementPickerItem(null);
     setComboPickerItem(null);
     setShowCustomerDetails(false);
     setShowReward(false);
@@ -464,11 +491,12 @@ export default function POSPage({ styles }) {
     const nextPayload = {
       clientOrderId: createClientOrderId(),
       items: regularItems.map(({
-        id, qty, protein, comboBowlId, comboDrinkId, comboRiceCakeId,
+        id, qty, protein, complement, comboBowlId, comboDrinkId, comboRiceCakeId,
       }) => ({
         id,
         qty,
         ...(protein ? { protein } : {}),
+        ...(complement ? { complement } : {}),
         ...(comboBowlId ? { comboBowlId, comboDrinkId, comboRiceCakeId } : {}),
       })),
       customer: cliente.trim() || "Mostrador",
@@ -666,12 +694,13 @@ export default function POSPage({ styles }) {
         className={ui.productCard}
         onClick={() => item.needsProtein
         ? setProteinPickerItem(item)
+        : item.needsComplement ? setComplementPickerItem(item)
         : item.needsCombo ? openComboPicker(item) : addItem(item)}
         type="button"
         >
         {quantity > 0 && <span className={ui.inCartBadge}>{quantity}</span>}
         <span className={ui.productIcon}>{item.icon}</span>
-        <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.needsCombo ? "Elige bowl, bebida y snack" : item.needsProtein ? "Elige la proteína" : "Toca para agregar"}</small></span>
+        <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.needsCombo ? "Elige bowl, bebida y snack" : item.needsProtein ? "Elige la proteína" : item.needsComplement ? "Elige el complemento" : "Toca para agregar"}</small></span>
         <span className={ui.productPrice}>${item.price}</span>
         <span className={ui.addProduct}>+</span>
         </button>
@@ -982,62 +1011,30 @@ export default function POSPage({ styles }) {
       </div>
 
       {proteinPickerItem && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Proteína del ${proteinPickerItem.name}`}
-          style={{
-            position: "fixed", inset: 0, zIndex: 200,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            background: "rgba(0,0,0,0.5)", padding: 20,
-          }}
-          onClick={() => setProteinPickerItem(null)}
-        >
-          <div
-            style={{
-              background: "#fff", borderRadius: 16, padding: 22,
-              width: "min(420px, 100%)", boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: "0 0 4px", fontSize: 16.5, color: "#1a1a1a" }}>
-              ¿De qué proteína es el {proteinPickerItem.name.toLowerCase()}?
-            </h3>
-            <p style={{ margin: "0 0 16px", fontSize: 12.5, color: "#777" }}>
-              Toca la proteína para agregar el producto a la orden.
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
-              {QUICK_PROTEINS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => confirmProteinPick(p.id)}
-                  style={{
-                    padding: "14px 10px", borderRadius: 10, border: "1.5px solid #e2e2e2",
-                    background: "#fafafa", color: "#1a1a1a", fontWeight: 700, fontSize: 13.5,
-                    cursor: "pointer",
-                  }}
-                >
-                  {p.label}
-                  {!proteinPickerItem?.promo2x1 && PREMIUM_PROTEIN_PRICES[p.id]
-                    ? ` (+$${PREMIUM_PROTEIN_PRICES[p.id]})`
-                    : ""}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setProteinPickerItem(null)}
-              style={{
-                marginTop: 14, width: "100%", padding: 10, borderRadius: 8,
-                border: "none", background: "transparent", color: "#888",
-                fontSize: 12.5, cursor: "pointer",
-              }}
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
+        <QuickOptionPicker
+          label={`Proteína del ${proteinPickerItem.name}`}
+          title={`¿De qué proteína es el ${proteinPickerItem.name.toLowerCase()}?`}
+          hint="Toca la proteína para agregar el producto a la orden."
+          options={QUICK_PROTEINS.map((p) => ({
+            ...p,
+            label: `${p.label}${!proteinPickerItem.promo2x1 && PREMIUM_PROTEIN_PRICES[p.id] ? ` (+$${PREMIUM_PROTEIN_PRICES[p.id]})` : ""}`,
+          }))}
+          onPick={confirmProteinPick}
+          onClose={() => setProteinPickerItem(null)}
+        />
+      )}
+
+      {complementPickerItem && (
+        <QuickOptionPicker
+          label="Complemento del extra"
+          title="¿Qué complemento extra lleva?"
+          hint={`Cada extra cuesta $${EXTRA_COMPLEMENT_PRICE}. Toca el complemento para agregarlo a la orden.`}
+          options={QUICK_COMPLEMENTS
+            .filter((c) => !hiddenIngredients.includes(c.id))
+            .map((c) => ({ ...c, disabled: unavailableItems.includes(c.id), note: unavailableItems.includes(c.id) ? "Agotado" : "" }))}
+          onPick={confirmComplementPick}
+          onClose={() => setComplementPickerItem(null)}
+        />
       )}
 
       {comboPickerItem && (
@@ -1097,6 +1094,66 @@ export default function POSPage({ styles }) {
 
       {cart.length > 0 && mode === "menu" && <button type="button" className={ui.mobileCart} onClick={() => { cartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); cartRef.current?.focus({ preventScroll: true }); }}>Ver orden · {cartItemCount} producto{cartItemCount !== 1 ? "s" : ""}<strong>${total.toLocaleString("es-MX")} →</strong></button>}
       <Receipt order={lastReceipt} />
+    </div>
+  );
+}
+
+// Selector rápido de una opción (proteína de un bowl de venta rápida,
+// complemento de un extra). Tocar una opción la agrega a la orden.
+function QuickOptionPicker({ label, title, hint, options, onPick, onClose }) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      style={{
+        position: "fixed", inset: 0, zIndex: 200,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: "rgba(0,0,0,0.5)", padding: 20,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#fff", borderRadius: 16, padding: 22,
+          width: "min(420px, 100%)", maxHeight: "calc(100dvh - 40px)", overflowY: "auto",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.25)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 style={{ margin: "0 0 4px", fontSize: 16.5, color: "#1a1a1a" }}>{title}</h3>
+        <p style={{ margin: "0 0 16px", fontSize: 12.5, color: "#777" }}>{hint}</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+          {options.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              disabled={option.disabled}
+              onClick={() => onPick(option.id)}
+              style={{
+                padding: "14px 10px", borderRadius: 10, border: "1.5px solid #e2e2e2",
+                background: option.disabled ? "#f1f1f1" : "#fafafa",
+                color: option.disabled ? "#999" : "#1a1a1a", fontWeight: 700, fontSize: 13.5,
+                cursor: option.disabled ? "not-allowed" : "pointer",
+              }}
+            >
+              {option.label}
+              {option.note && <small style={{ display: "block", fontWeight: 600, fontSize: 11, marginTop: 2 }}>{option.note}</small>}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            marginTop: 14, width: "100%", padding: 10, borderRadius: 8,
+            border: "none", background: "transparent", color: "#888",
+            fontSize: 12.5, cursor: "pointer",
+          }}
+        >
+          Cancelar
+        </button>
+      </div>
     </div>
   );
 }

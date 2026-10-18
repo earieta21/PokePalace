@@ -1,5 +1,5 @@
 import { isComboPalaceDay, isPromo2x1Day } from "../utils/promoSchedule.js";
-import { EXTRA_SCOOP_PRICE, PREMIUM_PROTEIN_PRICES } from "../pricing.js";
+import { EXTRA_COMPLEMENT_PRICE, EXTRA_SCOOP_PRICE, PREMIUM_PROTEIN_PRICES } from "../pricing.js";
 
 // Protein stock is stored in kilograms. A medium bowl contains 100 g total,
 // a large bowl contains 120 g total, and every extra scoop adds 40 g.
@@ -91,6 +91,14 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: { agua_natural: 1 },
   },
   {
+    catalogId: "celsius", legacyId: 29, name: "Celsius", price: 55, category: "drinks",
+    inventoryRecipe: { celsius: 1 },
+  },
+  {
+    catalogId: "bloom", legacyId: 30, name: "Bloom", price: 55, category: "drinks",
+    inventoryRecipe: { bloom: 1 },
+  },
+  {
     // Descontinuado: ya no se ofrece en el menú, ni en el POS, ni como
     // opción del Combo Palace. La entrada se queda para que las órdenes
     // viejas y las colas offline sigan resolviendo su nombre y su precio.
@@ -114,6 +122,15 @@ export const POS_CATALOG = Object.freeze([
     // proteína elegida trae upcharge en PREMIUM_PROTEIN_PRICES (hoy solo
     // atún sellado, +$20), resolvePosItems lo suma.
     catalogId: "extra-protein-scoop", legacyId: 27, name: "Extra de proteína", price: EXTRA_SCOOP_PRICE, category: "extras",
+    inventoryRecipe: {},
+  },
+  {
+    // Cobro rápido de una porción extra de un complemento (mango, aguacate…)
+    // al mismo precio que cobra el armador por cada complemento adicional.
+    // Igual que el extra de proteína: sin receta fija, el cajero elige el
+    // complemento en caja (resolvePosItems lo valida) y se descuenta una
+    // porción de ese complemento del inventario (addItemDemand).
+    catalogId: "extra-complement", legacyId: 28, name: "Extra de complemento", price: EXTRA_COMPLEMENT_PRICE, category: "extras",
     inventoryRecipe: {},
   },
 ]);
@@ -225,6 +242,16 @@ export const resolvePosItems = (items, now = new Date()) => {
       throw new PosOrderValidationError("Selecciona la proteína del extra");
     }
 
+    // Solo el extra de complemento lleva complemento; en cualquier otro
+    // producto el campo se ignora.
+    let complement;
+    if (catalogItem.catalogId === "extra-complement") {
+      if (typeof rawItem.complement !== "string" || !COMPLEMENTS_CATALOG.has(rawItem.complement)) {
+        throw new PosOrderValidationError("Selecciona el complemento del extra");
+      }
+      complement = rawItem.complement;
+    }
+
     const comboSelections = catalogItem.comboPalace
       ? sanitizeComboPalaceSelections(rawItem, catalogItem.name)
       : null;
@@ -234,7 +261,8 @@ export const resolvePosItems = (items, now = new Date()) => {
     // se mantienen separadas para no perder de cuál proteína era cada una.
     const mapKey = comboSelections
       ? `${catalogItem.catalogId}::${comboSelections.comboBowlId}::${comboSelections.comboDrinkId}::${comboSelections.comboRiceCakeId}`
-      : protein ? `${catalogItem.catalogId}::${protein}` : catalogItem.catalogId;
+      : protein ? `${catalogItem.catalogId}::${protein}`
+        : complement ? `${catalogItem.catalogId}::${complement}` : catalogItem.catalogId;
     const previous = resolved.get(mapKey);
     const combinedQty = (previous?.qty || 0) + qty;
     if (combinedQty > 99) {
@@ -264,6 +292,7 @@ export const resolvePosItems = (items, now = new Date()) => {
       rewardDrink: Boolean(catalogItem.rewardDrink),
       rewardSnack: Boolean(catalogItem.rewardSnack),
       ...(protein ? { protein } : {}),
+      ...(complement ? { complement } : {}),
       ...(comboSelections || {}),
     });
   }
@@ -537,6 +566,9 @@ const addItemDemand = (demand, item) => {
     const entries = Object.entries(recipe);
     if (entries.length > 0) {
       for (const [key, portions] of entries) addDemand(demand, key, portions * qty);
+    } else if (catalogItem.catalogId === "extra-complement") {
+      // Una porción del complemento elegido por cada extra vendido.
+      if (typeof item?.complement === "string" && item.complement) addDemand(demand, item.complement, qty);
     } else if (typeof item?.protein === "string" && item.protein) {
       // Venta rápida sin receta (bowl mediano/grande/promo 2x1): se descuenta
       // la proteína capturada en caja, aunque el resto del bowl (base,
@@ -621,6 +653,7 @@ export const getUnavailablePosSelections = ({
     consider(inventoryKeyFromName(catalogItem.name));
     for (const key of Object.keys(catalogItem.inventoryRecipe || {})) consider(key);
     consider(item.protein);
+    consider(item.complement);
     if (catalogItem.comboPalace) {
       for (const catalogId of [item.comboBowlId, item.comboDrinkId, item.comboRiceCakeId]) {
         const selectedItem = getPosCatalogItem(catalogId);

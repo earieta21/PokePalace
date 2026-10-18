@@ -53,6 +53,8 @@ const BEVERAGE_PRODUCTS = [
   { name: "Coca-Cola", category: "Refrescos", unit: "latas", key: "coca_cola" },
   { name: "Botella de Agua", category: "Aguas", unit: "botellas", key: "botella_de_agua" },
   { name: "Agua del día", category: "Aguas", unit: "L", key: "agua_natural" },
+  { name: "Celsius", category: "Refrescos", unit: "latas", key: "celsius" },
+  { name: "Bloom", category: "Refrescos", unit: "latas", key: "bloom" },
 ];
 
 const EMPTY_FORM = {

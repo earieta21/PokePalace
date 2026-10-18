@@ -74,7 +74,8 @@ function orderLines(order) {
   }
 
   (order.items || []).forEach((item) => {
-    const proteinSuffix = item.protein ? ` (${PROTEIN_LABELS[item.protein] ?? item.protein})` : "";
+    const proteinSuffix = item.protein ? ` (${PROTEIN_LABELS[item.protein] ?? item.protein})`
+      : item.complement ? ` (${COMPLEMENT_LABELS[item.complement] ?? item.complement})` : "";
     const comboSuffix = item.catalogId === "combo-palace" ? ` — ${comboPalaceSelectionSummary(item)}` : "";
     lines.push({ title: `${item.qty} × ${item.name}${proteinSuffix}${comboSuffix}`, rows: [] });
   });

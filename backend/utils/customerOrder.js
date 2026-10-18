@@ -211,6 +211,7 @@ export const CUSTOMER_EXCLUDED_CATALOG_IDS = new Set([
   "bowl-grande-rapido",
   "promo-2x1-dinein",
   "extra-protein-scoop",
+  "extra-complement",
 ]);
 
 const MAX_CART_LINES = 12;

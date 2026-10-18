@@ -51,3 +51,11 @@ test("preset bowls and combo drinks respect the number sold", () => {
   assert.equal(demand.salmon, 0.1);
   assert.equal(inventoryDemandForItem({ unit: "L", menuKeys: ["agua_natural"], quantityPerPortion: 0.4 }, demand).quantity, 0.8);
 });
+
+test("Celsius y Bloom en latas descuentan una lata por venta sin configurar porción", () => {
+  for (const key of ["celsius", "bloom"]) {
+    const item = { unit: "latas", menuKeys: [key] };
+    assert.equal(inventoryDemandForItem(item, { [key]: 3 }).quantity, 3);
+    assert.equal(inventoryConsumptionStatus(item).ready, true);
+  }
+});
