@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useOrder } from "./OrderContext";
 import { useAvailability } from "../context/AvailabilityContext";
 import {
@@ -40,7 +40,7 @@ const MenuBrowser = ({
     updateCartItemQty,
     startNewBowl,
   } = useOrder();
-  const { unavailableItems, comboPalaceActive } = useAvailability();
+  const { unavailableItems, unavailableCatalogItems, comboPalaceActive } = useAvailability();
   const [activeCombo, setActiveCombo] = useState(null);
   const [comboSelection, setComboSelection] = useState({
     comboBowlId: "",
@@ -53,14 +53,25 @@ const MenuBrowser = ({
   // picker del combo tiene que hacer lo mismo, si no el cliente puede elegir
   // algo agotado y el pedido se rechaza hasta el final, al confirmar (con un
   // error fácil de no notar), sin ningún aviso en el momento de elegir.
-  const availableOptions = (options) =>
-    options.filter((o) => !unavailableItems.includes(o.id));
+  // unavailableCatalogItems cubre lo que se agota por receta (ej. The OG
+  // cuando no hay salmón): el personal apaga ingredientes, no productos.
+  const isCatalogIdUnavailable = useCallback((id) =>
+    unavailableItems.includes(id) || unavailableCatalogItems.includes(id),
+  [unavailableItems, unavailableCatalogItems]);
 
-  const defaultComboSelection = (item) => ({
+  const availableOptions = useCallback((options) =>
+    options.filter((o) => !isCatalogIdUnavailable(o.id)), [isCatalogIdUnavailable]);
+
+  const isItemUnavailable = useCallback((item) =>
+    isCatalogIdUnavailable(item.catalogId)
+    || (item.isCombo && Object.values(item.comboOptions).some((options) => availableOptions(options).length === 0)),
+  [isCatalogIdUnavailable, availableOptions]);
+
+  const defaultComboSelection = useCallback((item) => ({
     comboBowlId: availableOptions(item.comboOptions.bowls)[0]?.id || "",
     comboDrinkId: availableOptions(item.comboOptions.drinks)[0]?.id || "",
     comboRiceCakeId: availableOptions(item.comboOptions.riceCakes)[0]?.id || "",
-  });
+  }), [availableOptions]);
 
   useEffect(() => {
     if (openedInitialCombo.current || !initialComboId) return;
@@ -69,11 +80,11 @@ const MenuBrowser = ({
     // día en que el combo no corre.
     if (comboPalaceActive !== true) return;
     const item = CUSTOMER_CATALOG_BY_ID[initialComboId];
-    if (!item?.isCombo) return;
+    if (!item?.isCombo || isItemUnavailable(item)) return;
     openedInitialCombo.current = true;
     setActiveCombo(item);
     setComboSelection(defaultComboSelection(item));
-  }, [initialComboId, comboPalaceActive]);
+  }, [initialComboId, comboPalaceActive, defaultComboSelection, isItemUnavailable]);
 
   const cartCount = order.cart.reduce((sum, line) => sum + line.qty, 0);
   const cartSubtotal = order.cart.reduce(
@@ -93,7 +104,9 @@ const MenuBrowser = ({
     onBuildBowl();
   };
 
-  const handleAdd = (item) => addCatalogItem(item, 1);
+  const handleAdd = (item) => {
+    if (!isItemUnavailable(item)) addCatalogItem(item, 1);
+  };
   const handleRemove = (item) => {
     const cartLine = order.cart.find(
       (l) => l.kind === "item" && l.catalogId === item.catalogId,
@@ -102,6 +115,7 @@ const MenuBrowser = ({
   };
 
   const openComboPicker = (item) => {
+    if (isItemUnavailable(item) || comboPalaceActive !== true) return;
     setActiveCombo(item);
     setComboSelection(defaultComboSelection(item));
   };
@@ -109,7 +123,7 @@ const MenuBrowser = ({
   const closeComboPicker = () => setActiveCombo(null);
 
   const confirmCombo = () => {
-    if (!activeCombo) return;
+    if (!comboSelectionValid) return;
     addComboToCart(activeCombo, comboSelection, 1);
     closeComboPicker();
   };
@@ -145,7 +159,9 @@ const MenuBrowser = ({
   const halloween = useHalloweenTheme() && isKiosk;
 
   const comboFullyUnavailable =
-    activeCombo && comboGroups.some((group) => group.options.length === 0);
+    activeCombo && (isItemUnavailable(activeCombo) || comboPalaceActive !== true);
+  const comboSelectionValid = activeCombo && !comboFullyUnavailable
+    && comboGroups.every((group) => group.options.some((option) => option.id === comboSelection[group.key]));
 
   return (
     <div className={`${styles.wrapper} ${isKiosk ? styles.kiosk : ""}`}>
@@ -276,6 +292,7 @@ const MenuBrowser = ({
               <div className={styles.grid}>
                 {items.map((item) => {
                   const qty = qtyForCatalogItem(item.catalogId);
+                  const soldOut = isItemUnavailable(item);
                   return (
                     <div
                       key={item.catalogId}
@@ -303,6 +320,7 @@ const MenuBrowser = ({
                       <div className={styles.cardBody}>
                         <div className={styles.cardBodyText}>
                           <p className={styles.cardName}>{item.name}</p>
+                          {soldOut && <p id={`sold-out-${item.catalogId}`} className={styles.soldOut}>Agotado por ahora</p>}
                           {item.description && (
                             <p className={styles.cardDescription}>
                               {item.description}
@@ -325,6 +343,8 @@ const MenuBrowser = ({
                               className={styles.addBtn}
                               onClick={() => openComboPicker(item)}
                               aria-label={`Elegir ${item.name}`}
+                              disabled={soldOut}
+                              aria-describedby={soldOut ? `sold-out-${item.catalogId}` : undefined}
                             >
                               Elegir
                             </button>
@@ -350,6 +370,8 @@ const MenuBrowser = ({
                               className={styles.stepperBtn}
                               onClick={() => handleAdd(item)}
                               aria-label={`Agregar otro ${item.name}`}
+                              disabled={soldOut}
+                              aria-describedby={soldOut ? `sold-out-${item.catalogId}` : undefined}
                             >
                               +
                             </button>
@@ -360,6 +382,8 @@ const MenuBrowser = ({
                             className={styles.addBtn}
                             onClick={() => handleAdd(item)}
                             aria-label={`Agregar ${item.name}`}
+                            disabled={soldOut}
+                            aria-describedby={soldOut ? `sold-out-${item.catalogId}` : undefined}
                           >
                             Agregar
                           </button>
@@ -474,13 +498,17 @@ const MenuBrowser = ({
                 tarde.
               </p>
             ) : (
+              <>
+              {!comboSelectionValid && <p className={styles.comboGroupEmpty} role="status">La disponibilidad cambió. Elige de nuevo las opciones que faltan.</p>}
               <button
                 type="button"
                 className={styles.comboConfirm}
                 onClick={confirmCombo}
+                disabled={!comboSelectionValid}
               >
                 Agregar Combo Palace · {formatPrice(activeCombo.price)}
               </button>
+              </>
             )}
           </div>
         </div>

@@ -38,7 +38,11 @@ export default function Home() {
   const es = language === "es";
   const { addCatalogItem, reorder, startPromo2x1 } = useOrder();
   const { user, isLoggedIn, token } = useContext(AuthContext);
-  const { promo2x1Active, comboPalaceActive } = useAvailability();
+  const { unavailableItems, unavailableCatalogItems, promo2x1Active, comboPalaceActive } = useAvailability();
+  // Un bowl de la casa también se agota cuando falta un ingrediente de su
+  // receta (ej. sin salmón no sale The OG) — eso viene en unavailableCatalogItems.
+  const isSoldOut = (catalogId) =>
+    unavailableItems.includes(catalogId) || unavailableCatalogItems.includes(catalogId);
   const [lastOrder, setLastOrder] = useState(null);
 
   useEffect(() => {
@@ -329,7 +333,10 @@ export default function Home() {
             <button
               className={styles.recipe}
               key={catalogId}
+              type="button"
+              disabled={isSoldOut(catalogId)}
               onClick={() => {
+                if (isSoldOut(catalogId)) return;
                 addCatalogItem(
                   {
                     catalogId,
@@ -349,8 +356,10 @@ export default function Home() {
                   ${computeBowlSubtotal("normal")} <small>MXN</small>
                 </strong>
                 <span>
-                  {es ? "Agregar" : "Add"}
-                  <ArrowRight size={17} />
+                  {isSoldOut(catalogId)
+                    ? (es ? "Agotado por ahora" : "Currently sold out")
+                    : (es ? "Agregar" : "Add")}
+                  {!isSoldOut(catalogId) && <ArrowRight size={17} />}
                 </span>
               </span>
             </button>

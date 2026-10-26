@@ -74,7 +74,7 @@ const loadSavedOrder = () => {
 
 export const OrderProvider = ({ children }) => {
   const [order, setOrder] = useState(loadSavedOrder);
-  const { unavailableItems } = useAvailability();
+  const { unavailableItems, unavailableCatalogItems } = useAvailability();
 
   useEffect(() => {
     localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(order));
@@ -334,6 +334,9 @@ export const OrderProvider = ({ children }) => {
   // pueda armarse (ej. todas sus proteínas dejaron de estar disponibles).
   const reorder = useCallback((pastOrder) => {
     const unavailable = new Set(unavailableItems);
+    // Productos que se agotan por receta (ej. The OG sin salmón), incluidas
+    // las elecciones de un Combo Palace.
+    const unavailableCatalog = new Set([...unavailableItems, ...unavailableCatalogItems]);
 
     const sourceLines = Array.isArray(pastOrder.cartItems) && pastOrder.cartItems.length > 0
       ? pastOrder.cartItems
@@ -352,7 +355,8 @@ export const OrderProvider = ({ children }) => {
     const cart = sourceLines
       .map((line) => {
         if (line.kind === "item") {
-          if (unavailable.has(line.catalogId)) return null;
+          const lineIds = [line.catalogId, line.comboBowlId, line.comboDrinkId, line.comboRiceCakeId];
+          if (lineIds.some((id) => id && unavailableCatalog.has(id))) return null;
           return {
             cartId: generateCartId(),
             kind: "item",
@@ -443,7 +447,7 @@ export const OrderProvider = ({ children }) => {
       notes: "",
       draftStep: 0,
     }));
-  }, [unavailableItems]);
+  }, [unavailableItems, unavailableCatalogItems]);
 
   // Used by the self-service kiosk to wipe a session clean between customers.
   const resetOrder = useCallback(() => {

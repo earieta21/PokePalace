@@ -16,6 +16,7 @@ import {
 } from "../utils/staffRoles.js";
 import {
   getPosInventoryDemand,
+  getUnavailableCatalogIds,
   getUnavailablePosSelections,
   PosOrderValidationError,
   normalizePosClientOrderId,
@@ -350,6 +351,25 @@ test("el servidor detecta productos e ingredientes agotados aunque el POS esté 
     }),
     ["agua-del-dia", "furikake", "salmon"]
   );
+});
+
+test("un ingrediente agotado apaga los productos del catálogo que lo llevan", () => {
+  assert.deepEqual(getUnavailableCatalogIds([]), []);
+
+  const sinSalmon = getUnavailableCatalogIds(["salmon"]);
+  assert.ok(sinSalmon.includes("bowl-the-og"));
+  assert.ok(!sinSalmon.includes("bowl-skinny"));
+  assert.ok(!sinSalmon.includes("bowl-quinoa"));
+  // El combo depende de lo que elija el cliente; el armador filtra las opciones.
+  assert.ok(!sinSalmon.includes("combo-palace"));
+
+  const sinCamaronNiAgua = getUnavailableCatalogIds(["shrimp", "agua_natural"]);
+  assert.ok(sinCamaronNiAgua.includes("bowl-skinny"));
+  assert.ok(sinCamaronNiAgua.includes("bowl-quinoa"));
+  assert.ok(sinCamaronNiAgua.includes("agua-del-dia"));
+  assert.ok(!sinCamaronNiAgua.includes("bowl-the-og"));
+
+  assert.ok(getUnavailableCatalogIds(["coca-zero"]).includes("coca-zero"));
 });
 
 test("el topping Rewards se limita al catálogo operativo", () => {

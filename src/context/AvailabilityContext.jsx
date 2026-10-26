@@ -1,10 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { API_URL } from "../config";
 
-const AvailabilityContext = createContext({ unavailableItems: [], hiddenIngredients: [], promo2x1Active: false, comboPalaceActive: false });
+const AvailabilityContext = createContext({ unavailableItems: [], unavailableCatalogItems: [], hiddenIngredients: [], promo2x1Active: false, comboPalaceActive: false });
 
 export function AvailabilityProvider({ children }) {
   const [unavailableItems, setUnavailableItems] = useState([]);
+  // Productos del catálogo (bowls de la casa, bebidas, extras) que el
+  // servidor rechazaría porque llevan algo agotado — lo calcula el backend
+  // con la misma receta con la que valida el pedido.
+  const [unavailableCatalogItems, setUnavailableCatalogItems] = useState([]);
   // Ingredientes que el negocio no maneja: no se muestran en absoluto, a
   // diferencia de los agotados, que sí aparecen marcados.
   const [hiddenIngredients, setHiddenIngredients] = useState([]);
@@ -19,6 +23,7 @@ export function AvailabilityProvider({ children }) {
       .then((r) => r.json())
       .then((d) => {
         setUnavailableItems(d.unavailableItems ?? []);
+        setUnavailableCatalogItems(d.unavailableCatalogItems ?? []);
         setHiddenIngredients(d.hiddenIngredients ?? []);
         setPromo2x1Active(Boolean(d.promo2x1Active));
         setComboPalaceActive(Boolean(d.comboPalaceActive));
@@ -33,7 +38,7 @@ export function AvailabilityProvider({ children }) {
   }, [fetchAvailability]);
 
   return (
-    <AvailabilityContext.Provider value={{ unavailableItems, hiddenIngredients, promo2x1Active, comboPalaceActive, refetch: fetchAvailability }}>
+    <AvailabilityContext.Provider value={{ unavailableItems, unavailableCatalogItems, hiddenIngredients, promo2x1Active, comboPalaceActive, refetch: fetchAvailability }}>
       {children}
     </AvailabilityContext.Provider>
   );

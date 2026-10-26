@@ -668,3 +668,13 @@ export const getUnavailablePosSelections = ({
 
   return [...selected].sort();
 };
+
+// Productos del catálogo que el servidor rechazaría hoy, ya sea porque se
+// apagaron directo o porque su receta lleva un ingrediente agotado (ej. sin
+// salmón no sale The OG). Se publica en /api/settings/availability para que
+// el menú del cliente los marque como agotados antes de llegar al checkout.
+export const getUnavailableCatalogIds = (unavailableItems = []) =>
+  POS_CATALOG
+    .filter(({ catalogId }) =>
+      getUnavailablePosSelections({ items: [{ catalogId }], unavailableItems }).length > 0)
+    .map(({ catalogId }) => catalogId);

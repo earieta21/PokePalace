@@ -4,6 +4,7 @@ import { isComboPalaceDay, isPromo2x1Day } from "../utils/promoSchedule.js";
 import {
   DELIVERY_APP_PLATFORMS,
   PosOrderValidationError,
+  getUnavailableCatalogIds,
   sanitizeDeliveryCommissions,
 } from "../config/posCatalog.js";
 
@@ -20,8 +21,11 @@ export const getAvailability = async (req, res) => {
       // distinto de `unavailableItems`, que es lo agotado del día.
       BowlCosting.findById("bowl-costing").select("disabledProteins disabledComplements"),
     ]);
+    const unavailableItems = doc?.unavailableItems ?? [];
     res.json({
-      unavailableItems: doc?.unavailableItems ?? [],
+      unavailableItems,
+      // Bowls de la casa, bebidas y extras que quedan fuera por lo agotado.
+      unavailableCatalogItems: getUnavailableCatalogIds(unavailableItems),
       hiddenIngredients: [
         ...(costing?.disabledProteins ?? []),
         ...(costing?.disabledComplements ?? []),

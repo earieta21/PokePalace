@@ -336,11 +336,11 @@
     background 120ms ease;
 }
 
-.addBtn:hover {
+.addBtn:hover:not(:disabled) {
   background: var(--accent-2);
 }
 
-.addBtn:active {
+.addBtn:active:not(:disabled) {
   transform: scale(0.96);
 }
 
@@ -373,6 +373,26 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--text);
+}
+
+.soldOut {
+  display: inline-block;
+  margin: 6px 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border-md);
+  border-radius: 6px;
+  color: var(--text-2);
+  background: var(--bg-card);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.addBtn:disabled,
+.stepperBtn:disabled,
+.comboConfirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* ---- Combo Palace picker ---- */
