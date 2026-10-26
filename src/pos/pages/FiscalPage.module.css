@@ -187,7 +187,36 @@
   font-size: 13px;
 }
 
+.reportGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.groupTitle {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.groupAmount {
+  margin: 0;
+  font-family: "DM Mono", monospace;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.reportHelp {
+  color: var(--p-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 8px 0 14px;
+}
+
 @media (max-width: 900px) {
+  .reportGrid {
+    grid-template-columns: 1fr;
+  }
+
   .kpiGrid {
     grid-template-columns: repeat(2, 1fr);
   }

@@ -1,17 +1,11 @@
-import { useState, useEffect, useContext, useCallback } from "react";
+import { useState, useEffect, useContext, useMemo } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import ui from "./FiscalPage.module.css";
+import { downloadCSV } from "../../utils/csv";
+import { buildFiscalCSV, FISCAL_METHOD_LABELS, fiscalPlatformLabel } from "../../utils/fiscalExport.js";
 
 const fmtMXN = (n) => `$${(n ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const METODO_LABEL = {
-  cash: "Efectivo",
-  card_terminal: "Tarjeta (terminal)",
-  online: "Pago en línea (Openpay)",
-  pay_at_pickup: "Pagar al recoger",
-  delivery_app: "Apps de delivery (liquidación)",
-};
 
 const MES_LABEL = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -36,23 +30,32 @@ const monthLabel = (key) => {
 
 export default function FiscalPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
-  const api = createStaffApi(staffToken);
+  const api = useMemo(() => createStaffApi(staffToken), [staffToken]);
 
   const months = availableMonths();
   const [month, setMonth]     = useState(months[0]);
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
+  const [refresh, setRefresh] = useState(0);
 
-  const load = useCallback(() => {
+  useEffect(() => {
+    let active = true;
     setLoading(true);
+    setError("");
     api.get(`/api/staff/fiscal?month=${month}`)
-      .then(setData)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [staffToken, month]);
+      .then((result) => { if (active) setData(result); })
+      .catch((e) => { if (active) { setError(e.message); setData(null); } })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [api, month, refresh]);
 
-  useEffect(() => { load(); }, [load]);
+  const currentData = data?.month === month ? data : null;
+  const canExport = Boolean(currentData?.ingresos.grupos) && !loading;
+  function exportReport(groupId = null) {
+    if (!canExport) return;
+    downloadCSV(`poke_palace_fiscal_${month}_${groupId || "completo"}.csv`, buildFiscalCSV(currentData, groupId));
+  }
 
   const dueDate = data ? new Date(`${data.vencimiento}T12:00:00`) : null;
   const daysToDue = dueDate ? Math.ceil((dueDate - Date.now()) / 86400000) : null;
@@ -70,14 +73,15 @@ export default function FiscalPage({ styles }) {
           <select className={ui.monthSelect} value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Mes a consultar">
             {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
           </select>
-          <button className={styles.btnGhost} onClick={load} title="Volver a cargar">↻ Actualizar</button>
+          <button className={styles.btnGhost} onClick={() => setRefresh((n) => n + 1)} title="Volver a cargar">↻ Actualizar</button>
+          <button className={styles.btnGhost} onClick={() => exportReport()} disabled={!canExport}>Descargar resumen completo (CSV)</button>
         </div>
       </div>
 
       {error && <p style={{ color: "red", fontSize: 13, marginBottom: 12 }}>{error}</p>}
       {loading && <p className={ui.loadingText}>Calculando el mes…</p>}
 
-      {data && !loading && (
+      {currentData && !loading && (
         <>
           <div className={ui.deadlineBanner}>
             <span>🗓️</span>
@@ -110,6 +114,37 @@ export default function FiscalPage({ styles }) {
             </div>
           </div>
 
+          {data.ingresos.grupos && (
+            <>
+              <div className={ui.sectionTitle}>
+                <span>Para el contador</span>
+                <strong>Reportes separados por forma de cobro</strong>
+              </div>
+              <p className={ui.reportHelp}>Los tres grupos integran el total general. Cada CSV identifica su alcance e incluye el resumen general y el detalle de sus ventas, sin duplicarlas entre grupos.</p>
+              <div className={ui.reportGrid}>
+                {data.ingresos.grupos.map((group) => (
+                  <div key={group.id} className={ui.detailCard}>
+                    <h2 className={ui.groupTitle}>{group.label}</h2>
+                    <p className={ui.groupAmount}>{fmtMXN(group.total)}</p>
+                    <p className={ui.reportHelp}>{group.ordenes} órdenes pagadas · IVA incluido</p>
+                    {group.id === "delivery_app" && (
+                      <>
+                        {data.ingresos.porPlataforma.map((platform) => (
+                          <div key={platform.id} className={ui.detailRow}>
+                            <span>{fiscalPlatformLabel(platform.id)}</span>
+                            <strong>{fmtMXN(platform.total)}</strong>
+                          </div>
+                        ))}
+                        <p className={ui.reportHelp}>Ventas registradas en el sistema. Para conciliar depósitos, comisiones y retenciones, adjunta las liquidaciones de cada app.</p>
+                      </>
+                    )}
+                    <button className={styles.btnGhost} type="button" aria-label={`Descargar reporte de ${group.label}`} onClick={() => exportReport(group.id)} disabled={!canExport}>Descargar CSV</button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
           <div className={ui.sectionTitle}>
             <span>Desglose</span>
             <strong>Ingresos por método de pago</strong>
@@ -120,7 +155,7 @@ export default function FiscalPage({ styles }) {
             ) : (
               Object.entries(data.ingresos.porMetodo).map(([metodo, monto]) => (
                 <div key={metodo} className={ui.detailRow}>
-                  <span>{METODO_LABEL[metodo] || metodo}</span>
+                  <span>{FISCAL_METHOD_LABELS[metodo] || metodo}</span>
                   <strong>{fmtMXN(monto)}</strong>
                 </div>
               ))

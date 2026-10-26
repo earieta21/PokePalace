@@ -5,6 +5,7 @@
    física en RESICO, "Restaurantes de comida para llevar". */
 import Order from "../models/Order.js";
 import Expense from "../models/Expense.js";
+import { buildFiscalIncome } from "./fiscalIncome.js";
 import { zonedDateTimeToUtc, dateKeyInTimeZone } from "../utils/timeZone.js";
 
 const IVA_RATE = 0.16;
@@ -36,23 +37,18 @@ export async function computeFiscalSummary(year, month) {
       status: { $ne: "cancelled" },
       paymentStatus: "paid",
       total: { $ne: null },
-    }).lean(),
+    }).select("_id createdAt total paymentMethod deliveryPlatform").sort({ createdAt: 1, _id: 1 }).lean(),
     Expense.find({
       date: { $gte: dateKeyInTimeZone(start), $lt: dateKeyInTimeZone(end) },
     }).lean(),
   ]);
 
-  const ingresosConIva = orders.reduce((sum, order) => sum + order.total, 0);
+  const income = buildFiscalIncome(orders);
+  const ingresosConIva = income.total;
   const base = ingresosConIva / (1 + IVA_RATE);
   const ivaTrasladado = ingresosConIva - base;
   const rate = resicoRate(base);
   const isrEstimado = base * rate;
-
-  const porMetodo = {};
-  for (const order of orders) {
-    const key = order.paymentMethod || "pay_at_pickup";
-    porMetodo[key] = round2((porMetodo[key] || 0) + order.total);
-  }
 
   const gastosTotal = expenses.reduce((sum, expense) => sum + expense.amount, 0);
 
@@ -77,7 +73,9 @@ export async function computeFiscalSummary(year, month) {
       conIva: round2(ingresosConIva),
       base: round2(base),
       ivaTrasladado: round2(ivaTrasladado),
-      porMetodo,
+      porMetodo: income.porMetodo,
+      grupos: income.grupos,
+      porPlataforma: income.porPlataforma,
     },
     isr: {
       tasa: rate,
