@@ -13,7 +13,10 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000).unref?.();
 
-export const rateLimit = ({ windowMs, max, message, keyFn }) => {
+// refundSuccess: solo cuentan los intentos que fallan. Se cuentan todos al
+// llegar (así muchas solicitudes en paralelo no se saltan el tope) y los que
+// salen bien se devuelven al terminar.
+export const rateLimit = ({ windowMs, max, message, keyFn, refundSuccess = false }) => {
   return (req, res, next) => {
     const key = keyFn ? `${keyFn(req)}:${req.baseUrl}${req.path}` : `${req.ip}:${req.baseUrl}${req.path}`;
     const now = Date.now();
@@ -30,6 +33,12 @@ export const rateLimit = ({ windowMs, max, message, keyFn }) => {
       const retryAfterSec = Math.ceil((bucket.resetAt - now) / 1000);
       res.set("Retry-After", String(retryAfterSec));
       return res.status(429).json({ msg: message || "Demasiados intentos. Intenta más tarde." });
+    }
+
+    if (refundSuccess) {
+      res.on("finish", () => {
+        if (res.statusCode < 400 && buckets.get(key) === bucket) bucket.count -= 1;
+      });
     }
 
     next();

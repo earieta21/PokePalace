@@ -831,8 +831,8 @@ test("pin-login sin locationId se rechaza", async () => {
   assert.equal(r.status, 400);
 });
 
-// Ojo: pin-login permite 8 intentos por IP cada 10 min y todas las pruebas
-// salen de la misma IP — no agregar más llamadas de las necesarias.
+// Ojo: pin-login permite 8 intentos fallidos por IP cada 10 min y todas las
+// pruebas salen de la misma IP — no agregar más fallos de los necesarios.
 test("gerencia con PIN de 4 dígitos crea uno de 6 antes de poder entrar", async () => {
   process.env.PIN_PEPPER ||= "ci-test-pepper";
   const locationId = "ci-pin-upgrade";
@@ -954,6 +954,26 @@ test("muchos PIN fallidos en la sucursal pausan el PIN aunque vengan de otras IP
   const r = await postJSON("/api/staff-auth/pin-login", { pin: "4829", locationId });
   assert.equal(r.status, 429);
   assert.match((await r.json()).message, /pausado/);
+});
+
+// Todo el local sale por la misma IP: los ingresos buenos de la tableta no
+// deben agotar el límite y dejar fuera al siguiente (p. ej. al gerente).
+test("los PIN correctos no gastan el límite de intentos por IP", async () => {
+  process.env.PIN_PEPPER ||= "ci-test-pepper";
+  const locationId = "ci-pin-limit";
+  await StaffUser.create({
+    name: "CI Empleado límite",
+    email: `${STAFF_FIXTURE_PREFIX}pin-limit@example.test`,
+    password: await bcrypt.hash("ci-only-password", 10),
+    role: "employee",
+    locationId,
+    active: true,
+    pin: await hashPin("5823"), // sin pinLength, como las cuentas de antes
+  });
+  for (let i = 0; i < 9; i++) {
+    const r = await postJSON("/api/staff-auth/pin-login", { pin: "5823", locationId });
+    assert.equal(r.status, 200, `el ingreso ${i + 1} no debió frenarse`);
+  }
 });
 
 test("un PIN nuevo respeta el largo del puesto y no puede ser obvio", async () => {

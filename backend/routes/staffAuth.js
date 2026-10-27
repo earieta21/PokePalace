@@ -15,9 +15,12 @@ const router = express.Router();
 
 // PINs are only 4 digits (10,000 combinations) — without this limit, anyone
 // could script through every combination and log in as staff within minutes.
+// Solo cuentan los PIN fallidos: todo el local sale por la misma IP del wifi
+// y los ingresos buenos de la tableta no deben dejar fuera a los demás.
 const pinLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 8,
+  refundSuccess: true,
   message: "Demasiados intentos de PIN. Espera unos minutos e intenta de nuevo.",
 });
 

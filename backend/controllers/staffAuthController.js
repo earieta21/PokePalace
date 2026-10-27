@@ -90,7 +90,14 @@ export const pinLogin = async (req, res) => {
         message: "El acceso con PIN está pausado unos minutos por demasiados intentos fallidos. Si tienes Face ID, úsalo.",
       });
     }
-    const candidates = await StaffUser.find({ locationId, active: true }).select("+pin");
+    // Cada comparación de bcrypt tarda ~0.5 s: solo se prueban las cuentas
+    // con un PIN de ese largo (o sin largo guardado, de antes de los PIN de 6).
+    const enteredLength = String(pin).length;
+    const candidates = await StaffUser.find({
+      locationId,
+      active: true,
+      pinLength: { $in: [enteredLength, null] },
+    }).select("+pin");
     let user = null;
     for (const candidate of candidates) {
       if (await comparePin(pin, candidate.pin)) {
@@ -100,10 +107,11 @@ export const pinLogin = async (req, res) => {
     }
     if (!user) {
       // Una sucursal inexistente no tiene cuentas que adivinar: no se registra.
-      if (candidates.length) await recordPinFailure(req, locationId);
+      if (candidates.length || await StaffUser.exists({ locationId, active: true })) {
+        await recordPinFailure(req, locationId);
+      }
       return res.status(401).json({ message: "PIN incorrecto" });
     }
-    const enteredLength = String(pin).length;
     if (!isHashedPin(user.pin) || user.pinLength !== enteredLength) {
       if (!isHashedPin(user.pin)) user.pin = await hashPin(pin);
       user.pinLength = enteredLength;

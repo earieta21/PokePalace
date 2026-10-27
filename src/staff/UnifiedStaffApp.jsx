@@ -300,7 +300,7 @@ export default function UnifiedStaffApp() {
     staffLogout: handleLogout,
   }), [token, me]);
 
-  async function handleLogin(pin) {
+  async function handleLogin(pin, signal) {
     let r;
     try {
       r = await fetch(`${API_URL}/api/staff-auth/pin-login`, {
@@ -309,6 +309,7 @@ export default function UnifiedStaffApp() {
         // Sin esta marca el servidor pide recargar en vez de mandar a crear
         // el PIN de 6 (una pestaña vieja no sabría mostrar esa pantalla).
         body: JSON.stringify({ pin, locationId: LOCATION_ID, supportsPinUpgrade: true }),
+        signal,
       });
     } catch {
       throw new Error("Sin conexión con el servidor. Intenta de nuevo.");
@@ -358,6 +359,7 @@ export default function UnifiedStaffApp() {
   }
 
   async function startSession(t, user) {
+    rememberPinLength(pinLengthForRole(user.role));
     setToken(t);
     setMe(user);
     const employeePath = user.isManager ? "/api/kiosk/employees/manage" : "/api/kiosk/employees";
@@ -756,41 +758,72 @@ const primaryButton = (halloween) =>
 
 // Empleados usan PIN de 4 dígitos y gerencia de 6 (backend/utils/staffPin.js).
 // Con 4 dígitos se espera un instante antes de enviar por si siguen
-// escribiendo; con 6 se envía en cuanto se completa.
+// escribiendo (más si en este dispositivo suele entrar alguien de gerencia);
+// con 6 se envía en cuanto se completa.
 const PIN_SUBMIT_PAUSE_MS = 700;
+const PIN_SUBMIT_SLOW_PAUSE_MS = 2000;
 
-function PinPad({ halloween, lengths, onSubmit, disabled = false, message = "" }) {
+// Largo del PIN de quien entró por última vez aquí: en el teléfono de un
+// gerente el teclado ya espera 6 dígitos y no corta en 4.
+const PIN_LENGTH_KEY = "pp_staff_pin_length";
+function rememberedPinLength() {
+  try { return localStorage.getItem(PIN_LENGTH_KEY) === "6" ? 6 : 4; } catch { return 4; }
+}
+function rememberPinLength(length) {
+  try { localStorage.setItem(PIN_LENGTH_KEY, String(length)); } catch { /* modo privado */ }
+}
+
+function PinPad({ halloween, lengths, expected = lengths[0], onSubmit, disabled = false, message = "" }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const pauseRef = useRef(null);
+  // Envío de un PIN corto que se cancela si la persona sigue escribiendo
+  // (su PIN es el largo y solo hizo una pausa).
+  const shortSubmitRef = useRef(null);
   const maxLength = Math.max(...lengths);
-  const dots = lengths.find((n) => n >= pin.length) ?? maxLength;
+  const dots = lengths.find((n) => n >= Math.max(pin.length, expected)) ?? maxLength;
   const locked = busy || disabled;
   const canSubmit = !locked && lengths.includes(pin.length);
 
-  useEffect(() => () => clearTimeout(pauseRef.current), []);
+  useEffect(() => () => {
+    clearTimeout(pauseRef.current);
+    shortSubmitRef.current?.abort();
+  }, []);
 
   async function submit(value) {
     clearTimeout(pauseRef.current);
+    const controller = new AbortController();
+    shortSubmitRef.current = value.length < maxLength ? controller : null;
     setBusy(true);
     try {
-      await onSubmit(value);
+      await onSubmit(value, controller.signal);
       setPin(""); setBusy(false);
     } catch (err) {
+      if (controller.signal.aborted) return;
       setError(err.message || "PIN incorrecto, intenta de nuevo");
       setTimeout(() => { setPin(""); setBusy(false); }, 700);
+    } finally {
+      if (shortSubmitRef.current === controller) shortSubmitRef.current = null;
     }
   }
 
   function press(d) {
-    if (locked || pin.length >= maxLength) return;
+    if (busy && !disabled && shortSubmitRef.current) {
+      shortSubmitRef.current.abort();
+      shortSubmitRef.current = null;
+      setBusy(false);
+    } else if (locked) return;
+    if (pin.length >= maxLength) return;
     setError("");
     const next = pin + d;
     setPin(next);
     clearTimeout(pauseRef.current);
     if (next.length === maxLength) submit(next);
-    else if (lengths.includes(next.length)) pauseRef.current = setTimeout(() => submit(next), PIN_SUBMIT_PAUSE_MS);
+    else if (lengths.includes(next.length)) {
+      const pause = next.length < expected ? PIN_SUBMIT_SLOW_PAUSE_MS : PIN_SUBMIT_PAUSE_MS;
+      pauseRef.current = setTimeout(() => submit(next), pause);
+    }
   }
 
   function erase() {
@@ -927,7 +960,8 @@ function PinLogin({ onLogin, onPasskeyLogin, passkeySupported, halloween }) {
         </button>
       )}
 
-      <PinPad halloween={halloween} lengths={[4, 6]} onSubmit={onLogin} message={passkeyError} />
+      <PinPad halloween={halloween} lengths={[4, 6]} expected={rememberedPinLength()}
+        onSubmit={onLogin} message={passkeyError} />
     </LoginShell>
   );
 }
