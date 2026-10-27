@@ -15,7 +15,7 @@ const STATUS_CFG = {
   cancelled: { cls: "badgeRed",   label: "Cancelado" },
 };
 
-const SOURCE_LABEL = { online: "En línea", pos: "POS", whatsapp: "WhatsApp" };
+const SOURCE_LABEL = { online: "En línea", pos: "POS", whatsapp: "WhatsApp", delivery: "Delivery" };
 const FULFILLMENT_LABEL = { pickup: "Para llevar", dine_in: "En restaurante", delivery: "Delivery" };
 const PAYMENT_STATUS_LABEL = { paid: "Pagado", pending: "Pendiente de pago" };
 

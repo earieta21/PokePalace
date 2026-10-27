@@ -31,6 +31,7 @@ import {
 } from "../utils/timeZone.js";
 
 import { deductInventory, restoreInventoryForOrder } from "../services/orderInventory.js";
+import { cancelUberEatsOrder } from "../services/uberEats.js";
 
 async function reverseLoyaltyForPosCancellation(order) {
   const earned = Math.max(0, Number(order.loyaltyPointsEarned) || 0);
@@ -433,12 +434,21 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(409).json({ message: "La orden no puede cambiar a ese estado" });
     }
 
+    // Confirma primero la cancelación externa. Si Uber no responde, la orden
+    // local permanece activa para no ocultar un pedido que sigue vigente.
+    if (status === "cancelled" && prev.externalProvider === "uber_eats" && prev.externalOrderId) {
+      await cancelUberEatsOrder(prev.externalOrderId);
+    }
+
     let order = await Order.findOneAndUpdate(
       { _id: req.params.id, status: prev.status },
       {
         status,
         ...(status === "completed" ? { paymentStatus: "paid" } : {}),
-        ...(status === "cancelled" ? { cancelledAt: new Date() } : {}),
+        ...(status === "cancelled" ? {
+          cancelledAt: new Date(),
+          ...(prev.externalProvider === "uber_eats" ? { externalState: "CANCELED" } : {}),
+        } : {}),
       },
       { new: true }
     ).populate("user", "name email");
@@ -498,7 +508,13 @@ export const updateOrderStatus = async (req, res) => {
         .catch((err) => console.error("ready notification error:", err.message));
     }
   } catch (err) {
-    res.status(500).json({ message: "Error updating order", err: err.message });
+    const upstream = err?.code === "UBER_API_ERROR" || err?.code === "UBER_NOT_CONFIGURED";
+    res.status(upstream ? 502 : 500).json({
+      message: upstream
+        ? "Uber Eats no confirmó la cancelación; la orden sigue activa y puedes reintentar"
+        : "Error updating order",
+      err: err.message,
+    });
   }
 };
 

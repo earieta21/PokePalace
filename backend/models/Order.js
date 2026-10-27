@@ -118,8 +118,22 @@ const orderSchema = new mongoose.Schema(
     // referencia a ningún proveedor en particular).
     paymentRequestId: { type: String, default: null },
     paymentRequestUrl: { type: String, default: null },
-    source:   { type: String, enum: ["online", "pos", "whatsapp"], default: "online" },
+    source:   { type: String, enum: ["online", "pos", "whatsapp", "delivery"], default: "online" },
     total:    { type: Number, default: null },  // in MXN
+
+    // Identidad y estado del pedido en una plataforma conectada. La pareja
+    // provider + orderId es única para que los reintentos del webhook nunca
+    // creen dos comandas para la misma venta.
+    externalProvider: {
+      type: String,
+      enum: ["uber_eats", "didi_food", "rappi", null],
+      default: null,
+    },
+    externalOrderId:   { type: String, default: null, trim: true, maxlength: 128 },
+    externalDisplayId: { type: String, default: null, trim: true, maxlength: 40 },
+    externalStoreId:   { type: String, default: null, trim: true, maxlength: 128 },
+    externalState:     { type: String, default: null, trim: true, maxlength: 40 },
+    externalAcceptedAt:{ type: Date, default: null },
 
     // Canal de publicidad por el que el cliente dice haber conocido el
     // restaurante (capturado por el cajero en el POS). Ver REFERRAL_SOURCES
@@ -201,6 +215,18 @@ orderSchema.index(
     unique: true,
     name: "unique_client_order_id",
     partialFilterExpression: { clientOrderId: { $type: "string" } },
+  }
+);
+
+orderSchema.index(
+  { externalProvider: 1, externalOrderId: 1 },
+  {
+    unique: true,
+    name: "unique_external_order",
+    partialFilterExpression: {
+      externalProvider: { $type: "string" },
+      externalOrderId: { $type: "string" },
+    },
   }
 );
 

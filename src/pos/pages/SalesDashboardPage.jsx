@@ -16,7 +16,7 @@ const fmtHour = (h) => {
   return `${hh}${ampm}`;
 };
 
-const SOURCE_LABEL = { pos: "POS", online: "En línea", whatsapp: "WhatsApp" };
+const SOURCE_LABEL = { pos: "POS", online: "En línea", whatsapp: "WhatsApp", delivery: "Delivery" };
 const FULFILLMENT_LABEL = { pickup: "Pickup", dine_in: "Comer aquí", delivery: "Delivery" };
 const PAYMENT_LABEL = {
   cash: "Efectivo",

@@ -32,11 +32,13 @@ import staffFixedExpenseRoutes from "./routes/staffFixedExpenses.js";
 import whatsappRoutes from "./routes/whatsapp.js";
 import telegramFinanceRoutes from "./routes/telegramFinance.js";
 import kioskPairingRoutes from "./routes/kioskPairing.js";
+import uberEatsRoutes from "./routes/uberEats.js";
 import { logServerError } from "./controllers/monitorController.js";
 import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
 import { startOrderChangeStream } from "./utils/orderEvents.js";
 import { registerDueFixedExpenses } from "./utils/fixedExpenses.js";
 import { checkAndSendFiscalReminder } from "./utils/fiscalReminder.js";
+import { startUberEatsWebhookWorker } from "./services/uberEats.js";
 
 dotenv.config();
 
@@ -83,6 +85,9 @@ app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 // query/body para construir consultas a Mongo, así que no necesita esa
 // protección.
 app.use("/api/whatsapp",       whatsappRoutes);
+// Igual que WhatsApp, Uber firma los bytes exactos del body. Se verifica en
+// su controlador y solo después se guarda el evento, antes de sanitizeMongo.
+app.use("/api/integrations/uber", uberEatsRoutes);
 
 app.use(sanitizeMongo);
 
@@ -188,6 +193,7 @@ const start = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ MongoDB conectado");
     startOrderChangeStream();
+    startUberEatsWebhookWorker();
 
     app.listen(PORT, () => {
       console.log(`✅ Server running on ${PORT}`);

@@ -86,6 +86,7 @@ function orderTicket(order) {
     // capturó caja) y, si se armó uno, el bowl personalizado en campos planos.
     for (const item of order.items || []) {
       const detail = [
+        item.detail,
         item.protein && label(PROTEIN_LABELS, item.protein),
         item.complement && label(COMPLEMENT_LABELS, item.complement),
         item.catalogId === "combo-palace" && comboPalaceSelectionSummary(item),
@@ -353,7 +354,9 @@ export default function KDSPage({ styles, role }) {
       <article key={order._id} className={`${styles.kdsCard} ${styles[cfg.card] ?? ""}`}>
         <header className={styles.kdsHeader}>
           <div className={styles.kdsHeadTop}>
-            <span className={styles.kdsNum}>#{order._id.slice(-5).toUpperCase()}</span>
+            <span className={styles.kdsNum}>
+              {order.externalDisplayId ? `UE ${order.externalDisplayId}` : `#${order._id.slice(-5).toUpperCase()}`}
+            </span>
             <span className={`${styles.kdsTimer} ${timerClass(order, now, styles)}`}>{orderTimingLabel(order, now)}</span>
           </div>
           <div className={styles.kdsHeadMeta}>

@@ -58,7 +58,8 @@ function itemSummary(order) {
       const proteinSuffix = i.protein ? ` (${PROTEIN_LABELS[i.protein] ?? i.protein})`
         : i.complement ? ` (${COMPLEMENT_LABELS[i.complement] ?? i.complement})` : "";
       const comboSuffix = i.catalogId === "combo-palace" ? ` (${comboPalaceSelectionSummary(i)})` : "";
-      return `${i.name}${proteinSuffix}${comboSuffix} ×${i.qty}`;
+      const detailSuffix = i.detail ? ` (${i.detail})` : "";
+      return `${i.name}${detailSuffix}${proteinSuffix}${comboSuffix} ×${i.qty}`;
     }).join(", "));
   }
 
