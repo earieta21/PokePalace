@@ -29,3 +29,23 @@ Los scripts ya no incluyen cuentas ni credenciales predeterminadas.
 
 Las variables `MONGO_URI`, `JWT_SECRET` y `PIN_PEPPER` deben administrarse en el
 gestor de secretos del entorno de despliegue.
+
+## Acceso al portal del staff
+
+- **PIN por puesto.** Empleados, caja y cocina usan PIN de 4 dígitos; dueño,
+  admin y gerente, de 6. Una cuenta de gerencia que todavía tenga PIN de 4
+  dígitos no entra: al usarlo se le pide crear uno de 6 en ese momento. Los PIN
+  nuevos no pueden ser dígitos repetidos ni seguidos (`0000`, `123456`).
+- **Freno por sucursal.** Además del límite por IP, si una sucursal acumula 20
+  PIN incorrectos en 15 minutos (vengan de donde vengan), el acceso con PIN se
+  pausa hasta que esos intentos salgan de la ventana. Face ID sigue
+  funcionando. El conteo vive en Mongo, así que un reinicio no lo borra.
+- **Aviso.** Al activarse el freno se manda un mensaje de Telegram (máximo uno
+  por hora) con el bot de `TELEGRAM_FINANCE_BOT_TOKEN` al chat de
+  `TELEGRAM_SECURITY_CHAT_ID`, o al de `TELEGRAM_FISCAL_CHAT_ID` si no está
+  definido.
+- **Bitácora.** La colección `staffloginevents` guarda entradas, PIN fallidos,
+  bloqueos, cambios de PIN y Face ID activados, con IP y navegador. Se borra
+  sola a los 180 días.
+- **Face ID.** Passkeys (WebAuthn) para `pokepalace.org` y subdominios; solo
+  se ofrecen en teléfonos. El backend guarda únicamente la llave pública.

@@ -11,6 +11,7 @@ import User from "../models/User.js";
 import PromoCode from "../models/PromoCode.js";
 import Order from "../models/Order.js";
 import StaffUser from "../models/StaffUser.js";
+import StaffLoginEvent from "../models/StaffLoginEvent.js";
 import Inventory from "../models/Inventory.js";
 import InventoryMovement from "../models/InventoryMovement.js";
 import AuditLog from "../models/AuditLog.js";
@@ -19,6 +20,7 @@ import Redemption from "../models/Redemption.js";
 import StoreSettings from "../models/StoreSettings.js";
 import { dateKeyInTimeZone, nextDateKey, zonedDateTimeToUtc } from "../utils/timeZone.js";
 import { stableCustomerOrderObjectId } from "../utils/orderReservations.js";
+import { hashPin } from "../utils/staffPin.js";
 
 /* Prueba de integración del flujo crítico: arranca el servidor real contra
    el MongoDB de CI y ejercita las rutas que pagan la renta — crear una orden
@@ -103,6 +105,7 @@ after(async () => {
     await Redemption.deleteMany({ clientRedemptionId: { $regex: "^member-qr:" } });
     await User.deleteMany({ email: { $regex: "^ci-pos-security-" } });
     await StaffUser.deleteMany({ email: { $regex: `^${STAFF_FIXTURE_PREFIX}` } });
+    await StaffLoginEvent.deleteMany({ locationId: { $regex: "^ci-pin-" } });
     await mongoose.disconnect();
   }
   server?.kill("SIGKILL");
@@ -825,6 +828,79 @@ test("registro rechaza contraseñas menores de 8 caracteres", async () => {
 test("pin-login sin locationId se rechaza", async () => {
   const r = await postJSON("/api/staff-auth/pin-login", { pin: "1234" });
   assert.equal(r.status, 400);
+});
+
+// Ojo: pin-login permite 8 intentos por IP cada 10 min y todas las pruebas
+// salen de la misma IP — no agregar más llamadas de las necesarias.
+test("gerencia con PIN de 4 dígitos crea uno de 6 antes de poder entrar", async () => {
+  process.env.PIN_PEPPER ||= "ci-test-pepper";
+  const locationId = "ci-pin-upgrade";
+  await StaffLoginEvent.deleteMany({ locationId });
+  await StaffUser.create({
+    name: "CI Gerente PIN",
+    email: `${STAFF_FIXTURE_PREFIX}pin-upgrade@example.test`,
+    password: await bcrypt.hash("ci-only-password", 10),
+    role: "manager",
+    locationId,
+    active: true,
+    pin: await hashPin("4829"),
+  });
+
+  const login = await postJSON("/api/staff-auth/pin-login", { pin: "4829", locationId });
+  assert.equal(login.status, 200);
+  const pending = await login.json();
+  assert.equal(pending.pinUpgradeRequired, true);
+  assert.equal(pending.token, undefined);
+
+  // El token para cambiar el PIN no abre ninguna ruta del staff.
+  const blocked = await fetch(`${BASE}/api/kiosk/employees?locationId=${locationId}`, {
+    headers: { Authorization: `Bearer ${pending.upgradeToken}` },
+  });
+  assert.equal(blocked.status, 403);
+
+  const upgrade = (newPin) => postJSON("/api/staff-auth/pin-upgrade", { upgradeToken: pending.upgradeToken, newPin });
+  assert.equal((await upgrade("123456")).status, 400); // obvio
+  assert.equal((await upgrade("4830")).status, 400);   // corto para gerencia
+  const upgraded = await upgrade("482913");
+  assert.equal(upgraded.status, 200);
+  const session = await upgraded.json();
+  assert.ok(session.token);
+  assert.equal(session.user.name, "CI Gerente PIN");
+  assert.equal((await upgrade("571946")).status, 401); // el token ya no sirve
+
+  assert.equal((await postJSON("/api/staff-auth/pin-login", { pin: "4829", locationId })).status, 401);
+  const relogin = await postJSON("/api/staff-auth/pin-login", { pin: "482913", locationId });
+  assert.equal(relogin.status, 200);
+  assert.ok((await relogin.json()).token);
+
+  const types = await StaffLoginEvent.find({ locationId }).distinct("type");
+  for (const type of ["upgrade_required", "pin_changed", "success", "failed"]) {
+    assert.ok(types.includes(type), `falta el evento ${type}`);
+  }
+});
+
+test("muchos PIN fallidos en la sucursal pausan el PIN aunque vengan de otras IPs", async () => {
+  const locationId = "ci-pin-lockout";
+  await StaffLoginEvent.deleteMany({ locationId });
+  await StaffLoginEvent.insertMany(
+    Array.from({ length: 20 }, (_, i) => ({ type: "failed", method: "pin", locationId, ip: `203.0.113.${i}` }))
+  );
+  const r = await postJSON("/api/staff-auth/pin-login", { pin: "4829", locationId });
+  assert.equal(r.status, 429);
+  assert.match((await r.json()).message, /pausado/);
+});
+
+test("un PIN nuevo respeta el largo del puesto y no puede ser obvio", async () => {
+  const create = (role, pin) => staffRequest("owner", "/api/kiosk/employees", {
+    method: "POST",
+    body: { name: `CI PIN ${role} ${pin}`, role, pin, locationId: "main" },
+  });
+  assert.equal((await create("manager", "4829")).status, 400);
+  assert.equal((await create("cashier", "1234")).status, 400);
+  const created = await create("manager", "571946");
+  assert.equal(created.status, 201);
+  const { employee } = await created.json();
+  await StaffUser.deleteOne({ _id: employee._id });
 });
 
 test("las rutas de staff exigen token", async () => {

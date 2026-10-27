@@ -5,7 +5,7 @@ import {
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
   ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard, Landmark,
-  Menu, X, Wallet, Pencil, Users, Calculator, ChefHat, ScanFace,
+  Menu, X, Wallet, Pencil, Users, Calculator, ChefHat, ScanFace, Check,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -96,6 +96,8 @@ const ASSIGNABLE_ROLES = {
   admin: ["employee", "cashier", "kitchen", "manager"],
   owner: ["employee", "cashier", "kitchen", "manager", "admin", "owner"],
 };
+// Igual que backend/utils/staffPin.js: gerencia usa PIN de 6 dígitos.
+const pinLengthForRole = (role) => (["owner", "admin", "manager"].includes(role) ? 6 : 4);
 const canManageEmployee = (actor, employee) =>
   sid(actor?.id) !== sid(employee?._id) && Boolean(MANAGEABLE_ROLES[actor?.role]?.includes(employee?.role));
 
@@ -227,6 +229,7 @@ export default function UnifiedStaffApp() {
   const halloween = useHalloweenTheme();
   const passkeySupported = usePasskeySupport();
   const [passkeyOffer, setPasskeyOffer] = useState(false);
+  const [pinUpgrade, setPinUpgrade] = useState(null); // { upgradeToken, pinLength, name }
   const [now, setNow] = useState(Date.now());
   const [lowStockCount, setLowStockCount] = useState(0);
   const [clockError, setClockError] = useState("");
@@ -313,7 +316,32 @@ export default function UnifiedStaffApp() {
       // El límite de intentos (429) responde con `msg`, no con `message`.
       throw new Error(r.status === 401 ? "PIN incorrecto, intenta de nuevo" : err.message || err.msg || "No se pudo verificar el PIN");
     }
-    const { token: t, user } = await r.json();
+    const data = await r.json();
+    if (data.pinUpgradeRequired) {
+      setPinUpgrade({ upgradeToken: data.upgradeToken, pinLength: data.pinLength, name: data.user.name });
+      return;
+    }
+    await enterAfterPin(data);
+  }
+
+  async function handlePinUpgrade(newPin) {
+    let r;
+    try {
+      r = await fetch(`${API_URL}/api/staff-auth/pin-upgrade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ upgradeToken: pinUpgrade.upgradeToken, newPin }),
+      });
+    } catch {
+      throw new Error("Sin conexión con el servidor. Intenta de nuevo.");
+    }
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.message || data.msg || "No se pudo guardar tu PIN.");
+    setPinUpgrade(null);
+    await enterAfterPin(data);
+  }
+
+  async function enterAfterPin({ token: t, user }) {
     if (passkeySupported && shouldOfferPasskey(user.id)) setPasskeyOffer(true);
     await startSession(t, user);
   }
@@ -489,6 +517,12 @@ export default function UnifiedStaffApp() {
   }
 
   if (!me) {
+    if (pinUpgrade) {
+      return (
+        <PinUpgrade halloween={halloween} pending={pinUpgrade}
+          onSave={handlePinUpgrade} onCancel={() => setPinUpgrade(null)} />
+      );
+    }
     return (
       <PinLogin onLogin={handleLogin} onPasskeyLogin={handlePasskeyLogin}
         passkeySupported={passkeySupported} halloween={halloween} />
@@ -714,10 +748,99 @@ const primaryButton = (halloween) =>
     halloween ? "bg-orange-400 hover:bg-orange-300 text-orange-950 shadow-orange-950/40" : "bg-emerald-400 hover:bg-emerald-300 text-emerald-950 shadow-emerald-950/40"
   }`;
 
-function PinLogin({ onLogin, onPasskeyLogin, passkeySupported, halloween }) {
+// Empleados usan PIN de 4 dígitos y gerencia de 6 (backend/utils/staffPin.js).
+// Con 4 dígitos se espera un instante antes de enviar por si siguen
+// escribiendo; con 6 se envía en cuanto se completa.
+const PIN_SUBMIT_PAUSE_MS = 700;
+
+function PinPad({ halloween, lengths, onSubmit, disabled = false, message = "" }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const pauseRef = useRef(null);
+  const maxLength = Math.max(...lengths);
+  const dots = lengths.find((n) => n >= pin.length) ?? maxLength;
+  const locked = busy || disabled;
+  const canSubmit = !locked && lengths.includes(pin.length);
+
+  useEffect(() => () => clearTimeout(pauseRef.current), []);
+
+  async function submit(value) {
+    clearTimeout(pauseRef.current);
+    setBusy(true);
+    try {
+      await onSubmit(value);
+      setPin(""); setBusy(false);
+    } catch (err) {
+      setError(err.message || "PIN incorrecto, intenta de nuevo");
+      setTimeout(() => { setPin(""); setBusy(false); }, 700);
+    }
+  }
+
+  function press(d) {
+    if (locked || pin.length >= maxLength) return;
+    setError("");
+    const next = pin + d;
+    setPin(next);
+    clearTimeout(pauseRef.current);
+    if (next.length === maxLength) submit(next);
+    else if (lengths.includes(next.length)) pauseRef.current = setTimeout(() => submit(next), PIN_SUBMIT_PAUSE_MS);
+  }
+
+  function erase() {
+    if (locked) return;
+    clearTimeout(pauseRef.current);
+    setError("");
+    setPin((p) => p.slice(0, -1));
+  }
+
+  // Teclado físico (compu del local o tableta con teclado).
+  useEffect(() => {
+    function onKey(e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (/^[0-9]$/.test(e.key)) press(e.key);
+      else if (e.key === "Backspace") erase();
+      else if (e.key === "Enter" && canSubmit) submit(pin);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const shown = error || message;
+  return (
+    <>
+      <div className={`flex gap-4 mb-3 ${error ? shellStyles.pinShake : ""} ${busy && !error ? "animate-pulse" : ""}`}
+        role="img" aria-label={`${pin.length} de ${dots} dígitos`}>
+        {Array.from({ length: dots }, (_, i) => (
+          <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${
+            error ? "bg-rose-500 border-rose-500"
+            : pin.length > i ? `${halloween ? "bg-orange-500" : "bg-emerald-500"} border-transparent scale-110`
+            : "border-slate-600"}`} />
+        ))}
+      </div>
+      <p aria-live="polite" className="min-h-5 text-rose-400 text-xs text-center mb-3">{shown}</p>
+
+      <div className="grid grid-cols-3 gap-3 w-full">
+        {[1,2,3,4,5,6,7,8,9].map((d) => (
+          <PinKey key={d} onClick={() => press(String(d))}>{d}</PinKey>
+        ))}
+        {canSubmit ? (
+          <PinKey ariaLabel="Entrar" subtle onClick={() => submit(pin)}>
+            <Check className="w-5 h-5 mx-auto" />
+          </PinKey>
+        ) : <div />}
+        <PinKey onClick={() => press("0")}>0</PinKey>
+        <PinKey ariaLabel="Borrar último dígito" subtle onClick={erase}>
+          <Delete className="w-5 h-5 mx-auto" />
+        </PinKey>
+      </div>
+    </>
+  );
+}
+
+function PinLogin({ onLogin, onPasskeyLogin, passkeySupported, halloween }) {
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeyError, setPasskeyError] = useState("");
   // Se lee en cada render: si el servidor ya no reconoce la passkey, se
   // borra del dispositivo y el botón desaparece solo.
   const passkeyReady = passkeySupported && getDevicePasskeys().length > 0;
@@ -734,61 +857,29 @@ function PinLogin({ onLogin, onPasskeyLogin, passkeySupported, halloween }) {
     return () => clearInterval(timer);
   }, [passkeyReady, prepareRound]);
 
-  async function press(d) {
-    if (busy || pin.length >= 4) return;
-    setError("");
-    const next = pin + d;
-    setPin(next);
-    if (next.length === 4) {
-      setBusy(true);
-      try { await onLogin(next); }
-      catch (err) {
-        setError(err.message || "PIN incorrecto, intenta de nuevo");
-        setTimeout(() => { setPin(""); setBusy(false); }, 700);
-      }
-    }
-  }
-
-  function erase() {
-    if (busy) return;
-    setError("");
-    setPin((p) => p.slice(0, -1));
-  }
-
   async function enterWithPasskey() {
-    if (busy) return;
-    setError(""); setBusy(true);
+    if (passkeyBusy) return;
+    setPasskeyError(""); setPasskeyBusy(true);
     const prepared = preparedRef.current;
     preparedRef.current = null;
     try { await onPasskeyLogin(prepared); }
     catch (err) {
-      if (!isPasskeyCancel(err)) setError(err.message || `No se pudo verificar ${label}. Usa tu PIN.`);
-      setBusy(false);
+      if (!isPasskeyCancel(err)) setPasskeyError(err.message || `No se pudo verificar ${label}. Usa tu PIN.`);
+      setPasskeyBusy(false);
       setPrepareRound((n) => n + 1);
     }
   }
-
-  // Teclado físico (compu del local o tableta con teclado).
-  useEffect(() => {
-    function onKey(e) {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (/^[0-9]$/.test(e.key)) press(e.key);
-      else if (e.key === "Backspace") erase();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
 
   return (
     <LoginShell halloween={halloween}>
       <p className="font-bold text-lg text-white mb-1">Acceso privado</p>
       <p className="text-xs text-slate-400 mb-6 text-center">
-        {passkeyReady ? `Entra con ${label} o con tu PIN de 4 dígitos.` : "Ingresa tu PIN de 4 dígitos."}
+        {passkeyReady ? `Entra con ${label} o con tu PIN.` : "Ingresa tu PIN."}
       </p>
 
       {passkeyReady && (
         <>
-          <button type="button" onClick={enterWithPasskey} disabled={busy} className={primaryButton(halloween)}>
+          <button type="button" onClick={enterWithPasskey} disabled={passkeyBusy} className={primaryButton(halloween)}>
             <ScanFace className="w-6 h-6" aria-hidden="true" /> Entrar con {label}
           </button>
           <div className="flex items-center gap-3 w-full my-6 text-[11px] uppercase tracking-[0.2em] text-slate-500">
@@ -797,27 +888,7 @@ function PinLogin({ onLogin, onPasskeyLogin, passkeySupported, halloween }) {
         </>
       )}
 
-      <div className={`flex gap-4 mb-3 ${error ? shellStyles.pinShake : ""} ${busy && !error ? "animate-pulse" : ""}`}
-        role="img" aria-label={`${pin.length} de 4 dígitos`}>
-        {[0,1,2,3].map((i) => (
-          <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${
-            error ? "bg-rose-500 border-rose-500"
-            : pin.length > i ? `${halloween ? "bg-orange-500" : "bg-emerald-500"} border-transparent scale-110`
-            : "border-slate-600"}`} />
-        ))}
-      </div>
-      <p aria-live="polite" className="min-h-5 text-rose-400 text-xs text-center mb-3">{error}</p>
-
-      <div className="grid grid-cols-3 gap-3 w-full">
-        {[1,2,3,4,5,6,7,8,9].map((d) => (
-          <PinKey key={d} onClick={() => press(String(d))}>{d}</PinKey>
-        ))}
-        <div />
-        <PinKey onClick={() => press("0")}>0</PinKey>
-        <PinKey ariaLabel="Borrar último dígito" subtle onClick={erase}>
-          <Delete className="w-5 h-5 mx-auto" />
-        </PinKey>
-      </div>
+      <PinPad halloween={halloween} lengths={[4, 6]} onSubmit={onLogin} disabled={passkeyBusy} message={passkeyError} />
     </LoginShell>
   );
 }
@@ -830,6 +901,47 @@ function PinKey({ children, onClick, subtle, ariaLabel }) {
       }`}>
       {children}
     </button>
+  );
+}
+
+// Gerencia que todavía tiene PIN de 4 dígitos: antes de entrar crea uno de 6
+// (se escribe dos veces). El servidor rechaza los obvios y los repetidos.
+function PinUpgrade({ halloween, pending, onSave, onCancel }) {
+  const [first, setFirst] = useState(null);
+  const [notice, setNotice] = useState("");
+  const firstName = pending.name.split(" ")[0];
+
+  async function confirm(value) {
+    if (value !== first) {
+      setFirst(null);
+      setNotice("Los PIN no coinciden. Empieza de nuevo.");
+      return;
+    }
+    try { await onSave(value); }
+    catch (err) {
+      setFirst(null);
+      setNotice(err.message || "No se pudo guardar tu PIN.");
+    }
+  }
+
+  return (
+    <LoginShell halloween={halloween}>
+      <p className="font-bold text-lg text-white mb-1 text-center">
+        {first ? "Confirma tu nuevo PIN" : `Hola, ${firstName}. Crea tu PIN de ${pending.pinLength} dígitos`}
+      </p>
+      <p className="text-xs text-slate-400 mb-6 text-center">
+        {first
+          ? "Escríbelo otra vez."
+          : "Por seguridad, las cuentas de gerencia ahora usan un PIN más largo. Evita números repetidos o seguidos."}
+      </p>
+      <PinPad key={first ? "confirm" : "new"} halloween={halloween} lengths={[pending.pinLength]}
+        onSubmit={first ? confirm : (value) => { setNotice(""); setFirst(value); }}
+        message={first ? "" : notice} />
+      <button type="button" onClick={onCancel}
+        className="w-full h-12 mt-4 rounded-2xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+        Cancelar
+      </button>
+    </LoginShell>
   );
 }
 
@@ -2364,10 +2476,11 @@ function TeamManager({ actor, employees, onAdd, onRemove }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmId, setConfirmId] = useState(null);
+  const pinLength = pinLengthForRole(form.role);
 
   async function handleAdd() {
     if (!form.name.trim()) return setError("Escribe el nombre");
-    if (form.pin.length !== 4) return setError("El PIN debe tener 4 dígitos");
+    if (form.pin.length !== pinLength) return setError(`El PIN debe tener ${pinLength} dígitos`);
     setError(""); setSaving(true);
     try {
       await onAdd({ ...form, hourlyRate: parseFloat(form.hourlyRate) || 0 });
@@ -2422,14 +2535,15 @@ function TeamManager({ actor, employees, onAdd, onRemove }) {
           <input value={form.name} onChange={(e) => setForm({...form, name:e.target.value})} placeholder="Nombre completo"
             className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500" />
           <div className="grid grid-cols-2 gap-2">
-            <select value={form.role} onChange={(e) => setForm({...form, role:e.target.value})}
+            <select value={form.role}
+              onChange={(e) => setForm({...form, role:e.target.value, pin:form.pin.slice(0, pinLengthForRole(e.target.value))})}
               className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
               {(ASSIGNABLE_ROLES[actor?.role] || []).map((role) => (
                 <option key={role} value={role}>{ROLE_LABEL[role] || role}</option>
               ))}
             </select>
-            <input value={form.pin} inputMode="numeric" placeholder="PIN (4 dígitos)"
-              onChange={(e) => setForm({...form, pin:e.target.value.replace(/\D/g,"").slice(0,4)})}
+            <input value={form.pin} inputMode="numeric" placeholder={`PIN (${pinLength} dígitos)`}
+              onChange={(e) => setForm({...form, pin:e.target.value.replace(/\D/g,"").slice(0,pinLength)})}
               className="bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 tracking-widest" />
           </div>
           <input value={form.hourlyRate} type="number" min="0" step="10" inputMode="decimal"

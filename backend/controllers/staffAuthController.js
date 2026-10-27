@@ -1,8 +1,18 @@
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import StaffUser from "../models/StaffUser.js";
 import StaffPasskey from "../models/StaffPasskey.js";
-import { comparePin, hashPin, isHashedPin, isValidPin } from "../utils/staffPin.js";
+import {
+  comparePin,
+  hashPin,
+  isHashedPin,
+  isValidPin,
+  isValidPinForRole,
+  isWeakPin,
+  pinLengthForRole,
+} from "../utils/staffPin.js";
+import { isPinLoginLocked, recordLoginEvent, recordPinFailure } from "../utils/staffLoginGuard.js";
 import {
   SUPPORTED_ALGORITHMS,
   WebAuthnError,
@@ -32,12 +42,37 @@ const sessionFor = (user) => ({
   },
 });
 
+// Token que solo sirve para cambiar el PIN (requireStaffAuth lo rechaza por
+// su type). Lleva una huella del hash actual para que deje de servir en
+// cuanto el PIN cambia.
+const pinVersion = (storedPin) =>
+  crypto.createHash("sha256").update(String(storedPin || "")).digest("base64url").slice(0, 16);
+const upgradeTokenFor = (user) =>
+  jwt.sign(
+    { id: user._id, type: "staff-pin-upgrade", pv: pinVersion(user.pin) },
+    process.env.JWT_SECRET,
+    { expiresIn: "10m" }
+  );
+
+async function isPinTaken(locationId, pin, excludeId) {
+  const others = await StaffUser.find({ locationId, active: true, _id: { $ne: excludeId } }).select("+pin");
+  for (const other of others) {
+    if (await comparePin(pin, other.pin)) return true;
+  }
+  return false;
+}
+
 export const pinLogin = async (req, res) => {
   const { pin, locationId } = req.body;
   if (!isValidPin(pin) || typeof locationId !== "string" || !locationId) {
     return res.status(400).json({ message: "pin y locationId requeridos" });
   }
   try {
+    if (await isPinLoginLocked(locationId)) {
+      return res.status(429).json({
+        message: "El acceso con PIN está pausado unos minutos por demasiados intentos fallidos. Si tienes Face ID, úsalo.",
+      });
+    }
     const candidates = await StaffUser.find({ locationId, active: true }).select("+pin");
     let user = null;
     for (const candidate of candidates) {
@@ -47,15 +82,63 @@ export const pinLogin = async (req, res) => {
       }
     }
     if (!user) {
+      // Una sucursal inexistente no tiene cuentas que adivinar: no se registra.
+      if (candidates.length) await recordPinFailure(req, locationId);
       return res.status(401).json({ message: "PIN incorrecto" });
     }
     if (!isHashedPin(user.pin)) {
       user.pin = await hashPin(pin);
       await user.save();
     }
+    // Gerencia con PIN de 4 dígitos: no entra hasta crear uno de 6.
+    if (String(pin).length < pinLengthForRole(user.role)) {
+      await recordLoginEvent(req, { type: "upgrade_required", method: "pin", locationId, user });
+      return res.json({
+        pinUpgradeRequired: true,
+        upgradeToken: upgradeTokenFor(user),
+        pinLength: pinLengthForRole(user.role),
+        user: { name: user.name },
+      });
+    }
+    await recordLoginEvent(req, { type: "success", method: "pin", locationId, user });
     res.json(sessionFor(user));
   } catch (err) {
     res.status(500).json({ message: "Server error", err: err.message });
+  }
+};
+
+export const pinUpgrade = async (req, res) => {
+  const { upgradeToken, newPin } = req.body || {};
+  let payload;
+  try {
+    payload = jwt.verify(String(upgradeToken || ""), process.env.JWT_SECRET);
+  } catch {
+    return res.status(401).json({ message: "Pasó demasiado tiempo. Cancela y entra de nuevo con tu PIN actual." });
+  }
+  if (payload.type !== "staff-pin-upgrade") return res.status(401).json({ message: "Solicitud inválida" });
+  try {
+    const user = await StaffUser.findOne({ _id: payload.id, active: true }).select("+pin");
+    if (!user || pinVersion(user.pin) !== payload.pv) {
+      return res.status(401).json({ message: "Esta solicitud ya no es válida. Entra de nuevo con tu PIN." });
+    }
+    const length = pinLengthForRole(user.role);
+    if (!isValidPinForRole(newPin, user.role)) {
+      return res.status(400).json({ message: `Tu PIN debe tener ${length} dígitos` });
+    }
+    if (isWeakPin(newPin)) {
+      return res.status(400).json({ message: "Ese PIN es muy fácil de adivinar. Evita números repetidos o seguidos." });
+    }
+    if (await isPinTaken(user.locationId, newPin, user._id)) {
+      return res.status(409).json({ message: "Ese PIN no está disponible. Elige otro." });
+    }
+    user.pin = await hashPin(newPin);
+    await user.save();
+    await recordLoginEvent(req, { type: "pin_changed", method: "pin", locationId: user.locationId, user });
+    await recordLoginEvent(req, { type: "success", method: "pin", locationId: user.locationId, user });
+    res.json(sessionFor(user));
+  } catch (err) {
+    console.error("PIN upgrade error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -108,6 +191,12 @@ export const passkeyRegister = async (req, res) => {
       ...verified,
       deviceLabel: typeof deviceLabel === "string" ? deviceLabel.slice(0, 40) : "",
     });
+    await recordLoginEvent(req, {
+      type: "passkey_registered",
+      method: "passkey",
+      locationId: req.staff.locationId,
+      user: { _id: req.staff.id, name: req.staff.name },
+    });
     res.status(201).json({ ok: true, credentialId: verified.credentialId });
   } catch (err) {
     if (err instanceof WebAuthnError) return res.status(400).json({ message: err.message });
@@ -137,30 +226,32 @@ export const passkeyLogin = async (req, res) => {
   if (typeof credential?.id !== "string" || typeof locationId !== "string" || !locationId) {
     return res.status(400).json({ message: "credencial y locationId requeridos" });
   }
+  const failed = (message, extra = {}) => {
+    recordLoginEvent(req, { type: "failed", method: "passkey", locationId });
+    return res.status(401).json({ message, ...extra });
+  };
   try {
     const challenge = consumeChallenge(challengeToken, "login");
     const passkey = await StaffPasskey.findOne({ credentialId: credential.id });
     if (!passkey) {
-      return res.status(401).json({
-        message: "Face ID ya no está activo en este dispositivo. Entra con tu PIN.",
-        code: "unknown_credential",
-      });
+      return failed("Face ID ya no está activo en este dispositivo. Entra con tu PIN.", { code: "unknown_credential" });
     }
     const userHandle = credential.response?.userHandle;
     if (userHandle && userHandle !== userHandleFor(passkey.staffId)) {
-      return res.status(401).json({ message: "La credencial no corresponde a la cuenta" });
+      return failed("La credencial no corresponde a la cuenta");
     }
     const { signCount } = verifyAuthentication(credential, challenge, passkey);
 
     const user = await StaffUser.findOne({ _id: passkey.staffId, locationId, active: true });
-    if (!user) return res.status(401).json({ message: "Cuenta no disponible. Habla con tu gerente." });
+    if (!user) return failed("Cuenta no disponible. Habla con tu gerente.");
 
     passkey.signCount = signCount;
     passkey.lastUsedAt = new Date();
     await passkey.save();
+    await recordLoginEvent(req, { type: "success", method: "passkey", locationId, user });
     res.json(sessionFor(user));
   } catch (err) {
-    if (err instanceof WebAuthnError) return res.status(401).json({ message: err.message });
+    if (err instanceof WebAuthnError) return failed(err.message);
     console.error("Passkey login error:", err);
     res.status(500).json({ message: "Server error" });
   }

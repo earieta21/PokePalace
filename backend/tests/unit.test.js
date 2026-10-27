@@ -7,7 +7,7 @@ import {
   PREMIUM_PROTEIN_PRICES,
 } from "../pricing.js";
 import { distanceMeters, isWithinRestaurant, RESTAURANT_LOCATION } from "../utils/geo.js";
-import { isValidPin, hashPin, comparePin } from "../utils/staffPin.js";
+import { isValidPin, isValidPinForRole, isWeakPin, pinLengthForRole, hashPin, comparePin } from "../utils/staffPin.js";
 import { sanitizeCustomerBowl } from "../utils/customerOrder.js";
 import {
   subscribeToOrderEvents,
@@ -144,12 +144,34 @@ test("la distancia Haversine es simetrica y positiva", () => {
 
 /* ── PINs del staff ── */
 
-test("solo 4 digitos exactos son un PIN valido", () => {
+test("un PIN valido tiene 4 digitos (empleados) o 6 (gerencia)", () => {
   assert.equal(isValidPin("1234"), true);
+  assert.equal(isValidPin("123456"), true);
   assert.equal(isValidPin("123"), false);
   assert.equal(isValidPin("12345"), false);
+  assert.equal(isValidPin("1234567"), false);
   assert.equal(isValidPin("12a4"), false);
   assert.equal(isValidPin(""), false);
+});
+
+test("gerencia necesita PIN de 6 digitos y el resto de 4", () => {
+  assert.equal(pinLengthForRole("owner"), 6);
+  assert.equal(pinLengthForRole("admin"), 6);
+  assert.equal(pinLengthForRole("manager"), 6);
+  assert.equal(pinLengthForRole("cashier"), 4);
+  assert.equal(isValidPinForRole("4821", "manager"), false);
+  assert.equal(isValidPinForRole("482193", "manager"), true);
+  assert.equal(isValidPinForRole("482193", "employee"), false);
+  assert.equal(isValidPinForRole("4821", "kitchen"), true);
+});
+
+test("los PIN repetidos o seguidos se consideran debiles", () => {
+  for (const weak of ["0000", "1111", "1234", "4321", "999999", "123456", "654321", "345678"]) {
+    assert.equal(isWeakPin(weak), true, weak);
+  }
+  for (const ok of ["4821", "1357", "482193", "112233", "1243"]) {
+    assert.equal(isWeakPin(ok), false, ok);
+  }
 });
 
 test("un PIN hasheado se verifica y uno incorrecto se rechaza", async () => {

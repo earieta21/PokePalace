@@ -6,7 +6,7 @@ import TempRecord from "../models/TempRecord.js";
 import Announcement from "../models/Announcement.js";
 import Schedule from "../models/Schedule.js";
 import StaffUser from "../models/StaffUser.js";
-import { comparePin, hashPin, isValidPin } from "../utils/staffPin.js";
+import { comparePin, hashPin, isValidPinForRole, isWeakPin, pinLengthForRole } from "../utils/staffPin.js";
 import { isWithinRestaurant, MAX_DISTANCE_METERS } from "../utils/geo.js";
 import {
   canAssignStaffRole,
@@ -99,14 +99,21 @@ export const getManagedKioskEmployees = async (req, res) => {
 export const createKioskEmployee = async (req, res) => {
   const { name, role, pin, color, locationId, hourlyRate, payType, weeklySalary } = req.body;
   const requestedRole = role || "employee";
-  if (!name?.trim() || !isValidPin(pin) || !locationId) {
-    return res.status(400).json({ message: "Nombre y PIN de 4 dígitos requeridos" });
+  if (!name?.trim() || !locationId) {
+    return res.status(400).json({ message: "Nombre y PIN requeridos" });
   }
   if (!requestedLocationIsAllowed(req, locationId)) {
     return res.status(403).json({ message: "No puedes crear personal en otra sucursal" });
   }
   if (!isStaffRole(requestedRole) || !canAssignStaffRole(req.staff.role, requestedRole)) {
     return res.status(403).json({ message: "No tienes permiso para asignar ese rol" });
+  }
+  // Gerencia usa 6 dígitos; el resto, 4 (ver utils/staffPin.js).
+  if (!isValidPinForRole(pin, requestedRole)) {
+    return res.status(400).json({ message: `El PIN debe tener ${pinLengthForRole(requestedRole)} dígitos para ese puesto` });
+  }
+  if (isWeakPin(pin)) {
+    return res.status(400).json({ message: "Ese PIN es muy fácil de adivinar. Evita números repetidos o seguidos." });
   }
   try {
     const candidates = await StaffUser.find({ locationId, active: true }).select("+pin");

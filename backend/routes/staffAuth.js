@@ -2,6 +2,7 @@ import express from "express";
 import {
   staffLogin,
   pinLogin,
+  pinUpgrade,
   passkeyLogin,
   passkeyLoginOptions,
   passkeyRegister,
@@ -36,6 +37,8 @@ const passkeyLimiter = rateLimit({
 
 router.post("/login", loginLimiter, staffLogin);
 router.post("/pin-login", pinLimiter, pinLogin);
+// Solo acepta el token corto que entrega pin-login a gerencia con PIN de 4.
+router.post("/pin-upgrade", loginLimiter, pinUpgrade);
 
 router.post("/passkey/login-options", passkeyLimiter, passkeyLoginOptions);
 router.post("/passkey/login", passkeyLimiter, passkeyLogin);
