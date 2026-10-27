@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import StaffUser from "../models/StaffUser.js";
+import StaffPasskey from "../models/StaffPasskey.js";
 import TimeRecord from "../models/TimeRecord.js";
 import {
   canAssignStaffRole,
@@ -178,6 +179,7 @@ export const deleteEmployee = async (req, res) => {
     if (force && timeRecordCount > 0) {
       await TimeRecord.deleteMany({ employeeId: target._id });
     }
+    await StaffPasskey.deleteMany({ staffId: target._id });
     await StaffUser.findByIdAndDelete(target._id);
 
     res.json({ ok: true, deletedTimeRecords: force ? timeRecordCount : 0 });

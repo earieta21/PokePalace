@@ -940,6 +940,17 @@
   animation-delay: -3s;
 }
 
+/* PIN incorrecto: los puntos tiemblan, como en la pantalla de bloqueo. */
+.pinShake {
+  animation: pinShake 0.4s ease-in-out;
+}
+
+@keyframes pinShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
 @keyframes staffBatFloat {
   0%, 100% { transform: translate(0, 0) rotate(-4deg) scaleX(1); }
   25% { transform: translate(-5px, -4px) rotate(2deg) scaleX(0.82); }
@@ -951,7 +962,8 @@
   .brandBatOne,
   .brandBatTwo,
   .pinBatOne,
-  .pinBatTwo {
+  .pinBatTwo,
+  .pinShake {
     animation: none;
   }
 }
