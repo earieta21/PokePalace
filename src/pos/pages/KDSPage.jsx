@@ -108,9 +108,9 @@ function orderTicket(order) {
 const dueAt = (order) => new Date(order.scheduledPickupTime || order.createdAt).getTime() || 0;
 const byDue = (a, b) => dueAt(a) - dueAt(b);
 
-// Minutos desde que llegó el pedido a partir de los cuales el reloj se pinta
-// de ámbar y de rojo.
-const LATE_WARN_MIN = 8;
+// Un pedido tarda unos 12 minutos. El reloj se pinta de ámbar un poco antes
+// (ya debería estar por salir) y de rojo cuando ya se pasó de lo normal.
+const LATE_WARN_MIN = 10;
 const LATE_ALERT_MIN = 15;
 
 function timerClass(order, now, styles) {
