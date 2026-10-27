@@ -18,10 +18,11 @@ Agrega estas variables al servicio del backend, en **Environment**:
 UBER_EATS_ENV=sandbox
 UBER_EATS_CLIENT_ID=<Application ID de Uber>
 UBER_EATS_CLIENT_SECRET=<Client Secret de Uber>
+UBER_EATS_WEBHOOK_SECRET=<Signing Key independiente del webhook>
 UBER_EATS_AUTO_ACCEPT=true
 ```
 
-No guardes el Client Secret en GitHub, mensajes o capturas. Para producción cambia `UBER_EATS_ENV=production` únicamente cuando Uber apruebe la aplicación productiva y sus alcances.
+No guardes ningún secreto en GitHub, mensajes o capturas. Usa una Signing Key distinta al Client Secret. Para producción cambia `UBER_EATS_ENV=production` únicamente cuando Uber apruebe la aplicación productiva y sus alcances.
 
 Mientras **Integration Verification Result** siga pendiente, usa solamente la aplicación TEST y los dominios de sandbox.
 

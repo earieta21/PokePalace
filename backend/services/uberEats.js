@@ -35,6 +35,10 @@ export function getUberEatsConfig(env = process.env) {
   };
 }
 
+export function getUberEatsWebhookSecret(env = process.env) {
+  return String(env.UBER_EATS_WEBHOOK_SECRET || env.UBER_EATS_CLIENT_SECRET || "").trim();
+}
+
 function requireConfig() {
   const config = getUberEatsConfig();
   if (!config.clientId || !config.clientSecret) {
@@ -45,7 +49,7 @@ function requireConfig() {
   return config;
 }
 
-export function verifyUberWebhookSignature(rawBody, signature, secret = process.env.UBER_EATS_CLIENT_SECRET) {
+export function verifyUberWebhookSignature(rawBody, signature, secret = getUberEatsWebhookSecret()) {
   if (!Buffer.isBuffer(rawBody) || !signature || !secret) return false;
   const cleanSignature = String(signature).trim().toLowerCase().replace(/^sha256=/, "");
   if (!/^[a-f0-9]{64}$/.test(cleanSignature)) return false;

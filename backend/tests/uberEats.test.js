@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   getUberEatsConfig,
+  getUberEatsWebhookSecret,
   normalizeUberEatsOrder,
   verifyUberWebhookSignature,
 } from "../services/uberEats.js";
@@ -26,6 +27,14 @@ test("usa los dominios correctos para sandbox y producción", () => {
   const production = getUberEatsConfig({ UBER_EATS_ENV: "production" });
   assert.equal(production.tokenUrl, "https://auth.uber.com/oauth/v2/token");
   assert.equal(production.apiBase, "https://api.uber.com");
+});
+
+test("la firma usa una clave de webhook separada y conserva compatibilidad", () => {
+  assert.equal(getUberEatsWebhookSecret({
+    UBER_EATS_WEBHOOK_SECRET: "firma-separada",
+    UBER_EATS_CLIENT_SECRET: "oauth-secret",
+  }), "firma-separada");
+  assert.equal(getUberEatsWebhookSecret({ UBER_EATS_CLIENT_SECRET: "oauth-secret" }), "oauth-secret");
 });
 
 test("convierte un pedido Uber en una comanda del KDS con modificadores y notas", () => {
