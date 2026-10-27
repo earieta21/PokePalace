@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useLocation } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 
@@ -40,6 +41,7 @@ function registerVisit() {
 }
 
 export default function PwaInstallPrompt() {
+  const isNative = Capacitor.isNativePlatform();
   const { pathname } = useLocation();
   const { t } = useLanguage();
   const [promptEvent, setPromptEvent] = useState(null);
@@ -52,11 +54,12 @@ export default function PwaInstallPrompt() {
   const isHome = pathname === "/";
 
   useEffect(() => {
+    if (isNative) return;
     setIsReturnVisit(registerVisit());
-  }, []);
+  }, [isNative]);
 
   useEffect(() => {
-    if (dismissed || isInStandalone()) return undefined;
+    if (isNative || dismissed || isInStandalone()) return undefined;
 
     const handler = (event) => {
       event.preventDefault();
@@ -64,16 +67,16 @@ export default function PwaInstallPrompt() {
     };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, [dismissed]);
+  }, [dismissed, isNative]);
 
   useEffect(() => {
     setDelayReady(false);
     setIosStep2(false);
-    if (!isHome || !isReturnVisit || dismissed || isInStandalone()) return undefined;
+    if (isNative || !isHome || !isReturnVisit || dismissed || isInStandalone()) return undefined;
 
     const timer = window.setTimeout(() => setDelayReady(true), PROMPT_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [dismissed, isHome, isReturnVisit]);
+  }, [dismissed, isHome, isNative, isReturnVisit]);
 
   const dismiss = () => {
     setDismissed(true);
@@ -108,6 +111,7 @@ export default function PwaInstallPrompt() {
   };
 
   const visible = isHome
+    && !isNative
     && isReturnVisit
     && delayReady
     && !dismissed

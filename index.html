@@ -119,6 +119,9 @@
       // este bloque busca versiones nuevas cada 15 min y recarga solo cuando
       // nadie ha tocado la pantalla, para no perder una orden a medio capturar.
       (function () {
+        // Capacitor ya empaqueta los archivos dentro de la app. Un service
+        // worker aquí solo duplicaría el cache y puede dejar una versión vieja.
+        if (window.Capacitor?.isNativePlatform?.()) return;
         if (!("serviceWorker" in navigator)) return;
 
         var IDLE_BEFORE_RELOAD_MS = 3 * 60 * 1000;

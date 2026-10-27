@@ -55,6 +55,8 @@ app.use(
       // Netlify keeps that subdomain live alongside the custom domain).
       const allowed = [
         /^http:\/\/localhost:\d+$/,
+        /^https?:\/\/localhost$/,
+        /^capacitor:\/\/localhost$/,
         /^https:\/\/(www\.)?pokepalace\.org$/,
         /^https:\/\/pos\.pokepalace\.org$/,
         /^https:\/\/(pos[.-])?pokepalace\.netlify\.app$/,

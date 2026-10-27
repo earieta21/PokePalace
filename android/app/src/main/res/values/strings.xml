@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Poke Palace</string>
+    <string name="title_activity_main">Poke Palace</string>
+    <string name="package_name">com.pokepalace.app</string>
+    <string name="custom_url_scheme">com.pokepalace.app</string>
+</resources>

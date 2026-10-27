@@ -1,0 +1,9 @@
+{
+  "appId": "com.pokepalace.app",
+  "appName": "Poke Palace",
+  "webDir": "dist",
+  "backgroundColor": "#F4C2B0",
+  "server": {
+    "hostname": "localhost"
+  }
+}
