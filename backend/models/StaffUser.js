@@ -19,6 +19,9 @@ const staffUserSchema = new mongoose.Schema(
         message: "PIN must be stored as a bcrypt hash",
       },
     },
+    // Dígitos del PIN guardado (el hash no lo revela). null = cuenta anterior
+    // a este campo; se llena la próxima vez que entra con PIN.
+    pinLength:  { type: Number, default: null },
     color:      { type: String, default: "emerald" },
     locationId: { type: String, default: null },
     active:     { type: Boolean, default: true },

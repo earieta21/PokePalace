@@ -134,6 +134,7 @@ export const createKioskEmployee = async (req, res) => {
       name: name.trim(),
       role: requestedRole,
       pin: await hashPin(pin),
+      pinLength: String(pin).length,
       color: color || "emerald",
       email,
       password,

@@ -179,7 +179,9 @@ export async function registerPasskey(token, userId, prepared) {
   rememberDevicePasskey(userId, credentialId);
 }
 
-export async function loginWithPasskey(locationId, prepared) {
+// `signal` cancela el diálogo de Face ID si la persona entra con PIN mientras
+// sigue abierto (el login lo abre solo al cargar).
+export async function loginWithPasskey(locationId, prepared, signal) {
   const { challengeToken, options } = isFresh(prepared) ? prepared : await preparePasskeyLogin();
   const known = getDevicePasskeys().filter((p) => p.credentialId);
   const credential = await navigator.credentials.get({
@@ -188,6 +190,7 @@ export async function loginWithPasskey(locationId, prepared) {
       challenge: fromB64url(options.challenge),
       allowCredentials: known.map((p) => ({ type: "public-key", id: fromB64url(p.credentialId) })),
     },
+    signal,
   });
   const { response } = credential;
   const id = toB64url(credential.rawId);
@@ -195,6 +198,7 @@ export async function loginWithPasskey(locationId, prepared) {
     return await postJSON("/passkey/login", {
       challengeToken,
       locationId,
+      supportsPinUpgrade: true, // ver handleLogin en UnifiedStaffApp.jsx
       credential: {
         id,
         response: {

@@ -54,6 +54,23 @@ const upgradeTokenFor = (user) =>
     { expiresIn: "10m" }
   );
 
+// Gerencia con PIN de 4 dígitos no entra hasta crear uno de 6, tampoco con
+// Face ID: si no, ese PIN corto seguiría sirviendo para entrar para siempre.
+async function respondPinUpgrade(req, res, user, method, locationId) {
+  // Una pestaña abierta desde antes de este cambio no sabe mostrar la
+  // pantalla del PIN nuevo y entraría sin sesión: se le pide recargar.
+  if (req.body?.supportsPinUpgrade !== true) {
+    return res.status(409).json({ message: "Hay una versión nueva del portal. Recarga la página y entra de nuevo." });
+  }
+  await recordLoginEvent(req, { type: "upgrade_required", method, locationId, user });
+  return res.json({
+    pinUpgradeRequired: true,
+    upgradeToken: upgradeTokenFor(user),
+    pinLength: pinLengthForRole(user.role),
+    user: { name: user.name },
+  });
+}
+
 async function isPinTaken(locationId, pin, excludeId) {
   const others = await StaffUser.find({ locationId, active: true, _id: { $ne: excludeId } }).select("+pin");
   for (const other of others) {
@@ -86,19 +103,14 @@ export const pinLogin = async (req, res) => {
       if (candidates.length) await recordPinFailure(req, locationId);
       return res.status(401).json({ message: "PIN incorrecto" });
     }
-    if (!isHashedPin(user.pin)) {
-      user.pin = await hashPin(pin);
+    const enteredLength = String(pin).length;
+    if (!isHashedPin(user.pin) || user.pinLength !== enteredLength) {
+      if (!isHashedPin(user.pin)) user.pin = await hashPin(pin);
+      user.pinLength = enteredLength;
       await user.save();
     }
-    // Gerencia con PIN de 4 dígitos: no entra hasta crear uno de 6.
-    if (String(pin).length < pinLengthForRole(user.role)) {
-      await recordLoginEvent(req, { type: "upgrade_required", method: "pin", locationId, user });
-      return res.json({
-        pinUpgradeRequired: true,
-        upgradeToken: upgradeTokenFor(user),
-        pinLength: pinLengthForRole(user.role),
-        user: { name: user.name },
-      });
+    if (enteredLength < pinLengthForRole(user.role)) {
+      return respondPinUpgrade(req, res, user, "pin", locationId);
     }
     await recordLoginEvent(req, { type: "success", method: "pin", locationId, user });
     res.json(sessionFor(user));
@@ -132,6 +144,7 @@ export const pinUpgrade = async (req, res) => {
       return res.status(409).json({ message: "Ese PIN no está disponible. Elige otro." });
     }
     user.pin = await hashPin(newPin);
+    user.pinLength = String(newPin).length;
     await user.save();
     await recordLoginEvent(req, { type: "pin_changed", method: "pin", locationId: user.locationId, user });
     await recordLoginEvent(req, { type: "success", method: "pin", locationId: user.locationId, user });
@@ -242,12 +255,17 @@ export const passkeyLogin = async (req, res) => {
     }
     const { signCount } = verifyAuthentication(credential, challenge, passkey);
 
-    const user = await StaffUser.findOne({ _id: passkey.staffId, locationId, active: true });
+    // +pin: el token para cambiar el PIN lleva una huella del actual.
+    const user = await StaffUser.findOne({ _id: passkey.staffId, locationId, active: true }).select("+pin");
     if (!user) return failed("Cuenta no disponible. Habla con tu gerente.");
 
     passkey.signCount = signCount;
     passkey.lastUsedAt = new Date();
     await passkey.save();
+    // Sin pinLength es una cuenta anterior a los PIN de 6: se asume de 4.
+    if ((user.pinLength || 4) < pinLengthForRole(user.role)) {
+      return respondPinUpgrade(req, res, user, "passkey", locationId);
+    }
     await recordLoginEvent(req, { type: "success", method: "passkey", locationId, user });
     res.json(sessionFor(user));
   } catch (err) {

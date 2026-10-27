@@ -34,7 +34,8 @@ gestor de secretos del entorno de despliegue.
 
 - **PIN por puesto.** Empleados, caja y cocina usan PIN de 4 dígitos; dueño,
   admin y gerente, de 6. Una cuenta de gerencia que todavía tenga PIN de 4
-  dígitos no entra: al usarlo se le pide crear uno de 6 en ese momento. Los PIN
+  dígitos no entra, ni con PIN ni con Face ID, hasta crear uno de 6 en ese
+  momento (`StaffUser.pinLength` guarda el largo; vacío cuenta como 4). Los PIN
   nuevos no pueden ser dígitos repetidos ni seguidos (`0000`, `123456`).
 - **Freno por sucursal.** Además del límite por IP, si una sucursal acumula 20
   PIN incorrectos en 15 minutos (vengan de donde vengan), el acceso con PIN se

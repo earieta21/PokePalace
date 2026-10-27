@@ -306,7 +306,9 @@ export default function UnifiedStaffApp() {
       r = await fetch(`${API_URL}/api/staff-auth/pin-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, locationId: LOCATION_ID }),
+        // Sin esta marca el servidor pide recargar en vez de mandar a crear
+        // el PIN de 6 (una pestaña vieja no sabría mostrar esa pantalla).
+        body: JSON.stringify({ pin, locationId: LOCATION_ID, supportsPinUpgrade: true }),
       });
     } catch {
       throw new Error("Sin conexión con el servidor. Intenta de nuevo.");
@@ -316,7 +318,12 @@ export default function UnifiedStaffApp() {
       // El límite de intentos (429) responde con `msg`, no con `message`.
       throw new Error(r.status === 401 ? "PIN incorrecto, intenta de nuevo" : err.message || err.msg || "No se pudo verificar el PIN");
     }
-    const data = await r.json();
+    await continueLogin(await r.json());
+  }
+
+  // Con PIN o con Face ID, gerencia con PIN de 4 dígitos pasa primero por la
+  // pantalla para crear el de 6.
+  async function continueLogin(data) {
     if (data.pinUpgradeRequired) {
       setPinUpgrade({ upgradeToken: data.upgradeToken, pinLength: data.pinLength, name: data.user.name });
       return;
@@ -346,9 +353,8 @@ export default function UnifiedStaffApp() {
     await startSession(t, user);
   }
 
-  async function handlePasskeyLogin(prepared) {
-    const { token: t, user } = await loginWithPasskey(LOCATION_ID, prepared);
-    await startSession(t, user);
+  async function handlePasskeyLogin(prepared, signal) {
+    await continueLogin(await loginWithPasskey(LOCATION_ID, prepared, signal));
   }
 
   async function startSession(t, user) {
@@ -838,15 +844,23 @@ function PinPad({ halloween, lengths, onSubmit, disabled = false, message = "" }
   );
 }
 
+// Face ID se abre solo una vez por carga de página (no después de "Cerrar
+// sesión", donde sería molesto) y al volver a la app tras un rato fuera.
+let passkeyAutoStarted = false;
+const PASSKEY_RESUME_AFTER_MS = 30 * 1000;
+
 function PinLogin({ onLogin, onPasskeyLogin, passkeySupported, halloween }) {
   const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [passkeyError, setPasskeyError] = useState("");
   // Se lee en cada render: si el servidor ya no reconoce la passkey, se
-  // borra del dispositivo y el botón desaparece solo.
+  // borra del dispositivo y la opción de Face ID desaparece sola.
   const passkeyReady = passkeySupported && getDevicePasskeys().length > 0;
   const label = biometricLabel();
   const preparedRef = useRef(null);
   const [prepareRound, setPrepareRound] = useState(0);
+  const busyRef = useRef(false);
+  const abortRef = useRef(null);
+  const enterRef = useRef(null);
 
   // Challenge listo de antemano para que Face ID abra al primer toque.
   useEffect(() => {
@@ -858,37 +872,62 @@ function PinLogin({ onLogin, onPasskeyLogin, passkeySupported, halloween }) {
   }, [passkeyReady, prepareRound]);
 
   async function enterWithPasskey() {
-    if (passkeyBusy) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setPasskeyError(""); setPasskeyBusy(true);
     const prepared = preparedRef.current;
     preparedRef.current = null;
-    try { await onPasskeyLogin(prepared); }
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try { await onPasskeyLogin(prepared, controller.signal); }
     catch (err) {
       if (!isPasskeyCancel(err)) setPasskeyError(err.message || `No se pudo verificar ${label}. Usa tu PIN.`);
+      busyRef.current = false;
       setPasskeyBusy(false);
       setPrepareRound((n) => n + 1);
     }
   }
+  enterRef.current = enterWithPasskey;
+
+  // Face ID es la primera opción: se abre solo, sin tocar nada. Si el
+  // navegador no lo deja abrir sin un toque o la persona cancela, queda
+  // "Usar Face ID" y el PIN.
+  useEffect(() => {
+    if (!passkeyReady) return undefined;
+    if (!passkeyAutoStarted) {
+      passkeyAutoStarted = true;
+      enterRef.current();
+    }
+    let hiddenAt = 0;
+    function onVisibility() {
+      if (document.visibilityState === "hidden") hiddenAt = Date.now();
+      else if (hiddenAt && Date.now() - hiddenAt > PASSKEY_RESUME_AFTER_MS) enterRef.current();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [passkeyReady]);
+
+  // Si se entra con PIN mientras Face ID sigue pendiente, se cancela.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   return (
     <LoginShell halloween={halloween}>
       <p className="font-bold text-lg text-white mb-1">Acceso privado</p>
-      <p className="text-xs text-slate-400 mb-6 text-center">
+      <p className="text-xs text-slate-400 mb-4 text-center">
         {passkeyReady ? `Entra con ${label} o con tu PIN.` : "Ingresa tu PIN."}
       </p>
 
       {passkeyReady && (
-        <>
-          <button type="button" onClick={enterWithPasskey} disabled={passkeyBusy} className={primaryButton(halloween)}>
-            <ScanFace className="w-6 h-6" aria-hidden="true" /> Entrar con {label}
-          </button>
-          <div className="flex items-center gap-3 w-full my-6 text-[11px] uppercase tracking-[0.2em] text-slate-500">
-            <span className="h-px flex-1 bg-slate-800" /> o con tu PIN <span className="h-px flex-1 bg-slate-800" />
-          </div>
-        </>
+        <button type="button" onClick={enterWithPasskey} disabled={passkeyBusy}
+          className={`mb-6 inline-flex items-center gap-2 h-10 px-4 rounded-full border text-sm font-semibold transition-colors disabled:cursor-default ${
+            halloween ? "border-orange-400/30 text-orange-300 hover:bg-orange-500/10" : "border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+          }`}>
+          <ScanFace className={`w-5 h-5 ${passkeyBusy ? "animate-pulse" : ""}`} aria-hidden="true" />
+          {passkeyBusy ? `Abriendo ${label}…` : `Usar ${label}`}
+        </button>
       )}
 
-      <PinPad halloween={halloween} lengths={[4, 6]} onSubmit={onLogin} disabled={passkeyBusy} message={passkeyError} />
+      <PinPad halloween={halloween} lengths={[4, 6]} onSubmit={onLogin} message={passkeyError} />
     </LoginShell>
   );
 }
