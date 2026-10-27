@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Clock, LogIn, LogOut, CheckSquare, Thermometer, Calendar, Megaphone,
   TrendingUp, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
   ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard, Landmark,
-  Menu, X, Wallet, Pencil, Users, Calculator, ChefHat,
+  Menu, X, Wallet, Pencil, Users, Calculator, ChefHat, ScanFace,
 } from "lucide-react";
 import {
   BASE_LABELS, PROTEIN_LABELS, MARINADE_LABELS,
@@ -19,6 +19,11 @@ import RewardQrCode from "../components/RewardQrCode";
 import { Bat, Pumpkin } from "../components/HalloweenDecor";
 import { useHalloweenTheme } from "../data/seasonalTheme";
 import shellStyles from "./UnifiedStaffApp.module.css";
+import {
+  biometricLabel, dismissPasskeyOffer, getDevicePasskeys, isPasskeyCancel,
+  loginWithPasskey, preparePasskeyLogin, preparePasskeyRegistration,
+  registerPasskey, shouldOfferPasskey, usePasskeySupport,
+} from "./passkeys";
 
 // POS pages — unchanged, work via StaffAuthContext.Provider
 import POSPage from "../pos/pages/POSPage";
@@ -220,6 +225,8 @@ export default function UnifiedStaffApp() {
   // Solo decora el marco (menú, barra superior, PIN, saludo); el contenido
   // de POS, cocina, inventario, etc. conserva sus colores de trabajo.
   const halloween = useHalloweenTheme();
+  const passkeySupported = usePasskeySupport();
+  const [passkeyOffer, setPasskeyOffer] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [lowStockCount, setLowStockCount] = useState(0);
   const [clockError, setClockError] = useState("");
@@ -291,16 +298,32 @@ export default function UnifiedStaffApp() {
   }), [token, me]);
 
   async function handleLogin(pin) {
-    const r = await fetch(`${API_URL}/api/staff-auth/pin-login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pin, locationId: LOCATION_ID }),
-    });
+    let r;
+    try {
+      r = await fetch(`${API_URL}/api/staff-auth/pin-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin, locationId: LOCATION_ID }),
+      });
+    } catch {
+      throw new Error("Sin conexión con el servidor. Intenta de nuevo.");
+    }
     if (!r.ok) {
       const err = await r.json().catch(() => ({}));
-      throw new Error(err.message || "PIN incorrecto");
+      // El límite de intentos (429) responde con `msg`, no con `message`.
+      throw new Error(r.status === 401 ? "PIN incorrecto, intenta de nuevo" : err.message || err.msg || "No se pudo verificar el PIN");
     }
     const { token: t, user } = await r.json();
+    if (passkeySupported && shouldOfferPasskey(user.id)) setPasskeyOffer(true);
+    await startSession(t, user);
+  }
+
+  async function handlePasskeyLogin(prepared) {
+    const { token: t, user } = await loginWithPasskey(LOCATION_ID, prepared);
+    await startSession(t, user);
+  }
+
+  async function startSession(t, user) {
     setToken(t);
     setMe(user);
     const employeePath = user.isManager ? "/api/kiosk/employees/manage" : "/api/kiosk/employees";
@@ -320,7 +343,7 @@ export default function UnifiedStaffApp() {
   }
 
   function handleLogout() {
-    setToken(null); setMe(null); setTab(null); setLowStockCount(0);
+    setToken(null); setMe(null); setTab(null); setLowStockCount(0); setPasskeyOffer(false);
     setEmployees([]);
     setTime([]); setChecklist({}); setTemps([]); setSchedule({}); setAnnouncements([]);
   }
@@ -465,7 +488,15 @@ export default function UnifiedStaffApp() {
     return data.record;
   }
 
-  if (!me) return <PinLogin onLogin={handleLogin} halloween={halloween} />;
+  if (!me) {
+    return (
+      <PinLogin onLogin={handleLogin} onPasskeyLogin={handlePasskeyLogin}
+        passkeySupported={passkeySupported} halloween={halloween} />
+    );
+  }
+  if (passkeyOffer) {
+    return <PasskeyOffer halloween={halloween} me={me} token={token} onDone={() => setPasskeyOffer(false)} />;
+  }
 
   const isWideTab = ["pos", "cocina", "hist", "resumen", "ventas", "inv", "fin", "panel"].includes(tab);
 
@@ -642,26 +673,10 @@ function StaffSidebar({ halloween, me, tabs, tab, setTab, openEntry, lowStockCou
 /* ============================================================================
    PIN LOGIN
    ========================================================================== */
-function PinLogin({ onLogin, halloween }) {
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  async function press(d) {
-    if (busy || pin.length >= 4) return;
-    setError(false);
-    const next = pin + d;
-    setPin(next);
-    if (next.length === 4) {
-      setBusy(true);
-      try { await onLogin(next); }
-      catch { setError(true); setTimeout(() => { setPin(""); setBusy(false); }, 700); }
-    }
-  }
-
+function LoginShell({ halloween, children }) {
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
-      <div className="px-6 pt-10 pb-8 text-center relative overflow-hidden">
+    <div className="min-h-dvh bg-slate-950 flex flex-col" style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}>
+      <div className="px-6 pt-8 pb-6 sm:pt-10 sm:pb-8 text-center relative overflow-hidden">
         <div className={`absolute inset-0 bg-gradient-to-b ${halloween ? "from-purple-950/70" : "from-emerald-950/50"} to-transparent pointer-events-none`} />
         {halloween && (
           <div className={shellStyles.pinSpooky} aria-hidden="true">
@@ -687,44 +702,198 @@ function PinLogin({ onLogin, halloween }) {
         </div>
       </div>
 
-      <div className="flex-1 px-6 max-w-xs mx-auto w-full flex flex-col items-center">
-          <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-4 shadow-xl ${halloween ? "bg-orange-500/15 border border-orange-400/30 shadow-orange-950/30" : "bg-emerald-500/20 border border-emerald-500/30 shadow-emerald-950/30"}`}>
-            <ShieldCheck className={`w-9 h-9 ${halloween ? "text-orange-400" : "text-emerald-400"}`} />
-          </div>
-          <p className="font-bold text-lg text-white mb-1">Acceso privado</p>
-          <p className="text-xs text-slate-400 mb-6 text-center">Ingresa tu PIN de 4 dígitos. Tu nombre aparecerá después de verificarlo.</p>
-          <div className="flex gap-4 mb-8">
-            {[0,1,2,3].map((i) => (
-              <div key={i} className={`w-5 h-5 rounded-full border-2 transition-all duration-150 ${
-                error ? "bg-rose-500 border-rose-500 scale-110"
-                : pin.length > i ? `${halloween ? "bg-orange-500" : "bg-emerald-500"} border-transparent scale-110`
-                : "border-slate-600"}`} />
-            ))}
-          </div>
-          {error && <p className="text-rose-400 text-xs -mt-4 mb-4">PIN incorrecto, intenta de nuevo</p>}
-          <div className="grid grid-cols-3 gap-3 w-full">
-            {[1,2,3,4,5,6,7,8,9].map((d) => (
-              <PinKey key={d} onClick={() => press(String(d))}>{d}</PinKey>
-            ))}
-            <div />
-            <PinKey onClick={() => press("0")}>0</PinKey>
-            <PinKey ariaLabel="Borrar último dígito" subtle onClick={() => { setError(false); setPin((p) => p.slice(0, -1)); }}>
-              <Delete className="w-5 h-5 mx-auto" />
-            </PinKey>
-          </div>
+      <div className="flex-1 px-6 pb-8 max-w-xs mx-auto w-full flex flex-col items-center">
+        {children}
       </div>
     </div>
+  );
+}
+
+const primaryButton = (halloween) =>
+  `w-full h-14 rounded-2xl flex items-center justify-center gap-2.5 font-bold transition-all active:scale-[0.98] disabled:opacity-60 shadow-lg ${
+    halloween ? "bg-orange-400 hover:bg-orange-300 text-orange-950 shadow-orange-950/40" : "bg-emerald-400 hover:bg-emerald-300 text-emerald-950 shadow-emerald-950/40"
+  }`;
+
+function PinLogin({ onLogin, onPasskeyLogin, passkeySupported, halloween }) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  // Se lee en cada render: si el servidor ya no reconoce la passkey, se
+  // borra del dispositivo y el botón desaparece solo.
+  const passkeyReady = passkeySupported && getDevicePasskeys().length > 0;
+  const label = biometricLabel();
+  const preparedRef = useRef(null);
+  const [prepareRound, setPrepareRound] = useState(0);
+
+  // Challenge listo de antemano para que Face ID abra al primer toque.
+  useEffect(() => {
+    if (!passkeyReady) return undefined;
+    const refresh = () => preparePasskeyLogin().then((p) => { preparedRef.current = p; }).catch(() => {});
+    refresh();
+    const timer = setInterval(refresh, 2 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [passkeyReady, prepareRound]);
+
+  async function press(d) {
+    if (busy || pin.length >= 4) return;
+    setError("");
+    const next = pin + d;
+    setPin(next);
+    if (next.length === 4) {
+      setBusy(true);
+      try { await onLogin(next); }
+      catch (err) {
+        setError(err.message || "PIN incorrecto, intenta de nuevo");
+        setTimeout(() => { setPin(""); setBusy(false); }, 700);
+      }
+    }
+  }
+
+  function erase() {
+    if (busy) return;
+    setError("");
+    setPin((p) => p.slice(0, -1));
+  }
+
+  async function enterWithPasskey() {
+    if (busy) return;
+    setError(""); setBusy(true);
+    const prepared = preparedRef.current;
+    preparedRef.current = null;
+    try { await onPasskeyLogin(prepared); }
+    catch (err) {
+      if (!isPasskeyCancel(err)) setError(err.message || `No se pudo verificar ${label}. Usa tu PIN.`);
+      setBusy(false);
+      setPrepareRound((n) => n + 1);
+    }
+  }
+
+  // Teclado físico (compu del local o tableta con teclado).
+  useEffect(() => {
+    function onKey(e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (/^[0-9]$/.test(e.key)) press(e.key);
+      else if (e.key === "Backspace") erase();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  return (
+    <LoginShell halloween={halloween}>
+      <p className="font-bold text-lg text-white mb-1">Acceso privado</p>
+      <p className="text-xs text-slate-400 mb-6 text-center">
+        {passkeyReady ? `Entra con ${label} o con tu PIN de 4 dígitos.` : "Ingresa tu PIN de 4 dígitos."}
+      </p>
+
+      {passkeyReady && (
+        <>
+          <button type="button" onClick={enterWithPasskey} disabled={busy} className={primaryButton(halloween)}>
+            <ScanFace className="w-6 h-6" aria-hidden="true" /> Entrar con {label}
+          </button>
+          <div className="flex items-center gap-3 w-full my-6 text-[11px] uppercase tracking-[0.2em] text-slate-500">
+            <span className="h-px flex-1 bg-slate-800" /> o con tu PIN <span className="h-px flex-1 bg-slate-800" />
+          </div>
+        </>
+      )}
+
+      <div className={`flex gap-4 mb-3 ${error ? shellStyles.pinShake : ""} ${busy && !error ? "animate-pulse" : ""}`}
+        role="img" aria-label={`${pin.length} de 4 dígitos`}>
+        {[0,1,2,3].map((i) => (
+          <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${
+            error ? "bg-rose-500 border-rose-500"
+            : pin.length > i ? `${halloween ? "bg-orange-500" : "bg-emerald-500"} border-transparent scale-110`
+            : "border-slate-600"}`} />
+        ))}
+      </div>
+      <p aria-live="polite" className="min-h-5 text-rose-400 text-xs text-center mb-3">{error}</p>
+
+      <div className="grid grid-cols-3 gap-3 w-full">
+        {[1,2,3,4,5,6,7,8,9].map((d) => (
+          <PinKey key={d} onClick={() => press(String(d))}>{d}</PinKey>
+        ))}
+        <div />
+        <PinKey onClick={() => press("0")}>0</PinKey>
+        <PinKey ariaLabel="Borrar último dígito" subtle onClick={erase}>
+          <Delete className="w-5 h-5 mx-auto" />
+        </PinKey>
+      </div>
+    </LoginShell>
   );
 }
 
 function PinKey({ children, onClick, subtle, ariaLabel }) {
   return (
     <button type="button" onClick={onClick} aria-label={ariaLabel}
-      className={`h-16 rounded-2xl text-xl font-semibold transition-all active:scale-95 ${
+      className={`h-14 sm:h-16 rounded-2xl text-xl font-semibold transition-all active:scale-95 ${
         subtle ? "bg-slate-800 hover:bg-slate-700 text-slate-400" : "bg-slate-800 hover:bg-slate-700 text-white border border-white/5"
       }`}>
       {children}
     </button>
+  );
+}
+
+// Justo después de entrar con PIN en un teléfono: ofrece activar Face ID
+// (o huella en Android) para las siguientes veces.
+function PasskeyOffer({ halloween, me, token, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+  const label = biometricLabel();
+  const firstName = me.name.split(" ")[0];
+  const preparedRef = useRef(null);
+  const [prepareRound, setPrepareRound] = useState(0);
+
+  useEffect(() => {
+    preparePasskeyRegistration(token).then((p) => { preparedRef.current = p; }).catch(() => {});
+  }, [token, prepareRound]);
+
+  async function activate() {
+    setError(""); setBusy(true);
+    const prepared = preparedRef.current;
+    preparedRef.current = null;
+    try {
+      await registerPasskey(token, me.id, prepared);
+      setDone(true);
+      setTimeout(onDone, 1200);
+    } catch (err) {
+      if (!isPasskeyCancel(err)) setError(err.message || `No se pudo activar ${label}.`);
+      setBusy(false);
+      setPrepareRound((n) => n + 1);
+    }
+  }
+
+  function later() {
+    dismissPasskeyOffer(me.id);
+    onDone();
+  }
+
+  const Icon = done ? ShieldCheck : ScanFace;
+  return (
+    <LoginShell halloween={halloween}>
+      <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-5 shadow-xl ${halloween ? "bg-orange-500/15 border border-orange-400/30 shadow-orange-950/30" : "bg-emerald-500/20 border border-emerald-500/30 shadow-emerald-950/30"}`}>
+        <Icon className={`w-10 h-10 ${halloween ? "text-orange-400" : "text-emerald-400"}`} aria-hidden="true" />
+      </div>
+      <p className="font-bold text-xl text-white mb-2 text-center">
+        {done ? `${label} activado` : `Hola, ${firstName}. ¿Entrar con ${label}?`}
+      </p>
+      <p className="text-sm text-slate-400 text-center mb-2">
+        {done ? "La próxima vez entra sin escribir tu PIN." : `La próxima vez entra en este teléfono con ${label}, sin escribir tu PIN.`}
+      </p>
+      {!done && (
+        <>
+          <p className="text-xs text-slate-500 text-center">Actívalo solo en tu teléfono personal. Tu PIN sigue funcionando.</p>
+          <p aria-live="polite" className="min-h-5 text-rose-400 text-xs text-center my-4">{error}</p>
+          <button type="button" onClick={activate} disabled={busy} className={primaryButton(halloween)}>
+            <ScanFace className="w-6 h-6" aria-hidden="true" /> {busy ? "Esperando…" : `Activar ${label}`}
+          </button>
+          <button type="button" onClick={later} disabled={busy}
+            className="w-full h-12 mt-3 rounded-2xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-60">
+            Ahora no
+          </button>
+        </>
+      )}
+    </LoginShell>
   );
 }
 

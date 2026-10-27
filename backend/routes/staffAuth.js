@@ -1,6 +1,14 @@
 import express from "express";
-import { staffLogin, pinLogin } from "../controllers/staffAuthController.js";
+import {
+  staffLogin,
+  pinLogin,
+  passkeyLogin,
+  passkeyLoginOptions,
+  passkeyRegister,
+  passkeyRegisterOptions,
+} from "../controllers/staffAuthController.js";
 import { rateLimit } from "../middleware/rateLimit.js";
+import { requireStaffAuth } from "../middleware/requireStaffAuth.js";
 
 const router = express.Router();
 
@@ -18,7 +26,20 @@ const loginLimiter = rateLimit({
   message: "Demasiados intentos de acceso. Espera unos minutos e intenta de nuevo.",
 });
 
+// Face ID no se puede adivinar como un PIN (cada intento lleva una firma),
+// así que el límite solo frena abuso, no fuerza bruta.
+const passkeyLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  message: "Demasiados intentos con Face ID. Espera unos minutos o entra con tu PIN.",
+});
+
 router.post("/login", loginLimiter, staffLogin);
 router.post("/pin-login", pinLimiter, pinLogin);
+
+router.post("/passkey/login-options", passkeyLimiter, passkeyLoginOptions);
+router.post("/passkey/login", passkeyLimiter, passkeyLogin);
+router.post("/passkey/register-options", passkeyLimiter, requireStaffAuth(), passkeyRegisterOptions);
+router.post("/passkey/register", passkeyLimiter, requireStaffAuth(), passkeyRegister);
 
 export default router;
