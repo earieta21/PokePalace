@@ -14,133 +14,135 @@ import { orderTimingLabel } from "../orderTiming.js";
 import { comboPalaceSelectionSummary } from "../../data/comboPalace";
 import { DELIVERY_PLATFORM_LABELS } from "../../data/deliveryPlatforms.js";
 
+// `card` pinta la franja de arriba de la comanda con el color del estado.
 const STATUS_CFG = {
-  pending:   { cls: "badgeYellow", label: "Nuevo" },
-  preparing: { cls: "badgeBlue",   label: "Preparando" },
-  ready:     { cls: "badgeGreen",  label: "Listo" },
+  pending:   { cls: "badgeYellow", card: "kdsCardPending",   label: "Nuevo" },
+  preparing: { cls: "badgeBlue",   card: "kdsCardPreparing", label: "Preparando" },
+  ready:     { cls: "badgeGreen",  card: "kdsCardReady",     label: "Listo" },
 };
 
 const FULFILLMENT_LABEL = {
   pickup: "Recoger",
-  dine_in: "Comer aqui",
+  dine_in: "Comer aquí",
   delivery: "Delivery",
 };
 
-const PAYMENT_LABEL = {
-  pay_at_pickup: "Paga al recoger",
-  cash: "Efectivo",
-  card_terminal: "Tarjeta",
-  online: "Online",
-  delivery_app: "Pagado en app",
-};
+const label = (map, id) => map[id] ?? id;
+const labelList = (map, ids) => ids.map((id) => label(map, id)).join(", ");
 
-function orderLines(order) {
-  const lines = [];
-  const label = (map, id) => map[id] ?? id;
+// Un bowl (del carrito, del 2x1 o de los campos planos del POS) siempre en
+// las mismas filas y en el mismo orden, para que cocina lea igual cada
+// comanda. Lo que cambia la preparación (mitad y mitad, scoop extra) va
+// aparte como alerta.
+function bowlTicket(bowl, { proteinText = null } = {}) {
+  const rows = [];
+  const alerts = [];
+  const isHalfHalf = bowl.bases?.length > 1;
+  if (isHalfHalf) {
+    rows.push({ label: "Base", value: bowl.bases.map((id) => label(BASE_LABELS, id)).join(" + ") });
+    alerts.push("Mitad y mitad de base");
+  } else if (bowl.base) {
+    rows.push({ label: "Base", value: label(BASE_LABELS, bowl.base) });
+  }
+  const protein = proteinText
+    ?? (bowl.proteins?.length ? labelList(PROTEIN_LABELS, bowl.proteins) : null)
+    ?? (bowl.protein ? label(PROTEIN_LABELS, bowl.protein) : null);
+  if (protein) rows.push({ label: "Proteína", value: protein });
+  if (bowl.extraScoopProteins?.length) {
+    alerts.push(`Scoop extra: ${labelList(PROTEIN_LABELS, bowl.extraScoopProteins)}`);
+  }
+  if (bowl.marinades?.length) rows.push({ label: "Marinado", value: labelList(MARINADE_LABELS, bowl.marinades) });
+  if (bowl.complements?.length) rows.push({ label: "Complementos", value: labelList(COMPLEMENT_LABELS, bowl.complements) });
+  if (bowl.sauces?.length) rows.push({ label: "Salsas", value: labelList(SAUCE_LABELS, bowl.sauces) });
+  if (bowl.toppings?.length) rows.push({ label: "Toppings", value: labelList(TOPPING_LABELS, bowl.toppings) });
+  return { rows, alerts };
+}
 
-  // Carrito de cliente/kiosco (1+ bowls y/o artículos) — cada línea se marca
-  // por separado para que cocina no mezcle los ingredientes de 2 bowls.
+// La comanda separada en bowls (cada uno en su bloque, para no mezclar los
+// ingredientes de dos bowls) y el resto de productos con su cantidad.
+function orderTicket(order) {
+  const bowls = [];
+  const others = [];
+
+  // Carrito de cliente/kiosco. Esos pedidos también copian el primer bowl en
+  // los campos planos, así que aquí se ignoran.
   if (order.cartItems?.length) {
-    const bowlCount = order.cartItems.filter((l) => l.kind === "bowl").length
-      + order.cartItems.filter((l) => l.kind === "promo2x1").length * 2;
-    let bowlNumber = 0;
     for (const line of order.cartItems) {
       if (line.kind === "item") {
-        lines.push(`${line.name} ×${line.qty}`);
-        if (line.catalogId === "combo-palace") {
-          lines.push(`Incluye: ${comboPalaceSelectionSummary(line)}`);
-        }
-        continue;
-      }
-      if (line.kind === "promo2x1") {
-        lines.push("— 2x1 en Bowls —");
-        const proteinLabel = label(PROTEIN_LABELS, line.protein);
-        (line.bowls || []).forEach((bowl) => {
-          bowlNumber += 1;
-          lines.push(`— Bowl ${bowlNumber} (2x1) —`);
-          const isHalfHalf = bowl.bases?.length > 1;
-          const baseText = isHalfHalf
-            ? bowl.bases.map((id) => label(BASE_LABELS, id)).join(" + ")
-            : label(BASE_LABELS, bowl.base);
-          lines.push(`Base: ${baseText}`);
-          if (isHalfHalf) lines.push("⚠️ MITAD Y MITAD DE BASE");
-          lines.push(`Proteína: ${proteinLabel} (60 g)`);
-          if (bowl.marinades?.length)
-            lines.push(`Marinados: ${bowl.marinades.map((id) => label(MARINADE_LABELS, id)).join(", ")}`);
-          if (bowl.complements?.length)
-            lines.push(`Complementos: ${bowl.complements.map((id) => label(COMPLEMENT_LABELS, id)).join(", ")}`);
-          if (bowl.sauces?.length)
-            lines.push(`Salsas: ${bowl.sauces.map((id) => label(SAUCE_LABELS, id)).join(", ")}`);
-          if (bowl.toppings?.length)
-            lines.push(`Toppings: ${bowl.toppings.map((id) => label(TOPPING_LABELS, id)).join(", ")}`);
+        others.push({
+          qty: line.qty || 1,
+          name: line.name,
+          detail: line.catalogId === "combo-palace" ? `Incluye: ${comboPalaceSelectionSummary(line)}` : null,
         });
-        continue;
+      } else if (line.kind === "promo2x1") {
+        const proteinText = `${label(PROTEIN_LABELS, line.protein)} (60 g)`;
+        for (const bowl of line.bowls || []) bowls.push({ tags: ["2x1"], ...bowlTicket(bowl, { proteinText }) });
+      } else {
+        bowls.push({ size: line.bowlSize, ...bowlTicket(line) });
       }
-      bowlNumber += 1;
-      lines.push(bowlCount > 1 ? `— Bowl ${bowlNumber} —` : "— Bowl —");
-      const isHalfHalf = line.bases?.length > 1;
-      const baseText = isHalfHalf
-        ? line.bases.map((id) => label(BASE_LABELS, id)).join(" + ")
-        : label(BASE_LABELS, line.base);
-      lines.push(`Base: ${baseText}`);
-      if (isHalfHalf) lines.push("⚠️ MITAD Y MITAD DE BASE");
-      if (line.proteins?.length) {
-        lines.push(`Proteínas: ${line.proteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
-      }
-      lines.push(line.bowlSize === "large" ? "Bowl grande" : "Bowl mediano");
-      if (line.extraScoopProteins?.length) {
-        lines.push(`⚠️ SCOOP EXTRA: ${line.extraScoopProteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
-      }
-      if (line.marinades?.length)
-        lines.push(`Marinados: ${line.marinades.map((id) => label(MARINADE_LABELS, id)).join(", ")}`);
-      if (line.complements?.length)
-        lines.push(`Complementos: ${line.complements.map((id) => label(COMPLEMENT_LABELS, id)).join(", ")}`);
-      if (line.sauces?.length)
-        lines.push(`Salsas: ${line.sauces.map((id) => label(SAUCE_LABELS, id)).join(", ")}`);
-      if (line.toppings?.length)
-        lines.push(`Toppings: ${line.toppings.map((id) => label(TOPPING_LABELS, id)).join(", ")}`);
     }
-    return lines.length ? lines : ["Bowl personalizado"];
+  } else {
+    // POS: artículos del catálogo (los bowls rápidos traen la proteína que
+    // capturó caja) y, si se armó uno, el bowl personalizado en campos planos.
+    for (const item of order.items || []) {
+      const detail = [
+        item.protein && label(PROTEIN_LABELS, item.protein),
+        item.complement && label(COMPLEMENT_LABELS, item.complement),
+        item.catalogId === "combo-palace" && comboPalaceSelectionSummary(item),
+      ].filter(Boolean).join(" · ");
+      others.push({ qty: item.qty || 1, name: item.name, detail: detail || null });
+    }
+    if (order.base || order.bases?.length > 1) bowls.push({ size: order.bowlSize, ...bowlTicket(order) });
   }
 
-  if (order.items?.length) {
-    // Los bowls rápidos (mediano/grande) no traen receta, pero desde que se
-    // captura la proteína en caja sí se sabe qué preparar.
-    lines.push(...order.items.map((i) => {
-      const proteinSuffix = i.protein ? ` — ${label(PROTEIN_LABELS, i.protein)}` : "";
-      const complementSuffix = i.complement ? ` — ${label(COMPLEMENT_LABELS, i.complement)}` : "";
-      const comboSuffix = i.catalogId === "combo-palace" ? ` — ${comboPalaceSelectionSummary(i)}` : "";
-      return `${i.name}${proteinSuffix}${complementSuffix}${comboSuffix} ×${i.qty}`;
-    }));
-  }
+  if (!bowls.length && !others.length) others.push({ qty: 1, name: "Bowl personalizado", detail: null });
 
-  if (order.base) {
-    const isHalfHalf = order.bases?.length > 1;
-    const baseText = isHalfHalf
-      ? order.bases.map((id) => label(BASE_LABELS, id)).join(" + ")
-      : label(BASE_LABELS, order.base);
-    lines.push(`Base: ${baseText}`);
-    if (isHalfHalf) lines.push("⚠️ MITAD Y MITAD DE BASE");
-    if (order.proteins?.length) {
-      lines.push(`Proteínas: ${order.proteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
-    } else if (order.protein) {
-      lines.push(`Proteína: ${order.protein}`);
-    }
-    lines.push(order.bowlSize === "large" ? "Bowl grande" : "Bowl mediano");
-    if (order.extraScoopProteins?.length) {
-      lines.push(`⚠️ SCOOP EXTRA: ${order.extraScoopProteins.map((id) => label(PROTEIN_LABELS, id)).join(", ")}`);
-    }
-    if (order.marinades?.length)
-      lines.push(`Marinados: ${order.marinades.map((id) => label(MARINADE_LABELS, id)).join(", ")}`);
-    if (order.complements?.length)
-      lines.push(`Complementos: ${order.complements.map((id) => label(COMPLEMENT_LABELS, id)).join(", ")}`);
-    if (order.sauces?.length)
-      lines.push(`Salsas: ${order.sauces.map((id) => label(SAUCE_LABELS, id)).join(", ")}`);
-    if (order.toppings?.length)
-      lines.push(`Toppings: ${order.toppings.map((id) => label(TOPPING_LABELS, id)).join(", ")}`);
-  }
+  const gifts = order.rewardExtraTopping
+    ? [`Premio: topping extra de ${label(TOPPING_LABELS, order.rewardExtraTopping)}`]
+    : [];
+  return { bowls, others, gifts };
+}
 
-  return lines.length ? lines : ["Bowl personalizado"];
+// Pedidos programados se ordenan por su hora de recoger; el resto, por
+// llegada. Así la comanda más urgente siempre queda primero.
+const dueAt = (order) => new Date(order.scheduledPickupTime || order.createdAt).getTime() || 0;
+const byDue = (a, b) => dueAt(a) - dueAt(b);
+
+// Minutos desde que llegó el pedido a partir de los cuales el reloj se pinta
+// de ámbar y de rojo.
+const LATE_WARN_MIN = 8;
+const LATE_ALERT_MIN = 15;
+
+function timerClass(order, now, styles) {
+  if (order.status === "ready" || order.scheduledPickupTime) return "";
+  const minutes = (now - new Date(order.createdAt).getTime()) / 60000;
+  if (minutes >= LATE_ALERT_MIN) return styles.kdsTimerLate;
+  if (minutes >= LATE_WARN_MIN) return styles.kdsTimerWarn;
+  return "";
+}
+
+function TicketBowl({ bowl, title, styles }) {
+  return (
+    <section className={styles.kdsBowl}>
+      <div className={styles.kdsBowlHead}>
+        <span className={styles.kdsBowlTitle}>{title}</span>
+        {bowl.size === "large" && <span className={`${styles.kdsTag} ${styles.kdsTagStrong}`}>Grande</span>}
+        {bowl.size && bowl.size !== "large" && <span className={styles.kdsTag}>Mediano</span>}
+        {bowl.tags?.map((tag) => <span key={tag} className={styles.kdsTag}>{tag}</span>)}
+      </div>
+      {bowl.alerts.map((alert) => (
+        <p key={alert} className={styles.kdsAlert}>⚠️ {alert}</p>
+      ))}
+      <dl className={styles.kdsRows}>
+        {bowl.rows.map((row) => (
+          <div key={row.label} className={styles.kdsRow}>
+            <dt>{row.label}</dt>
+            <dd>{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
 }
 
 function playNewOrderBeep() {
@@ -317,7 +319,112 @@ export default function KDSPage({ styles, role }) {
   const [confirming, setConfirming] = useState(null);
   const isKitchenOnly = role === "kitchen";
 
-  const pending = orders.filter((o) => o.status !== "ready").length;
+  // El reloj de cada comanda avanza aunque no llegue nada nuevo.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Lo más antiguo primero: las comandas nuevas se agregan al final en vez de
+  // empujar a las que ya se están preparando. Las listas van en su sección.
+  const active = orders.filter((o) => o.status !== "ready").sort(byDue);
+  const ready = orders.filter((o) => o.status === "ready").sort(byDue);
+
+  const renderCard = (order) => {
+    const cfg = STATUS_CFG[order.status] ?? STATUS_CFG.pending;
+    const isReady = order.status === "ready";
+    const ticket = orderTicket(order);
+    const cliente =
+      order.customer ||
+      order.user?.name ||
+      order.user?.email?.split("@")[0] ||
+      "Cliente";
+    const fulfillment = [
+      FULFILLMENT_LABEL[order.fulfillment] ?? "Recoger",
+      order.deliveryPlatform ? DELIVERY_PLATFORM_LABELS[order.deliveryPlatform] ?? order.deliveryPlatform : null,
+    ].filter(Boolean).join(" · ");
+    const chipClass =
+      order.fulfillment === "delivery" ? styles.kdsChipDelivery
+      : order.fulfillment === "dine_in" ? styles.kdsChipDineIn
+      : "";
+
+    return (
+      <article key={order._id} className={`${styles.kdsCard} ${styles[cfg.card] ?? ""}`}>
+        <header className={styles.kdsHeader}>
+          <div className={styles.kdsHeadTop}>
+            <span className={styles.kdsNum}>#{order._id.slice(-5).toUpperCase()}</span>
+            <span className={`${styles.kdsTimer} ${timerClass(order, now, styles)}`}>{orderTimingLabel(order, now)}</span>
+          </div>
+          <div className={styles.kdsHeadMeta}>
+            <span className={styles.kdsCustomer}>{cliente}</span>
+            <span className={`${styles.kdsChip} ${chipClass}`}>{fulfillment}</span>
+            <span className={`${styles.badge} ${styles[cfg.cls]}`}>{cfg.label}</span>
+          </div>
+        </header>
+        <div className={styles.kdsBody}>
+          {order.notes && <p className={styles.kdsNoteBox}>📝 {order.notes}</p>}
+          {ticket.gifts.map((gift) => (
+            <p key={gift} className={`${styles.kdsAlert} ${styles.kdsAlertGift}`}>🎁 {gift}</p>
+          ))}
+          {ticket.bowls.map((bowl, i) => (
+            <TicketBowl
+              key={i}
+              bowl={bowl}
+              title={ticket.bowls.length > 1 ? `Bowl ${i + 1} de ${ticket.bowls.length}` : "Bowl"}
+              styles={styles}
+            />
+          ))}
+          {ticket.others.length > 0 && (
+            <div>
+              {ticket.bowls.length > 0 && <p className={styles.kdsOthersTitle}>También lleva</p>}
+              <ul className={styles.kdsOtherList}>
+                {ticket.others.map((item, i) => (
+                  <li key={i} className={styles.kdsOther}>
+                    <span className={styles.kdsQty}>{item.qty}×</span>
+                    <span>
+                      <strong>{item.name}</strong>
+                      {item.detail && <small>{item.detail}</small>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+        <div className={styles.kdsFooter}>
+          {isReady ? (
+            isKitchenOnly ? (
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--p-muted)" }}>
+                Esperando entrega en caja
+              </span>
+            ) : (
+              <button className={`${styles.kdsBtnReady} ${styles.kdsBtnDismiss}`} onClick={() => dismiss(order)}>
+                Marcar Completado
+              </button>
+            )
+          ) : (
+            <button className={styles.kdsBtnReady} onClick={() => advance(order)}>
+              {order.status === "pending" ? "Iniciar Preparación" : "Marcar Listo"}
+            </button>
+          )}
+          {!isKitchenOnly && (
+            confirming === order._id ? (
+              <div className={styles.kdsCancelConfirm}>
+                <span>¿Cancelar orden?</span>
+                <button className={styles.kdsCancelYes} onClick={() => { cancel(order); setConfirming(null); }}>Sí</button>
+                <button className={styles.kdsCancelNo}  onClick={() => setConfirming(null)}>No</button>
+              </div>
+            ) : (
+              <button className={styles.kdsBtnCancel} onClick={() => setConfirming(order._id)}>
+                Cancelar orden
+              </button>
+            )
+          )}
+        </div>
+      </article>
+    );
+  };
 
   return (
     <div>
@@ -375,7 +482,7 @@ export default function KDSPage({ styles, role }) {
         <div>
           <h1 className={styles.pageTitle}>Pantalla de Cocina</h1>
           <p className={styles.pageSubtitle}>
-            {loading ? "Cargando…" : `${pending} pendientes · ${orders.length} total`}
+            {loading ? "Cargando…" : `${active.length} por preparar · ${ready.length} listos`}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -391,75 +498,19 @@ export default function KDSPage({ styles, role }) {
           <p style={{ fontWeight: 600 }}>Sin órdenes activas por ahora</p>
         </div>
       ) : (
-        <div className={styles.kdsGrid}>
-          {orders.map((order) => {
-            const cfg = STATUS_CFG[order.status] ?? STATUS_CFG.pending;
-            const isReady = order.status === "ready";
-            const lines = orderLines(order);
-            const cliente =
-              order.customer ||
-              order.user?.name ||
-              order.user?.email?.split("@")[0] ||
-              "Cliente";
-
-            return (
-              <div key={order._id} className={`${styles.kdsCard} ${isReady ? styles.kdsCardReady : ""}`}>
-                <div className={styles.kdsHeader}>
-                  <span className={styles.kdsNum}>#{order._id.slice(-5).toUpperCase()}</span>
-                  <span className={`${styles.badge} ${styles[cfg.cls]}`}>{cfg.label}</span>
-                  <span className={styles.kdsTimer}>{orderTimingLabel(order)}</span>
-                </div>
-                <div className={styles.kdsBody}>
-                  <p style={{ fontSize: 11, color: "var(--p-muted)", marginBottom: 6 }}>{cliente}</p>
-                  <p style={{ fontSize: 11, color: "var(--p-muted)", marginBottom: 8 }}>
-                    {FULFILLMENT_LABEL[order.fulfillment] ?? "Recoger"}
-                    {order.deliveryPlatform ? ` · ${DELIVERY_PLATFORM_LABELS[order.deliveryPlatform] ?? order.deliveryPlatform}` : ""}
-                    {order.phone ? ` · ${order.phone}` : ""}
-                    {order.paymentMethod ? ` · ${PAYMENT_LABEL[order.paymentMethod] ?? order.paymentMethod}` : ""}
-                  </p>
-                  {order.notes && (
-                    <p style={{ fontSize: 12, color: "var(--p-text)", marginBottom: 8, fontWeight: 700 }}>
-                      Nota: {order.notes}
-                    </p>
-                  )}
-                  {lines.map((line) => (
-                    <div key={line} className={styles.kdsItem}><span>{line}</span></div>
-                  ))}
-                </div>
-                <div className={styles.kdsFooter}>
-                  {isReady ? (
-                    isKitchenOnly ? (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "var(--p-muted)" }}>
-                        Esperando entrega en caja
-                      </span>
-                    ) : (
-                      <button className={`${styles.kdsBtnReady} ${styles.kdsBtnDismiss}`} onClick={() => dismiss(order)}>
-                        Marcar Completado
-                      </button>
-                    )
-                  ) : (
-                    <button className={styles.kdsBtnReady} onClick={() => advance(order)}>
-                      {order.status === "pending" ? "Iniciar Preparación" : "Marcar Listo"}
-                    </button>
-                  )}
-                  {!isKitchenOnly && (
-                    confirming === order._id ? (
-                      <div className={styles.kdsCancelConfirm}>
-                        <span>¿Cancelar orden?</span>
-                        <button className={styles.kdsCancelYes} onClick={() => { cancel(order); setConfirming(null); }}>Sí</button>
-                        <button className={styles.kdsCancelNo}  onClick={() => setConfirming(null)}>No</button>
-                      </div>
-                    ) : (
-                      <button className={styles.kdsBtnCancel} onClick={() => setConfirming(order._id)}>
-                        Cancelar orden
-                      </button>
-                    )
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <>
+          {active.length > 0 ? (
+            <div className={styles.kdsGrid}>{active.map(renderCard)}</div>
+          ) : (
+            <p className={styles.kdsEmptyActive}>No hay pedidos por preparar.</p>
+          )}
+          {ready.length > 0 && (
+            <>
+              <h2 className={styles.kdsSectionTitle}>Listos para entregar · {ready.length}</h2>
+              <div className={styles.kdsGrid}>{ready.map(renderCard)}</div>
+            </>
+          )}
+        </>
       )}
     </div>
   );
