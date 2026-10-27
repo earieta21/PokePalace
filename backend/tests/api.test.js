@@ -1,7 +1,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import mongoose from "mongoose";
@@ -12,6 +12,7 @@ import PromoCode from "../models/PromoCode.js";
 import Order from "../models/Order.js";
 import StaffUser from "../models/StaffUser.js";
 import StaffLoginEvent from "../models/StaffLoginEvent.js";
+import StaffPasskey from "../models/StaffPasskey.js";
 import Inventory from "../models/Inventory.js";
 import InventoryMovement from "../models/InventoryMovement.js";
 import AuditLog from "../models/AuditLog.js";
@@ -846,7 +847,12 @@ test("gerencia con PIN de 4 dígitos crea uno de 6 antes de poder entrar", async
     pin: await hashPin("4829"),
   });
 
-  const login = await postJSON("/api/staff-auth/pin-login", { pin: "4829", locationId });
+  // Una pestaña abierta desde antes no sabe mostrar la pantalla nueva.
+  const oldTab = await postJSON("/api/staff-auth/pin-login", { pin: "4829", locationId });
+  assert.equal(oldTab.status, 409);
+  assert.match((await oldTab.json()).message, /Recarga/);
+
+  const login = await postJSON("/api/staff-auth/pin-login", { pin: "4829", locationId, supportsPinUpgrade: true });
   assert.equal(login.status, 200);
   const pending = await login.json();
   assert.equal(pending.pinUpgradeRequired, true);
@@ -877,6 +883,66 @@ test("gerencia con PIN de 4 dígitos crea uno de 6 antes de poder entrar", async
   for (const type of ["upgrade_required", "pin_changed", "success", "failed"]) {
     assert.ok(types.includes(type), `falta el evento ${type}`);
   }
+});
+
+test("gerencia que entra con Face ID y aún tiene PIN de 4 también debe cambiarlo", async () => {
+  process.env.PIN_PEPPER ||= "ci-test-pepper";
+  const locationId = "ci-pin-passkey";
+  const manager = await StaffUser.create({
+    name: "CI Gerente FaceID",
+    email: `${STAFF_FIXTURE_PREFIX}pin-passkey@example.test`,
+    password: await bcrypt.hash("ci-only-password", 10),
+    role: "manager",
+    locationId,
+    active: true,
+    pin: await hashPin("4829"),
+  });
+  // Passkey de prueba registrada directo en la base, firmada como lo haría
+  // el teléfono (ver tests/webauthn.test.js).
+  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const credentialId = randomBytes(16).toString("base64url");
+  await StaffPasskey.create({
+    staffId: manager._id,
+    credentialId,
+    publicKey: publicKey.export({ type: "spki", format: "der" }).toString("base64url"),
+    algorithm: -7,
+    rpId: "localhost",
+  });
+
+  const origin = "http://localhost:5173";
+  const optionsRes = await postJSON("/api/staff-auth/passkey/login-options", {}, { Origin: origin });
+  assert.equal(optionsRes.status, 200);
+  const { challengeToken, options } = await optionsRes.json();
+  const sha256 = (data) => createHash("sha256").update(data).digest();
+  const authData = Buffer.alloc(37);
+  sha256("localhost").copy(authData);
+  authData[32] = 0x05; // presente + verificado con biometría
+  const clientData = Buffer.from(JSON.stringify({ type: "webauthn.get", challenge: options.challenge, origin }));
+  const signature = sign("sha256", Buffer.concat([authData, sha256(clientData)]), privateKey);
+
+  const login = await postJSON("/api/staff-auth/passkey/login", {
+    challengeToken,
+    locationId,
+    supportsPinUpgrade: true,
+    credential: {
+      id: credentialId,
+      response: {
+        clientDataJSON: clientData.toString("base64url"),
+        authenticatorData: authData.toString("base64url"),
+        signature: signature.toString("base64url"),
+      },
+    },
+  }, { Origin: origin });
+  assert.equal(login.status, 200);
+  const pending = await login.json();
+  assert.equal(pending.pinUpgradeRequired, true);
+  assert.equal(pending.token, undefined);
+
+  const upgraded = await postJSON("/api/staff-auth/pin-upgrade", { upgradeToken: pending.upgradeToken, newPin: "571946" });
+  assert.equal(upgraded.status, 200);
+  assert.ok((await upgraded.json()).token);
+  assert.equal((await StaffUser.findById(manager._id)).pinLength, 6);
+  await StaffPasskey.deleteMany({ staffId: manager._id });
 });
 
 test("muchos PIN fallidos en la sucursal pausan el PIN aunque vengan de otras IPs", async () => {

@@ -195,6 +195,7 @@ export async function loginWithPasskey(locationId, prepared) {
     return await postJSON("/passkey/login", {
       challengeToken,
       locationId,
+      supportsPinUpgrade: true, // ver handleLogin en UnifiedStaffApp.jsx
       credential: {
         id,
         response: {

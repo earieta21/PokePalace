@@ -306,7 +306,9 @@ export default function UnifiedStaffApp() {
       r = await fetch(`${API_URL}/api/staff-auth/pin-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin, locationId: LOCATION_ID }),
+        // Sin esta marca el servidor pide recargar en vez de mandar a crear
+        // el PIN de 6 (una pestaña vieja no sabría mostrar esa pantalla).
+        body: JSON.stringify({ pin, locationId: LOCATION_ID, supportsPinUpgrade: true }),
       });
     } catch {
       throw new Error("Sin conexión con el servidor. Intenta de nuevo.");
@@ -316,7 +318,12 @@ export default function UnifiedStaffApp() {
       // El límite de intentos (429) responde con `msg`, no con `message`.
       throw new Error(r.status === 401 ? "PIN incorrecto, intenta de nuevo" : err.message || err.msg || "No se pudo verificar el PIN");
     }
-    const data = await r.json();
+    await continueLogin(await r.json());
+  }
+
+  // Con PIN o con Face ID, gerencia con PIN de 4 dígitos pasa primero por la
+  // pantalla para crear el de 6.
+  async function continueLogin(data) {
     if (data.pinUpgradeRequired) {
       setPinUpgrade({ upgradeToken: data.upgradeToken, pinLength: data.pinLength, name: data.user.name });
       return;
@@ -347,8 +354,7 @@ export default function UnifiedStaffApp() {
   }
 
   async function handlePasskeyLogin(prepared) {
-    const { token: t, user } = await loginWithPasskey(LOCATION_ID, prepared);
-    await startSession(t, user);
+    await continueLogin(await loginWithPasskey(LOCATION_ID, prepared));
   }
 
   async function startSession(t, user) {
