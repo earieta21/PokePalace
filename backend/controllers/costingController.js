@@ -51,7 +51,7 @@ const loadSalesMix = async (sinceDays = MIX_WINDOW_DAYS) => {
   const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
   const orders = await Order.find(
     { createdAt: { $gte: since }, status: { $ne: "cancelled" } },
-    { proteins: 1, base: 1, cartItems: 1 }
+    { proteins: 1, base: 1, cartItems: 1, items: 1 }
   ).lean();
 
   const mix = {};
@@ -64,6 +64,11 @@ const loadSalesMix = async (sinceDays = MIX_WINDOW_DAYS) => {
     // Los bowls de venta rápida no traen receta, pero sí la proteína capturada.
     for (const line of order.cartItems || []) {
       if (line.kind === "item" && line.protein) bump(line.protein);
+      if (line.kind === "item") (line.proteins || []).forEach(bump);
+    }
+    for (const item of order.items || []) {
+      if (item.protein) bump(item.protein);
+      (item.proteins || []).forEach(bump);
     }
   }
   return mix;

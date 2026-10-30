@@ -41,11 +41,11 @@ export default function Receipt({ order }) {
         {(order.items || []).map((item) => (
           <div
             className={ui.receiptLine}
-            key={item.cartKey || [item.catalogId, item.protein, item.complement, item.comboBowlId, item.comboDrinkId, item.comboRiceCakeId].filter(Boolean).join("-") || item.name}
+            key={item.cartKey || [item.catalogId, ...(item.proteins || []), item.protein, item.complement, item.comboBowlId, item.comboDrinkId, item.comboRiceCakeId].filter(Boolean).join("-") || item.name}
           >
             <span>
               {item.qty} × {item.name}
-              {item.protein ? ` (${PROTEIN_LABELS[item.protein] || item.protein})` : ""}
+              {item.proteins?.length ? ` (${item.proteins.map((id) => PROTEIN_LABELS[id] || id).join(", ")})` : item.protein ? ` (${PROTEIN_LABELS[item.protein] || item.protein})` : ""}
               {item.complement ? ` (${COMPLEMENT_LABELS[item.complement] || item.complement})` : ""}
               {item.catalogId === "combo-palace" ? ` — ${comboPalaceSelectionSummary(item)}` : ""}
             </span>

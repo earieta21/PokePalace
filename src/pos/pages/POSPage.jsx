@@ -9,13 +9,12 @@ import {
   isNetworkError,
   getQueuedOrders,
 } from "../offlineQueue";
-import CustomBowlBuilder from "../CustomBowlBuilder";
 import Receipt from "../Receipt.jsx";
 import MemberQrScanner from "../MemberQrScanner.jsx";
 import { getRewardById, REWARDS } from "../../data/rewardsCatalog.js";
 import { REFERRAL_SOURCES } from "../../data/referralSources.js";
 import { DELIVERY_PLATFORMS, DELIVERY_PLATFORM_LABELS, isDeliveryApp } from "../../data/deliveryPlatforms.js";
-import { getBaseLabel, COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
+import { COMPLEMENT_LABELS, TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
 import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, EXTRA_COMPLEMENT_PRICE, PREMIUM_PROTEIN_PRICES } from "../../order/pricing.js";
 import {
   COMBO_PALACE_OPTIONS,
@@ -23,8 +22,6 @@ import {
   comboPalaceSelectionSummary,
 } from "../../data/comboPalace.js";
 import ui from "./POSPage.module.css";
-
-const CUSTOM_BOWL_ID = "custom-bowl";
 
 const MENU = [
   // Solo lunes, miércoles y viernes — se oculta los demás días vía
@@ -36,8 +33,8 @@ const MENU = [
   // hace que se pregunte la proteina antes de agregarlo, para poder
   // descontar al menos esa parte del inventario (ver confirmProteinPick).
   // Van primero porque son los mas usados en hora pico.
-  { id: 20, name: "Bowl mediano", price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗", needsProtein: true },
-  { id: 21, name: "Bowl grande",  price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🥗", needsProtein: true },
+  { id: 20, name: "Bowl mediano", price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗", needsProtein: true, minProteins: 1, maxProteins: 2 },
+  { id: 21, name: "Bowl grande",  price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🥗", needsProtein: true, minProteins: 3, maxProteins: 3 },
   // Promo recurrente martes y jueves — 2 bowls por el precio de un bowl
   // grande, solo para comer en el local, máx. 4 complementos por bowl
   // (regla verbal para el cajero, no se valida aquí). Se oculta del menú
@@ -93,10 +90,7 @@ export default function POSPage({ styles }) {
   const api = createStaffApi(staffToken);
   const pendingSaleRef = useRef(null);
   const cartRef = useRef(null);
-  const builderPanelRef = useRef(null);
-  const [builderVersion, setBuilderVersion] = useState(0);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [showReferral, setShowReferral] = useState(false);
   const [cashReceived, setCashReceived] = useState("");
 
   const [cart, setCart]         = useState([]);
@@ -116,7 +110,6 @@ export default function POSPage({ styles }) {
   const [success, setSuccess]   = useState("");
   const [error, setError]       = useState("");
   const [queuedCount, setQueuedCount] = useState(() => getQueuedOrders().length);
-  const [mode, setMode] = useState("menu"); // "menu" | "bowl"
   const [rewardCode, setRewardCode] = useState("");
   const [reward, setReward] = useState(null);
   const [rewardTopping, setRewardTopping] = useState("");
@@ -137,12 +130,6 @@ export default function POSPage({ styles }) {
   const [memberRedeeming, setMemberRedeeming] = useState(null);
   const [lastReceipt, setLastReceipt] = useState(null);
   const [printRequested, setPrintRequested] = useState(false);
-
-  useEffect(() => {
-    if (mode !== "bowl") return;
-    builderPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    builderPanelRef.current?.focus({ preventScroll: true });
-  }, [mode]);
 
   const printLastReceipt = () => {
     if (!lastReceipt) return;
@@ -196,12 +183,10 @@ export default function POSPage({ styles }) {
   };
 
   const removeItem = (key) => {
-    if (key === CUSTOM_BOWL_ID) resetBuilder();
     setCart((prev) => prev.filter((i) => cartKeyOf(i) !== key));
   };
 
   const changeQty = (key, delta) => {
-    if (key === CUSTOM_BOWL_ID && delta < 0) resetBuilder();
     setCart((previous) => previous
       .map((item) => cartKeyOf(item) === key ? { ...item, qty: item.qty + delta } : item)
       .filter((item) => item.qty > 0));
@@ -210,6 +195,7 @@ export default function POSPage({ styles }) {
   };
 
   const [proteinPickerItem, setProteinPickerItem] = useState(null);
+  const [proteinSelection, setProteinSelection] = useState([]);
   const [complementPickerItem, setComplementPickerItem] = useState(null);
   const [comboPickerItem, setComboPickerItem] = useState(null);
   const [comboSelection, setComboSelection] = useState({
@@ -218,21 +204,33 @@ export default function POSPage({ styles }) {
     comboRiceCakeId: "",
   });
 
-  const confirmProteinPick = (proteinId) => {
+  const openProteinPicker = (item) => {
+    setProteinPickerItem(item);
+    setProteinSelection([]);
+  };
+
+  const confirmProteinPick = (pickedProteins = proteinSelection) => {
     const item = proteinPickerItem;
-    setProteinPickerItem(null);
     if (!item) return;
-    const proteinLabel = QUICK_PROTEINS.find((p) => p.id === proteinId)?.label || "";
+    const proteins = Array.isArray(pickedProteins) ? pickedProteins : [pickedProteins];
+    const minProteins = item.minProteins || 1;
+    const maxProteins = item.maxProteins || 1;
+    if (proteins.length < minProteins || proteins.length > maxProteins) return;
+    setProteinPickerItem(null);
+    setProteinSelection([]);
+    const proteinLabels = proteins.map((proteinId) => QUICK_PROTEINS.find((p) => p.id === proteinId)?.label || proteinId);
     // Mismo cálculo que resolvePosItems en el servidor, que es quien cobra.
     // La promo 2x1 va a precio plano y no suma el upcharge.
-    const upcharge = item.promo2x1 ? 0 : (PREMIUM_PROTEIN_PRICES[proteinId] || 0);
+    const upcharge = item.promo2x1 ? 0 : proteins.reduce((sum, proteinId) => sum + (PREMIUM_PROTEIN_PRICES[proteinId] || 0), 0);
     const price = item.price + upcharge;
+    const proteinKey = [...proteins].sort().join("-");
     addItem({
       ...item,
       price,
-      protein: proteinId,
-      name: `${item.name} (${proteinLabel})`,
-      cartKey: `${item.id}-${proteinId}`,
+      protein: proteins.length === 1 ? proteins[0] : undefined,
+      proteins,
+      name: `${item.name} (${proteinLabels.join(", ")})`,
+      cartKey: `${item.id}-${proteinKey}`,
     });
   };
 
@@ -269,18 +267,11 @@ export default function POSPage({ styles }) {
     setComboPickerItem(null);
   };
 
-  const resetBuilder = () => {
-    setBuilderVersion((version) => version + 1);
-    setMode("menu");
-  };
-
   const clearOrder = () => {
     setPhase(1);
-    resetBuilder();
     pendingSaleRef.current = null;
     setCart([]);
     setCashReceived("");
-    setShowReferral(false);
     setConfirmClear(false);
     setCliente("");
     setPhone("");
@@ -294,6 +285,7 @@ export default function POSPage({ styles }) {
     setReward(null);
     setRewardTopping("");
     setProteinPickerItem(null);
+    setProteinSelection([]);
     setComplementPickerItem(null);
     setComboPickerItem(null);
     setShowCustomerDetails(false);
@@ -311,24 +303,6 @@ export default function POSPage({ styles }) {
     setError("");
   };
 
-  // Only one custom bowl is supported per ticket — the Order model stores a
-  // single set of bowl fields per document. A second person's bowl is a new
-  // ticket, same as ringing up two separate customers.
-  const handleAddBowl = (bowl) => {
-    setCart((prev) => [
-      ...prev.filter((i) => i.id !== CUSTOM_BOWL_ID),
-      {
-        id: CUSTOM_BOWL_ID,
-        name: `Bowl Personalizado${bowl.bowlSize === "large" ? " (Grande)" : ""}`,
-        price: bowl.price,
-        qty: 1,
-        bowl,
-      },
-    ]);
-    setSuccess(""); setError("");
-    resetBuilder();
-  };
-
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const visibleMenu = MENU.filter((item) => {
@@ -339,7 +313,6 @@ export default function POSPage({ styles }) {
     return matchesCategory && matchesSearch;
   });
   const iva      = subtotal * IVA;
-  const customRewardBowl = cart.find((i) => i.id === CUSTOM_BOWL_ID);
   const bowlLines = cart.filter((i) => /bowl/i.test(i.name));
   const drinkLines = cart.filter((item) => item.rewardDrink);
   const snackLines = cart.filter((item) => item.rewardSnack);
@@ -348,7 +321,7 @@ export default function POSPage({ styles }) {
     rewardDiscount = Math.min(...drinkLines.map((item) => item.price));
   } else if (reward?.type === "free_snack" && bowlLines.length && snackLines.length) {
     rewardDiscount = Math.min(...snackLines.map((item) => item.price));
-  } else if (reward?.type === "double_protein" && customRewardBowl?.bowl?.proteins?.length >= 3) {
+  } else if (reward?.type === "double_protein" && cart.some((item) => item.proteins?.length === 3)) {
     rewardDiscount = 40;
   } else if (reward?.type === "free_bowl" && bowlLines.length) {
     rewardDiscount = Math.min(BOWL_BASE_PRICE, Math.min(...bowlLines.map((item) => item.price)));
@@ -473,7 +446,7 @@ export default function POSPage({ styles }) {
   };
 
   const handleCobrar = async () => {
-    if (cart.length === 0 || saving || cashShort || mode === "bowl") return;
+    if (cart.length === 0 || saving || cashShort) return;
     if (missingDeliveryPlatform) {
       setError("Elige la plataforma del delivery (Uber Eats, DiDi Food, Rappi o propio).");
       setPhase(2);
@@ -485,17 +458,15 @@ export default function POSPage({ styles }) {
     }
     setSaving(true); setError("");
 
-    const customBowl = cart.find((i) => i.id === CUSTOM_BOWL_ID);
-    const regularItems = cart.filter((i) => i.id !== CUSTOM_BOWL_ID);
-
     const nextPayload = {
       clientOrderId: createClientOrderId(),
-      items: regularItems.map(({
-        id, qty, protein, complement, comboBowlId, comboDrinkId, comboRiceCakeId,
+      items: cart.map(({
+        id, qty, protein, proteins, complement, comboBowlId, comboDrinkId, comboRiceCakeId,
       }) => ({
         id,
         qty,
         ...(protein ? { protein } : {}),
+        ...(proteins?.length ? { proteins } : {}),
         ...(complement ? { complement } : {}),
         ...(comboBowlId ? { comboBowlId, comboDrinkId, comboRiceCakeId } : {}),
       })),
@@ -510,16 +481,6 @@ export default function POSPage({ styles }) {
       rewardCode: reward?.code || null,
       rewardTopping: reward?.type === "extra_topping" ? rewardTopping : null,
       customerUserId: rewardsCustomer?._id || null,
-      ...(customBowl && {
-        base: customBowl.bowl.base,
-        bases: customBowl.bowl.bases,
-        proteins: customBowl.bowl.proteins,
-        bowlSize: customBowl.bowl.bowlSize,
-        marinades: customBowl.bowl.marinades,
-        complements: customBowl.bowl.complements,
-        sauces: customBowl.bowl.sauces,
-        toppings: customBowl.bowl.toppings,
-      }),
     };
     const payload = pendingSaleRef.current || nextPayload;
     pendingSaleRef.current = payload;
@@ -550,10 +511,8 @@ export default function POSPage({ styles }) {
       }
     }
 
-    resetBuilder();
     setCart([]);
     setCashReceived("");
-    setShowReferral(false);
     setConfirmClear(false);
     setCliente("");
     setPhone("");
@@ -641,41 +600,16 @@ export default function POSPage({ styles }) {
       </nav>
 
       <div className={ui.posWorkspace}>
-      {/* Menú / Bowl personalizado */}
       {/* Fase 1 — Productos */}
       {phase === 1 && (
         <section className={ui.menuPanel}>
-        <div className={ui.modeSwitch}>
-        <button
-        type="button"
-        onClick={() => setMode("menu")}
-        className={mode === "menu" ? ui.modeActive : ""}
-        aria-pressed={mode === "menu"}
-        >
-        <span>▦</span> Productos
-        </button>
-        <button
-        type="button"
-        onClick={() => setMode("bowl")}
-        className={mode === "bowl" ? ui.modeActive : ""}
-        aria-pressed={mode === "bowl"}
-        >
-        <span>＋</span> {customRewardBowl ? "Editar bowl" : "Armar tu bowl"}
-        </button>
-        </div>
-
-        {mode === "menu" && (
-        <>
         <div className={ui.menuIntro}>
-        <div><span>Paso 1</span><h2>Elige los productos</h2><p>Toca una tarjeta para agregarla a la orden.</p></div>
+        <div><span>Paso 1</span><h2>Elige los productos</h2><p>Toca Bowl mediano o Bowl grande y selecciona sus proteínas.</p></div>
         <label className={ui.menuSearch}>
         <span>⌕</span>
         <input value={menuSearch} onChange={(e) => setMenuSearch(e.target.value)} aria-label="Buscar producto" placeholder="Buscar producto…" />
         </label>
         </div>
-        <button type="button" className={ui.bowlShortcut} onClick={() => setMode("bowl")}>
-        <span aria-hidden="true">🥗</span><span><strong>{customRewardBowl ? "Editar bowl personalizado" : "Armar tu bowl"}</strong><small>Elige ingredientes · Mediano ${BOWL_BASE_PRICE} / Grande ${BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE}</small></span><span aria-hidden="true">→</span>
-        </button>
         <div className={ui.categoryTabs} aria-label="Categorías del menú">
         {MENU_CATEGORIES.map((category) => (
         <button key={category} type="button" aria-pressed={menuCategory === category} onClick={() => setMenuCategory(category)}>{category}</button>
@@ -693,14 +627,14 @@ export default function POSPage({ styles }) {
         key={item.id}
         className={ui.productCard}
         onClick={() => item.needsProtein
-        ? setProteinPickerItem(item)
+        ? openProteinPicker(item)
         : item.needsComplement ? setComplementPickerItem(item)
         : item.needsCombo ? openComboPicker(item) : addItem(item)}
         type="button"
         >
         {quantity > 0 && <span className={ui.inCartBadge}>{quantity}</span>}
         <span className={ui.productIcon}>{item.icon}</span>
-        <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.needsCombo ? "Elige bowl, bebida y snack" : item.needsProtein ? "Elige la proteína" : item.needsComplement ? "Elige el complemento" : "Toca para agregar"}</small></span>
+        <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.needsCombo ? "Elige bowl, bebida y snack" : item.maxProteins === 3 ? "Elige 3 proteínas" : item.maxProteins === 2 ? "Elige 1 o 2 proteínas" : item.needsProtein ? "Elige la proteína" : item.needsComplement ? "Elige el complemento" : "Toca para agregar"}</small></span>
         <span className={ui.productPrice}>${item.price}</span>
         <span className={ui.addProduct}>+</span>
         </button>
@@ -708,13 +642,6 @@ export default function POSPage({ styles }) {
         })}
         </div>
         {visibleMenu.length === 0 && <div className={ui.noProducts}>No encontramos productos con esos filtros.<button type="button" onClick={() => { setMenuSearch(""); setMenuCategory("Todos"); }}>Ver todos los productos</button></div>}
-        </>
-        )}
-        <div className={ui.bowlPanel} hidden={mode !== "bowl"} ref={builderPanelRef} tabIndex={-1} aria-label="Armar tu bowl">
-        <div className={ui.menuIntro}><div><span>Paso 1</span><h2>Armar tu bowl</h2><p>Elige los ingredientes y revisa el precio antes de agregarlo.</p></div></div>
-        {customRewardBowl && <p className={ui.bowlNotice}>Estás editando el bowl de esta orden. Para otro bowl personalizado, abre un ticket separado.</p>}
-        <CustomBowlBuilder key={`${builderVersion}-${customRewardBowl ? "edit" : "new"}`} initialBowl={customRewardBowl?.bowl} onAdd={handleAddBowl} onCancel={resetBuilder} />
-        </div>
         </section>
       )}
 
@@ -950,9 +877,7 @@ export default function POSPage({ styles }) {
           </div>
 
           {paymentMethod === "cash" && cart.length > 0 && <div className={ui.cashPanel}><label htmlFor="pos-cash">Efectivo recibido <small>Opcional · calcula el cambio</small></label><input id="pos-cash" type="number" min="0" step="0.01" inputMode="decimal" value={cashReceived} onChange={(event) => setCashReceived(event.target.value)} placeholder={String(total)} /><p role="status">{cashReceived !== "" ? cashShort ? `Faltan $${Math.max(0, total - (cashAmount || 0)).toLocaleString("es-MX")}` : `Cambio: $${(cashAmount - total).toLocaleString("es-MX", { maximumFractionDigits: 2 })}` : "Ingresa el monto que te entregó el cliente."}</p></div>}
-          {mode === "bowl" && <p className={ui.bowlNotice}>Agrega o guarda el bowl antes de cobrar. Si no lo necesitas, pulsa Cancelar.</p>}
-
-          <button className={ui.chargeButton} onClick={handleCobrar} disabled={cart.length === 0 || saving || cashShort || mode === "bowl" || missingDeliveryPlatform || (reward?.type === "extra_topping" && !rewardTopping)} type="button">
+          <button className={ui.chargeButton} onClick={handleCobrar} disabled={cart.length === 0 || saving || cashShort || missingDeliveryPlatform || (reward?.type === "extra_topping" && !rewardTopping)} type="button">
           {saving ? "Enviando orden…" : cart.length === 0 ? "Agrega productos para cobrar" : missingDeliveryPlatform ? "Elige la plataforma del delivery" : paymentMethod === "delivery_app" ? `Registrar pedido ${DELIVERY_PLATFORM_LABELS[deliveryPlatform]} · $${total.toLocaleString("es-MX")}` : paymentMethod === "pay_at_pickup" ? `Guardar sin cobrar · $${total.toLocaleString("es-MX")}` : `Cobrar $${total.toLocaleString("es-MX")} MXN`}
           </button>
           </div>
@@ -988,19 +913,12 @@ export default function POSPage({ styles }) {
               <div className={ui.cartItemInfo}>
                 <strong>{item.name}</strong>
                 {item.comboBowlId && <span className={ui.cartItemMeta}>{comboPalaceSelectionSummary(item)}</span>}
-                {item.bowl && <><span className={ui.cartItemMeta}>{[
-                  getBaseLabel(item.bowl.bases, item.bowl.base),
-                  ...item.bowl.proteins.map((id) => PROTEIN_LABELS[id]),
-                  ...item.bowl.complements.map((id) => COMPLEMENT_LABELS[id]),
-                  ...item.bowl.sauces.map((id) => SAUCE_LABELS[id]),
-                  ...item.bowl.toppings.map((id) => TOPPING_LABELS[id]),
-                ].join(" · ")}</span><button type="button" className={ui.editBowl} onClick={() => setMode("bowl")}>Editar ingredientes</button></>}
                 <small>${item.price} c/u</small>
               </div>
               <div className={ui.qtyControl}>
                 <button type="button" onClick={() => changeQty(cartKeyOf(item), -1)} aria-label={`Reducir ${item.name}`}>−</button>
                 <span>{item.qty}</span>
-                {item.id !== CUSTOM_BOWL_ID && <button type="button" onClick={() => changeQty(cartKeyOf(item), 1)} aria-label={`Agregar otro ${item.name}`}>+</button>}
+                <button type="button" onClick={() => changeQty(cartKeyOf(item), 1)} aria-label={`Agregar otro ${item.name}`}>+</button>
               </div>
               <strong className={ui.linePrice}>${(item.price * item.qty).toLocaleString("es-MX")}</strong>
               <button className={ui.removeItem} onClick={() => removeItem(cartKeyOf(item))} type="button" aria-label={`Quitar ${item.name}`}>×</button>
@@ -1010,19 +928,38 @@ export default function POSPage({ styles }) {
       </aside>
       </div>
 
-      {proteinPickerItem && (
+      {proteinPickerItem && (proteinPickerItem.maxProteins > 1 ? (
+        <ProteinPicker
+          item={proteinPickerItem}
+          selection={proteinSelection}
+          setSelection={setProteinSelection}
+          options={QUICK_PROTEINS
+            .filter((p) => !hiddenIngredients.includes(p.id))
+            .map((p) => ({
+              ...p,
+              label: `${p.label}${PREMIUM_PROTEIN_PRICES[p.id] ? ` (+$${PREMIUM_PROTEIN_PRICES[p.id]})` : ""}`,
+              disabled: unavailableItems.includes(p.id),
+            }))}
+          onConfirm={() => confirmProteinPick()}
+          onClose={() => { setProteinPickerItem(null); setProteinSelection([]); }}
+        />
+      ) : (
         <QuickOptionPicker
           label={`Proteína del ${proteinPickerItem.name}`}
           title={`¿De qué proteína es el ${proteinPickerItem.name.toLowerCase()}?`}
           hint="Toca la proteína para agregar el producto a la orden."
-          options={QUICK_PROTEINS.map((p) => ({
-            ...p,
-            label: `${p.label}${!proteinPickerItem.promo2x1 && PREMIUM_PROTEIN_PRICES[p.id] ? ` (+$${PREMIUM_PROTEIN_PRICES[p.id]})` : ""}`,
-          }))}
-          onPick={confirmProteinPick}
-          onClose={() => setProteinPickerItem(null)}
+          options={QUICK_PROTEINS
+            .filter((p) => !hiddenIngredients.includes(p.id))
+            .map((p) => ({
+              ...p,
+              label: `${p.label}${!proteinPickerItem.promo2x1 && PREMIUM_PROTEIN_PRICES[p.id] ? ` (+$${PREMIUM_PROTEIN_PRICES[p.id]})` : ""}`,
+              disabled: unavailableItems.includes(p.id),
+              note: unavailableItems.includes(p.id) ? "Agotado" : "",
+            }))}
+          onPick={(proteinId) => confirmProteinPick([proteinId])}
+          onClose={() => { setProteinPickerItem(null); setProteinSelection([]); }}
         />
-      )}
+      ))}
 
       {complementPickerItem && (
         <QuickOptionPicker
@@ -1092,8 +1029,54 @@ export default function POSPage({ styles }) {
         </div>
       )}
 
-      {cart.length > 0 && mode === "menu" && <button type="button" className={ui.mobileCart} onClick={() => { cartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); cartRef.current?.focus({ preventScroll: true }); }}>Ver orden · {cartItemCount} producto{cartItemCount !== 1 ? "s" : ""}<strong>${total.toLocaleString("es-MX")} →</strong></button>}
+      {cart.length > 0 && <button type="button" className={ui.mobileCart} onClick={() => { cartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); cartRef.current?.focus({ preventScroll: true }); }}>Ver orden · {cartItemCount} producto{cartItemCount !== 1 ? "s" : ""}<strong>${total.toLocaleString("es-MX")} →</strong></button>}
       <Receipt order={lastReceipt} />
+    </div>
+  );
+}
+
+function ProteinPicker({ item, selection, setSelection, options, onConfirm, onClose }) {
+  const min = item.minProteins || 1;
+  const max = item.maxProteins || 1;
+  const exact = min === max;
+  const ready = selection.length >= min && selection.length <= max;
+  const selectedPrice = item.price + selection.reduce((sum, id) => sum + (PREMIUM_PROTEIN_PRICES[id] || 0), 0);
+  const toggle = (proteinId) => {
+    setSelection((current) => {
+      if (current.includes(proteinId)) return current.filter((id) => id !== proteinId);
+      if (current.length >= max) return current;
+      return [...current, proteinId];
+    });
+  };
+
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby="pos-protein-picker-title" className={ui.comboPickerBackdrop} onClick={onClose}>
+      <div className={ui.comboPickerModal} onClick={(event) => event.stopPropagation()}>
+        <div className={ui.comboPickerHeader}>
+          <div>
+            <span>{item.name} · ${item.price} MXN</span>
+            <h3 id="pos-protein-picker-title">Elige {exact ? `las ${max}` : "1 o 2"} proteínas</h3>
+            <p>{exact ? `Selecciona exactamente ${max} proteínas.` : "Selecciona una o dos proteínas."}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Cerrar">×</button>
+        </div>
+        <fieldset className={ui.comboPickerGroup}>
+          <legend>{selection.length} de {max} seleccionadas</legend>
+          <div>
+            {options.map((option) => {
+              const selected = selection.includes(option.id);
+              return (
+                <button key={option.id} type="button" disabled={option.disabled} aria-pressed={selected} onClick={() => toggle(option.id)}>
+                  <span>{selected ? "✓" : ""}</span>{option.label}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+        <button type="button" className={ui.comboPickerConfirm} disabled={!ready} onClick={onConfirm}>
+          {ready ? `Agregar ${item.name} · $${selectedPrice}` : exact ? `Faltan ${max - selection.length} proteína${max - selection.length === 1 ? "" : "s"}` : "Elige al menos una proteína"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -225,17 +225,34 @@ export const resolvePosItems = (items, now = new Date()) => {
       throw new PosOrderValidationError(`Cantidad inválida para ${catalogItem.name}`);
     }
 
-    // Bowls de venta rápida (mediano/grande) no traen receta fija -- si en
-    // caja se capturó la proteína, se guarda para poder descontar al menos
-    // esa parte del inventario (ver addItemDemand más abajo). Se acepta en
-    // cualquier producto, no solo esos dos, pero solo se usa cuando el
-    // catálogo no tiene inventoryRecipe.
+    // Los bowls rápidos pueden traer la selección completa (1–2 proteínas
+    // para mediano, exactamente 3 para grande). `protein` se conserva para
+    // colas offline y versiones anteriores del POS.
     let protein;
     if (rawItem.protein !== undefined && rawItem.protein !== null && rawItem.protein !== "") {
       if (typeof rawItem.protein !== "string" || !BOWL_RULES.proteins.allowed.has(rawItem.protein)) {
         throw new PosOrderValidationError(`Proteína inválida para ${catalogItem.name}`);
       }
       protein = rawItem.protein;
+    }
+
+    let proteins;
+    if (rawItem.proteins !== undefined) {
+      if (!Array.isArray(rawItem.proteins)
+        || new Set(rawItem.proteins).size !== rawItem.proteins.length
+        || rawItem.proteins.some((id) => typeof id !== "string" || !BOWL_RULES.proteins.allowed.has(id))) {
+        throw new PosOrderValidationError(`Proteínas inválidas para ${catalogItem.name}`);
+      }
+      const isMedium = catalogItem.catalogId === "bowl-mediano-rapido";
+      const isLarge = catalogItem.catalogId === "bowl-grande-rapido";
+      if (!isMedium && !isLarge) {
+        throw new PosOrderValidationError(`${catalogItem.name} no admite varias proteínas`);
+      }
+      if ((isMedium && (rawItem.proteins.length < 1 || rawItem.proteins.length > 2))
+        || (isLarge && rawItem.proteins.length !== 3)) {
+        throw new PosOrderValidationError(`Cantidad de proteínas inválida para ${catalogItem.name}`);
+      }
+      proteins = [...rawItem.proteins];
     }
 
     if (catalogItem.catalogId === "extra-protein-scoop" && !protein) {
@@ -259,9 +276,10 @@ export const resolvePosItems = (items, now = new Date()) => {
     // Dos líneas del mismo producto con distinta proteína o distintas
     // elecciones del combo no se combinan.
     // se mantienen separadas para no perder de cuál proteína era cada una.
+    const proteinKey = proteins?.length ? [...proteins].sort().join("+") : protein;
     const mapKey = comboSelections
       ? `${catalogItem.catalogId}::${comboSelections.comboBowlId}::${comboSelections.comboDrinkId}::${comboSelections.comboRiceCakeId}`
-      : protein ? `${catalogItem.catalogId}::${protein}`
+      : proteinKey ? `${catalogItem.catalogId}::${proteinKey}`
         : complement ? `${catalogItem.catalogId}::${complement}` : catalogItem.catalogId;
     const previous = resolved.get(mapKey);
     const combinedQty = (previous?.qty || 0) + qty;
@@ -278,8 +296,9 @@ export const resolvePosItems = (items, now = new Date()) => {
     // La promo 2x1 queda fuera a propósito: se cobra a precio plano por los
     // 2 bowls, igual que en el armador en línea, donde el atún sellado ni se
     // ofrece dentro de la promo.
-    const proteinUpcharge = protein && catalogItem.catalogId !== "promo-2x1-dinein"
-      ? PREMIUM_PROTEIN_PRICES[protein] || 0
+    const chosenProteins = proteins?.length ? proteins : protein ? [protein] : [];
+    const proteinUpcharge = catalogItem.catalogId !== "promo-2x1-dinein"
+      ? chosenProteins.reduce((sum, id) => sum + (PREMIUM_PROTEIN_PRICES[id] || 0), 0)
       : 0;
     const price = catalogItem.price + proteinUpcharge;
 
@@ -291,7 +310,8 @@ export const resolvePosItems = (items, now = new Date()) => {
       category: catalogItem.category,
       rewardDrink: Boolean(catalogItem.rewardDrink),
       rewardSnack: Boolean(catalogItem.rewardSnack),
-      ...(protein ? { protein } : {}),
+      ...(protein && !proteins?.length ? { protein } : {}),
+      ...(proteins?.length ? { proteins } : {}),
       ...(complement ? { complement } : {}),
       ...(comboSelections || {}),
     });
@@ -569,7 +589,8 @@ const addItemDemand = (demand, item) => {
     } else if (catalogItem.catalogId === "extra-complement") {
       // Una porción del complemento elegido por cada extra vendido.
       if (typeof item?.complement === "string" && item.complement) addDemand(demand, item.complement, qty);
-    } else if (typeof item?.protein === "string" && item.protein) {
+    } else if ((Array.isArray(item?.proteins) && item.proteins.length > 0)
+      || (typeof item?.protein === "string" && item.protein)) {
       // Venta rápida sin receta (bowl mediano/grande/promo 2x1): se descuenta
       // la proteína capturada en caja, aunque el resto del bowl (base,
       // complementos, salsas) no se pueda rastrear. Sin proteína capturada
@@ -582,7 +603,11 @@ const addItemDemand = (demand, item) => {
         : catalogItem.catalogId === "bowl-grande-rapido" || catalogItem.catalogId === "promo-2x1-dinein"
           ? LARGE_BOWL_PROTEIN_KG
           : MEDIUM_BOWL_PROTEIN_KG;
-      addDemand(demand, item.protein, proteinKg * qty);
+      const proteins = Array.isArray(item.proteins) && item.proteins.length > 0
+        ? item.proteins
+        : [item.protein];
+      const portionKg = proteinKg / proteins.length;
+      for (const chosenProtein of proteins) addDemand(demand, chosenProtein, portionKg * qty);
     }
   } else {
     // Preserve stock matching for historical POS orders created before the
@@ -653,6 +678,7 @@ export const getUnavailablePosSelections = ({
     consider(inventoryKeyFromName(catalogItem.name));
     for (const key of Object.keys(catalogItem.inventoryRecipe || {})) consider(key);
     consider(item.protein);
+    for (const key of Array.isArray(item.proteins) ? item.proteins : []) consider(key);
     consider(item.complement);
     if (catalogItem.comboPalace) {
       for (const catalogId of [item.comboBowlId, item.comboDrinkId, item.comboRiceCakeId]) {

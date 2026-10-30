@@ -712,8 +712,11 @@ export const createPosOrder = async (req, res) => {
         // discount to apply. Persist the exact choice for KDS and inventory.
         rewardInstruction = `PREMIO REWARDS: agregar 1 porción extra de ${POS_TOPPING_LABELS[safeRewardTopping]}.`;
       } else if (reward.type === "double_protein") {
-        if (!hasBowl || safeBowl.proteins.length < 3) {
-          return res.status(400).json({ message: "Proteína doble requiere un bowl personalizado grande" });
+        const hasLargeQuickBowl = safeItems.some((item) =>
+          item.catalogId === "bowl-grande-rapido" && item.proteins?.length === 3
+        );
+        if ((!hasBowl || safeBowl.proteins.length < 3) && !hasLargeQuickBowl) {
+          return res.status(400).json({ message: "Proteína doble requiere un bowl grande" });
         }
         rewardDiscount = 40;
       } else if (reward.type === "free_bowl") {

@@ -213,6 +213,35 @@ test("el bowl mediano/grande descuenta la proteina cuando se captura en caja", (
   assert.deepEqual(getPosInventoryDemand({ items: [mediano, grande] }), { salmon: 0.24, tuna: 0.1 });
 });
 
+test("el bowl rapido guarda y reparte inventario entre todas sus proteinas", () => {
+  const [mediano, grande] = resolvePosItems([
+    { catalogId: "bowl-mediano-rapido", qty: 1, proteins: ["tuna", "salmon"] },
+    { catalogId: "bowl-grande-rapido", qty: 1, proteins: ["shrimp", "tofu", "seared_tuna"] },
+  ]);
+
+  assert.deepEqual(mediano.proteins, ["tuna", "salmon"]);
+  assert.deepEqual(grande.proteins, ["shrimp", "tofu", "seared_tuna"]);
+  assert.equal(grande.price, 270);
+  assert.deepEqual(getPosInventoryDemand({ items: [mediano, grande] }), {
+    salmon: 0.05,
+    seared_tuna: 0.04,
+    shrimp: 0.04,
+    tofu: 0.04,
+    tuna: 0.05,
+  });
+});
+
+test("el bowl rapido exige la cantidad de proteinas de su tamaño", () => {
+  assert.throws(
+    () => resolvePosItems([{ catalogId: "bowl-grande-rapido", proteins: ["tuna", "salmon"] }]),
+    /Cantidad de proteínas inválida/
+  );
+  assert.throws(
+    () => resolvePosItems([{ catalogId: "bowl-mediano-rapido", proteins: ["tuna", "salmon", "shrimp"] }]),
+    /Cantidad de proteínas inválida/
+  );
+});
+
 test("dos bowls medianos con distinta proteina no se combinan en una sola linea", () => {
   const items = resolvePosItems([
     { catalogId: "bowl-mediano-rapido", qty: 1, protein: "tuna" },
