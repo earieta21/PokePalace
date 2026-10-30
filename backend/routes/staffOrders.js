@@ -17,7 +17,9 @@ import { streamOrderEvents } from "../utils/orderEvents.js";
 const router = express.Router();
 
 const seniorStaff = requireStaffAuth(["manager", "admin", "owner"]);
-const orderReaders = requireStaffAuth(["cashier", "kitchen", "manager", "admin", "owner"]);
+// El empleado opera el local completo: ve las comandas, las avanza y
+// reimprime tickets, igual que caja y cocina.
+const orderReaders = requireStaffAuth(["employee", "cashier", "kitchen", "manager", "admin", "owner"]);
 const posSalesStaff = requireStaffAuth(["employee", "cashier", "manager", "admin", "owner"]);
 
 router.get  ("/events",        orderReaders, streamOrderEvents);

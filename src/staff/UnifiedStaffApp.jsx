@@ -153,9 +153,10 @@ const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 // periódico (horario, avisos), y al final lo administrativo/menos frecuente
 // (ventas, fin, panel).
 const TABS_BY_ROLE = {
-  // Empleado: vende y cobra en el POS, agrega inventario (alta y recepción,
-  // sin editar ni borrar) y hace su corte de caja.
-  employee: ["pos", "inicio", "consumo", "tareas", "temp", "inv", "corte", "horario", "avisos"],
+  // Empleado: opera el local completo -- vende y cobra, ve comandas, canjea
+  // premios, reimprime, registra mermas, marca agotados, agrega inventario
+  // (sin editar ni borrar) y hace su corte. Sin reportes ni administración.
+  employee: ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos"],
   cashier:  ["pos", "premios", "inicio", "consumo", "tareas", "temp", "hist", "corte", "horario", "avisos"],
   kitchen:  ["cocina", "inicio", "consumo", "tareas", "temp", "hist", "mermas", "horario", "avisos"],
   manager:  ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "recetas", "panel"],
@@ -198,7 +199,7 @@ const TAB_GROUPS = [
 ];
 
 const MOBILE_PRIMARY_BY_ROLE = {
-  employee: ["pos", "inicio", "consumo", "tareas"],
+  employee: ["pos", "cocina", "inicio", "tareas"],
   cashier: ["pos", "premios", "inicio", "consumo"],
   kitchen: ["cocina", "inicio", "consumo", "tareas"],
   manager: ["pos", "cocina", "inicio", "inv"],

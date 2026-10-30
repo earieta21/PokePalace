@@ -1027,7 +1027,7 @@ test("la jerarquía protege owner/admin y conserva los flujos de caja/cocina", a
   );
   assert.equal(managerCannotDeleteOwner.status, 403);
 
-  assert.equal((await staffRequest("employee", "/api/staff/orders")).status, 403);
+  assert.equal((await staffRequest("employee", "/api/staff/orders?limit=1")).status, 200);
   assert.equal((await staffRequest("kitchen", "/api/staff/orders?limit=1")).status, 200);
   assert.equal((await staffRequest("kitchen", "/api/staff/orders", {
     method: "POST",
@@ -1035,7 +1035,7 @@ test("la jerarquía protege owner/admin y conserva los flujos de caja/cocina", a
   })).status, 403);
 });
 
-test("un empleado puede vender en el POS aunque no pueda ver el historial completo de órdenes", async () => {
+test("un empleado vende en el POS, ve las comandas y canjea premios", async () => {
   const clientOrderId = `ci-pos-security:employee:${Date.now()}:${Math.random().toString(16).slice(2)}`;
 
   const created = await staffRequest("employee", "/api/staff/orders", {
@@ -1053,20 +1053,19 @@ test("un empleado puede vender en el POS aunque no pueda ver el historial comple
   const order = (await created.json()).order;
   assert.equal(order.staffId, String(staffFixtures.employee._id));
 
-  const customerSearch = await staffRequest("employee", "/api/staff/orders/customers/search?q=CI");
+  const customerSearch = await staffRequest("employee", "/api/staff/orders/customers/search?q=CIE");
   assert.equal(customerSearch.status, 200);
 
   const rewardLookup = await staffRequest("employee", "/api/staff/rewards/codigo-que-no-existe");
   assert.notEqual(rewardLookup.status, 403);
 
-  // Vender no es lo mismo que administrar campañas de premios ni ver el
-  // historial completo de órdenes -- ninguno de los dos se abre por vender.
+  // El empleado opera el local: entrega premios de historias y ve comandas.
   const socialStory = await staffRequest("employee", "/api/staff/rewards/social-story", {
     method: "POST",
     body: {},
   });
-  assert.equal(socialStory.status, 403);
-  assert.equal((await staffRequest("employee", "/api/staff/orders")).status, 403);
+  assert.notEqual(socialStory.status, 403);
+  assert.equal((await staffRequest("employee", "/api/staff/orders?limit=1")).status, 200);
 });
 
 test("un empleado cobra pendientes, hace el corte y agrega inventario, pero no lo edita", async () => {
@@ -1099,6 +1098,26 @@ test("un empleado cobra pendientes, hace el corte y agrega inventario, pero no l
   assert.equal((await staffRequest("kitchen", "/api/staff/orders/unpaid")).status, 403);
 
   assert.equal((await staffRequest("employee", "/api/staff/cash-cuts/preview")).status, 200);
+
+  // Comandas: el empleado las ve y las avanza.
+  const kitchenQueue = await staffRequest("employee", "/api/staff/orders?status=pending,preparing,ready&limit=30");
+  assert.equal(kitchenQueue.status, 200);
+  assert.ok((await kitchenQueue.json()).orders.some((o) => o._id === pendingOrder._id));
+  const advanced = await staffRequest("employee", `/api/staff/orders/${pendingOrder._id}/status`, {
+    method: "PATCH",
+    body: { status: "preparing" },
+  });
+  assert.equal(advanced.status, 200);
+
+  // Tienda: marcar agotados y pausar pedidos sí; reportes y equipo no.
+  const availability = await (await fetch(`${BASE}/api/settings/availability`)).json();
+  assert.equal((await staffRequest("employee", "/api/settings/availability", {
+    method: "PUT",
+    body: { unavailableItems: availability.unavailableItems },
+  })).status, 200);
+  assert.equal((await staffRequest("employee", "/api/staff/orders/analytics")).status, 403);
+  assert.equal((await staffRequest("employee", "/api/staff/customers")).status, 403);
+  assert.equal((await staffRequest("employee", "/api/kiosk/employees/manage")).status, 403);
 
   const created = await staffRequest("employee", "/api/staff/inventory", {
     method: "POST",
