@@ -89,6 +89,7 @@ function orderTicket(order) {
         item.detail,
         item.proteins?.length ? item.proteins.map((id) => label(PROTEIN_LABELS, id)).join(", ") : item.protein && label(PROTEIN_LABELS, item.protein),
         item.complement && label(COMPLEMENT_LABELS, item.complement),
+        item.sauce && label(SAUCE_LABELS, item.sauce),
         item.catalogId === "combo-palace" && comboPalaceSelectionSummary(item),
       ].filter(Boolean).join(" · ");
       others.push({ qty: item.qty || 1, name: item.name, detail: detail || null });

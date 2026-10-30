@@ -76,7 +76,8 @@ function orderLines(order) {
   (order.items || []).forEach((item) => {
     const proteinSuffix = item.proteins?.length ? ` (${labelList(item.proteins, PROTEIN_LABELS).join(", ")})`
       : item.protein ? ` (${PROTEIN_LABELS[item.protein] ?? item.protein})`
-      : item.complement ? ` (${COMPLEMENT_LABELS[item.complement] ?? item.complement})` : "";
+      : item.complement ? ` (${COMPLEMENT_LABELS[item.complement] ?? item.complement})`
+        : item.sauce ? ` (${SAUCE_LABELS[item.sauce] ?? item.sauce})` : "";
     const comboSuffix = item.catalogId === "combo-palace" ? ` — ${comboPalaceSelectionSummary(item)}` : "";
     lines.push({ title: `${item.qty} × ${item.name}${proteinSuffix}${comboSuffix}`, rows: [] });
   });

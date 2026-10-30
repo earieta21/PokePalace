@@ -1,5 +1,5 @@
 import { isComboPalaceDay, isPromo2x1Day } from "../utils/promoSchedule.js";
-import { EXTRA_COMPLEMENT_PRICE, EXTRA_SCOOP_PRICE, PREMIUM_PROTEIN_PRICES } from "../pricing.js";
+import { EXTRA_COMPLEMENT_PRICE, EXTRA_SAUCE_PRICE, EXTRA_SCOOP_PRICE, PREMIUM_PROTEIN_PRICES } from "../pricing.js";
 
 // Protein stock is stored in kilograms. A medium bowl contains 100 g total,
 // a large bowl contains 120 g total, and every extra scoop adds 40 g.
@@ -131,6 +131,13 @@ export const POS_CATALOG = Object.freeze([
     // complemento en caja (resolvePosItems lo valida) y se descuenta una
     // porción de ese complemento del inventario (addItemDemand).
     catalogId: "extra-complement", legacyId: 28, name: "Extra de complemento", price: EXTRA_COMPLEMENT_PRICE, category: "extras",
+    inventoryRecipe: {},
+  },
+  {
+    // Aderezo extra en caja, mismo esquema que el extra de complemento: el
+    // cajero elige cuál (resolvePosItems lo valida) y se descuenta una
+    // porción de ese aderezo del inventario.
+    catalogId: "extra-sauce", legacyId: 31, name: "Extra de aderezo", price: EXTRA_SAUCE_PRICE, category: "extras",
     inventoryRecipe: {},
   },
 ]);
@@ -269,6 +276,14 @@ export const resolvePosItems = (items, now = new Date()) => {
       complement = rawItem.complement;
     }
 
+    let sauce;
+    if (catalogItem.catalogId === "extra-sauce") {
+      if (typeof rawItem.sauce !== "string" || !BOWL_RULES.sauces.allowed.has(rawItem.sauce)) {
+        throw new PosOrderValidationError("Selecciona el aderezo del extra");
+      }
+      sauce = rawItem.sauce;
+    }
+
     const comboSelections = catalogItem.comboPalace
       ? sanitizeComboPalaceSelections(rawItem, catalogItem.name)
       : null;
@@ -280,7 +295,8 @@ export const resolvePosItems = (items, now = new Date()) => {
     const mapKey = comboSelections
       ? `${catalogItem.catalogId}::${comboSelections.comboBowlId}::${comboSelections.comboDrinkId}::${comboSelections.comboRiceCakeId}`
       : proteinKey ? `${catalogItem.catalogId}::${proteinKey}`
-        : complement ? `${catalogItem.catalogId}::${complement}` : catalogItem.catalogId;
+        : complement ? `${catalogItem.catalogId}::${complement}`
+          : sauce ? `${catalogItem.catalogId}::${sauce}` : catalogItem.catalogId;
     const previous = resolved.get(mapKey);
     const combinedQty = (previous?.qty || 0) + qty;
     if (combinedQty > 99) {
@@ -313,6 +329,7 @@ export const resolvePosItems = (items, now = new Date()) => {
       ...(protein && !proteins?.length ? { protein } : {}),
       ...(proteins?.length ? { proteins } : {}),
       ...(complement ? { complement } : {}),
+      ...(sauce ? { sauce } : {}),
       ...(comboSelections || {}),
     });
   }
@@ -589,6 +606,9 @@ const addItemDemand = (demand, item) => {
     } else if (catalogItem.catalogId === "extra-complement") {
       // Una porción del complemento elegido por cada extra vendido.
       if (typeof item?.complement === "string" && item.complement) addDemand(demand, item.complement, qty);
+    } else if (catalogItem.catalogId === "extra-sauce") {
+      // Una porción del aderezo elegido por cada extra vendido.
+      if (typeof item?.sauce === "string" && item.sauce) addDemand(demand, item.sauce, qty);
     } else if ((Array.isArray(item?.proteins) && item.proteins.length > 0)
       || (typeof item?.protein === "string" && item.protein)) {
       // Venta rápida sin receta (bowl mediano/grande/promo 2x1): se descuenta
@@ -680,6 +700,7 @@ export const getUnavailablePosSelections = ({
     consider(item.protein);
     for (const key of Array.isArray(item.proteins) ? item.proteins : []) consider(key);
     consider(item.complement);
+    consider(item.sauce);
     if (catalogItem.comboPalace) {
       for (const catalogId of [item.comboBowlId, item.comboDrinkId, item.comboRiceCakeId]) {
         const selectedItem = getPosCatalogItem(catalogId);

@@ -6,6 +6,7 @@ export const LARGE_BOWL_UPCHARGE = 20;    // bowl grande (3 proteínas, 120 g) =
 export const EXTRA_SCOOP_PRICE = 40;      // porción extra (40 g) de una proteína ya elegida
 export const COMPLEMENT_FREE_LIMIT = 6;   // complementos incluidos sin costo
 export const EXTRA_COMPLEMENT_PRICE = 15; // cada complemento más allá del límite gratis
+export const EXTRA_SAUCE_PRICE = 10;      // aderezo extra cobrado en el POS
 export const PREMIUM_PROTEIN_PRICES = Object.freeze({
   seared_tuna: 20,
 });

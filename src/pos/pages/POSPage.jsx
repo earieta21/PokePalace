@@ -14,8 +14,8 @@ import MemberQrScanner from "../MemberQrScanner.jsx";
 import { getRewardById, REWARDS } from "../../data/rewardsCatalog.js";
 import { REFERRAL_SOURCES } from "../../data/referralSources.js";
 import { DELIVERY_PLATFORMS, DELIVERY_PLATFORM_LABELS, isDeliveryApp } from "../../data/deliveryPlatforms.js";
-import { COMPLEMENT_LABELS, TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
-import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, EXTRA_COMPLEMENT_PRICE, PREMIUM_PROTEIN_PRICES } from "../../order/pricing.js";
+import { COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
+import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, EXTRA_COMPLEMENT_PRICE, EXTRA_SAUCE_PRICE, PREMIUM_PROTEIN_PRICES } from "../../order/pricing.js";
 import {
   COMBO_PALACE_OPTIONS,
   COMBO_PALACE_PRICE,
@@ -64,6 +64,8 @@ const MENU = [
   // por cada complemento adicional. El cajero elige cuál (needsComplement)
   // para que cocina sepa qué servir y se descuente del inventario.
   { id: 28, name: "Extra de complemento",     price: EXTRA_COMPLEMENT_PRICE, category: "Bowls", icon: "🥒", needsComplement: true },
+  // Aderezo extra: el cajero elige cuál para que cocina sepa qué servir.
+  { id: 31, name: "Extra de aderezo",         price: EXTRA_SAUCE_PRICE, category: "Bowls", icon: "🥫", needsSauce: true },
 ];
 
 const MENU_CATEGORIES = ["Todos", "Promos", "Bowls", "Bebidas", "Rice Cakes"];
@@ -79,6 +81,11 @@ const QUICK_COMPLEMENTS = [
   "shredded_carrots", "seaweed", "edamame", "red_onion", "cucumber", "mango",
   "pineapple", "beet", "surimi", "spicy_surimi", "avocado",
 ].map((id) => ({ id, label: COMPLEMENT_LABELS[id] || id }));
+
+// Mismos aderezos que ofrece el armador del POS (CustomBowlBuilder).
+const QUICK_SAUCES = [
+  "spicy_mayo", "sweet_dressing", "citrus_dressing", "red_sauce", "sriracha", "cilantro_dressing",
+].map((id) => ({ id, label: SAUCE_LABELS[id] || id }));
 
 const normalizeSearch = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
@@ -197,6 +204,7 @@ export default function POSPage({ styles }) {
   const [proteinPickerItem, setProteinPickerItem] = useState(null);
   const [proteinSelection, setProteinSelection] = useState([]);
   const [complementPickerItem, setComplementPickerItem] = useState(null);
+  const [saucePickerItem, setSaucePickerItem] = useState(null);
   const [comboPickerItem, setComboPickerItem] = useState(null);
   const [comboSelection, setComboSelection] = useState({
     comboBowlId: "",
@@ -247,6 +255,19 @@ export default function POSPage({ styles }) {
     });
   };
 
+  const confirmSaucePick = (sauceId) => {
+    const item = saucePickerItem;
+    setSaucePickerItem(null);
+    if (!item) return;
+    const sauceLabel = QUICK_SAUCES.find((s) => s.id === sauceId)?.label || sauceId;
+    addItem({
+      ...item,
+      sauce: sauceId,
+      name: `${item.name} (${sauceLabel})`,
+      cartKey: `${item.id}-${sauceId}`,
+    });
+  };
+
   const openComboPicker = (item) => {
     setComboPickerItem(item);
     setComboSelection({
@@ -287,6 +308,7 @@ export default function POSPage({ styles }) {
     setProteinPickerItem(null);
     setProteinSelection([]);
     setComplementPickerItem(null);
+    setSaucePickerItem(null);
     setComboPickerItem(null);
     setShowCustomerDetails(false);
     setShowReward(false);
@@ -461,13 +483,14 @@ export default function POSPage({ styles }) {
     const nextPayload = {
       clientOrderId: createClientOrderId(),
       items: cart.map(({
-        id, qty, protein, proteins, complement, comboBowlId, comboDrinkId, comboRiceCakeId,
+        id, qty, protein, proteins, complement, sauce, comboBowlId, comboDrinkId, comboRiceCakeId,
       }) => ({
         id,
         qty,
         ...(protein ? { protein } : {}),
         ...(proteins?.length ? { proteins } : {}),
         ...(complement ? { complement } : {}),
+        ...(sauce ? { sauce } : {}),
         ...(comboBowlId ? { comboBowlId, comboDrinkId, comboRiceCakeId } : {}),
       })),
       customer: cliente.trim() || "Mostrador",
@@ -629,12 +652,13 @@ export default function POSPage({ styles }) {
         onClick={() => item.needsProtein
         ? openProteinPicker(item)
         : item.needsComplement ? setComplementPickerItem(item)
+        : item.needsSauce ? setSaucePickerItem(item)
         : item.needsCombo ? openComboPicker(item) : addItem(item)}
         type="button"
         >
         {quantity > 0 && <span className={ui.inCartBadge}>{quantity}</span>}
         <span className={ui.productIcon}>{item.icon}</span>
-        <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.needsCombo ? "Elige bowl, bebida y snack" : item.maxProteins === 3 ? "Elige de 1 a 3 proteínas" : item.maxProteins === 2 ? "Elige 1 o 2 proteínas" : item.needsProtein ? "Elige la proteína" : item.needsComplement ? "Elige el complemento" : "Toca para agregar"}</small></span>
+        <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.needsCombo ? "Elige bowl, bebida y snack" : item.maxProteins === 3 ? "Elige de 1 a 3 proteínas" : item.maxProteins === 2 ? "Elige 1 o 2 proteínas" : item.needsProtein ? "Elige la proteína" : item.needsComplement ? "Elige el complemento" : item.needsSauce ? "Elige el aderezo" : "Toca para agregar"}</small></span>
         <span className={ui.productPrice}>${item.price}</span>
         <span className={ui.addProduct}>+</span>
         </button>
@@ -971,6 +995,19 @@ export default function POSPage({ styles }) {
             .map((c) => ({ ...c, disabled: unavailableItems.includes(c.id), note: unavailableItems.includes(c.id) ? "Agotado" : "" }))}
           onPick={confirmComplementPick}
           onClose={() => setComplementPickerItem(null)}
+        />
+      )}
+
+      {saucePickerItem && (
+        <QuickOptionPicker
+          label="Aderezo del extra"
+          title="¿Qué aderezo extra lleva?"
+          hint={`Cada extra cuesta $${EXTRA_SAUCE_PRICE}. Toca el aderezo para agregarlo a la orden.`}
+          options={QUICK_SAUCES
+            .filter((s) => !hiddenIngredients.includes(s.id))
+            .map((s) => ({ ...s, disabled: unavailableItems.includes(s.id), note: unavailableItems.includes(s.id) ? "Agotado" : "" }))}
+          onPick={confirmSaucePick}
+          onClose={() => setSaucePickerItem(null)}
         />
       )}
 

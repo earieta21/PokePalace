@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { COMPLEMENT_LABELS, PROTEIN_LABELS } from "../order/OrderLabels.jsx";
+import { COMPLEMENT_LABELS, PROTEIN_LABELS, SAUCE_LABELS } from "../order/OrderLabels.jsx";
 import { comboPalaceSelectionSummary } from "../data/comboPalace.js";
 import ui from "./Receipt.module.css";
 import { DELIVERY_PLATFORM_LABELS } from "../data/deliveryPlatforms.js";
@@ -41,12 +41,13 @@ export default function Receipt({ order }) {
         {(order.items || []).map((item) => (
           <div
             className={ui.receiptLine}
-            key={item.cartKey || [item.catalogId, ...(item.proteins || []), item.protein, item.complement, item.comboBowlId, item.comboDrinkId, item.comboRiceCakeId].filter(Boolean).join("-") || item.name}
+            key={item.cartKey || [item.catalogId, ...(item.proteins || []), item.protein, item.complement, item.sauce, item.comboBowlId, item.comboDrinkId, item.comboRiceCakeId].filter(Boolean).join("-") || item.name}
           >
             <span>
               {item.qty} × {item.name}
               {item.proteins?.length ? ` (${item.proteins.map((id) => PROTEIN_LABELS[id] || id).join(", ")})` : item.protein ? ` (${PROTEIN_LABELS[item.protein] || item.protein})` : ""}
               {item.complement ? ` (${COMPLEMENT_LABELS[item.complement] || item.complement})` : ""}
+              {item.sauce ? ` (${SAUCE_LABELS[item.sauce] || item.sauce})` : ""}
               {item.catalogId === "combo-palace" ? ` — ${comboPalaceSelectionSummary(item)}` : ""}
             </span>
             <span>${(item.price * item.qty).toLocaleString("es-MX")}</span>

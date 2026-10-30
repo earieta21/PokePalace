@@ -63,3 +63,22 @@ test("Celsius y Bloom se cobran a $55 y descuentan una pieza cada una", () => {
   assert.deepEqual(lines.map((l) => [l.name, l.price, l.qty]), [["Celsius", 55, 2], ["Bloom", 55, 1]]);
   assert.deepEqual(getPosInventoryDemand({ items: lines }), { bloom: 1, celsius: 2 });
 });
+
+test("el extra de aderezo cobra $10, exige un aderezo válido y descuenta una porción", () => {
+  const lines = resolvePosItems([
+    { id: 31, sauce: "spicy_mayo", qty: 2 },
+    { id: "extra-sauce", sauce: "sriracha" },
+  ]);
+  assert.deepEqual(lines.map((l) => [l.name, l.price, l.qty, l.sauce]), [
+    ["Extra de aderezo", 10, 2, "spicy_mayo"],
+    ["Extra de aderezo", 10, 1, "sriracha"],
+  ]);
+  assert.deepEqual(getPosInventoryDemand({ items: lines }), { spicy_mayo: 2, sriracha: 1 });
+  assert.throws(() => resolvePosItems([{ id: "extra-sauce" }]), PosOrderValidationError);
+  assert.throws(() => resolvePosItems([{ id: "extra-sauce", sauce: "mango" }]), PosOrderValidationError);
+  assert.deepEqual(
+    getUnavailablePosSelections({ items: [{ id: "extra-sauce", sauce: "sriracha" }], unavailableItems: ["sriracha"] }),
+    ["sriracha"],
+  );
+  assert.equal(CUSTOMER_EXCLUDED_CATALOG_IDS.has("extra-sauce"), true);
+});

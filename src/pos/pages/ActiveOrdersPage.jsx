@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
-import { PROTEIN_LABELS, BASE_LABELS, COMPLEMENT_LABELS } from "../../order/OrderLabels";
+import { PROTEIN_LABELS, BASE_LABELS, COMPLEMENT_LABELS, SAUCE_LABELS } from "../../order/OrderLabels";
 import { comboPalaceSelectionSummary } from "../../data/comboPalace";
 import { DELIVERY_PLATFORM_LABELS } from "../../data/deliveryPlatforms.js";
 
@@ -56,7 +56,8 @@ function itemSummary(order) {
   if (order.items?.length) {
     segments.push(order.items.map((i) => {
       const proteinSuffix = i.protein ? ` (${PROTEIN_LABELS[i.protein] ?? i.protein})`
-        : i.complement ? ` (${COMPLEMENT_LABELS[i.complement] ?? i.complement})` : "";
+        : i.complement ? ` (${COMPLEMENT_LABELS[i.complement] ?? i.complement})`
+          : i.sauce ? ` (${SAUCE_LABELS[i.sauce] ?? i.sauce})` : "";
       const comboSuffix = i.catalogId === "combo-palace" ? ` (${comboPalaceSelectionSummary(i)})` : "";
       const detailSuffix = i.detail ? ` (${i.detail})` : "";
       return `${i.name}${detailSuffix}${proteinSuffix}${comboSuffix} ×${i.qty}`;
