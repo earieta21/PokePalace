@@ -34,7 +34,7 @@ const MENU = [
   // descontar al menos esa parte del inventario (ver confirmProteinPick).
   // Van primero porque son los mas usados en hora pico.
   { id: 20, name: "Bowl mediano", price: BOWL_BASE_PRICE, category: "Bowls", icon: "🥗", needsProtein: true, minProteins: 1, maxProteins: 2 },
-  { id: 21, name: "Bowl grande",  price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🥗", needsProtein: true, minProteins: 3, maxProteins: 3 },
+  { id: 21, name: "Bowl grande",  price: BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE, category: "Bowls", icon: "🥗", needsProtein: true, minProteins: 1, maxProteins: 3 },
   // Promo recurrente martes y jueves — 2 bowls por el precio de un bowl
   // grande, solo para comer en el local, máx. 4 complementos por bowl
   // (regla verbal para el cajero, no se valida aquí). Se oculta del menú
@@ -634,7 +634,7 @@ export default function POSPage({ styles }) {
         >
         {quantity > 0 && <span className={ui.inCartBadge}>{quantity}</span>}
         <span className={ui.productIcon}>{item.icon}</span>
-        <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.needsCombo ? "Elige bowl, bebida y snack" : item.maxProteins === 3 ? "Elige 3 proteínas" : item.maxProteins === 2 ? "Elige 1 o 2 proteínas" : item.needsProtein ? "Elige la proteína" : item.needsComplement ? "Elige el complemento" : "Toca para agregar"}</small></span>
+        <span className={ui.productInfo}><strong>{item.name}</strong><small>{item.needsCombo ? "Elige bowl, bebida y snack" : item.maxProteins === 3 ? "Elige de 1 a 3 proteínas" : item.maxProteins === 2 ? "Elige 1 o 2 proteínas" : item.needsProtein ? "Elige la proteína" : item.needsComplement ? "Elige el complemento" : "Toca para agregar"}</small></span>
         <span className={ui.productPrice}>${item.price}</span>
         <span className={ui.addProduct}>+</span>
         </button>
@@ -1055,8 +1055,8 @@ function ProteinPicker({ item, selection, setSelection, options, onConfirm, onCl
         <div className={ui.comboPickerHeader}>
           <div>
             <span>{item.name} · ${item.price} MXN</span>
-            <h3 id="pos-protein-picker-title">Elige {exact ? `las ${max}` : "1 o 2"} proteínas</h3>
-            <p>{exact ? `Selecciona exactamente ${max} proteínas.` : "Selecciona una o dos proteínas."}</p>
+            <h3 id="pos-protein-picker-title">Elige {exact ? `las ${max}` : max === 3 ? "de 1 a 3" : "1 o 2"} proteínas</h3>
+            <p>{exact ? `Selecciona exactamente ${max} proteínas.` : `Selecciona entre ${min} y ${max} proteínas.`}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Cerrar">×</button>
         </div>

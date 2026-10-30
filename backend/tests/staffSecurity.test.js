@@ -232,10 +232,11 @@ test("el bowl rapido guarda y reparte inventario entre todas sus proteinas", () 
 });
 
 test("el bowl rapido exige la cantidad de proteinas de su tamaño", () => {
-  assert.throws(
-    () => resolvePosItems([{ catalogId: "bowl-grande-rapido", proteins: ["tuna", "salmon"] }]),
-    /Cantidad de proteínas inválida/
-  );
+  const grandes = [1, 2, 3].map((count) => resolvePosItems([{
+    catalogId: "bowl-grande-rapido",
+    proteins: ["tuna", "salmon", "shrimp"].slice(0, count),
+  }])[0]);
+  assert.deepEqual(grandes.map((item) => item.proteins.length), [1, 2, 3]);
   assert.throws(
     () => resolvePosItems([{ catalogId: "bowl-mediano-rapido", proteins: ["tuna", "salmon", "shrimp"] }]),
     /Cantidad de proteínas inválida/

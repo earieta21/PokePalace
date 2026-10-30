@@ -226,7 +226,7 @@ export const resolvePosItems = (items, now = new Date()) => {
     }
 
     // Los bowls rápidos pueden traer la selección completa (1–2 proteínas
-    // para mediano, exactamente 3 para grande). `protein` se conserva para
+    // para mediano, 1–3 para grande). `protein` se conserva para
     // colas offline y versiones anteriores del POS.
     let protein;
     if (rawItem.protein !== undefined && rawItem.protein !== null && rawItem.protein !== "") {
@@ -249,7 +249,7 @@ export const resolvePosItems = (items, now = new Date()) => {
         throw new PosOrderValidationError(`${catalogItem.name} no admite varias proteínas`);
       }
       if ((isMedium && (rawItem.proteins.length < 1 || rawItem.proteins.length > 2))
-        || (isLarge && rawItem.proteins.length !== 3)) {
+        || (isLarge && (rawItem.proteins.length < 1 || rawItem.proteins.length > 3))) {
         throw new PosOrderValidationError(`Cantidad de proteínas inválida para ${catalogItem.name}`);
       }
       proteins = [...rawItem.proteins];
