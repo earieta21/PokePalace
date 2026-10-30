@@ -836,6 +836,46 @@
   color: #422006;
 }
 
+/* Tamaño del bowl en el título de la comanda: el grande resalta porque
+   cambia la porción de proteína. */
+.kdsSize,
+.kdsSizeLarge {
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.kdsSizeLarge {
+  color: #fbbf24;
+}
+
+/* Total y estado del cobro en el encabezado de la comanda. */
+.kdsPay {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.kdsPay strong {
+  font-family: "DM Mono", monospace;
+  font-size: 17px;
+}
+
+.kdsPayDue {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.kdsPayPaid {
+  background: #dcfce7;
+  color: #166534;
+}
+
 .kdsRows {
   margin: 0;
   padding: 4px 10px 6px;

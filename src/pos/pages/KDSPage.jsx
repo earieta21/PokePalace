@@ -27,6 +27,31 @@ const FULFILLMENT_LABEL = {
   delivery: "Delivery",
 };
 
+// Lo que lleva cada tamaño, para que cocina no tenga que deducirlo.
+const SIZE_INFO = {
+  large: { label: "grande", grams: "120 g de proteína" },
+  normal: { label: "mediano", grams: "100 g de proteína" },
+};
+
+const PAID_LABEL = {
+  cash: "Efectivo",
+  card_terminal: "Tarjeta",
+  online: "En línea",
+  delivery_app: "App de delivery",
+};
+
+const money = (value) => `$${Number(value).toLocaleString("es-MX", { maximumFractionDigits: 2 })}`;
+
+// Total y estado del cobro. Cocina (rol kitchen) no recibe estos datos del
+// servidor, así que en su pantalla no aparece la línea.
+function paymentInfo(order) {
+  if (order.total == null && !order.paymentStatus) return null;
+  if (order.paymentStatus === "paid") {
+    return { paid: true, text: `Pagado${PAID_LABEL[order.paymentMethod] ? ` · ${PAID_LABEL[order.paymentMethod]}` : ""}`, total: order.total };
+  }
+  return { paid: false, text: "Por cobrar en caja", total: order.total };
+}
+
 const label = (map, id) => map[id] ?? id;
 const labelList = (map, ids) => ids.map((id) => label(map, id)).join(", ");
 
@@ -124,12 +149,14 @@ function timerClass(order, now, styles) {
 }
 
 function TicketBowl({ bowl, title, styles }) {
+  const size = SIZE_INFO[bowl.size === "large" ? "large" : bowl.size ? "normal" : ""];
   return (
     <section className={styles.kdsBowl}>
       <div className={styles.kdsBowlHead}>
-        <span className={styles.kdsBowlTitle}>{title}</span>
-        {bowl.size === "large" && <span className={`${styles.kdsTag} ${styles.kdsTagStrong}`}>Grande</span>}
-        {bowl.size && bowl.size !== "large" && <span className={styles.kdsTag}>Mediano</span>}
+        <span className={styles.kdsBowlTitle}>
+          {title}{size && <> · <span className={bowl.size === "large" ? styles.kdsSizeLarge : styles.kdsSize}>{size.label.toUpperCase()}</span></>}
+        </span>
+        {size && <span className={`${styles.kdsTag} ${bowl.size === "large" ? styles.kdsTagStrong : ""}`}>{size.grams}</span>}
         {bowl.tags?.map((tag) => <span key={tag} className={styles.kdsTag}>{tag}</span>)}
       </div>
       {bowl.alerts.map((alert) => (
@@ -346,6 +373,7 @@ export default function KDSPage({ styles, role }) {
       FULFILLMENT_LABEL[order.fulfillment] ?? "Recoger",
       order.deliveryPlatform ? DELIVERY_PLATFORM_LABELS[order.deliveryPlatform] ?? order.deliveryPlatform : null,
     ].filter(Boolean).join(" · ");
+    const payment = paymentInfo(order);
     const chipClass =
       order.fulfillment === "delivery" ? styles.kdsChipDelivery
       : order.fulfillment === "dine_in" ? styles.kdsChipDineIn
@@ -365,6 +393,12 @@ export default function KDSPage({ styles, role }) {
             <span className={`${styles.kdsChip} ${chipClass}`}>{fulfillment}</span>
             <span className={`${styles.badge} ${styles[cfg.cls]}`}>{cfg.label}</span>
           </div>
+          {payment && (
+            <div className={`${styles.kdsPay} ${payment.paid ? styles.kdsPayPaid : styles.kdsPayDue}`}>
+              <span>{payment.text}</span>
+              {payment.total != null && <strong>{money(payment.total)}</strong>}
+            </div>
+          )}
         </header>
         <div className={styles.kdsBody}>
           {order.notes && <p className={styles.kdsNoteBox}>📝 {order.notes}</p>}
