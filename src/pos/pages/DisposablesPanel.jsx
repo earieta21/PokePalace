@@ -40,7 +40,7 @@ const toInt = (value) => {
   return Number.isInteger(n) && n >= 0 ? n : NaN;
 };
 
-export default function DisposablesPanel({ styles, ui }) {
+export default function DisposablesPanel({ styles, ui, canManage = true }) {
   const { staffToken } = useContext(StaffAuthContext);
   const api = useMemo(() => createStaffApi(staffToken), [staffToken]);
 
@@ -400,9 +400,9 @@ export default function DisposablesPanel({ styles, ui }) {
                     <button type="button" className={styles.btnGhost} onClick={() => openMove("receive", item)}><Truck size={15} />Recibir</button>
                     <button type="button" className={styles.btnGhost} onClick={() => openMove("use", item)} disabled={item.pieces === 0}><Minus size={15} />Sacar</button>
                     <button type="button" className={styles.btnGhost} onClick={() => openMove("count", item)}><ClipboardCheck size={15} />Contar</button>
-                    <button type="button" className={dp.iconButton} onClick={() => openEdit(item)} title="Editar" aria-label={`Editar ${item.name}`}><Pencil size={15} /></button>
+                    {canManage && <button type="button" className={dp.iconButton} onClick={() => openEdit(item)} title="Editar" aria-label={`Editar ${item.name}`}><Pencil size={15} /></button>}
                     <button type="button" className={dp.iconButton} onClick={() => { setDialogError(""); setHistoryItem(item); }} title="Movimientos" aria-label={`Movimientos de ${item.name}`}><History size={15} /></button>
-                    <button type="button" className={`${dp.iconButton} ${dp.danger}`} onClick={() => removeItem(item)} title="Eliminar" aria-label={`Eliminar ${item.name}`}><Trash2 size={15} /></button>
+                    {canManage && <button type="button" className={`${dp.iconButton} ${dp.danger}`} onClick={() => removeItem(item)} title="Eliminar" aria-label={`Eliminar ${item.name}`}><Trash2 size={15} /></button>}
                   </div>
                 </li>
               );

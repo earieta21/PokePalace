@@ -3,8 +3,9 @@ import { requireStaffAuth } from "../middleware/requireStaffAuth.js";
 import { getCashCutPreview, createCashCut, getCashCuts } from "../controllers/cashCutController.js";
 
 const router = express.Router();
-// Quien toca la caja física puede hacer el corte -- no solo gerencia.
-const cashHandlingStaff = requireStaffAuth(["cashier", "manager", "admin", "owner"]);
+// Quien toca la caja física puede hacer el corte -- no solo gerencia. Los
+// empleados también cobran en el POS, así que también cierran su caja.
+const cashHandlingStaff = requireStaffAuth(["employee", "cashier", "manager", "admin", "owner"]);
 
 router.get ("/preview", cashHandlingStaff, getCashCutPreview);
 router.get ("/",        cashHandlingStaff, getCashCuts);

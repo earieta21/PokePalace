@@ -1,0 +1,29 @@
+.panel { margin: 0 0 14px; border: 1px solid #f0c977; border-radius: 14px; background: #fff8e8; color: #3d2c06; overflow: hidden; }
+.bar { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 0; border-radius: 0; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.bar:disabled { cursor: default; }
+.count { display: grid; place-items: center; min-width: 30px; height: 30px; padding: 0 8px; border-radius: 999px; background: #e3a21a; color: #fff; font-weight: 800; font-size: 14px; }
+.barText { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.barText strong { font-size: 15px; }
+.barText small { font-size: 12px; color: #7a5c17; }
+.notice, .error { margin: 0; padding: 8px 16px; font-size: 13px; }
+.notice { background: #e9f6ee; color: #1f6b42; }
+.error { background: #fdecec; color: #a12d2d; }
+.list { list-style: none; margin: 0; padding: 0; border-top: 1px solid #f0d9a4; background: #fff; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 12px 16px; border-bottom: 1px solid #f3ecdc; }
+.info { display: grid; gap: 3px; min-width: 0; }
+.info strong { font-size: 14px; color: #1d1a12; }
+.info small { font-size: 12px; color: #6f6656; }
+.items { overflow-wrap: anywhere; }
+.amount { font-size: 17px; color: #1d1a12; font-variant-numeric: tabular-nums; }
+.actions { display: flex; gap: 6px; }
+.actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 8px 14px; border: 1px solid #d8d2c4; border-radius: 10px; background: #fff; color: #1d1a12; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.actions button:hover:not(:disabled) { background: #f7f3ea; }
+.actions .confirm { border-color: #1f6b42; background: #1f6b42; color: #fff; }
+.actions .confirm:hover:not(:disabled) { background: #185535; }
+.footer { display: flex; justify-content: flex-end; padding: 8px 16px; }
+.footer button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: #7a5c17; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+@media (max-width: 640px) {
+  .row { grid-template-columns: minmax(0, 1fr) auto; }
+  .actions { grid-column: 1 / -1; }
+  .actions button { flex: 1; justify-content: center; }
+}

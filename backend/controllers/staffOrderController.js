@@ -341,6 +341,30 @@ export const getAllOrders = async (req, res) => {
   }
 };
 
+/* GET /api/staff/orders/unpaid — pedidos por cobrar en caja (kiosco, en
+   línea con pago al recoger, "Pendiente" del POS). Lo usa el panel "Por
+   cobrar" del POS, así que lo puede leer cualquiera que cobre, sin abrir el
+   historial completo de órdenes. Solo trae lo necesario para cobrar. */
+export const getUnpaidOrders = async (req, res) => {
+  try {
+    const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const orders = await Order.find({
+      paymentStatus: "pending",
+      status: { $ne: "cancelled" },
+      paymentMethod: { $ne: "online" },
+      total: { $gt: 0 },
+      createdAt: { $gte: since },
+    })
+      .sort({ createdAt: 1 })
+      .limit(50)
+      .select("customer source status fulfillment total items cartItems base bowlSize createdAt paymentMethod")
+      .lean();
+    res.json({ orders });
+  } catch (err) {
+    res.status(500).json({ message: "Error al cargar los pedidos por cobrar", err: err.message });
+  }
+};
+
 /* PATCH /api/staff/orders/:id/pay — body opcional: { method: "cash" | "card_terminal" }
    Registrar CÓMO se pagó permite cuadrar caja (efectivo) contra terminal. */
 export const markAsPaid = async (req, res) => {

@@ -18,14 +18,17 @@ const router = express.Router();
 const anyStaff    = requireStaffAuth([]);
 const seniorStaff = requireStaffAuth(["manager", "admin", "owner"]);
 const ownerOnly   = requireStaffAuth(["admin", "owner"]);
+// Los empleados pueden dar de alta artículos y recibir mercancía; editar,
+// borrar y los ajustes de valor siguen siendo de gerencia.
+const intakeStaff = requireStaffAuth(["employee", "manager", "admin", "owner"]);
 // Reiniciar el inventario borra cantidades y costos de todo el negocio de un
 // jalón -- solo el dueño puede autorizarlo, ni siquiera un admin.
 const strictlyOwner = requireStaffAuth(["owner"]);
 
 router.get   ("/low-stock", anyStaff, getLowStock);
 router.get   ("/",          anyStaff, getInventory);
-router.post  ("/",    seniorStaff, createItem);
-router.post  ("/restock-batch", seniorStaff, restockBatch);
+router.post  ("/",    intakeStaff, createItem);
+router.post  ("/restock-batch", intakeStaff, restockBatch);
 router.post  ("/backfill-expenses", ownerOnly, backfillInventoryExpenses);
 router.post  ("/reset-values", strictlyOwner, resetInventoryValues);
 router.patch ("/:id", seniorStaff, updateItem);

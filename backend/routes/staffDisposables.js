@@ -14,15 +14,17 @@ import {
 const router = express.Router();
 
 const anyStaff    = requireStaffAuth([]);
-// Mismos permisos que Inventario: quien ve la pestaña puede mover existencias.
+// Mismos permisos que Inventario: los empleados agregan y mueven existencias;
+// editar o borrar el artículo es de gerencia.
+const intakeStaff = requireStaffAuth(["employee", "manager", "admin", "owner"]);
 const seniorStaff = requireStaffAuth(["manager", "admin", "owner"]);
 
 router.get   ("/",              anyStaff,    listDisposables);
-router.post  ("/",              seniorStaff, createDisposable);
+router.post  ("/",              intakeStaff, createDisposable);
 router.patch ("/:id",           seniorStaff, updateDisposable);
-router.post  ("/:id/receive",   seniorStaff, receiveDisposable);
-router.post  ("/:id/use",       seniorStaff, useDisposable);
-router.post  ("/:id/count",     seniorStaff, countDisposable);
+router.post  ("/:id/receive",   intakeStaff, receiveDisposable);
+router.post  ("/:id/use",       intakeStaff, useDisposable);
+router.post  ("/:id/count",     intakeStaff, countDisposable);
 router.delete("/:id",           seniorStaff, deleteDisposable);
 router.get   ("/:id/movements", anyStaff,    listDisposableMovements);
 

@@ -27,6 +27,7 @@ import {
 
 // POS pages — unchanged, work via StaffAuthContext.Provider
 import POSPage from "../pos/pages/POSPage";
+import PendingPayments from "../pos/PendingPayments";
 import KDSPage from "../pos/pages/KDSPage";
 import OrderHistoryPage from "../pos/pages/OrderHistoryPage";
 import FinancePage from "../pos/pages/FinancePage";
@@ -152,7 +153,9 @@ const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 // periódico (horario, avisos), y al final lo administrativo/menos frecuente
 // (ventas, fin, panel).
 const TABS_BY_ROLE = {
-  employee: ["pos", "inicio", "consumo", "tareas", "temp", "horario", "avisos"],
+  // Empleado: vende y cobra en el POS, agrega inventario (alta y recepción,
+  // sin editar ni borrar) y hace su corte de caja.
+  employee: ["pos", "inicio", "consumo", "tareas", "temp", "inv", "corte", "horario", "avisos"],
   cashier:  ["pos", "premios", "inicio", "consumo", "tareas", "temp", "hist", "corte", "horario", "avisos"],
   kitchen:  ["cocina", "inicio", "consumo", "tareas", "temp", "hist", "mermas", "horario", "avisos"],
   manager:  ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "recetas", "panel"],
@@ -610,6 +613,7 @@ export default function UnifiedStaffApp() {
             {tab === "premios" && <RewardsRedeemTab token={token} />}
             {tab === "disponibilidad" && <AvailabilityTab token={token} role={me?.role} />}
             {tab === "panel"   && <PanelTab actor={me} employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} onUpdateTimeRecord={updateTimeRecord} />}
+            {tab === "pos"     && me.role !== "kitchen" && <PendingPayments />}
             {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
             {tab === "cocina"  && <section className={shellStyles.portalSurface}><KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} /></section>}
             {tab === "hist"    && <section className={shellStyles.portalSurface}><OrderHistoryPage styles={posStyles} /></section>}

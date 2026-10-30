@@ -1069,6 +1069,56 @@ test("un empleado puede vender en el POS aunque no pueda ver el historial comple
   assert.equal((await staffRequest("employee", "/api/staff/orders")).status, 403);
 });
 
+test("un empleado cobra pendientes, hace el corte y agrega inventario, pero no lo edita", async () => {
+  const pending = await staffRequest("employee", "/api/staff/orders", {
+    method: "POST",
+    body: {
+      clientOrderId: `ci-employee-unpaid:${Date.now()}:${Math.random().toString(16).slice(2)}`,
+      items: [{ catalogId: "coca-zero", qty: 1 }],
+      customer: "Pendiente CI Empleado",
+      paymentMethod: "pay_at_pickup",
+    },
+  });
+  assert.equal(pending.status, 201);
+  const pendingOrder = (await pending.json()).order;
+
+  const unpaid = await staffRequest("employee", "/api/staff/orders/unpaid");
+  assert.equal(unpaid.status, 200);
+  const listed = (await unpaid.json()).orders.find((o) => o._id === pendingOrder._id);
+  assert.ok(listed, "el pedido pendiente aparece en Por cobrar");
+  assert.equal(listed.phone, undefined);
+
+  const paid = await staffRequest("employee", `/api/staff/orders/${pendingOrder._id}/pay`, {
+    method: "PATCH",
+    body: { method: "cash" },
+  });
+  assert.equal(paid.status, 200);
+  assert.equal((await paid.json()).order.paymentMethod, "cash");
+  const afterPay = await (await staffRequest("employee", "/api/staff/orders/unpaid")).json();
+  assert.equal(afterPay.orders.some((o) => o._id === pendingOrder._id), false);
+  assert.equal((await staffRequest("kitchen", "/api/staff/orders/unpaid")).status, 403);
+
+  assert.equal((await staffRequest("employee", "/api/staff/cash-cuts/preview")).status, 200);
+
+  const created = await staffRequest("employee", "/api/staff/inventory", {
+    method: "POST",
+    body: { item: `CI Empleado Vasos ${Date.now()}`, section: "Empaque", category: "Contenedores", unit: "pz", qty: 10 },
+  });
+  assert.equal(created.status, 201);
+  const item = (await created.json()).item;
+  const received = await staffRequest("employee", "/api/staff/inventory/restock-batch", {
+    method: "POST",
+    body: { requestId: `ci-employee-receipt-${Date.now()}`, lines: [{ itemId: item._id, amount: 5 }], registerExpense: false },
+  });
+  assert.equal(received.status, 200);
+  assert.equal((await staffRequest("employee", `/api/staff/inventory/${item._id}`, {
+    method: "PATCH",
+    body: { minQty: 3 },
+  })).status, 403);
+  assert.equal((await staffRequest("employee", `/api/staff/inventory/${item._id}`, { method: "DELETE" })).status, 403);
+  await Inventory.deleteOne({ _id: item._id });
+});
+
 test("el POS calcula catálogo, deduplica reintentos y descuenta inventario una vez", async () => {
   const clientOrderId = `ci-pos-security:${Date.now()}:${Math.random().toString(16).slice(2)}`;
   const inventory = await Inventory.create({

@@ -192,6 +192,8 @@ export default function InventoryPage({ styles, role }) {
   // siquiera un admin, para cuando la valoración quedó mal capturada y hay
   // que volver a contar/cotizar desde cero.
   const canResetInventory = role === "owner";
+  // Empleados dan de alta y reciben mercancía; editar y borrar es de gerencia.
+  const canManageItems = ["manager", "admin", "owner"].includes(role);
   const [resetting, setResetting] = useState(false);
 
   // Add-item form
@@ -648,7 +650,7 @@ export default function InventoryPage({ styles, role }) {
           <button key={id} type="button" role="tab" aria-selected={view === id} className={view === id ? ui.viewTabActive : ""} onClick={() => setView(id)}>{label}</button>
         ))}
       </div>
-      {view === "desechables" ? <DisposablesPanel styles={styles} ui={ui} /> : (<>
+      {view === "desechables" ? <DisposablesPanel styles={styles} ui={ui} canManage={canManageItems} /> : (<>
       <dialog ref={movementDialog} className={ui.movementDialog} onClose={() => setMovementItem(null)} aria-labelledby="inventory-movements-title">
         <div className={ui.movementHeading}>
           <h2 id="inventory-movements-title">Movimientos: {movementItem?.item}</h2>
@@ -1167,9 +1169,9 @@ export default function InventoryPage({ styles, role }) {
                   <td className={ui.statusCell}><span className={`${styles.badge} ${styles[cls]}`}>{label}</span></td>
                   <td data-label="Proveedor">{row.supplier || <span className={ui.mutedValue}>Sin proveedor</span>}</td>
                   <td className={ui.actionsCell}><div className={ui.rowActions}>
-                    <button className={styles.btnGhost} onClick={() => { setError(""); startEdit(row); }} title="Editar artículo" aria-label={`Editar ${row.item}`}><Pencil size={16} /></button>
+                    {canManageItems && <button className={styles.btnGhost} onClick={() => { setError(""); startEdit(row); }} title="Editar artículo" aria-label={`Editar ${row.item}`}><Pencil size={16} /></button>}
                     <button className={styles.btnGhost} onClick={() => setMovementItem(row)} title="Movimientos" aria-label={`Movimientos de ${row.item}`}><History size={16} /></button>
-                    <button className={ui.deleteButton} onClick={() => handleDelete(row)} title="Eliminar artículo" aria-label={`Eliminar ${row.item}`}><Trash2 size={16} /></button>
+                    {canManageItems && <button className={ui.deleteButton} onClick={() => handleDelete(row)} title="Eliminar artículo" aria-label={`Eliminar ${row.item}`}><Trash2 size={16} /></button>}
                   </div></td>
                 </tr>
               );
