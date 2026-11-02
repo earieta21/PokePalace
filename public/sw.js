@@ -1,4 +1,6 @@
-const CACHE = "pokepalace-v8";
+// Cambiar la versión hace que las pantallas abiertas (iPads del kiosco) se
+// recarguen solas en cuanto nadie las toca (ver index.html).
+const CACHE = "pokepalace-v9";
 const SHELL = ["/", "/index.html", "/manifest.json", "/icons/icon-192.png"];
 
 // ── Install: pre-cache app shell ──────────────────────────────────────────────
