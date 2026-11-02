@@ -13,8 +13,7 @@ export default function Footer() {
         color: "var(--text-3, #999)",
       }}
     >
-      <p style={{ margin: 0 }}>{t("footer.operatedBy")}</p>
-      <p style={{ margin: "4px 0 0" }}>
+      <p style={{ margin: 0 }}>
         <Link to="/aviso-de-privacidad" style={{ color: "inherit" }}>
           {t("footer.privacyLink")}
         </Link>
