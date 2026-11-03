@@ -335,7 +335,7 @@ export function normalizeCustomerOrderId(value) {
 // Abre los 7 días de 11:00 a 21:00. Si cambia, actualizar también
 // index.html (lo que lee Google), utils/notify.js, services/whatsappAgent.js,
 // el selector de hora de src/order/OrderSummary.jsx y los textos de
-// src/i18n/LanguageContext.jsx.
+// src/i18n/LanguageContext.jsx y src/data/pageMeta.js.
 export const RESTAURANT_OPEN_HOUR = 11;
 export const RESTAURANT_CLOSE_HOUR = 21;
 

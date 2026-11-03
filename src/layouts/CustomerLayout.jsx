@@ -6,13 +6,17 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import ActiveOrderBanner from "../components/ActiveOrderBanner";
 import CartBar from "../components/CartBar";
 import PwaInstallPrompt from "../components/PwaInstallPrompt";
+import { useLanguage } from "../i18n/LanguageContext";
+import { pageMetaFor } from "../data/pageMeta";
 
 const SITE_URL = "https://pokepalace.org";
 
-// Cada página se declara como su propia URL (sin ?parámetros) para que Google
-// indexe /menu, /ubicaciones, etc. por separado. Ver public/sitemap.xml.
-function useCanonicalUrl() {
+// Cada página se declara como su propia URL (sin ?parámetros) y con su
+// título y descripción, para que Google indexe /menu, /ubicaciones, etc. por
+// separado. Ver public/sitemap.xml y src/data/pageMeta.js.
+function usePageMeta() {
   const { pathname } = useLocation();
+  const { language } = useLanguage();
   useEffect(() => {
     let link = document.querySelector('link[rel="canonical"]');
     if (!link) {
@@ -21,11 +25,15 @@ function useCanonicalUrl() {
       document.head.appendChild(link);
     }
     link.href = `${SITE_URL}${pathname}`;
-  }, [pathname]);
+
+    const { title, description } = pageMetaFor(pathname, language);
+    document.title = title;
+    document.querySelector('meta[name="description"]')?.setAttribute("content", description);
+  }, [pathname, language]);
 }
 
 export default function CustomerLayout() {
-  useCanonicalUrl();
+  usePageMeta();
 
   return (
     <>
