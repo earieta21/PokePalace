@@ -38,19 +38,18 @@ test("los horarios de pedidos usan America/Tijuana en verano e invierno", () => 
   assert.equal(isWithinRestaurantHours(new Date("2026-01-16T05:00:00Z")), false); // 21:00 PST, jueves
 });
 
-test("viernes, sábado y domingo abren una hora antes (10:00) que el resto de la semana", () => {
+test("viernes, sábado y domingo ya no abren antes: 11:00 a 21:00 como el resto de la semana", () => {
   // 17 de julio 2026 es viernes en hora de Tijuana.
-  assert.equal(isWithinRestaurantHours(new Date("2026-07-17T16:59:59Z")), false); // 9:59 PDT, viernes
-  assert.equal(isWithinRestaurantHours(new Date("2026-07-17T17:00:00Z")), true);  // 10:00 PDT, viernes
-  // A la misma hora, un jueves normal todavía no abre.
-  assert.equal(isWithinRestaurantHours(new Date("2026-07-16T17:30:00Z")), false); // 10:30 PDT, jueves
-  // El cierre sigue siendo 21:00 aunque haya abierto más temprano.
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-17T17:30:00Z")), false); // 10:30 PDT, viernes
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-17T18:00:00Z")), true);  // 11:00 PDT, viernes
   assert.equal(isWithinRestaurantHours(new Date("2026-07-18T03:59:59Z")), true);  // 20:59 PDT, viernes
   assert.equal(isWithinRestaurantHours(new Date("2026-07-18T04:00:00Z")), false); // 21:00 PDT, viernes
+  // 18 de julio 2026 es sábado.
+  assert.equal(isWithinRestaurantHours(new Date("2026-07-18T17:30:00Z")), false); // 10:30 PDT, sábado
   // 16 de enero 2026 (invierno) es viernes en hora de Tijuana — mismo horario
-  // temprano en temporada de horario estándar (PST).
-  assert.equal(isWithinRestaurantHours(new Date("2026-01-16T17:59:59Z")), false); // 9:59 PST, viernes
-  assert.equal(isWithinRestaurantHours(new Date("2026-01-16T18:00:00Z")), true);  // 10:00 PST, viernes
+  // en temporada de horario estándar (PST).
+  assert.equal(isWithinRestaurantHours(new Date("2026-01-16T18:59:59Z")), false); // 10:59 PST, viernes
+  assert.equal(isWithinRestaurantHours(new Date("2026-01-16T19:00:00Z")), true);  // 11:00 PST, viernes
 });
 
 test("el restaurante ya abre todos los días, incluido miércoles", () => {
@@ -61,12 +60,10 @@ test("el restaurante ya abre todos los días, incluido miércoles", () => {
   assert.equal(isWithinRestaurantHours(new Date("2026-07-15T18:00:00Z")), true);  // 11:00 PDT, miércoles
 });
 
-test("restaurantOpenHour regresa 10 de viernes a domingo y 11 el resto de la semana", () => {
+test("restaurantOpenHour regresa 11 todos los días", () => {
   assert.equal(restaurantOpenHour(new Date("2026-07-15T20:00:00Z")), 11); // miércoles
-  assert.equal(restaurantOpenHour(new Date("2026-07-16T20:00:00Z")), 11); // jueves
-  assert.equal(restaurantOpenHour(new Date("2026-07-17T20:00:00Z")), 10); // viernes
-  assert.equal(restaurantOpenHour(new Date("2026-07-18T20:00:00Z")), 10); // sábado
-  assert.equal(restaurantOpenHour(new Date("2026-07-19T20:00:00Z")), 10); // domingo
+  assert.equal(restaurantOpenHour(new Date("2026-07-17T20:00:00Z")), 11); // viernes
+  assert.equal(restaurantOpenHour(new Date("2026-07-19T20:00:00Z")), 11); // domingo
 });
 
 test("el canje se limita a bloques completos que caben en el total", () => {

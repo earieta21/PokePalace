@@ -1,4 +1,4 @@
-import { zonedParts, zonedWeekday } from "./timeZone.js";
+import { zonedParts } from "./timeZone.js";
 import {
   computeBowlSubtotal,
   computeExtrasSubtotal,
@@ -332,16 +332,15 @@ export function normalizeCustomerOrderId(value) {
   return normalized;
 }
 
-// Abre los 7 días. Viernes, sábado y domingo abren una hora antes que el
-// resto de la semana; el cierre es el mismo todos los días. Si cambia,
-// actualizar también index.html (lo que lee Google) y utils/notify.js.
-const EARLY_OPEN_WEEKDAYS = new Set([0, 5, 6]); // domingo, viernes, sábado
+// Abre los 7 días de 11:00 a 21:00. Si cambia, actualizar también
+// index.html (lo que lee Google), utils/notify.js, services/whatsappAgent.js,
+// el selector de hora de src/order/OrderSummary.jsx y los textos de
+// src/i18n/LanguageContext.jsx.
 export const RESTAURANT_OPEN_HOUR = 11;
-export const RESTAURANT_EARLY_OPEN_HOUR = 10;
 export const RESTAURANT_CLOSE_HOUR = 21;
 
-export function restaurantOpenHour(date = new Date()) {
-  return EARLY_OPEN_WEEKDAYS.has(zonedWeekday(date)) ? RESTAURANT_EARLY_OPEN_HOUR : RESTAURANT_OPEN_HOUR;
+export function restaurantOpenHour() {
+  return RESTAURANT_OPEN_HOUR;
 }
 
 export function isWithinRestaurantHours(date = new Date()) {
