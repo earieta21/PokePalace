@@ -1,0 +1,16 @@
+# Páginas internas (personal, kiosco, cuentas y pedidos de clientes) no
+# tienen nada que buscar en Google.
+User-agent: *
+Disallow: /staff
+Disallow: /empleados
+Disallow: /pos
+Disallow: /kitchen
+Disallow: /kiosk
+Disallow: /pair/
+Disallow: /mi-cuenta
+Disallow: /claim-reward
+Disallow: /seguimiento/
+Disallow: /summary
+Disallow: /qr
+
+Sitemap: https://pokepalace.org/sitemap.xml

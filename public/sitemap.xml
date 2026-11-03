@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Páginas públicas del sitio (rutas de src/App.jsx). Al agregar una página
+     para clientes, agrégala aquí también. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://pokepalace.org/</loc></url>
+  <url><loc>https://pokepalace.org/menu</loc></url>
+  <url><loc>https://pokepalace.org/order</loc></url>
+  <url><loc>https://pokepalace.org/ubicaciones</loc></url>
+  <url><loc>https://pokepalace.org/rewards-deals</loc></url>
+  <url><loc>https://pokepalace.org/earn-points</loc></url>
+  <url><loc>https://pokepalace.org/aviso-de-privacidad</loc></url>
+  <url><loc>https://pokepalace.org/terminos-de-servicio</loc></url>
+</urlset>
