@@ -13,7 +13,7 @@
     <!-- SEO -->
     <meta
       name="description"
-      content="Poke bowls frescos en Tijuana. Arma tu bowl a tu gusto: elige base, proteína, marinado, complementos y toppings. Pide en línea y recoge en minutos. Abierto de jueves a martes de 11 AM a 9 PM. Cerrado los miércoles."
+      content="Poke bowls frescos en Tijuana, abiertos todos los días: lunes a jueves de 11 AM a 9 PM y viernes a domingo de 10 AM a 9 PM. Arma tu bowl a tu gusto, pídelo en línea y recoge en minutos."
     />
     <meta name="keywords" content="poke, poke bowl, poke Tijuana, comida saludable Tijuana, bowls Tijuana, comida japonesa hawaiana, pedir poke en línea" />
     <link rel="canonical" href="https://pokepalace.org/" />
@@ -38,7 +38,9 @@
     <meta name="twitter:description" content="Arma tu poke bowl a tu gusto y pídelo en línea. Recoge en minutos." />
     <meta name="twitter:image" content="https://pokepalace.org/icons/icon-512.png" />
 
-    <!-- Datos estructurados — Google Maps y búsqueda local -->
+    <!-- Datos estructurados — Google Maps y búsqueda local. El horario (aquí y
+         en la descripción de arriba) debe coincidir con el de
+         backend/utils/customerOrder.js. -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -70,8 +72,14 @@
       "openingHoursSpecification": [
         {
           "@type": "OpeningHoursSpecification",
-          "dayOfWeek": ["Monday", "Tuesday", "Thursday", "Friday", "Saturday", "Sunday"],
+          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday"],
           "opens": "11:00",
+          "closes": "21:00"
+        },
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Friday", "Saturday", "Sunday"],
+          "opens": "10:00",
           "closes": "21:00"
         }
       ],

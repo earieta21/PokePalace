@@ -333,7 +333,8 @@ export function normalizeCustomerOrderId(value) {
 }
 
 // Abre los 7 días. Viernes, sábado y domingo abren una hora antes que el
-// resto de la semana; el cierre es el mismo todos los días.
+// resto de la semana; el cierre es el mismo todos los días. Si cambia,
+// actualizar también index.html (lo que lee Google) y utils/notify.js.
 const EARLY_OPEN_WEEKDAYS = new Set([0, 5, 6]); // domingo, viernes, sábado
 export const RESTAURANT_OPEN_HOUR = 11;
 export const RESTAURANT_EARLY_OPEN_HOUR = 10;
