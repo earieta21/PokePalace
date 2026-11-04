@@ -40,7 +40,7 @@ export default function Home() {
   const es = language === "es";
   const { addCatalogItem, reorder, startPromo2x1 } = useOrder();
   const { user, isLoggedIn, token } = useContext(AuthContext);
-  const { unavailableItems, unavailableCatalogItems, promo2x1Active, comboPalaceActive } = useAvailability();
+  const { unavailableItems, unavailableCatalogItems, hiddenCatalogItems, promo2x1Active, comboPalaceActive } = useAvailability();
   // Un bowl de la casa también se agota cuando falta un ingrediente de su
   // receta (ej. sin salmón no sale The OG) — eso viene en unavailableCatalogItems.
   const isSoldOut = (catalogId) =>
@@ -331,7 +331,8 @@ export default function Home() {
           </Link>
         </div>
         <div className={styles.recipes}>
-          {recipes.map(([catalogId, nameKey, descriptionKey], i) => (
+          {/* Lo de temporada (el Skinny sin mango) no sale hasta que regrese. */}
+          {recipes.filter(([catalogId]) => !hiddenCatalogItems.includes(catalogId)).map(([catalogId, nameKey, descriptionKey], i) => (
             <button
               className={styles.recipe}
               key={catalogId}

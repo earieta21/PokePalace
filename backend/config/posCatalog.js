@@ -34,9 +34,6 @@ export const POS_CATALOG = Object.freeze([
       cucumber: 1, shredded_carrots: 1, mango: 1, red_onion: 1, avocado: 1,
       cilantro_dressing: 1, sesame_seeds: 1, nori_strips: 1, croutons: 1,
     },
-    // Si no hay mango (fuera de temporada o agotado hoy) el Skinny se vende
-    // sin él en vez de marcarse agotado. Ver omittedIngredientsFor.
-    optionalIngredients: ["mango"],
   },
   {
     catalogId: "bowl-quinoa", legacyId: 3, name: "Quinoa Bowl", price: 230, category: "bowls",
@@ -596,7 +593,7 @@ const addItemDemand = (demand, item) => {
     const selections = [item.comboBowlId, item.comboDrinkId, item.comboRiceCakeId];
     for (const catalogId of selections) {
       if (typeof catalogId === "string" && catalogId !== catalogItem.catalogId) {
-        addItemDemand(demand, { catalogId, qty, omit: item.omit });
+        addItemDemand(demand, { catalogId, qty });
       }
     }
     return;
@@ -605,10 +602,7 @@ const addItemDemand = (demand, item) => {
   if (recipe && typeof recipe === "object") {
     const entries = Object.entries(recipe);
     if (entries.length > 0) {
-      const omitted = new Set(Array.isArray(item?.omit) ? item.omit : []);
-      for (const [key, portions] of entries) {
-        if (!omitted.has(key)) addDemand(demand, key, portions * qty);
-      }
+      for (const [key, portions] of entries) addDemand(demand, key, portions * qty);
     } else if (catalogItem.catalogId === "extra-complement") {
       // Una porción del complemento elegido por cada extra vendido.
       if (typeof item?.complement === "string" && item.complement) addDemand(demand, item.complement, qty);
@@ -687,14 +681,6 @@ export const getUnavailablePosSelections = ({
     const cleanKey = key === undefined || key === null ? "" : String(key).trim();
     if (cleanKey && unavailable.has(cleanKey)) selected.add(cleanKey);
   };
-  // Lo opcional de una receta (el mango del Skinny) no deja al producto sin
-  // venderse: sale sin ese ingrediente.
-  const considerRecipe = (catalogItem) => {
-    const optional = new Set(catalogItem.optionalIngredients || []);
-    for (const key of Object.keys(catalogItem.inventoryRecipe || {})) {
-      if (!optional.has(key)) consider(key);
-    }
-  };
 
   if (bowl) {
     consider(bowl.base);
@@ -710,7 +696,7 @@ export const getUnavailablePosSelections = ({
     consider(catalogItem.catalogId);
     consider(catalogItem.legacyId);
     consider(inventoryKeyFromName(catalogItem.name));
-    considerRecipe(catalogItem);
+    for (const key of Object.keys(catalogItem.inventoryRecipe || {})) consider(key);
     consider(item.protein);
     for (const key of Array.isArray(item.proteins) ? item.proteins : []) consider(key);
     consider(item.complement);
@@ -722,45 +708,13 @@ export const getUnavailablePosSelections = ({
         consider(selectedItem.catalogId);
         consider(selectedItem.legacyId);
         consider(inventoryKeyFromName(selectedItem.name));
-        considerRecipe(selectedItem);
+        for (const key of Object.keys(selectedItem.inventoryRecipe || {})) consider(key);
       }
     }
   }
 
   return [...selected].sort();
 };
-
-// Ingredientes opcionales que un producto del catálogo lleva de menos con lo
-// que no hay ahora (p. ej. ["mango"] para el Skinny fuera de temporada). En
-// un Combo Palace cuenta el bowl elegido.
-export const omittedIngredientsFor = (line, unavailableItems = []) => {
-  const catalogItem = catalogItemForStoredLine(line);
-  if (!catalogItem) return [];
-  const unavailable = new Set(Array.isArray(unavailableItems) ? unavailableItems : []);
-  const sources = [catalogItem];
-  if (catalogItem.comboPalace) {
-    const bowl = getPosCatalogItem(line.comboBowlId);
-    if (bowl) sources.push(bowl);
-  }
-  const omitted = new Set();
-  for (const source of sources) {
-    for (const key of source.optionalIngredients || []) {
-      if (unavailable.has(key)) omitted.add(key);
-    }
-  }
-  return [...omitted].sort();
-};
-
-// Deja en cada línea de producto lo que se vende sin (`omit`), calculado aquí
-// y nunca tomado del cliente. La comanda lo muestra ("Sin mango") y el
-// inventario no lo descuenta. Las líneas de bowl armado no cambian.
-export const withOmittedIngredients = (lines = [], unavailableItems = []) =>
-  lines.map((line) => {
-    if (!line || typeof line !== "object" || (line.kind && line.kind !== "item")) return line;
-    const { omit: _clientOmit, ...rest } = line;
-    const omit = omittedIngredientsFor(rest, unavailableItems);
-    return omit.length ? { ...rest, omit } : rest;
-  });
 
 // Productos del catálogo que el servidor rechazaría hoy, ya sea porque se
 // apagaron directo o porque su receta lleva un ingrediente agotado (ej. sin

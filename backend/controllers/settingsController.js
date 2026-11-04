@@ -32,16 +32,20 @@ export const getAvailability = async (req, res) => {
       BowlCosting.findById("bowl-costing").select("disabledProteins disabledComplements"),
     ]);
     const lists = availabilityLists(doc);
+    // Lo de temporada tampoco se ofrece en el armador.
+    const hiddenIngredients = [...new Set([
+      ...(costing?.disabledProteins ?? []),
+      ...(costing?.disabledComplements ?? []),
+      ...lists.seasonalUnavailableItems,
+    ])];
     res.json({
       ...lists,
       // Bowls de la casa, bebidas y extras que quedan fuera por lo agotado.
       unavailableCatalogItems: getUnavailableCatalogIds(lists.unavailableItems),
-      // Lo de temporada tampoco se ofrece en el armador.
-      hiddenIngredients: [...new Set([
-        ...(costing?.disabledProteins ?? []),
-        ...(costing?.disabledComplements ?? []),
-        ...lists.seasonalUnavailableItems,
-      ])],
+      hiddenIngredients,
+      // Los que llevan algo fuera de temporada (el Skinny sin mango) ni se
+      // muestran: "Agotado" sonaría a que regresa pronto.
+      hiddenCatalogItems: getUnavailableCatalogIds(hiddenIngredients),
       // La promo 2x1 solo corre martes/jueves y el Combo Palace lunes,
       // miércoles y viernes — el frontend usa esto para mostrar/ocultar cada
       // sección sin que cada pantalla calcule el día por su cuenta.

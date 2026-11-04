@@ -375,17 +375,6 @@
   color: var(--text);
 }
 
-.withoutNote {
-  display: inline-block;
-  margin: 6px 0 2px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  color: #92400e;
-  background: #fef3c7;
-  font-size: 11.5px;
-  font-weight: 700;
-}
-
 .soldOut {
   display: inline-block;
   margin: 6px 0;

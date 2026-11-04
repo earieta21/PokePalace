@@ -359,8 +359,11 @@ test("agotado hoy se reinicia al día siguiente y temporada solo la cambia geren
     let availability = await publicAvailability();
     assert.ok(availability.hiddenIngredients.includes("mango"));
     assert.ok(availability.unavailableCatalogItems.includes("bowl-the-og"));
-    // El Skinny no se apaga por el mango: se vende sin él.
-    assert.equal(availability.unavailableCatalogItems.includes("bowl-skinny"), false);
+    assert.ok(availability.unavailableCatalogItems.includes("bowl-skinny"));
+    // El Skinny ni se muestra mientras el mango esté fuera de temporada; lo
+    // agotado solo hoy (salmón → The OG) sí se muestra, marcado.
+    assert.ok(availability.hiddenCatalogItems.includes("bowl-skinny"));
+    assert.equal(availability.hiddenCatalogItems.includes("bowl-the-og"), false);
 
     // Una tablet con la versión anterior manda la lista completa: no puede
     // sacar el mango de temporada.
@@ -374,8 +377,7 @@ test("agotado hoy se reinicia al día siguiente y temporada solo la cambia geren
     assert.deepEqual(availability.todayUnavailableItems, []);
     assert.deepEqual(availability.unavailableItems, ["mango"]);
     assert.equal(availability.unavailableCatalogItems.includes("bowl-the-og"), false);
-    // El Skinny no se apaga por el mango: se vende sin él.
-    assert.equal(availability.unavailableCatalogItems.includes("bowl-skinny"), false);
+    assert.ok(availability.unavailableCatalogItems.includes("bowl-skinny"));
 
     const attempt = customerAttempt("season");
     const order = await postJSON("/api/orders", {
@@ -387,32 +389,6 @@ test("agotado hoy se reinicia al día siguiente y temporada solo la cambia geren
     }, { "X-Order-Token": attempt.orderToken });
     assert.equal(order.status, 409);
     assert.deepEqual((await order.json()).unavailableItems, ["mango"]);
-
-    // El Skinny sí se vende, sin mango, en la web y en caja; lo que mande el
-    // cliente en `omit` no cuenta.
-    const skinnyAttempt = customerAttempt("skinny-sin-mango");
-    const skinnyWeb = await postJSON("/api/orders", {
-      cart: [{ kind: "item", catalogId: "bowl-skinny", qty: 1, omit: ["tuna"] }],
-      customer: "Temporada CI",
-      phone: "6630000098",
-      scheduledPickupTime: tomorrowAt15(),
-      clientOrderId: skinnyAttempt.clientOrderId,
-    }, { "X-Order-Token": skinnyAttempt.orderToken });
-    assert.equal(skinnyWeb.status, 201);
-    assert.deepEqual((await skinnyWeb.json()).order.cartItems[0].omit, ["mango"]);
-
-    const skinnyPos = await staffRequest("employee", "/api/staff/orders", {
-      method: "POST",
-      body: {
-        clientOrderId: `ci-skinny-sin-mango:${Date.now()}:${Math.random().toString(16).slice(2)}`,
-        items: [{ catalogId: "bowl-skinny", qty: 1, omit: [] }],
-        customer: "Temporada CI",
-        fulfillment: "pickup",
-        paymentMethod: "cash",
-      },
-    });
-    assert.equal(skinnyPos.status, 201);
-    assert.deepEqual((await skinnyPos.json()).order.items[0].omit, ["mango"]);
   } finally {
     await StoreSettings.findOneAndUpdate(
       { key: "main" },

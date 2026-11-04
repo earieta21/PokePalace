@@ -53,12 +53,6 @@ function paymentInfo(order) {
 }
 
 const label = (map, id) => map[id] ?? id;
-
-// Lo que un producto del menú lleva de menos porque no había (el servidor lo
-// guarda en `omit`, p. ej. el Skinny sin mango fuera de temporada).
-const omitText = (line) => line?.omit?.length
-  ? `Sin ${line.omit.map((id) => label(COMPLEMENT_LABELS, id).toLowerCase()).join(", ")}`
-  : null;
 const labelList = (map, ids) => ids.map((id) => label(map, id)).join(", ");
 
 // Un bowl (del carrito, del 2x1 o de los campos planos del POS) siempre en
@@ -103,10 +97,7 @@ function orderTicket(order) {
         others.push({
           qty: line.qty || 1,
           name: line.name,
-          detail: [
-            line.catalogId === "combo-palace" && `Incluye: ${comboPalaceSelectionSummary(line)}`,
-            omitText(line),
-          ].filter(Boolean).join(" · ") || null,
+          detail: line.catalogId === "combo-palace" ? `Incluye: ${comboPalaceSelectionSummary(line)}` : null,
         });
       } else if (line.kind === "promo2x1") {
         const proteinText = `${label(PROTEIN_LABELS, line.protein)} (60 g)`;
@@ -125,7 +116,6 @@ function orderTicket(order) {
         item.complement && label(COMPLEMENT_LABELS, item.complement),
         item.sauce && label(SAUCE_LABELS, item.sauce),
         item.catalogId === "combo-palace" && comboPalaceSelectionSummary(item),
-        omitText(item),
       ].filter(Boolean).join(" · ");
       others.push({ qty: item.qty || 1, name: item.name, detail: detail || null });
     }

@@ -8,12 +8,6 @@ import {
   effectiveUnavailableItems,
   todayUnavailableItems,
 } from "../utils/availability.js";
-import {
-  getPosInventoryDemand,
-  getUnavailableCatalogIds,
-  getUnavailablePosSelections,
-  withOmittedIngredients,
-} from "../config/posCatalog.js";
 
 // 4 nov 2026, 10:00 en Tijuana (UTC-8) y el día siguiente.
 const NOV4 = new Date("2026-11-04T18:00:00Z");
@@ -70,27 +64,4 @@ test("una pantalla vieja que manda la lista completa no saca nada de temporada",
     season: ["mango"],
   });
   assert.deepEqual(applyLegacyAvailabilityList(settings, undefined), { today: [], season: ["mango"] });
-});
-
-test("sin mango el Skinny se vende sin él: no se apaga, la orden lo anota y no se descuenta", () => {
-  assert.deepEqual(getUnavailableCatalogIds(["mango"]), []);
-  assert.deepEqual(getUnavailableCatalogIds(["mango", "salmon"]), ["bowl-the-og"]);
-
-  // Un bowl armado con mango sí se rechaza.
-  assert.deepEqual(getUnavailablePosSelections({ bowl: { base: "white_rice", complements: ["mango"] }, unavailableItems: ["mango"] }), ["mango"]);
-
-  const lines = withOmittedIngredients([
-    { kind: "item", catalogId: "bowl-skinny", qty: 2, omit: ["tuna"] },
-    { kind: "item", catalogId: "combo-palace", comboBowlId: "bowl-skinny", comboDrinkId: "coca-zero", qty: 1 },
-    { kind: "item", catalogId: "bowl-the-og", qty: 1, omit: ["salmon"] },
-    { kind: "bowl", base: "white_rice", complements: ["mango"] },
-  ], ["mango"]);
-  assert.deepEqual(lines.map((line) => line.omit), [["mango"], ["mango"], undefined, undefined]);
-  assert.deepEqual(withOmittedIngredients([{ catalogId: "bowl-skinny", qty: 1 }], [])[0].omit, undefined);
-
-  const demand = getPosInventoryDemand({ cartItems: lines.slice(0, 2) });
-  assert.equal("mango" in demand, false);
-  assert.equal(demand.coca_zero, 1);
-  assert.ok(demand.avocado >= 3);
-  assert.ok("mango" in getPosInventoryDemand({ cartItems: [{ kind: "item", catalogId: "bowl-skinny", qty: 1 }] }));
 });

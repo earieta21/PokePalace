@@ -41,7 +41,7 @@ const MenuBrowser = ({
     updateCartItemQty,
     startNewBowl,
   } = useOrder();
-  const { unavailableItems, unavailableCatalogItems, comboPalaceActive } = useAvailability();
+  const { unavailableItems, unavailableCatalogItems, hiddenCatalogItems, comboPalaceActive } = useAvailability();
   const [activeCombo, setActiveCombo] = useState(null);
   const [comboSelection, setComboSelection] = useState({
     comboBowlId: "",
@@ -57,15 +57,8 @@ const MenuBrowser = ({
   // unavailableCatalogItems cubre lo que se agota por receta (ej. The OG
   // cuando no hay salmón): el personal apaga ingredientes, no productos.
   const isCatalogIdUnavailable = useCallback((id) =>
-    unavailableItems.includes(id) || unavailableCatalogItems.includes(id),
-  [unavailableItems, unavailableCatalogItems]);
-
-  // Lo opcional que no hay ahora (el mango del Skinny fuera de temporada): el
-  // producto se vende sin eso y aquí se avisa.
-  const missingText = useCallback((item) => {
-    const missing = (item?.optionalIngredients || []).filter((o) => unavailableItems.includes(o.id));
-    return missing.length ? `Por ahora sin ${missing.map((o) => o.label).join(", ")}` : "";
-  }, [unavailableItems]);
+    unavailableItems.includes(id) || unavailableCatalogItems.includes(id) || hiddenCatalogItems.includes(id),
+  [unavailableItems, unavailableCatalogItems, hiddenCatalogItems]);
 
   const availableOptions = useCallback((options) =>
     options.filter((o) => !isCatalogIdUnavailable(o.id)), [isCatalogIdUnavailable]);
@@ -309,6 +302,9 @@ const MenuBrowser = ({
             // vacía y el `return null` de abajo la quita entera. El servidor
             // también lo rechaza fuera de esos días, esto es solo UX.
             if (item.isCombo && comboPalaceActive !== true) return false;
+            // Fuera de temporada (el Skinny sin mango) no se muestra; en el
+            // combo tampoco se ofrece (isCatalogIdUnavailable).
+            if (hiddenCatalogItems.includes(item.catalogId)) return false;
             return true;
           });
           if (items.length === 0) return null;
@@ -356,7 +352,6 @@ const MenuBrowser = ({
                         <div className={styles.cardBodyText}>
                           <p className={styles.cardName}>{item.name}</p>
                           {soldOut && <p id={`sold-out-${item.catalogId}`} className={styles.soldOut}>Agotado por ahora</p>}
-                          {!soldOut && missingText(item) && <p className={styles.withoutNote}>{missingText(item)}</p>}
                           {item.description && (
                             <p className={styles.cardDescription}>
                               {item.description}
@@ -506,10 +501,7 @@ const MenuBrowser = ({
                           <span className={styles.comboOptionText}>
                             <strong>{option.label}</strong>
                             {catalogItem?.description && (
-                              <small>
-                                {catalogItem.description}
-                                {missingText(catalogItem) && ` ${missingText(catalogItem)}.`}
-                              </small>
+                              <small>{catalogItem.description}</small>
                             )}
                           </span>
                           {selected && (
