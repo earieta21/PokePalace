@@ -11,6 +11,8 @@ import {
   POS_CATALOG,
   getPosCatalogItem,
   getUnavailablePosSelections,
+  omittedIngredientsFor,
+  withOmittedIngredients,
 } from "../config/posCatalog.js";
 import {
   sanitizeCustomerCart,
@@ -52,9 +54,13 @@ const cartSummary = (cart) => ({
   total: cartTotal(cart),
 });
 
-const buildSystemPrompt = ({ menuItems, cart, customerName }) => {
+const buildSystemPrompt = ({ menuItems, cart, customerName, unavailable = [] }) => {
   const menuLines = menuItems
-    .map((i) => `- [${i.catalogId}] ${i.name} — $${i.price} MXN`)
+    .map((i) => {
+      const without = omittedIngredientsFor({ catalogId: i.catalogId }, unavailable);
+      const note = without.length ? ` (por ahora sin ${without.join(", ").replace(/_/g, " ")})` : "";
+      return `- [${i.catalogId}] ${i.name} — ${i.price} MXN${note}`;
+    })
     .join("\n");
   const cartLines = cart.length
     ? cart.map((c) => `- ${c.name} x${c.qty} — $${c.price * c.qty} MXN`).join("\n") +
@@ -189,7 +195,8 @@ async function confirmOrder(session, phone, nombreCliente) {
   }
 
   const cartLines = session.cart.map((c) => ({ kind: "item", catalogId: c.catalogId, qty: c.qty }));
-  const unavailableNow = findUnavailableCustomerCartItems(cartLines, effectiveUnavailableItems(settings));
+  const unavailableItems = effectiveUnavailableItems(settings);
+  const unavailableNow = findUnavailableCustomerCartItems(cartLines, unavailableItems);
   if (unavailableNow.length > 0) {
     return { error: true, message: "Uno de los productos de tu pedido se agotó justo ahora — ¿lo cambiamos por otra cosa?" };
   }
@@ -213,7 +220,7 @@ async function confirmOrder(session, phone, nombreCliente) {
   try {
     order = await Order.create({
       clientOrderId,
-      cartItems: safeCart,
+      cartItems: withOmittedIngredients(safeCart, unavailableItems),
       items: legacyItems,
       customer: name,
       phone,
@@ -265,7 +272,7 @@ export async function runWhatsAppAgent(session, phone, userText) {
     (i) => MENU_CATALOG_IDS.includes(i.catalogId) && isMenuItemAvailable(i, unavailable)
   );
 
-  const system = buildSystemPrompt({ menuItems, cart: session.cart, customerName: session.customerName });
+  const system = buildSystemPrompt({ menuItems, cart: session.cart, customerName: session.customerName, unavailable });
 
   const anthropicMessages = session.messages.slice(-MAX_HISTORY_MESSAGES).map((m) => ({ role: m.role, content: m.text }));
   anthropicMessages.push({ role: "user", content: userText });

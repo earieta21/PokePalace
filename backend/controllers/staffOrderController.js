@@ -21,6 +21,7 @@ import {
   sanitizePosReferralSource,
   sanitizePosDelivery,
   DELIVERY_APP_PLATFORMS,
+  withOmittedIngredients,
 } from "../config/posCatalog.js";
 import {
   RESTAURANT_TIME_ZONE,
@@ -648,11 +649,12 @@ export const createPosOrder = async (req, res) => {
     const storeSettings = await StoreSettings.findOne({ key: "main" })
       .select(`${AVAILABILITY_FIELDS} deliveryCommissions`)
       .lean();
+    const unavailableNow = effectiveUnavailableItems(storeSettings);
     const unavailableSelections = getUnavailablePosSelections({
       items: safeItems,
       bowl: safeBowl,
       rewardTopping: safeRewardTopping,
-      unavailableItems: effectiveUnavailableItems(storeSettings),
+      unavailableItems: unavailableNow,
     });
     if (unavailableSelections.length > 0) {
       return res.status(409).json({
@@ -770,7 +772,7 @@ export const createPosOrder = async (req, res) => {
       staffId: req.staff.id,
       clientOrderId: cleanClientOrderId,
       user: linkedCustomer?._id || null,
-      items: safeItems,
+      items: withOmittedIngredients(safeItems, unavailableNow),
       customer: customer || linkedCustomer?.name || "Walk-in",
       phone: phone || linkedCustomer?.phone || null,
       notes: orderNotes,

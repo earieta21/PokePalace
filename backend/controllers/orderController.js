@@ -26,6 +26,7 @@ import {
   usefulPointsToRedeem,
 } from "../utils/customerOrder.js";
 import { stableCustomerOrderObjectId } from "../utils/orderReservations.js";
+import { withOmittedIngredients } from "../config/posCatalog.js";
 
 // 100 puntos = $25 MXN
 const POINTS_PER_REWARD = 100;
@@ -285,10 +286,8 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({ msg: validationError.message });
     }
 
-    const unavailableSelections = findUnavailableCustomerCartItems(
-      safeCart,
-      effectiveUnavailableItems(storeSettings)
-    );
+    const unavailableNow = effectiveUnavailableItems(storeSettings);
+    const unavailableSelections = findUnavailableCustomerCartItems(safeCart, unavailableNow);
     if (unavailableSelections.length > 0) {
       return res.status(409).json({
         msg: "Uno o más ingredientes de tu pedido ya no están disponibles. Actualiza tu selección e intenta de nuevo.",
@@ -399,7 +398,7 @@ export const createOrder = async (req, res) => {
       paymentMethod: paymentMethod === "online" ? "online" : "pay_at_pickup",
       paymentStatus: "pending",
       source: "online",
-      cartItems: safeCart,
+      cartItems: withOmittedIngredients(safeCart, unavailableNow),
       items: legacyItems,
       base: firstBowl?.base ?? null,
       bases: firstBowl?.bases ?? [],

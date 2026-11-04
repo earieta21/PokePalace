@@ -40,6 +40,9 @@ const cartLineSchema = new mongoose.Schema(
     comboBowlId:     { type: String, default: null },
     comboDrinkId:    { type: String, default: null },
     comboRiceCakeId: { type: String, default: null },
+    // Ingredientes opcionales que este producto llevó de menos porque no
+    // había (p. ej. ["mango"] en el Skinny). Lo pone el servidor.
+    omit: { type: [String], default: undefined },
     // Campos de la promo "2x1 en Bowls" (kind: "promo2x1") — 1 proteína
     // compartida entre los 2 bowls (60 g + 60 g = 120 g).
     protein: { type: String, default: null },

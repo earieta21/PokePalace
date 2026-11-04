@@ -47,6 +47,9 @@ export const CUSTOMER_CATALOG = Object.freeze([
     catalogId: "bowl-skinny",
     name: "Skinny Bowl",
     description: "Arroz y mezcla de lechugas, atún, camarón, mango, aguacate, vegetales y aderezo de cilantro.",
+    // Si no hay mango (temporada o agotado) se vende sin él — mismo dato que
+    // optionalIngredients en backend/config/posCatalog.js.
+    optionalIngredients: [{ id: "mango", label: "mango" }],
     price: 230,
     category: "Bowls",
     categoryKey: "bowls",
