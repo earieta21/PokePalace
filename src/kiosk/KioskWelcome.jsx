@@ -6,25 +6,51 @@ import { useHalloweenTheme } from "../data/seasonalTheme";
 import { Bat, Pumpkin } from "../components/HalloweenDecor";
 import styles from "./KioskWelcome.module.css";
 
-import bowlsPhoto from "../assets/home/bowls-1200.webp";
-import salmonPhoto from "../assets/home/salmon-1200.webp";
-import shrimpPhoto from "../assets/home/shrimp-1200.webp";
-import freshPhoto from "../assets/home/fresh-1200.webp";
-import veggiePhoto from "../assets/home/veggie-1200.webp";
+import chopsticksPhoto from "../assets/home/hero-chopsticks-mobile-900.webp";
+import inspirationOnePhoto from "../assets/home/inspiration-one-1200.webp";
+import inspirationTwoPhoto from "../assets/home/inspiration-two-1200.webp";
+import inspirationThreePhoto from "../assets/home/inspiration-three-1200.webp";
+import visitPhoto from "../assets/home/visit-poke-palace-900.webp";
+import chopsticksWidePhoto from "../assets/home/hero-chopsticks-1200.webp";
+import buildYourBowlPhoto from "../assets/home/build-your-bowl-1200.webp";
 
 const SCREENSAVER_IDLE_MS = 25000;
 const SLIDE_INTERVAL_MS = 5000;
-// Fotos reales del producto, no los renders del catálogo. Se quedó fuera
-// agua-1200 (1200x2133): a pantalla completa con background-size cover se
-// recortaría casi entera. Estas cinco van entre 1:1 y 3:4, que aguantan el
-// recorte lo mismo en horizontal que en vertical.
-const SLIDES = [bowlsPhoto, salmonPhoto, shrimpPhoto, freshPhoto, veggiePhoto];
+// Las mismas fotos del local que la página de inicio. El kiosco va en
+// vertical (manifest-kiosk.json) y estas son 2:3, casi la forma de la iPad:
+// a pantalla completa apenas se recortan. Si la iPad se pone en horizontal
+// se usan las dos horizontales, para no enseñar solo una franja del bowl.
+const PORTRAIT_SLIDES = [chopsticksPhoto, inspirationOnePhoto, inspirationTwoPhoto, inspirationThreePhoto, visitPhoto];
+const LANDSCAPE_SLIDES = [chopsticksWidePhoto, buildYourBowlPhoto];
+const LANDSCAPE_QUERY = "(orientation: landscape)";
+
+function useLandscape() {
+  const [landscape, setLandscape] = useState(
+    () => typeof window !== "undefined" && Boolean(window.matchMedia?.(LANDSCAPE_QUERY).matches)
+  );
+  useEffect(() => {
+    const query = window.matchMedia?.(LANDSCAPE_QUERY);
+    if (!query) return undefined;
+    const update = () => setLandscape(query.matches);
+    update();
+    // Safari de iPads viejas solo tiene addListener.
+    if (query.addEventListener) query.addEventListener("change", update);
+    else query.addListener(update);
+    return () => {
+      if (query.removeEventListener) query.removeEventListener("change", update);
+      else query.removeListener(update);
+    };
+  }, []);
+  return landscape;
+}
 
 export default function KioskWelcome() {
   const navigate = useNavigate();
   const { resetOrder } = useOrder();
   const [screensaverOn, setScreensaverOn] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
+  const slides = useLandscape() ? LANDSCAPE_SLIDES : PORTRAIT_SLIDES;
+  const activeSlide = slideIndex % slides.length;
   // Se evalúa en cada vuelta a esta pantalla (cada cliente), así el kiosco
   // suelta el tema el 1 de noviembre aunque nadie recargue la página.
   const halloween = useHalloweenTheme();
@@ -44,10 +70,10 @@ export default function KioskWelcome() {
   useEffect(() => {
     if (!screensaverOn) return;
     const interval = setInterval(() => {
-      setSlideIndex((i) => (i + 1) % SLIDES.length);
+      setSlideIndex((i) => (i + 1) % slides.length);
     }, SLIDE_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [screensaverOn]);
+  }, [screensaverOn, slides.length]);
 
   return (
     <div
@@ -85,10 +111,10 @@ export default function KioskWelcome() {
           aria-label="Toca la pantalla para ordenar"
           onClick={() => setScreensaverOn(false)}
         >
-          {SLIDES.map((src, i) => (
+          {slides.map((src, i) => (
             <div
               key={src}
-              className={`${styles.slide} ${i === slideIndex ? styles.slideActive : ""}`}
+              className={`${styles.slide} ${i === activeSlide ? styles.slideActive : ""}`}
               style={{ backgroundImage: `url(${src})` }}
             />
           ))}

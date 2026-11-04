@@ -1,6 +1,7 @@
-// Cambiar la versión hace que las pantallas abiertas (iPads del kiosco) se
-// recarguen solas en cuanto nadie las toca (ver index.html).
-const CACHE = "pokepalace-v9";
+// La versión la pone el build (vite.config.js) y cambia sola cada vez que
+// cambia el sitio. Así las pantallas abiertas (iPads del kiosco) ven que hay
+// versión nueva y se recargan en cuanto nadie las toca (ver index.html).
+const CACHE = "pokepalace-__BUILD_ID__";
 const SHELL = ["/", "/index.html", "/manifest.json", "/icons/icon-192.png"];
 
 // ── Install: pre-cache app shell ──────────────────────────────────────────────
@@ -13,14 +14,18 @@ self.addEventListener("install", (e) => {
   );
 });
 
-// ── Activate: purge old caches ────────────────────────────────────────────────
-self.addEventListener("activate", (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+// ── Activate: take over open pages ────────────────────────────────────────────
+// El cache de la versión anterior no se borra aquí: una pantalla que sigue
+// abierta con esa versión (el kiosco a medio pedido) todavía necesita sus
+// archivos, y Netlify ya no los tiene. Se borra en la siguiente carga de
+// página (ver "navigate"), que ya trae la versión nueva.
+const deleteOldCaches = () =>
+  caches.keys().then((keys) =>
+    Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
   );
-  self.clients.claim();
+
+self.addEventListener("activate", (e) => {
+  e.waitUntil(self.clients.claim());
 });
 
 // ── Fetch strategy ────────────────────────────────────────────────────────────
@@ -49,6 +54,7 @@ self.addEventListener("fetch", (e) => {
         .then((res) => {
           const clone = res.clone();
           caches.open(CACHE).then((c) => c.put("/index.html", clone));
+          if (res.ok) deleteOldCaches().catch(() => {});
           return res;
         })
         .catch(() => caches.match("/index.html"))
@@ -74,6 +80,13 @@ self.addEventListener("fetch", (e) => {
         const cached = await cache.match(request);
         if (cached && !isHtml(cached)) return cached;
         if (cached) await cache.delete(request);
+        // Recién salida una versión, la pantalla que sigue con la anterior
+        // encuentra sus archivos en el cache viejo (ver "activate").
+        const previous = await caches.match(request);
+        if (previous && !isHtml(previous)) {
+          cache.put(request, previous.clone()).catch(() => {});
+          return previous;
+        }
         // Un solo fallo de red dejaba esta promesa rechazada, el navegador
         // daba el archivo por imposible de cargar y Vite reportaba "Unable to
         // preload CSS" — con eso se caía la pantalla entera al ErrorBoundary.
