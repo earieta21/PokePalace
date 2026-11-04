@@ -7,7 +7,7 @@ import {
   CUSTOMER_CATALOG_CATEGORIES,
 } from "../data/customerCatalog";
 import buildBowlBg from "../assets/poke.webp";
-import kioskBowlPhoto from "../assets/home/fresh-1200.webp";
+import kioskBowlPhoto from "../assets/home/build-your-bowl-1200.webp";
 import { ArrowRight, ShoppingBag } from "lucide-react";
 import { BOWL_BASE_PRICE } from "./pricing";
 import { useHalloweenTheme } from "../data/seasonalTheme";
@@ -231,7 +231,7 @@ const MenuBrowser = ({
             <span className={styles.kioskHeroPhoto}>
               <img
                 src={kioskBowlPhoto}
-                alt="Bowl de Poke Palace con ingredientes frescos"
+                alt="Poke bowl rodeado de bases, verduras y salsas"
                 fetchPriority="high"
               />
               {halloween && <Pumpkin className={styles.kioskPumpkin} />}
