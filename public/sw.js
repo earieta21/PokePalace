@@ -30,11 +30,11 @@ self.addEventListener("fetch", (e) => {
 
   if (request.method !== "GET") return;
 
-  // 1. Cross-origin (fonts, CDN) — network only, no caching
-  if (url.origin !== self.location.origin) {
-    e.respondWith(fetch(request));
-    return;
-  }
+  // 1. Otro dominio (Google Fonts, la API en Render): que lo pida el
+  // navegador. Un fetch() desde aquí cae bajo el connect-src de la CSP y
+  // bloqueaba Google Fonts: quien volvía al sitio lo veía con letra
+  // Georgia/Arial en vez de DM Serif e Inter.
+  if (url.origin !== self.location.origin) return;
 
   // 2. API calls — always network, never cache
   if (url.pathname.startsWith("/api/")) {
