@@ -1392,6 +1392,58 @@ test("el premio de Choco Rice Cake exige un bowl y el producto en la orden, y re
   assert.equal((await Redemption.findById(redemption._id)).status, "active");
 });
 
+test("ticket de la boba: Agua del día gratis con un bowl y sin combinar con premios", async () => {
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+  const sell = (name, body) => staffRequest("cashier", "/api/staff/orders", {
+    method: "POST",
+    body: { clientOrderId: `ci-pos-security:${suffix}:boba-${name}`, paymentMethod: "cash", bobaTicket: true, ...body },
+  });
+
+  const withoutWater = await sell("sin-agua", { items: [{ catalogId: "bowl-the-og", qty: 1 }] });
+  assert.equal(withoutWater.status, 400);
+  assert.match((await withoutWater.json()).message, /bowl y el Agua del día/);
+  assert.equal((await sell("sin-bowl", { items: [{ catalogId: "agua-del-dia", qty: 1 }] })).status, 400);
+
+  const rewardCode = `CIPOSBOBA${suffix}`;
+  const redemption = await Redemption.create({
+    rewardId: 2,
+    rewardName: "Choco Rice Cake",
+    pointsCost: 100,
+    code: rewardCode,
+    status: "active",
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  });
+  const withReward = await sell("con-premio", {
+    rewardCode,
+    items: [
+      { catalogId: "bowl-the-og", qty: 1 },
+      { catalogId: "choco-rice-cake", qty: 1 },
+      { catalogId: "agua-del-dia", qty: 1 },
+    ],
+  });
+  assert.equal(withReward.status, 400);
+  assert.match((await withReward.json()).message, /no se combina/);
+  assert.equal((await Redemption.findById(redemption._id)).status, "active");
+
+  const created = await sell("ok", {
+    items: [
+      { catalogId: "bowl-the-og", qty: 1 },
+      { catalogId: "agua-del-dia", qty: 1 },
+    ],
+  });
+  assert.equal(created.status, 201);
+  const { order } = await created.json();
+  assert.equal(order.discountAmount, 35);
+  assert.equal(order.total, 230);
+  assert.equal(order.partnerPromo, "boba_ticket");
+
+  const analytics = await staffRequest("manager", "/api/staff/orders/analytics");
+  assert.equal(analytics.status, 200);
+  const { bobaTickets } = await analytics.json();
+  assert.ok(bobaTickets.count >= 1);
+  assert.ok(bobaTickets.given >= 35);
+});
+
 test("cancelar una venta POS revierte inventario, puntos y premio una sola vez", async () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const customer = await User.create({

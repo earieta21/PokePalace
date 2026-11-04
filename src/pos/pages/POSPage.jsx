@@ -121,6 +121,7 @@ export default function POSPage({ styles }) {
   const [reward, setReward] = useState(null);
   const [rewardTopping, setRewardTopping] = useState("");
   const [rewardLoading, setRewardLoading] = useState(false);
+  const [bobaTicket, setBobaTicket] = useState(false);
   const [menuCategory, setMenuCategory] = useState("Todos");
   const [menuSearch, setMenuSearch] = useState("");
   const [showCustomerDetails, setShowCustomerDetails] = useState(false);
@@ -335,7 +336,12 @@ export default function POSPage({ styles }) {
     return matchesCategory && matchesSearch;
   });
   const iva      = subtotal * IVA;
-  const bowlLines = cart.filter((i) => /bowl/i.test(i.name));
+  // Igual que el servidor (category "bowls" en backend/config/posCatalog.js):
+  // The OG y los demás bowls de la casa, los rápidos y la 2x1, pero no los
+  // extras sueltos. Antes se buscaba "bowl" en el nombre y The OG no contaba.
+  const bowlLines = cart.filter((item) =>
+    (item.category === "Bowls" || item.promo2x1) && !item.extraProtein && !item.needsComplement && !item.needsSauce
+  );
   const drinkLines = cart.filter((item) => item.rewardDrink);
   const snackLines = cart.filter((item) => item.rewardSnack);
   let rewardDiscount = 0;
@@ -348,7 +354,13 @@ export default function POSPage({ styles }) {
   } else if (reward?.type === "free_bowl" && bowlLines.length) {
     rewardDiscount = Math.min(BOWL_BASE_PRICE, Math.min(...bowlLines.map((item) => item.price)));
   }
-  const total = Math.max(0, subtotal + iva - rewardDiscount);
+  // Ticket de la boba de la plaza: Agua del día gratis con la compra de un
+  // bowl. El servidor aplica la misma regla (staffOrderController).
+  const bobaReady = bowlLines.length > 0 && drinkLines.length > 0;
+  const bobaDiscount = bobaTicket && !reward && bobaReady
+    ? Math.min(...drinkLines.map((item) => item.price))
+    : 0;
+  const total = Math.max(0, subtotal + iva - rewardDiscount - bobaDiscount);
   const cashAmount = Number(cashReceived);
   const cashShort = paymentMethod === "cash" && cashReceived !== "" && (!Number.isFinite(cashAmount) || cashAmount < total);
   const missingDeliveryPlatform = fulfillment === "delivery" && !deliveryPlatform;
@@ -478,6 +490,10 @@ export default function POSPage({ styles }) {
       setError("Selecciona el topping extra elegido por el cliente.");
       return;
     }
+    if (bobaTicket && !bobaDiscount) {
+      setError("Para el ticket de la boba agrega un bowl y el Agua del día, o quítalo.");
+      return;
+    }
     setSaving(true); setError("");
 
     const nextPayload = {
@@ -503,6 +519,7 @@ export default function POSPage({ styles }) {
       referralSourceOther: referralSource === "otro" ? referralSourceOther.trim() : null,
       rewardCode: reward?.code || null,
       rewardTopping: reward?.type === "extra_topping" ? rewardTopping : null,
+      bobaTicket: bobaDiscount > 0,
       customerUserId: rewardsCustomer?._id || null,
     };
     const payload = pendingSaleRef.current || nextPayload;
@@ -549,6 +566,7 @@ export default function POSPage({ styles }) {
     setRewardCode("");
     setReward(null);
     setRewardTopping("");
+    setBobaTicket(false);
     setShowCustomerDetails(false);
     setShowReward(false);
     setShowLoyalty(false);
@@ -739,7 +757,7 @@ export default function POSPage({ styles }) {
             <button
             key={catalogReward.id}
             type="button"
-            disabled={!enoughPoints || Boolean(memberRedeeming) || Boolean(reward)}
+            disabled={!enoughPoints || Boolean(memberRedeeming) || Boolean(reward) || bobaTicket}
             onClick={() => redeemFromMemberQr(catalogReward)}
             title={catalogReward.terms.es}
             >
@@ -864,6 +882,24 @@ export default function POSPage({ styles }) {
             </div>
           </div>
           <div className={ui.checkoutPanel}>
+          <button type="button" className={ui.detailsToggle} aria-pressed={bobaTicket} disabled={Boolean(reward)}
+          onClick={() => { setBobaTicket((on) => !on); setError(""); }}>
+          <span>🧋 Ticket de la boba <small>{reward ? "No se combina con un premio" : "Agua del día gratis con su bowl"}</small></span><span>{bobaTicket ? "✓" : "+"}</span>
+          </button>
+          {bobaTicket && (
+          <div className={ui.rewardArea}>
+          {bobaDiscount > 0 ? (
+          <div className={ui.rewardSuccess}><strong>Agua del día gratis</strong><span>El cliente trajo ticket de la boba de la plaza.</span></div>
+          ) : (
+          <div className={ui.bobaPending}>
+          <span>{bowlLines.length ? "Falta el Agua del día en la orden." : "Agrega un bowl y el Agua del día a la orden."}</span>
+          {!drinkLines.length && (
+          <button type="button" className={styles.btnGhost} onClick={() => addItem(MENU.find((item) => item.rewardDrink))}>Agregar Agua del día</button>
+          )}
+          </div>
+          )}
+          </div>
+          )}
           <button type="button" className={ui.detailsToggle} aria-expanded={showReward} onClick={() => setShowReward((visible) => !visible)}>
           <span>Código de premio <small>Opcional</small></span><span>{showReward ? "−" : "+"}</span>
           </button>
@@ -871,7 +907,7 @@ export default function POSPage({ styles }) {
           <div className={ui.rewardArea}>
           <div>
           <input className={styles.input} value={rewardCode} onChange={(e) => { setRewardCode(e.target.value.toUpperCase()); setReward(null); setRewardTopping(""); }} placeholder="Código" maxLength={6} />
-          <button type="button" className={styles.btnGhost} onClick={lookupReward} disabled={!rewardCode.trim() || rewardLoading}>{rewardLoading ? "Buscando…" : "Aplicar"}</button>
+          <button type="button" className={styles.btnGhost} onClick={lookupReward} disabled={!rewardCode.trim() || rewardLoading || bobaTicket}>{rewardLoading ? "Buscando…" : "Aplicar"}</button>
           </div>
           {reward && <div className={ui.rewardSuccess}><strong>{reward.name.es}</strong><span>{reward.terms.es}</span></div>}
           {reward?.type === "extra_topping" && (
@@ -896,6 +932,7 @@ export default function POSPage({ styles }) {
           <div className={ui.totalBreakdown}>
           <div><span>Subtotal</span><span>${subtotal.toLocaleString("es-MX")}</span></div>
           {rewardDiscount > 0 && <div className={ui.discountRow}><span>Premio aplicado</span><strong>−${rewardDiscount.toLocaleString("es-MX")}</strong></div>}
+          {bobaDiscount > 0 && <div className={ui.discountRow}><span>Ticket de la boba · agua gratis</span><strong>−${bobaDiscount.toLocaleString("es-MX")}</strong></div>}
           <div className={ui.totalFinal}><span>Total</span><strong>${total.toLocaleString("es-MX")} MXN</strong></div>
           <small>IVA incluido</small>
           </div>

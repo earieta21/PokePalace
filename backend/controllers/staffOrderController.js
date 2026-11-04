@@ -277,7 +277,7 @@ async function consumeRedemptionForOrder(order, staffId) {
 const KITCHEN_PRIVATE_ORDER_FIELDS = [
   "phone", "user", "staffId", "clientOrderId", "paymentMethod",
   "paymentStatus", "subtotal", "tax", "total", "discountAmount",
-  "promoCode", "pointsRedeemed", "loyaltyPointsEarned", "rewardCode",
+  "promoCode", "pointsRedeemed", "loyaltyPointsEarned", "rewardCode", "partnerPromo",
   "rewardRedemption", "paymentRequestId", "paymentRequestUrl",
   "referralSource", "referralSourceOther", "deliveryCommissionRate", "deliveryCommission",
 ];
@@ -576,6 +576,7 @@ export const createPosOrder = async (req, res) => {
       items, customer, phone, notes, fulfillment, paymentMethod, rewardCode, customerUserId,
       base, bases, proteins, marinades, complements, sauces, toppings, extraScoopProteins,
       clientOrderId, rewardTopping, referralSource, referralSourceOther, deliveryPlatform,
+      bobaTicket,
     } = req.body;
 
     try {
@@ -729,6 +730,22 @@ export const createPosOrder = async (req, res) => {
       return res.status(400).json({ message: "Un topping de premio requiere un código Rewards activo" });
     }
 
+    // Promoción con la boba de la plaza: quien trae su ticket recibe gratis
+    // el Agua del día con la compra de un bowl. Mismas reglas que el premio
+    // free_drink; no se combina con otro premio.
+    const wantsBobaTicket = bobaTicket === true;
+    if (wantsBobaTicket) {
+      if (cleanRewardCode) {
+        return res.status(400).json({ message: "El ticket de la boba no se combina con un código de premio" });
+      }
+      const orderHasBowl = hasBowl || safeItems.some((item) => item.category === "bowls");
+      const drinks = safeItems.filter((item) => item.rewardDrink);
+      if (!orderHasBowl || !drinks.length) {
+        return res.status(400).json({ message: "Para el ticket de la boba agrega un bowl y el Agua del día" });
+      }
+      rewardDiscount = Math.min(Math.min(...drinks.map((item) => item.price)), subtotal);
+    }
+
     const total = Math.max(0, subtotal - rewardDiscount);
 
     let linkedCustomer = null;
@@ -765,6 +782,7 @@ export const createPosOrder = async (req, res) => {
       source: "pos",
       subtotal,
       discountAmount: rewardDiscount,
+      partnerPromo: wantsBobaTicket ? "boba_ticket" : null,
       total,
       rewardRedemption: redemption?._id || null,
       rewardCode: redemption?.code || null,
@@ -957,6 +975,12 @@ export const getAnalytics = async (req, res) => {
       { $sort: { count: -1 } },
     ]);
 
+    // Clientes que llegaron con ticket de la boba (Agua del día gratis)
+    const [bobaTicketAgg] = await Order.aggregate([
+      { $match: { ...last30Match, partnerPromo: "boba_ticket" } },
+      { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: "$total" }, given: { $sum: "$discountAmount" } } },
+    ]);
+
     const sourceAgg = await Order.aggregate([
       { $match: last30Match },
       {
@@ -1089,6 +1113,11 @@ export const getAnalytics = async (req, res) => {
       peakHours,
       topPosItems: posItemAgg,
       referralSources: referralAgg,
+      bobaTickets: {
+        count: bobaTicketAgg?.count ?? 0,
+        revenue: bobaTicketAgg?.revenue ?? 0,
+        given: bobaTicketAgg?.given ?? 0,
+      },
       sourceMix: sourceAgg,
       fulfillmentMix: fulfillmentAgg,
       deliveryPlatforms: deliveryPlatformAgg,

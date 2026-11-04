@@ -162,6 +162,9 @@ const orderSchema = new mongoose.Schema(
     // Promo codes
     promoCode:      { type: String, default: null },
     discountAmount: { type: Number, default: 0 },
+    // Promoción con un negocio vecino. "boba_ticket": el cliente trajo ticket
+    // de la boba de la plaza y se le regaló el Agua del día (POS).
+    partnerPromo:   { type: String, default: null },
 
     // Scheduled pickup
     scheduledPickupTime: { type: Date, default: null },

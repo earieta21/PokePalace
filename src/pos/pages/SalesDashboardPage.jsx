@@ -145,6 +145,7 @@ export default function SalesDashboardPage({ styles }) {
   const topProteins = analytics?.topProteins ?? EMPTY_LIST;
   const topPosItems = analytics?.topPosItems ?? EMPTY_LIST;
   const referralSources = analytics?.referralSources ?? EMPTY_LIST;
+  const bobaTickets = analytics?.bobaTickets ?? { count: 0, revenue: 0, given: 0 };
   const sourceMix = analytics?.sourceMix ?? EMPTY_LIST;
   const fulfillmentMix = analytics?.fulfillmentMix ?? EMPTY_LIST;
   const deliveryPlatforms = analytics?.deliveryPlatforms ?? EMPTY_LIST;
@@ -582,6 +583,23 @@ export default function SalesDashboardPage({ styles }) {
             getLabel={(r) => REFERRAL_SOURCE_LABELS[r._id] || r._id || "Sin fuente"}
             getValue={(r) => r.count}
           />
+        )}
+      </div>
+
+      <div className={styles.card}>
+        <div className={styles.salesCardHeader}>
+          <p className={styles.cardTitle}>Ticket de la boba</p>
+          <span>Últimos 30 días · Agua del día gratis con su bowl</span>
+        </div>
+        {loading ? (
+          <EmptyState styles={styles}>Cargando...</EmptyState>
+        ) : !bobaTickets.count ? (
+          <EmptyState styles={styles}>Todavía nadie ha llegado con ticket de la boba.</EmptyState>
+        ) : (
+          <p style={{ margin: 0 }}>
+            <strong>{fmtNumber(bobaTickets.count)} {bobaTickets.count === 1 ? "cliente" : "clientes"}</strong>
+            {" · "}ventas {fmtMXN(bobaTickets.revenue)} · aguas regaladas {fmtMXN(bobaTickets.given)}
+          </p>
         )}
       </div>
     </div>
