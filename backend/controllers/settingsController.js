@@ -7,6 +7,16 @@ import {
   getUnavailableCatalogIds,
   sanitizeDeliveryCommissions,
 } from "../config/posCatalog.js";
+import {
+  AVAILABILITY_FIELDS,
+  AVAILABILITY_STATUSES,
+  applyAvailabilityChange,
+  applyLegacyAvailabilityList,
+  availabilityLists,
+  availabilityUpdate,
+  cleanAvailabilityId,
+  seasonalUnavailableItems,
+} from "../utils/availability.js";
 
 const commissionsResponse = (doc) => Object.fromEntries(
   [...DELIVERY_APP_PLATFORMS].map((platform) => [platform, doc?.deliveryCommissions?.[platform] ?? 0])
@@ -15,21 +25,23 @@ const commissionsResponse = (doc) => Object.fromEntries(
 export const getAvailability = async (req, res) => {
   try {
     const [doc, costing] = await Promise.all([
-      StoreSettings.findOne({ key: "main" }),
+      StoreSettings.findOne({ key: "main" }).select(AVAILABILITY_FIELDS).lean(),
       // Los ingredientes que el negocio no maneja se apagan una sola vez en
       // Costeo; aquí se exponen para que el armador ni los ofrezca. Es
       // distinto de `unavailableItems`, que es lo agotado del día.
       BowlCosting.findById("bowl-costing").select("disabledProteins disabledComplements"),
     ]);
-    const unavailableItems = doc?.unavailableItems ?? [];
+    const lists = availabilityLists(doc);
     res.json({
-      unavailableItems,
+      ...lists,
       // Bowls de la casa, bebidas y extras que quedan fuera por lo agotado.
-      unavailableCatalogItems: getUnavailableCatalogIds(unavailableItems),
-      hiddenIngredients: [
+      unavailableCatalogItems: getUnavailableCatalogIds(lists.unavailableItems),
+      // Lo de temporada tampoco se ofrece en el armador.
+      hiddenIngredients: [...new Set([
         ...(costing?.disabledProteins ?? []),
         ...(costing?.disabledComplements ?? []),
-      ],
+        ...lists.seasonalUnavailableItems,
+      ])],
       // La promo 2x1 solo corre martes/jueves y el Combo Palace lunes,
       // miércoles y viernes — el frontend usa esto para mostrar/ocultar cada
       // sección sin que cada pantalla calcule el día por su cuenta.
@@ -41,15 +53,35 @@ export const getAvailability = async (req, res) => {
   }
 };
 
+// Cualquier empleado marca lo agotado de hoy; lo de temporada se queda
+// apagado indefinidamente, así que solo gerencia lo pone o lo quita.
+const SEASON_ROLES = new Set(["manager", "admin", "owner"]);
+
 export const setAvailability = async (req, res) => {
   try {
-    const { unavailableItems } = req.body;
+    const now = new Date();
+    const current = await StoreSettings.findOne({ key: "main" }).select(AVAILABILITY_FIELDS).lean();
+    let next;
+    if (req.body?.id !== undefined || req.body?.status !== undefined) {
+      const id = cleanAvailabilityId(req.body.id);
+      const { status } = req.body;
+      if (!id || !AVAILABILITY_STATUSES.includes(status)) {
+        return res.status(400).json({ msg: "Ingrediente o estado no válido" });
+      }
+      const wasSeason = seasonalUnavailableItems(current).includes(id);
+      if ((status === "season" || wasSeason) && !SEASON_ROLES.has(req.staff?.role)) {
+        return res.status(403).json({ msg: "Solo gerencia puede cambiar lo que está fuera de temporada" });
+      }
+      next = applyAvailabilityChange(current, { id, status }, now);
+    } else {
+      next = applyLegacyAvailabilityList(current, req.body?.unavailableItems);
+    }
     const doc = await StoreSettings.findOneAndUpdate(
       { key: "main" },
-      { unavailableItems: Array.isArray(unavailableItems) ? unavailableItems : [] },
+      { $set: availabilityUpdate(next, now) },
       { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-    res.json({ unavailableItems: doc.unavailableItems });
+    ).select(AVAILABILITY_FIELDS).lean();
+    res.json(availabilityLists(doc, now));
   } catch {
     res.status(500).json({ msg: "Error al actualizar disponibilidad" });
   }

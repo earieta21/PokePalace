@@ -3,6 +3,7 @@ import User from "../models/User.js";
 import Expense from "../models/Expense.js";
 import Redemption from "../models/Redemption.js";
 import StoreSettings from "../models/StoreSettings.js";
+import { AVAILABILITY_FIELDS, effectiveUnavailableItems } from "../utils/availability.js";
 import { sendSMS, sendWhatsApp } from "../utils/notify.js";
 import { awardLoyaltyPoints, expireStalePoints } from "../utils/loyalty.js";
 import { reconcileOnlineOrderCancellation } from "./orderController.js";
@@ -645,13 +646,13 @@ export const createPosOrder = async (req, res) => {
     }
 
     const storeSettings = await StoreSettings.findOne({ key: "main" })
-      .select("unavailableItems deliveryCommissions")
+      .select(`${AVAILABILITY_FIELDS} deliveryCommissions`)
       .lean();
     const unavailableSelections = getUnavailablePosSelections({
       items: safeItems,
       bowl: safeBowl,
       rewardTopping: safeRewardTopping,
-      unavailableItems: storeSettings?.unavailableItems,
+      unavailableItems: effectiveUnavailableItems(storeSettings),
     });
     if (unavailableSelections.length > 0) {
       return res.status(409).json({

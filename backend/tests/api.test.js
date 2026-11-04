@@ -284,7 +284,7 @@ test("checkout rechaza ingredientes agotados antes de reservar promo o puntos", 
   try {
     await StoreSettings.findOneAndUpdate(
       { key: "main" },
-      { $set: { unavailableItems: ["tuna"] } },
+      { $set: { unavailableItems: ["tuna"], unavailableItemsDay: dateKeyInTimeZone() } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
@@ -316,12 +316,85 @@ test("checkout rechaza ingredientes agotados antes de reservar promo o puntos", 
     await Promise.all([
       StoreSettings.findOneAndUpdate(
         { key: "main" },
-        { $set: { unavailableItems: originalSettings?.unavailableItems ?? [] } },
+        { $set: {
+          unavailableItems: originalSettings?.unavailableItems ?? [],
+          unavailableItemsDay: originalSettings?.unavailableItemsDay ?? null,
+        } },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       ),
       PromoCode.deleteOne({ _id: promo._id }),
       User.deleteOne({ _id: account._id }),
     ]);
+  }
+});
+
+test("agotado hoy se reinicia al día siguiente y temporada solo la cambia gerencia", async () => {
+  const originalSettings = await StoreSettings.findOne({ key: "main" }).lean();
+  const put = (role, body) => staffRequest(role, "/api/settings/availability", { method: "PUT", body });
+  const publicAvailability = async () => (await fetch(`${BASE}/api/settings/availability`)).json();
+
+  try {
+    await StoreSettings.findOneAndUpdate(
+      { key: "main" },
+      { $set: { unavailableItems: [], unavailableItemsDay: null, seasonalUnavailableItems: [] } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // Cualquier empleado marca lo agotado de hoy; temporada no.
+    const today = await put("employee", { id: "salmon", status: "today" });
+    assert.equal(today.status, 200);
+    assert.deepEqual((await today.json()).todayUnavailableItems, ["salmon"]);
+    assert.equal((await put("employee", { id: "mango", status: "season" })).status, 403);
+    assert.equal((await put("employee", { id: "mango", status: "otro" })).status, 400);
+
+    const season = await put("manager", { id: "mango", status: "season" });
+    assert.equal(season.status, 200);
+    assert.deepEqual(await season.json(), {
+      unavailableItems: ["salmon", "mango"],
+      todayUnavailableItems: ["salmon"],
+      seasonalUnavailableItems: ["mango"],
+    });
+    assert.equal((await put("employee", { id: "mango", status: "available" })).status, 403);
+
+    let availability = await publicAvailability();
+    assert.ok(availability.hiddenIngredients.includes("mango"));
+    assert.ok(availability.unavailableCatalogItems.includes("bowl-the-og"));
+    assert.ok(availability.unavailableCatalogItems.includes("bowl-skinny"));
+
+    // Una tablet con la versión anterior manda la lista completa: no puede
+    // sacar el mango de temporada.
+    const legacy = await put("employee", { unavailableItems: ["salmon"] });
+    assert.equal(legacy.status, 200);
+    assert.deepEqual((await legacy.json()).seasonalUnavailableItems, ["mango"]);
+
+    // Al día siguiente lo de hoy ya no cuenta; el mango sigue fuera.
+    await StoreSettings.updateOne({ key: "main" }, { $set: { unavailableItemsDay: "2000-01-01" } });
+    availability = await publicAvailability();
+    assert.deepEqual(availability.todayUnavailableItems, []);
+    assert.deepEqual(availability.unavailableItems, ["mango"]);
+    assert.equal(availability.unavailableCatalogItems.includes("bowl-the-og"), false);
+    assert.ok(availability.unavailableCatalogItems.includes("bowl-skinny"));
+
+    const attempt = customerAttempt("season");
+    const order = await postJSON("/api/orders", {
+      cart: [{ base: "white_rice", proteins: ["tuna"], complements: ["mango"] }],
+      customer: "Temporada CI",
+      phone: "6630000098",
+      scheduledPickupTime: tomorrowAt15(),
+      clientOrderId: attempt.clientOrderId,
+    }, { "X-Order-Token": attempt.orderToken });
+    assert.equal(order.status, 409);
+    assert.deepEqual((await order.json()).unavailableItems, ["mango"]);
+  } finally {
+    await StoreSettings.findOneAndUpdate(
+      { key: "main" },
+      { $set: {
+        unavailableItems: originalSettings?.unavailableItems ?? [],
+        unavailableItemsDay: originalSettings?.unavailableItemsDay ?? null,
+        seasonalUnavailableItems: originalSettings?.seasonalUnavailableItems ?? [],
+      } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
   }
 });
 

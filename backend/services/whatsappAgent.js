@@ -5,6 +5,7 @@
    la misma validación que ya usa la web/kiosco) — el modelo solo elige
    catalogId + cantidad, nunca decide precios. */
 import StoreSettings from "../models/StoreSettings.js";
+import { effectiveUnavailableItems } from "../utils/availability.js";
 import Order from "../models/Order.js";
 import {
   POS_CATALOG,
@@ -146,7 +147,7 @@ async function addToCart(session, catalogId, qty) {
   }
 
   const settings = await StoreSettings.findOne({ key: "main" });
-  if (!isMenuItemAvailable(catalogItem, settings?.unavailableItems || [])) {
+  if (!isMenuItemAvailable(catalogItem, effectiveUnavailableItems(settings))) {
     return { error: true, message: `${catalogItem.name} está agotado por ahora.` };
   }
 
@@ -188,7 +189,7 @@ async function confirmOrder(session, phone, nombreCliente) {
   }
 
   const cartLines = session.cart.map((c) => ({ kind: "item", catalogId: c.catalogId, qty: c.qty }));
-  const unavailableNow = findUnavailableCustomerCartItems(cartLines, settings?.unavailableItems || []);
+  const unavailableNow = findUnavailableCustomerCartItems(cartLines, effectiveUnavailableItems(settings));
   if (unavailableNow.length > 0) {
     return { error: true, message: "Uno de los productos de tu pedido se agotó justo ahora — ¿lo cambiamos por otra cosa?" };
   }
@@ -259,7 +260,7 @@ async function executeTool(name, input, session, phone) {
 // Muta `session` (cart/messages/etc.) — quien llama es responsable de guardarla.
 export async function runWhatsAppAgent(session, phone, userText) {
   const settings = await StoreSettings.findOne({ key: "main" });
-  const unavailable = settings?.unavailableItems || [];
+  const unavailable = effectiveUnavailableItems(settings);
   const menuItems = POS_CATALOG.filter(
     (i) => MENU_CATALOG_IDS.includes(i.catalogId) && isMenuItemAvailable(i, unavailable)
   );

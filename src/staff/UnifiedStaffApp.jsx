@@ -1836,10 +1836,20 @@ const AVAIL_CATEGORIES = [
   { label: "Toppings",     items: AVAIL_IDS.Toppings.map((id) => ({ id, label: TOPPING_LABELS[id] })) },
 ];
 
+// `today`: agotado hoy, el servidor lo reinicia solo al día siguiente.
+// `season`: fuera de temporada, se queda apagado hasta que gerencia lo prenda.
+function availabilityFromResponse(d) {
+  return {
+    today: d?.todayUnavailableItems ?? d?.unavailableItems ?? [],
+    season: d?.seasonalUnavailableItems ?? [],
+  };
+}
+
 function AvailabilityTab({ token, role }) {
-  const [unavailable, setUnavailable] = useState(null); // null = loading
+  const [availability, setAvailability] = useState(null); // null = loading
   const [saving, setSaving]           = useState(false);
   const [saveError, setSaveError]     = useState("");
+  const canManageSeason = role === "manager" || role === "admin" || role === "owner";
 
   const [storeStatus, setStoreStatus] = useState(null); // { ordersPaused, pausedMessage }
   const [pauseSaving, setPauseSaving] = useState(false);
@@ -1854,8 +1864,11 @@ function AvailabilityTab({ token, role }) {
   useEffect(() => {
     fetch(`${API_URL}/api/settings/availability`)
       .then((r) => r.json())
-      .then((d) => setUnavailable(d.unavailableItems ?? []))
-      .catch(() => setUnavailable([]));
+      .then((d) => setAvailability(availabilityFromResponse(d)))
+      .catch(() => {
+        setAvailability({ today: [], season: [] });
+        setSaveError("No se pudo cargar la disponibilidad. Recarga la página.");
+      });
 
     fetch(`${API_URL}/api/settings/store-status`)
       .then((r) => r.json())
@@ -1933,31 +1946,51 @@ function AvailabilityTab({ token, role }) {
     }
   };
 
-  const toggle = async (id) => {
-    const next = unavailable.includes(id)
-      ? unavailable.filter((x) => x !== id)
-      : [...unavailable, id];
-    setUnavailable(next);
+  // status: "available" | "today" | "season". Se manda un ingrediente a la
+  // vez; si el servidor no lo guarda (p. ej. la sesión expiró) se regresa el
+  // switch a como estaba y se avisa, en vez de aparentar que sí se guardó.
+  const setItemStatus = async (id, status) => {
+    const previous = availability;
+    const without = (list) => list.filter((x) => x !== id);
+    setAvailability({
+      today: status === "today" ? [...without(previous.today), id] : without(previous.today),
+      season: status === "season" ? [...without(previous.season), id] : without(previous.season),
+    });
     setSaving(true);
+    setSaveError("");
     try {
-      await fetch(`${API_URL}/api/settings/availability`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ unavailableItems: next }),
-      });
-    } catch {
-      setSaveError("Error al guardar. Intenta de nuevo.");
+      let r;
+      try {
+        r = await fetch(`${API_URL}/api/settings/availability`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ id, status }),
+        });
+      } catch {
+        throw new Error("No se guardó: revisa el internet e intenta de nuevo.");
+      }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        throw new Error(r.status === 401
+          ? "Tu sesión expiró y no se guardó. Vuelve a entrar e intenta de nuevo."
+          : data.msg || data.message || "No se guardó. Intenta de nuevo.");
+      }
+      setAvailability(availabilityFromResponse(data));
+    } catch (e) {
+      setAvailability(previous);
+      setSaveError(e.message);
     } finally {
       setSaving(false);
     }
   };
 
-  const unavailableCount = unavailable?.length ?? 0;
+  const todayCount = availability?.today.length ?? 0;
+  const seasonCount = availability?.season.length ?? 0;
 
-  if (unavailable === null || storeStatus === null) {
+  if (availability === null || storeStatus === null) {
     return <p className="text-slate-400 text-sm mt-4">Cargando…</p>;
   }
 
@@ -2047,13 +2080,26 @@ function AvailabilityTab({ token, role }) {
       <div className="mb-5">
         <h2 className="text-lg font-bold text-white">Disponibilidad de ingredientes</h2>
         <p className="text-slate-400 text-sm mt-1">
-          Marca un ingrediente como <span className="text-rose-400 font-semibold">Agotado</span> para que no aparezca en el builder de bowls.
-          {unavailableCount > 0 && (
-            <span className="ml-2 bg-rose-500/20 text-rose-400 text-xs font-semibold px-2 py-0.5 rounded-full">
-              {unavailableCount} agotado{unavailableCount > 1 ? "s" : ""}
-            </span>
-          )}
+          Apaga un ingrediente cuando se acabe: queda <span className="text-rose-400 font-semibold">Agotado hoy</span> y
+          vuelve a estar disponible solo al día siguiente.
+          {canManageSeason
+            ? <> Lo que no manejen por un tiempo (como el mango fuera de temporada) márcalo como <span className="text-amber-300 font-semibold">Temporada</span>: no se ofrece hasta que lo vuelvas a prender.</>
+            : <> Lo de <span className="text-amber-300 font-semibold">Temporada</span> solo lo cambia gerencia.</>}
         </p>
+        {(todayCount > 0 || seasonCount > 0) && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {todayCount > 0 && (
+              <span className="bg-rose-500/20 text-rose-400 text-xs font-semibold px-2 py-0.5 rounded-full">
+                {todayCount} agotado{todayCount > 1 ? "s" : ""} hoy
+              </span>
+            )}
+            {seasonCount > 0 && (
+              <span className="bg-amber-500/20 text-amber-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+                {seasonCount} de temporada
+              </span>
+            )}
+          </div>
+        )}
         {saving    && <p className="text-amber-400 text-xs mt-2">Guardando…</p>}
         {saveError && <p className="text-rose-400 text-xs mt-2">{saveError}</p>}
       </div>
@@ -2066,19 +2112,40 @@ function AvailabilityTab({ token, role }) {
             </p>
             <div className="divide-y divide-white/5">
               {cat.items.map((item) => {
-                const isAvailable = !unavailable.includes(item.id);
+                const offSeason = availability.season.includes(item.id);
+                const soldOutToday = !offSeason && availability.today.includes(item.id);
+                const isAvailable = !offSeason && !soldOutToday;
                 return (
-                  <div key={item.id} className="flex items-center justify-between px-4 py-3">
-                    <span className={`text-sm ${isAvailable ? "text-white" : "text-slate-500 line-through"}`}>
-                      {item.label}
+                  <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <span className="min-w-0 text-sm">
+                      <span className={isAvailable ? "text-white" : "text-slate-500 line-through"}>{item.label}</span>
+                      {soldOutToday && <span className="ml-2 text-xs font-semibold text-rose-400">Agotado hoy</span>}
+                      {offSeason && <span className="ml-2 text-xs font-semibold text-amber-300">Temporada</span>}
                     </span>
-                    <button
-                      onClick={() => toggle(item.id)}
-                      className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${isAvailable ? "bg-emerald-600" : "bg-slate-600"}`}
-                      aria-label={isAvailable ? "Marcar como agotado" : "Marcar como disponible"}
-                    >
-                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${isAvailable ? "translate-x-5" : "translate-x-0"}`} />
-                    </button>
+                    <span className="flex items-center gap-2 shrink-0">
+                      {canManageSeason && (
+                        <button
+                          onClick={() => setItemStatus(item.id, offSeason ? "available" : "season")}
+                          aria-pressed={offSeason}
+                          aria-label={offSeason ? `Volver a ofrecer ${item.label}` : `Marcar ${item.label} como fuera de temporada`}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition ${
+                            offSeason
+                              ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+                              : "border-white/10 text-slate-400 hover:text-white"
+                          }`}
+                        >
+                          Temporada
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setItemStatus(item.id, isAvailable ? "today" : "available")}
+                        disabled={offSeason && !canManageSeason}
+                        className={`relative w-11 h-6 rounded-full transition-colors duration-200 disabled:opacity-40 ${isAvailable ? "bg-emerald-600" : "bg-slate-600"}`}
+                        aria-label={isAvailable ? `Marcar ${item.label} como agotado hoy` : `Marcar ${item.label} como disponible`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${isAvailable ? "translate-x-5" : "translate-x-0"}`} />
+                      </button>
+                    </span>
                   </div>
                 );
               })}

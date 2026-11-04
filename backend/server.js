@@ -39,6 +39,8 @@ import { startOrderChangeStream } from "./utils/orderEvents.js";
 import { registerDueFixedExpenses } from "./utils/fixedExpenses.js";
 import { checkAndSendFiscalReminder } from "./utils/fiscalReminder.js";
 import { startUberEatsWebhookWorker } from "./services/uberEats.js";
+import StoreSettings from "./models/StoreSettings.js";
+import { dateKeyInTimeZone } from "./utils/timeZone.js";
 
 dotenv.config();
 
@@ -150,6 +152,17 @@ const PORT = process.env.PORT || 5001;
 // activo. Solo corre en Render (la variable RENDER la pone la plataforma);
 // un servicio despierto 24/7 usa ~720 de las 750 h gratis del mes.
 const KEEP_ALIVE_URL = process.env.KEEP_ALIVE_URL || "https://pokepalace.onrender.com/";
+
+// Lo agotado que se marcó antes de que existiera el reinicio diario no trae
+// fecha: se le pone la de hoy para que a partir de mañana se reinicie solo
+// como todo lo demás (ver utils/availability.js).
+async function stampLegacySoldOutDay() {
+  await StoreSettings.updateMany(
+    { unavailableItemsDay: null },
+    { $set: { unavailableItemsDay: dateKeyInTimeZone() } }
+  );
+}
+
 function startKeepAlive() {
   if (!process.env.RENDER) return;
   setInterval(() => {
@@ -193,6 +206,7 @@ const start = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ MongoDB conectado");
     startOrderChangeStream();
+    stampLegacySoldOutDay().catch((err) => console.error("stampLegacySoldOutDay:", err.message));
     startUberEatsWebhookWorker();
 
     app.listen(PORT, () => {

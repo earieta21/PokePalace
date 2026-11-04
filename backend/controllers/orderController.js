@@ -2,6 +2,7 @@ import Order from "../models/Order.js";
 import PromoCode from "../models/PromoCode.js";
 import User from "../models/User.js";
 import StoreSettings from "../models/StoreSettings.js";
+import { AVAILABILITY_FIELDS, effectiveUnavailableItems } from "../utils/availability.js";
 import mongoose from "mongoose";
 import { computeCartPricing } from "../pricing.js";
 import { sendEmail, orderConfirmationEmail } from "../utils/notify.js";
@@ -253,7 +254,7 @@ export const createOrder = async (req, res) => {
     }
 
     const storeSettings = await StoreSettings.findOne({ key: "main" })
-      .select("ordersPaused pausedMessage unavailableItems");
+      .select(`ordersPaused pausedMessage ${AVAILABILITY_FIELDS}`);
     if (storeSettings?.ordersPaused) {
       return res.status(503).json({
         msg: storeSettings.pausedMessage?.trim() || "No estamos aceptando pedidos en línea en este momento. Intenta más tarde.",
@@ -286,7 +287,7 @@ export const createOrder = async (req, res) => {
 
     const unavailableSelections = findUnavailableCustomerCartItems(
       safeCart,
-      storeSettings?.unavailableItems
+      effectiveUnavailableItems(storeSettings)
     );
     if (unavailableSelections.length > 0) {
       return res.status(409).json({

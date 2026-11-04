@@ -2,7 +2,11 @@ import mongoose from "mongoose";
 
 const schema = new mongoose.Schema({
   key:              { type: String, default: "main" },
+  // Agotado hoy: solo vale el día de Tijuana de unavailableItemsDay ("YYYY-MM-DD").
+  // Lo de temporada no se reinicia. Ver utils/availability.js.
   unavailableItems: { type: [String], default: [] },
+  unavailableItemsDay: { type: String, default: null },
+  seasonalUnavailableItems: { type: [String], default: [] },
   ordersPaused:     { type: Boolean, default: false },
   pausedMessage:    { type: String, default: "" },
   lastBackupAt:     { type: Date, default: null },
