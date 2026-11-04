@@ -2,8 +2,9 @@ import { Link } from "react-router-dom";
 import { ArrowUpRight, ArrowRight, Clock3, MapPin } from "lucide-react";
 import { useLanguage } from "../i18n/LanguageContext";
 import { computeBowlSubtotal } from "../order/pricing";
-import bowls from "../assets/home/bowls-1200.webp";
-import bowlsSmall from "../assets/home/bowls-600.webp";
+import hero from "../assets/home/hero-chopsticks-1200.webp";
+import heroMobile from "../assets/home/hero-chopsticks-mobile-600.webp";
+import heroMobileLarge from "../assets/home/hero-chopsticks-mobile-900.webp";
 import { useHalloweenTheme } from "../data/seasonalTheme";
 import { Bat, Pumpkin } from "./HalloweenDecor";
 import styles from "./HeroSection.module.css";
@@ -105,19 +106,22 @@ export default function HeroSection() {
         </p>
       </div>
       <div className={styles.media}>
-        <img
-          src={bowls}
-          srcSet={`${bowlsSmall} 600w, ${bowls} 1200w`}
-          sizes="(max-width: 760px) 100vw, 55vw"
-          width="1200"
-          height="1249"
-          fetchPriority="high"
-          alt={
-            es
-              ? "Dos bowls recién preparados en la barra de Poke Palace"
-              : "Two freshly prepared bowls at Poke Palace"
-          }
-        />
+        <picture className={styles.heroPicture}>
+          <source
+            media="(max-width: 760px)"
+            srcSet={`${heroMobile} 600w, ${heroMobileLarge} 900w`}
+            sizes="100vw"
+          />
+          <img
+            src={hero}
+            fetchPriority="high"
+            alt={
+              es
+                ? "Palillos levantando un bocado de un poke bowl de Poke Palace"
+                : "Chopsticks lifting a bite from a Poke Palace bowl"
+            }
+          />
+        </picture>
         <div className={styles.photoLabel}>
           <span>POKE PALACE</span>
           <strong>

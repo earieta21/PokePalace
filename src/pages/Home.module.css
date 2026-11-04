@@ -408,6 +408,15 @@
   padding: 60px 0 10px;
   text-align: center;
 }
+.visitPhoto {
+  display: block;
+  width: min(100%, 300px);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  object-position: center 55%;
+  border-radius: 16px;
+  margin: 0 auto 24px;
+}
 .closing > svg {
   color: var(--accent);
   display: block;

@@ -21,14 +21,16 @@ import { useAvailability } from "../context/AvailabilityContext";
 import { API_URL } from "../config";
 import { COMBO_PALACE_PRICE } from "../data/comboPalace";
 import styles from "./Home.module.css";
-import salmon from "../assets/home/salmon-1200.webp";
-import salmonSmall from "../assets/home/salmon-600.webp";
-import shrimp from "../assets/home/shrimp-1200.webp";
-import shrimpSmall from "../assets/home/shrimp-600.webp";
-import veggie from "../assets/home/veggie-1200.webp";
-import veggieSmall from "../assets/home/veggie-600.webp";
-import fresh from "../assets/home/fresh-1200.webp";
-import freshSmall from "../assets/home/fresh-600.webp";
+import salmon from "../assets/home/inspiration-one-1200.webp";
+import salmonSmall from "../assets/home/inspiration-one-600.webp";
+import shrimp from "../assets/home/inspiration-two-1200.webp";
+import shrimpSmall from "../assets/home/inspiration-two-600.webp";
+import veggie from "../assets/home/inspiration-three-1200.webp";
+import veggieSmall from "../assets/home/inspiration-three-600.webp";
+import fresh from "../assets/home/build-your-bowl-1200.webp";
+import freshSmall from "../assets/home/build-your-bowl-600.webp";
+import visit from "../assets/home/visit-poke-palace-900.webp";
+import visitSmall from "../assets/home/visit-poke-palace-600.webp";
 import agua from "../assets/home/agua-1200.webp";
 import aguaSmall from "../assets/home/agua-600.webp";
 
@@ -77,25 +79,25 @@ export default function Home() {
       image: salmon,
       small: salmonSmall,
       tag: es ? "PARA EL ANTOJO" : "FOR THE CRAVING",
-      title: es ? "Salmón, por favor." : "Salmon, please.",
+      title: es ? "Se antoja desde el primer bocado." : "Looks good from the first bite.",
       text: es
         ? "Color, frescura y tu aderezo favorito."
         : "Color, freshness and your favorite dressing.",
       alt: es
-        ? "Bowl real de salmón, pepino, zanahoria y wakame"
-        : "Salmon bowl with cucumber, carrot and wakame",
+        ? "Poke bowl con edamame, zanahoria y cebolla morada"
+        : "Poke bowl with edamame, carrot and red onion",
     },
     {
       image: shrimp,
       small: shrimpSmall,
       tag: es ? "CON TODO EL SABOR" : "FULL OF FLAVOR",
-      title: es ? "Hoy toca camarón." : "Make it shrimp.",
+      title: es ? "Con un toque cremoso." : "A creamy bite.",
       text: es
         ? "Un toque cremoso y mucho que disfrutar."
         : "A creamy touch and plenty to enjoy.",
       alt: es
-        ? "Bowl de camarón con edamame y aderezo de cilantro"
-        : "Shrimp bowl with edamame and cilantro dressing",
+        ? "Poke bowl con edamame, ajonjolí y aderezo"
+        : "Poke bowl with edamame, sesame and dressing",
     },
     {
       image: veggie,
@@ -106,8 +108,8 @@ export default function Home() {
         ? "Haz tu mezcla con los ingredientes que te gustan."
         : "Mix it up with the ingredients you love.",
       alt: es
-        ? "Bowl con tofu, mango, pepino, edamame y zanahoria"
-        : "Bowl with tofu, mango, cucumber, edamame and carrot",
+        ? "Poke bowl con aguacate y verduras"
+        : "Poke bowl with avocado and vegetables",
     },
   ];
   const steps = es
@@ -243,8 +245,8 @@ export default function Home() {
             sizes="(max-width: 760px) 100vw, 40vw"
             alt={
               es
-                ? "Un bowl recién preparado frente a nuestra barra de ingredientes"
-                : "A freshly prepared bowl at our ingredient counter"
+                ? "Vista cenital de un poke bowl rodeado de bases, verduras y salsas"
+                : "Overhead view of a poke bowl surrounded by bases, vegetables and sauces"
             }
             loading="lazy"
             width="600"
@@ -423,6 +425,14 @@ export default function Home() {
       )}
 
       <div className={styles.closing}>
+        <img
+          className={styles.visitPhoto}
+          src={visitSmall}
+          srcSet={`${visitSmall} 600w, ${visit} 900w`}
+          sizes="(max-width: 480px) 85vw, 300px"
+          alt={es ? "Un poke bowl servido en Poke Palace" : "A poke bowl served at Poke Palace"}
+          loading="lazy"
+        />
         <Soup size={28} />
         <h2>{es ? "Buen bowl. Buen día." : "Good bowl. Good day."}</h2>
         <p>{es ? "Te esperamos en Poke Palace." : "See you at Poke Palace."}</p>
