@@ -13,7 +13,7 @@ import { BOWL_BASE_PRICE } from "./pricing";
 import { useHalloweenTheme } from "../data/seasonalTheme";
 import { Bat, Pumpkin } from "../components/HalloweenDecor";
 import styles from "./MenuBrowser.module.css";
-import { trackEvent } from "../utils/analytics";
+import { analyticsItemFromCartLine, trackEvent } from "../utils/analytics";
 
 const formatPrice = (value) => `$${Number(value).toLocaleString("es-MX")} MXN`;
 
@@ -116,7 +116,18 @@ const MenuBrowser = ({
   const handleAdd = (item) => {
     if (!isItemUnavailable(item)) {
       addCatalogItem(item, 1);
-      trackEvent("add_to_cart", { item_id: item.catalogId, item_category: item.categoryKey || item.category });
+      trackEvent("add_to_cart", {
+        currency: "MXN",
+        value: item.price,
+        items: [analyticsItemFromCartLine({
+          kind: "item",
+          catalogId: item.catalogId,
+          name: item.name,
+          category: item.categoryKey || item.category || "menu",
+          price: item.price,
+          qty: 1,
+        })],
+      });
     }
   };
   const handleRemove = (item) => {
@@ -137,7 +148,18 @@ const MenuBrowser = ({
   const confirmCombo = () => {
     if (!comboSelectionValid) return;
     addComboToCart(activeCombo, comboSelection, 1);
-    trackEvent("add_to_cart", { item_id: activeCombo.catalogId, item_category: "combos" });
+    trackEvent("add_to_cart", {
+      currency: "MXN",
+      value: activeCombo.price,
+      items: [analyticsItemFromCartLine({
+        kind: "item",
+        catalogId: activeCombo.catalogId,
+        name: activeCombo.name,
+        category: "combos",
+        price: activeCombo.price,
+        qty: 1,
+      })],
+    });
     closeComboPicker();
   };
 

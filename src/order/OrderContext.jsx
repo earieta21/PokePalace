@@ -232,6 +232,7 @@ export const OrderProvider = ({ children }) => {
             kind: "item",
             catalogId: catalogItem.catalogId,
             name: catalogItem.name,
+            category: catalogItem.categoryKey || catalogItem.category || "menu",
             price: catalogItem.price,
             qty,
           }]
@@ -262,6 +263,7 @@ export const OrderProvider = ({ children }) => {
             kind: "item",
             catalogId: catalogItem.catalogId,
             name: catalogItem.name,
+            category: catalogItem.categoryKey || catalogItem.category || "combos",
             price: catalogItem.price,
             qty,
             comboBowlId,

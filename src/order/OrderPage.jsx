@@ -13,13 +13,15 @@ import { useOrder } from "./OrderContext";
 import { ITEM_LABELS, getBaseLabel } from "./OrderLabels";
 import {
   BOWL_BASE_PRICE,
+  computeBowlSubtotal,
+  computeExtrasSubtotal,
   LARGE_BOWL_UPCHARGE,
   PROMO_2X1_BOWLS_PRICE,
 } from "./pricing";
 import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./OrderPage.module.css";
-import { trackEvent } from "../utils/analytics";
+import { analyticsItemFromCartLine, trackEvent } from "../utils/analytics";
 
 const TOTAL_STEPS = 6;
 const LAST_STEP = TOTAL_STEPS - 1;
@@ -228,12 +230,36 @@ const OrderPage = () => {
       if (isFirstBowl) {
         setOrderStep(0);
       } else {
+        trackEvent("add_to_cart", {
+          currency: "MXN",
+          value: PROMO_2X1_BOWLS_PRICE,
+          items: [analyticsItemFromCartLine({
+            kind: "promo2x1",
+            catalogId: "promo-2x1-bowls",
+            price: PROMO_2X1_BOWLS_PRICE,
+            qty: 1,
+          })],
+        });
         navigate("/menu");
       }
       return;
     }
+    const bowlPrice = computeBowlSubtotal(order.bowlSize) + computeExtrasSubtotal({
+      extraScoops: order.extraScoopProteins?.length || 0,
+      complementsCount: order.complements?.length || 0,
+      proteins: order.proteins,
+    });
     addBowlToCart();
-    trackEvent("add_to_cart", { item_id: "custom_bowl", item_category: "bowls" });
+    trackEvent("add_to_cart", {
+      currency: "MXN",
+      value: bowlPrice,
+      items: [analyticsItemFromCartLine({
+        kind: "bowl",
+        bowlSize: order.bowlSize,
+        price: bowlPrice,
+        qty: 1,
+      })],
+    });
     navigate("/menu");
   };
 

@@ -12,7 +12,7 @@ import {
   getOrCreateOrderSubmission,
   keepOrderSubmissionPayload,
 } from "../utils/orderSubmission";
-import { trackEvent } from "../utils/analytics";
+import { analyticsItemsFromCart, trackEvent } from "../utils/analytics";
 
 const POINTS_PER_REWARD = 100;
 const REWARD_VALUE_MXN  = 25;
@@ -103,9 +103,10 @@ export default function OrderSummaryPage() {
   useEffect(() => {
     if (!Array.isArray(order?.cart) || order.cart.length === 0) return;
     trackEvent("begin_checkout", {
-      items: order.cart.reduce((sum, line) => sum + line.qty, 0),
+      items: analyticsItemsFromCart(order.cart),
       value: computeCartPricing(order.cart, validatedPromo).total,
       currency: "MXN",
+      ...(order.promoCode?.trim() ? { coupon: order.promoCode.trim().toUpperCase() } : {}),
     });
     // Track once when the checkout screen is entered; later edits should not duplicate it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -204,6 +205,18 @@ export default function OrderSummaryPage() {
         value: data.order.total ?? orderTotalAfterPromo,
         currency: "MXN",
         fulfillment: data.order.fulfillment || order.fulfillment,
+      });
+      trackEvent("purchase", {
+        transaction_id: data.order._id,
+        affiliation: "Poke Palace Web",
+        value: data.order.total ?? orderTotalAfterPromo,
+        tax: data.order.tax ?? 0,
+        shipping: 0,
+        currency: "MXN",
+        ...(order.promoCode?.trim() ? { coupon: order.promoCode.trim().toUpperCase() } : {}),
+        fulfillment: data.order.fulfillment || order.fulfillment,
+        payment_method: data.order.paymentMethod || order.paymentMethod,
+        items: analyticsItemsFromCart(order.cart),
       });
       clearOrderSubmission(actor, submission.clientOrderId);
       resetOrder();
