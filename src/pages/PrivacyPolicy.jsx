@@ -8,7 +8,7 @@ const LEGAL_RFC = "AINE020521HN6";
 const CONTENT = {
   es: {
     title: "Aviso de Privacidad",
-    updated: "Última actualización: 22 de julio de 2026",
+    updated: "Última actualización: 4 de noviembre de 2026",
     sections: [
       {
         title: "1. Responsable de los datos",
@@ -26,6 +26,7 @@ const CONTENT = {
           "Historial de pedidos, preferencias de menú y puntos de recompensas.",
           "Método de pago elegido (efectivo o tarjeta). Los pagos en línea se procesan a través de Openpay (BBVA); no almacenamos números de tarjeta en nuestros servidores.",
           "Información técnica básica del dispositivo/navegador para el funcionamiento de la app (incluyendo notificaciones push si las activas).",
+          "Datos de uso del sitio, como páginas visitadas e interacciones con el proceso de pedido, recopilados mediante Google Analytics. No enviamos a Analytics tu nombre, correo, teléfono ni datos de pago.",
         ],
       },
       {
@@ -37,6 +38,7 @@ const CONTENT = {
           "Procesar pagos de forma segura a través de nuestro proveedor de pagos.",
           "Enviarte notificaciones sobre el estado de tu pedido.",
           "Mejorar nuestros productos, menú y experiencia dentro de la app.",
+          "Medir de forma agregada el rendimiento del sitio y el avance por las etapas del proceso de compra.",
           "Cumplir obligaciones legales y fiscales.",
         ],
       },
@@ -49,6 +51,7 @@ const CONTENT = {
           "Openpay/BBVA (procesador de pagos) para completar transacciones en línea.",
           "OpenStreetMap para mostrar el mapa de nuestra ubicación dentro de la app.",
           "Google Maps, si eliges el botón \"Cómo llegar\", para abrir la ruta hacia nuestra sucursal.",
+          "Google Analytics para medir el uso del sitio y generar estadísticas agregadas de navegación y conversión.",
           "Proveedores de hospedaje e infraestructura tecnológica que almacenan nuestros datos de forma segura.",
           "Autoridades competentes cuando así lo exija la ley.",
         ],
@@ -75,7 +78,7 @@ const CONTENT = {
   },
   en: {
     title: "Privacy Policy",
-    updated: "Last updated: July 22, 2026",
+    updated: "Last updated: November 4, 2026",
     sections: [
       {
         title: "1. Data controller",
@@ -93,6 +96,7 @@ const CONTENT = {
           "Order history, menu preferences, and rewards points.",
           "Chosen payment method (cash or card). Online payments are processed through Openpay (BBVA); we do not store card numbers on our servers.",
           "Basic device/browser information needed for the app to work (including push notifications if enabled).",
+          "Website usage data, such as pages visited and interactions with the ordering flow, collected through Google Analytics. We do not send Analytics your name, email address, phone number, or payment details.",
         ],
       },
       {
@@ -104,6 +108,7 @@ const CONTENT = {
           "Securely process payments through our payment provider.",
           "Send you notifications about your order status.",
           "Improve our products, menu, and in-app experience.",
+          "Measure aggregate site performance and progress through the purchase funnel.",
           "Comply with legal and tax obligations.",
         ],
       },
@@ -116,6 +121,7 @@ const CONTENT = {
           "Openpay/BBVA (payment processor) to complete online transactions.",
           "OpenStreetMap to display our location map within the app.",
           "Google Maps, if you tap the \"Get Directions\" button, to open the route to our store.",
+          "Google Analytics to measure site usage and produce aggregate navigation and conversion statistics.",
           "Hosting and technology infrastructure providers that securely store our data.",
           "Competent authorities when required by law.",
         ],
