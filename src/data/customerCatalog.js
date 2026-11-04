@@ -1,13 +1,13 @@
-import theOg from "../assets/menu/the-og-uber.jpg";
-import skinnyBowl from "../assets/menu/skinny-bowl-uber.jpg";
-import quinoaBowl from "../assets/menu/quinoa-bowl-uber.jpg";
-import topoChico from "../assets/menu/products/topo-chico.png";
-import cocaZero from "../assets/menu/products/coca-zero.jpg";
-import cocaColaRegular from "../assets/menu/products/coca-cola-regular.jpg";
-import bottledWater from "../assets/menu/products/bottled-water.jpg";
+import theOg from "../assets/menu/the-og-uber.webp";
+import skinnyBowl from "../assets/menu/skinny-bowl-uber.webp";
+import quinoaBowl from "../assets/menu/quinoa-bowl-uber.webp";
+import topoChico from "../assets/menu/products/topo-chico.webp";
+import cocaZero from "../assets/menu/products/coca-zero.webp";
+import cocaColaRegular from "../assets/menu/products/coca-cola-regular.webp";
+import bottledWater from "../assets/menu/products/bottled-water.webp";
 import aguaDelDia from "../assets/menu/products/agua-del-dia.webp";
-import chocoRiceCake from "../assets/menu/products/choco-rice-cake.jpg";
-import honeyRiceCake from "../assets/menu/products/honey-rice-cake.jpg";
+import chocoRiceCake from "../assets/menu/products/choco-rice-cake.webp";
+import honeyRiceCake from "../assets/menu/products/honey-rice-cake.webp";
 import { COMBO_PALACE_OPTIONS, COMBO_PALACE_PRICE } from "./comboPalace";
 
 // Catálogo de artículos que un cliente puede agregar directo al carrito sin
