@@ -8,8 +8,10 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { LanguageProvider } from "./i18n/LanguageContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { installErrorMonitor } from "./monitor";
+import { initAnalytics } from "./utils/analytics";
 
 installErrorMonitor();
+initAnalytics();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

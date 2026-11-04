@@ -71,6 +71,25 @@
 .secondary {
   border-bottom: 1px solid #81947b;
 }
+.storeStatus {
+  margin-top: 24px;
+  padding: 13px 15px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(24, 62, 50, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.46);
+}
+.statusDot { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 4px rgba(99, 112, 103, .12); }
+.statusOpen { background: #278252; box-shadow: 0 0 0 4px rgba(39, 130, 82, .13); }
+.statusClosed { background: #a85435; }
+.storeStatus > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.storeStatus strong { font-size: 12px; }
+.storeStatus span:not(.statusDot),
+.storeStatus > a { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: #596451; }
+.storeStatus > a { font-weight: 700; color: #2e5d49; white-space: nowrap; }
 .primary:focus-visible,
 .secondary:focus-visible {
   outline: 3px solid #a85435;
@@ -231,6 +250,8 @@
     font-size: 12px;
     gap: 8px;
   }
+  .storeStatus { grid-template-columns: auto 1fr; }
+  .storeStatus > a { grid-column: 2; }
 }
 
 /* Halloween (src/data/seasonalTheme.js) — noche morada con acentos naranja.
@@ -273,6 +294,9 @@
 .halloween .prices {
   border-top-color: #4a3657;
 }
+.halloween .storeStatus { border-color: #4a3657; background: rgba(255,255,255,.05); }
+.halloween .storeStatus span:not(.statusDot),
+.halloween .storeStatus > a { color: #d9cce2; }
 .halloween .prices > div + div {
   border-left-color: #4a3657;
 }

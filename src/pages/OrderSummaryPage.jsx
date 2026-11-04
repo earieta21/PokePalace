@@ -12,6 +12,7 @@ import {
   getOrCreateOrderSubmission,
   keepOrderSubmissionPayload,
 } from "../utils/orderSubmission";
+import { trackEvent } from "../utils/analytics";
 
 const POINTS_PER_REWARD = 100;
 const REWARD_VALUE_MXN  = 25;
@@ -97,6 +98,17 @@ export default function OrderSummaryPage() {
       .then((r) => r.json())
       .then((d) => setWaitMinutes(d.waitMinutes ?? null))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!Array.isArray(order?.cart) || order.cart.length === 0) return;
+    trackEvent("begin_checkout", {
+      items: order.cart.reduce((sum, line) => sum + line.qty, 0),
+      value: computeCartPricing(order.cart, validatedPromo).total,
+      currency: "MXN",
+    });
+    // Track once when the checkout screen is entered; later edits should not duplicate it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onBuildBowl = () => {
@@ -187,6 +199,12 @@ export default function OrderSummaryPage() {
         data.order._id,
         data.orderToken || (!isLoggedIn ? submission.orderToken : null)
       );
+      trackEvent("order_submitted", {
+        order_id: data.order._id,
+        value: data.order.total ?? orderTotalAfterPromo,
+        currency: "MXN",
+        fulfillment: data.order.fulfillment || order.fulfillment,
+      });
       clearOrderSubmission(actor, submission.clientOrderId);
       resetOrder();
       refreshUser?.(); // update points balance after redemption

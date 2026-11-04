@@ -75,6 +75,16 @@ const PAGE_META = {
       description: "Terms for using the site, placing orders and taking part in the Poke Palace rewards program.",
     },
   },
+  "/ayuda": {
+    es: {
+      title: "Ayuda, contacto y alérgenos · Poke Palace",
+      description: "Contacta a Poke Palace, consulta preguntas frecuentes, horario e información importante sobre alérgenos.",
+    },
+    en: {
+      title: "Help, contact and allergens · Poke Palace",
+      description: "Contact Poke Palace and find frequently asked questions, opening hours and important allergen information.",
+    },
+  },
 };
 
 export function pageMetaFor(pathname, language) {

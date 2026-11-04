@@ -71,6 +71,7 @@ const ClaimRewardPage  = lazyWithReload(() => import("./pages/ClaimRewardPage"),
 const PrivacyPolicy    = lazyWithReload(() => import("./pages/PrivacyPolicy"), "PrivacyPolicy");
 const TermsOfService   = lazyWithReload(() => import("./pages/TermsOfService"), "TermsOfService");
 const KioskPair        = lazyWithReload(() => import("./pages/KioskPair"), "KioskPair");
+const HelpPage         = lazyWithReload(() => import("./pages/HelpPage"), "HelpPage");
 
 // Kiosk & staff — lazy loaded (never used by regular customers)
 const KioskLayout      = lazyWithReload(() => import("./kiosk/KioskLayout"), "KioskLayout");
@@ -137,6 +138,7 @@ const App = () => {
               <Route path="/aviso-de-privacidad" element={<PrivacyPolicy />} />
               <Route path="/terminos-de-servicio" element={<TermsOfService />} />
               <Route path="/pair/:token" element={<KioskPair />} />
+              <Route path="/ayuda" element={<HelpPage />} />
 
               <Route path="/menu" element={<MenuPage />} />
               <Route path="/order" element={<OrderPage />} />

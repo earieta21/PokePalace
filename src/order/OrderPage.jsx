@@ -19,6 +19,7 @@ import {
 import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./OrderPage.module.css";
+import { trackEvent } from "../utils/analytics";
 
 const TOTAL_STEPS = 6;
 const LAST_STEP = TOTAL_STEPS - 1;
@@ -198,6 +199,7 @@ const OrderPage = () => {
   const nextStep = () => {
     let next = Math.min(step + 1, LAST_STEP);
     if (isPromo2x1Stage2 && next === 1) next = 2;
+    trackEvent("bowl_step_complete", { step: step + 1, step_name: STEP_NAME_KEYS[step] });
     setOrderStep(next);
   };
 
@@ -231,6 +233,7 @@ const OrderPage = () => {
       return;
     }
     addBowlToCart();
+    trackEvent("add_to_cart", { item_id: "custom_bowl", item_category: "bowls" });
     navigate("/menu");
   };
 

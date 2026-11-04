@@ -13,6 +13,7 @@ import { BOWL_BASE_PRICE } from "./pricing";
 import { useHalloweenTheme } from "../data/seasonalTheme";
 import { Bat, Pumpkin } from "../components/HalloweenDecor";
 import styles from "./MenuBrowser.module.css";
+import { trackEvent } from "../utils/analytics";
 
 const formatPrice = (value) => `$${Number(value).toLocaleString("es-MX")} MXN`;
 
@@ -101,11 +102,15 @@ const MenuBrowser = ({
     // lo borraría junto con el paso guardado, que es justo lo que hacía
     // sentir que volver a entrar era empezar de cero.
     if (!hasBowlDraft) startNewBowl();
+    trackEvent("begin_bowl", { source: isKiosk ? "kiosk_menu" : "web_menu", resumed: hasBowlDraft });
     onBuildBowl();
   };
 
   const handleAdd = (item) => {
-    if (!isItemUnavailable(item)) addCatalogItem(item, 1);
+    if (!isItemUnavailable(item)) {
+      addCatalogItem(item, 1);
+      trackEvent("add_to_cart", { item_id: item.catalogId, item_category: item.categoryKey || item.category });
+    }
   };
   const handleRemove = (item) => {
     const cartLine = order.cart.find(
@@ -125,6 +130,7 @@ const MenuBrowser = ({
   const confirmCombo = () => {
     if (!comboSelectionValid) return;
     addComboToCart(activeCombo, comboSelection, 1);
+    trackEvent("add_to_cart", { item_id: activeCombo.catalogId, item_category: "combos" });
     closeComboPicker();
   };
 
@@ -175,7 +181,7 @@ const MenuBrowser = ({
           {isKiosk ? (
             <h1 className={styles.title}>¿Qué se te antoja hoy?</h1>
           ) : (
-            <h2 className={styles.title}>Menú</h2>
+            <h1 className={styles.title}>Menú</h1>
           )}
           <p className={styles.subtitle}>
             {isKiosk

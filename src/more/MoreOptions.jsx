@@ -18,15 +18,15 @@ const SECTIONS = [
     items: [
       { icon: "📍", labelKey: "more.locations", path: "/ubicaciones" },
       { icon: "🥗", labelKey: "more.fullMenu", path: "/menu" },
-      { icon: "🥑", labelKey: "more.nutrition", path: null },
+      { icon: "🥑", labelKey: "more.nutrition", path: "/ayuda#alergenos" },
       { icon: "🔳", labelKey: "more.qrCode", path: "/qr" },
     ],
   },
   {
     titleKey: "more.help",
     items: [
-      { icon: "💬", labelKey: "more.contact", path: null },
-      { icon: "❓", labelKey: "more.faq", path: null },
+      { icon: "💬", labelKey: "more.contact", path: "/ayuda" },
+      { icon: "❓", labelKey: "more.faq", path: "/ayuda#faq" },
       { icon: "⚖️", labelKey: "more.privacy", path: "/aviso-de-privacidad" },
     ],
   },
