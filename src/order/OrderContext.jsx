@@ -177,12 +177,17 @@ export const OrderProvider = ({ children }) => {
         price: PROMO_2X1_BOWLS_PRICE,
         qty: 1,
       };
+      // El 2x1 es solo para comer aquí: se deja la entrega lista para que
+      // "Confirmar" no amanezca bloqueado en "Recoger en restaurante".
       return {
         ...prev,
         ...blankBowlDraft(),
         promo2x1: null,
         cart: [...prev.cart, line],
         draftStep: 0,
+        fulfillment: "dine_in",
+        isScheduled: false,
+        scheduledPickupTime: "",
       };
     });
   }, []);

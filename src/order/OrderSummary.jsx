@@ -126,6 +126,16 @@ const OrderSummary = ({
   const hasPromo2x1BlockedByFulfillment = cart.some(
     (line) => line.kind === "promo2x1" && order.fulfillment !== "dine_in"
   );
+  const chooseFulfillment = (nextFulfillment) => {
+    order.updateCheckout("fulfillment", nextFulfillment);
+    // La programación de hora solo aplica a "para llevar" — si el cliente
+    // cambia a "comer aquí", se descarta para que no quede una hora
+    // programada obsoleta pegada al pedido.
+    if (nextFulfillment === "dine_in") {
+      order.updateCheckout("isScheduled", false);
+      order.updateCheckout("scheduledPickupTime", "");
+    }
+  };
   // Time picker helpers — mantiene el rango en línea con lo que de verdad
   // acepta el backend (11:00 a 21:00 todos los días), para no dejar elegir
   // una hora que luego se va a rechazar al confirmar. Usa la hora LOCAL del
@@ -536,17 +546,7 @@ const OrderSummary = ({
               <select
                 name="fulfillment"
                 value={order.fulfillment === "dine_in" ? "dine_in" : "pickup"}
-                onChange={(e) => {
-                  const nextFulfillment = e.target.value;
-                  order.updateCheckout("fulfillment", nextFulfillment);
-                  // La programación de hora solo aplica a "para llevar" — si
-                  // el cliente cambia a "comer aquí", se descarta para que no
-                  // quede una hora programada obsoleta pegada al pedido.
-                  if (nextFulfillment === "dine_in") {
-                    order.updateCheckout("isScheduled", false);
-                    order.updateCheckout("scheduledPickupTime", "");
-                  }
-                }}
+                onChange={(e) => chooseFulfillment(e.target.value)}
               >
                 <option value="pickup">{t("summary.pickup")}</option>
                 <option value="dine_in">{t("summary.dineIn")}</option>
@@ -697,6 +697,21 @@ const OrderSummary = ({
         <div className={styles.actions}>
           {submitError && (
             <p className={styles.submitError} role="alert">{submitError}</p>
+          )}
+          {/* El botón de confirmar queda apagado mientras el 2x1 esté "para
+              llevar" — se explica aquí, junto al botón, y no solo arriba en
+              la tarjeta de la promo, que en pantallas chicas ni se ve. */}
+          {hasPromo2x1BlockedByFulfillment && (
+            <p className={styles.submitError} role="alert">
+              El 2x1 es solo para comer en el restaurante.{" "}
+              <button
+                type="button"
+                onClick={() => chooseFulfillment("dine_in")}
+                style={{ background: "none", border: 0, padding: 0, color: "inherit", font: "inherit", fontWeight: 800, textDecoration: "underline", cursor: "pointer" }}
+              >
+                Cambiar a “Comer en restaurante”
+              </button>
+            </p>
           )}
           <div className={styles.actionButtons}>
             <button
