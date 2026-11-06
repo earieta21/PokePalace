@@ -130,6 +130,32 @@ test("la promo 2x1 se queda a precio plano aunque lleve proteina premium", () =>
   assert.equal(promo.price, 250);
 });
 
+test("la caja cobra la 2x1 y el extra de proteina aunque mande la proteina como lista", () => {
+  // Así lo manda POSPage: `protein` y también `proteins: [la misma]`.
+  const [promo, scoop] = resolvePosItems([
+    { id: 26, qty: 1, protein: "salmon", proteins: ["salmon"] },
+    { id: 27, qty: 1, protein: "seared_tuna", proteins: ["seared_tuna"] },
+  ], MARTES);
+  assert.equal(promo.catalogId, "promo-2x1-dinein");
+  assert.equal(promo.price, 250);
+  assert.equal(promo.protein, "salmon");
+  assert.equal(promo.proteins, undefined);
+  assert.equal(scoop.price, 60);
+  assert.deepEqual(getPosInventoryDemand({ items: [promo] }), { salmon: 0.12 });
+
+  // Sin `protein`, la lista de 1 basta.
+  assert.equal(resolvePosItems([{ id: 26, proteins: ["tuna"] }], MARTES)[0].protein, "tuna");
+  // Pero sigue sin admitir 2 proteínas, ni una lista que contradiga a `protein`.
+  assert.throws(
+    () => resolvePosItems([{ id: 26, proteins: ["tuna", "salmon"] }], MARTES),
+    PosOrderValidationError,
+  );
+  assert.throws(
+    () => resolvePosItems([{ id: 26, protein: "tuna", proteins: ["salmon"] }], MARTES),
+    PosOrderValidationError,
+  );
+});
+
 test("Combo Palace fija precio, conserva elecciones y descuenta sus componentes", () => {
   const [combo] = resolvePosItems([{
     catalogId: "combo-palace",

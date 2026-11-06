@@ -253,13 +253,21 @@ export const resolvePosItems = (items, now = new Date()) => {
       const isMedium = catalogItem.catalogId === "bowl-mediano-rapido";
       const isLarge = catalogItem.catalogId === "bowl-grande-rapido";
       if (!isMedium && !isLarge) {
-        throw new PosOrderValidationError(`${catalogItem.name} no admite varias proteínas`);
+        // La caja manda la proteína también como lista de 1 en lo que solo
+        // lleva una (promo 2x1, extra de proteína): se toma como `protein`.
+        // Antes se rechazaba y la 2x1 no se podía cobrar en caja.
+        const [only] = rawItem.proteins;
+        if (rawItem.proteins.length !== 1 || (protein && protein !== only)) {
+          throw new PosOrderValidationError(`${catalogItem.name} no admite varias proteínas`);
+        }
+        protein = only;
+      } else {
+        if ((isMedium && (rawItem.proteins.length < 1 || rawItem.proteins.length > 2))
+          || (isLarge && (rawItem.proteins.length < 1 || rawItem.proteins.length > 3))) {
+          throw new PosOrderValidationError(`Cantidad de proteínas inválida para ${catalogItem.name}`);
+        }
+        proteins = [...rawItem.proteins];
       }
-      if ((isMedium && (rawItem.proteins.length < 1 || rawItem.proteins.length > 2))
-        || (isLarge && (rawItem.proteins.length < 1 || rawItem.proteins.length > 3))) {
-        throw new PosOrderValidationError(`Cantidad de proteínas inválida para ${catalogItem.name}`);
-      }
-      proteins = [...rawItem.proteins];
     }
 
     if (catalogItem.catalogId === "extra-protein-scoop" && !protein) {
