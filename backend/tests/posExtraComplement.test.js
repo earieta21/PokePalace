@@ -82,3 +82,10 @@ test("el extra de aderezo cobra $10, exige un aderezo válido y descuenta una po
   );
   assert.equal(CUSTOMER_EXCLUDED_CATALOG_IDS.has("extra-sauce"), true);
 });
+
+test("la sopa miso se cobra a $50 y descuenta una porción", () => {
+  const [line] = resolvePosItems([{ id: 32, qty: 2, price: 1 }]);
+  assert.deepEqual([line.catalogId, line.name, line.price, line.qty], ["miso-soup", "Sopa Miso", 50, 2]);
+  assert.deepEqual(getPosInventoryDemand({ items: [line] }), { sopa_miso: 2 });
+  assert.equal(resolvePosItems([{ id: "miso-soup" }])[0].price, 50);
+});

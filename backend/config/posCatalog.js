@@ -99,6 +99,12 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: { bloom: 1 },
   },
   {
+    // Una porción por venta: en Inventario se vincula a "Sopa Miso" con
+    // unidad "porciones" (o la cantidad por porción que se configure).
+    catalogId: "miso-soup", legacyId: 32, name: "Sopa Miso", price: 50, category: "extras",
+    inventoryRecipe: { sopa_miso: 1 },
+  },
+  {
     // Descontinuado: ya no se ofrece en el menú, ni en el POS, ni como
     // opción del Combo Palace. La entrada se queda para que las órdenes
     // viejas y las colas offline sigan resolviendo su nombre y su precio.

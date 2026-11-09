@@ -81,7 +81,13 @@ const MENU_GROUPS = [
 const MENU_ITEMS = MENU_GROUPS.flatMap(({ labels, group, category, unit }) =>
   Object.entries(labels).map(([key, label]) => ({ key, label, group, category, unit }))
 );
-const SALE_OPTIONS = [...MENU_ITEMS, ...BEVERAGE_PRODUCTS.map((product) => ({ key: product.key, label: product.name }))];
+// Productos del POS que no son ingrediente ni bebida (se descuentan por porción).
+const OTHER_SALE_PRODUCTS = [{ key: "sopa_miso", label: "Sopa Miso" }];
+const SALE_OPTIONS = [
+  ...MENU_ITEMS,
+  ...BEVERAGE_PRODUCTS.map((product) => ({ key: product.key, label: product.name })),
+  ...OTHER_SALE_PRODUCTS,
+];
 const MOVEMENT_LABELS = {
   sale_deduction: "Venta", sale_reversal: "Cancelación de venta", restock: "Recepción",
   restock_batch: "Recepción", manual_adjustment: "Ajuste manual", internal_consumption: "Consumo interno",

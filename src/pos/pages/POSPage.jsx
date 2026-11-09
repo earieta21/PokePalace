@@ -52,6 +52,7 @@ const MENU = [
   { id: 15, name: "Agua del día",              price:  35, category: "Bebidas", icon: "🥤", rewardDrink: true },
   { id: 29, name: "Celsius",                 price:  55, category: "Bebidas", icon: "⚡" },
   { id: 30, name: "Bloom",                   price:  55, category: "Bebidas", icon: "🌸" },
+  { id: 32, name: "Sopa Miso",               price:  50, category: "Sopas", icon: "🍜" },
   { id: 17, name: "Choco Rice Cake",          price:  35, category: "Rice Cakes", icon: "🍫", rewardSnack: true },
   { id: 23, name: "Miel Rice Cake",           price:  35, category: "Rice Cakes", icon: "🍯" },
   // Porción extra (40 g) de cualquier proteína ya en el bowl. El precio
@@ -68,7 +69,7 @@ const MENU = [
   { id: 31, name: "Extra de aderezo",         price: EXTRA_SAUCE_PRICE, category: "Bowls", icon: "🥫", needsSauce: true },
 ];
 
-const MENU_CATEGORIES = ["Todos", "Promos", "Bowls", "Bebidas", "Rice Cakes"];
+const MENU_CATEGORIES = ["Todos", "Promos", "Bowls", "Sopas", "Bebidas", "Rice Cakes"];
 MENU.sort((a, b) => MENU_CATEGORIES.indexOf(a.category) - MENU_CATEGORIES.indexOf(b.category));
 
 // Opciones para el picker rapido de proteina (bowls sin receta fija).
