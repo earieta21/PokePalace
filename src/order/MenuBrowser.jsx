@@ -20,6 +20,7 @@ const formatPrice = (value) => `$${Number(value).toLocaleString("es-MX")} MXN`;
 const CATEGORY_ICONS = {
   Combos: "👑",
   Bowls: "🍣",
+  Sopas: "🍜",
   Bebidas: "🥤",
   Extras: "🍫",
 };

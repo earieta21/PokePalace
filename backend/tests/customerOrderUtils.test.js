@@ -376,3 +376,11 @@ test("el carrito acepta 2x1 en Bowls, ignora el precio enviado por el cliente y 
   assert.deepEqual(findUnavailablePromo2x1Items(promoLine, ["not_in_promo"]), []);
   assert.deepEqual(findUnavailableCustomerCartItems([promoLine], ["quinoa"]), ["quinoa"]);
 });
+
+test("el carrito del kiosco y en línea acepta la Sopa Miso a $50", () => {
+  const [soup] = sanitizeCustomerCart([{ kind: "item", catalogId: "miso-soup", qty: 2, price: 1 }]);
+  assert.equal(soup.kind, "item");
+  assert.equal(soup.catalogId, "miso-soup");
+  assert.equal(soup.qty, 2);
+  assert.equal(soup.price, 50);
+});

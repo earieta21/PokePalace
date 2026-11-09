@@ -64,6 +64,16 @@ export const CUSTOMER_CATALOG = Object.freeze([
     image: quinoaBowl,
   },
   {
+    // Sin foto todavía: la tarjeta muestra el ícono.
+    catalogId: "miso-soup",
+    name: "Sopa Miso",
+    description: "Sopa caliente para acompañar tu bowl.",
+    price: 50,
+    category: "Sopas",
+    categoryKey: "soups",
+    icon: "🍜",
+  },
+  {
     catalogId: "mineral-water",
     name: "Topochico",
     price: 35,
@@ -135,7 +145,7 @@ export const CUSTOMER_CATALOG = Object.freeze([
   },
 ]);
 
-export const CUSTOMER_CATALOG_CATEGORIES = Object.freeze(["Combos", "Bowls", "Bebidas", "Extras"]);
+export const CUSTOMER_CATALOG_CATEGORIES = Object.freeze(["Combos", "Bowls", "Sopas", "Bebidas", "Extras"]);
 
 export const CUSTOMER_CATALOG_BY_ID = Object.freeze(Object.fromEntries(
   CUSTOMER_CATALOG.map((item) => [item.catalogId, item])

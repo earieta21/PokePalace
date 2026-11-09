@@ -250,6 +250,14 @@
   padding: 14px;
 }
 
+/* En la web la tarjeta mide ~200px: ícono, texto y botón en una fila no
+   caben, así que el ícono va arriba (como la foto) y el resto debajo. El
+   kiosco tiene tarjetas más anchas y su propio acomodo. */
+.wrapper:not(.kiosk) .cardIconOnly {
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .cardIconBadge {
   display: grid;
   place-items: center;
