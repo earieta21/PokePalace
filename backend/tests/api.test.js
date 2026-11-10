@@ -259,6 +259,30 @@ test("crear orden valida: el precio lo pone el servidor, no el cliente", async (
   assert.equal(order.source, "online");
 });
 
+test("rutas de cliente solo aceptan tokens de tipo cliente", async () => {
+  const secret = process.env.JWT_SECRET || "ci-test-secret";
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const account = await User.create({
+    name: "Tipo Token CI",
+    email: `ci-pos-security-token-type-${suffix}@example.test`,
+    password: await bcrypt.hash("prueba-segura-123", 10),
+  });
+  const getMe = (token) =>
+    fetch(`${BASE}/api/users/me`, { headers: { Authorization: `Bearer ${token}` } });
+
+  const customer = jwt.sign({ id: account._id, type: "customer" }, secret, { expiresIn: "10m" });
+  assert.equal((await getMe(customer)).status, 200);
+
+  // Tokens sin type emitidos antes del cambio siguen funcionando mientras caducan.
+  const legacy = jwt.sign({ id: account._id }, secret, { expiresIn: "10m" });
+  assert.equal((await getMe(legacy)).status, 200);
+
+  for (const type of ["staff", "staff-pin-upgrade", "member_qr", "something-new"]) {
+    const other = jwt.sign({ id: account._id, type }, secret, { expiresIn: "10m" });
+    assert.equal((await getMe(other)).status, 401, `type ${type} no debe pasar como cliente`);
+  }
+});
+
 test("checkout rechaza ingredientes agotados antes de reservar promo o puntos", async () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const account = await User.create({
@@ -268,7 +292,7 @@ test("checkout rechaza ingredientes agotados antes de reservar promo o puntos", 
     points: 200,
   });
   const token = jwt.sign(
-    { id: account._id },
+    { id: account._id, type: "customer" },
     process.env.JWT_SECRET || "ci-test-secret",
     { expiresIn: "10m" }
   );

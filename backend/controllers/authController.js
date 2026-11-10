@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 const signToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign({ id: userId, type: "customer" }, process.env.JWT_SECRET, { expiresIn: "7d" });
 };
 
 // Incentivo para que la gente cree cuenta en vez de seguir pidiendo como

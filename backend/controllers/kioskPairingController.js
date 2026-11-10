@@ -62,7 +62,7 @@ export const getPairingStatus = async (req, res) => {
   pairing.consumedAt = new Date();
   await pairing.save();
 
-  const orderToken = jwt.sign({ id: String(user._id) }, process.env.JWT_SECRET, { expiresIn: "5m" });
+  const orderToken = jwt.sign({ id: String(user._id), type: "customer" }, process.env.JWT_SECRET, { expiresIn: "5m" });
 
   res.json({
     status: "confirmed",
