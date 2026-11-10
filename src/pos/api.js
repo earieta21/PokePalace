@@ -42,10 +42,11 @@ export function createStaffApi(token) {
         body: JSON.stringify(body),
       }).then(handleRes),
 
-    delete: (path) =>
+    delete: (path, body) =>
       fetch(`${BASE}${path}`, {
         method: "DELETE",
         headers: headers(),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       }).then(handleRes),
   };
 }

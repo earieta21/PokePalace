@@ -29,6 +29,7 @@ import staffCostingRoutes from "./routes/staffCosting.js";
 import staffPreparationRoutes from "./routes/staffPreparations.js";
 import staffConsumptionRoutes from "./routes/staffConsumption.js";
 import staffFixedExpenseRoutes from "./routes/staffFixedExpenses.js";
+import staffCalendarRoutes from "./routes/staffCalendar.js";
 import whatsappRoutes from "./routes/whatsapp.js";
 import telegramFinanceRoutes from "./routes/telegramFinance.js";
 import kioskPairingRoutes from "./routes/kioskPairing.js";
@@ -120,6 +121,7 @@ app.use("/api/staff/costing", staffCostingRoutes);
 app.use("/api/staff/preparations", staffPreparationRoutes);
 app.use("/api/staff/consumption",staffConsumptionRoutes);
 app.use("/api/staff/fixed-expenses",staffFixedExpenseRoutes);
+app.use("/api/staff/calendar", staffCalendarRoutes);
 app.use("/api/telegram",       telegramFinanceRoutes);
 app.use("/api/kiosk-pairing",  kioskPairingRoutes);
 
@@ -222,4 +224,3 @@ const start = async () => {
 };
 
 start();
-

@@ -8,6 +8,34 @@ Currently, two official plugins are available:
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 # PokePalace
 
+## Calendario del equipo
+
+En `/staff`, abre **Equipo → Calendario**. Todos los roles pueden consultar
+el calendario compartido de la sucursal y agregar pendientes, ausencias,
+reuniones y mantenimiento. Incluye vista mensual y agenda, búsqueda, filtros
+por responsable y tipo, prioridad alta y pendientes completados o vencidos.
+Las ausencias pueden abarcar varios días; los pendientes que coincidan con
+una ausencia de su responsable muestran una advertencia para organizar cobertura.
+
+Cada integrante puede editar y eliminar los eventos que creó y completar
+los pendientes asignados a su nombre. Gerencia, administración y propietarios
+pueden gestionar los eventos de la sucursal. Las ausencias de otras personas
+solo las puede registrar gerencia. Los detalles son visibles para el equipo.
+
+Los registros se guardan en MongoDB (`CalendarEntry`) y se incluyen en el
+respaldo general. El calendario se actualiza cada minuto mientras está visible
+y al volver a la pestaña; las fechas y horas corresponden a Tijuana. Los avisos
+de ausencia no cambian el horario semanal ni los registros de asistencia.
+Las ediciones simultáneas se rechazan con un aviso para volver a cargar el evento.
+
+Es necesario desplegar **frontend y backend** para habilitar la sección.
+No requiere nuevas variables de entorno ni dependencias de la aplicación.
+Pruebas específicas desde `backend/`:
+
+```bash
+node --test tests/teamCalendar.test.js tests/teamCalendarController.test.js
+```
+
 ## Reportes mensuales para el contador
 
 En el portal de personal, entra a **Fiscal** y elige el mes. Puedes descargar

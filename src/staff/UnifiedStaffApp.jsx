@@ -38,6 +38,7 @@ import SummaryPage from "../pos/pages/SummaryPage";
 import InventoryPage from "../pos/pages/InventoryPage";
 import WastePage from "../pos/pages/WastePage";
 import ConsumptionPage from "../pos/pages/ConsumptionPage";
+import TeamCalendarPage from "../pos/pages/TeamCalendarPage";
 import CustomersPage from "../pos/pages/CustomersPage";
 import CostingPage from "../pos/pages/CostingPage";
 
@@ -156,12 +157,12 @@ const TABS_BY_ROLE = {
   // Empleado: opera el local completo -- vende y cobra, ve comandas, canjea
   // premios, reimprime, registra mermas, marca agotados, agrega inventario
   // (sin editar ni borrar) y hace su corte. Sin reportes ni administración.
-  employee: ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos"],
-  cashier:  ["pos", "premios", "inicio", "consumo", "tareas", "temp", "hist", "corte", "horario", "avisos"],
-  kitchen:  ["cocina", "inicio", "consumo", "tareas", "temp", "hist", "mermas", "horario", "avisos"],
-  manager:  ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "recetas", "panel"],
-  admin:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "recetas", "fiscal", "panel"],
-  owner:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "recetas", "fiscal", "panel"],
+  employee: ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "calendario", "horario", "avisos"],
+  cashier:  ["pos", "premios", "inicio", "consumo", "tareas", "temp", "hist", "corte", "calendario", "horario", "avisos"],
+  kitchen:  ["cocina", "inicio", "consumo", "tareas", "temp", "hist", "mermas", "calendario", "horario", "avisos"],
+  manager:  ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "calendario", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "recetas", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "calendario", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "recetas", "fiscal", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "calendario", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "recetas", "fiscal", "panel"],
 };
 
 const TAB_META = {
@@ -187,6 +188,7 @@ const TAB_META = {
   tareas:  { label: "Tareas", title: "Tareas del local", icon: CheckSquare },
   temp:    { label: "Temperaturas", mobileLabel: "Temp.", title: "Control de temperaturas", icon: Thermometer },
   horario: { label: "Horario", title: "Horario del equipo", icon: Calendar },
+  calendario: { label: "Calendario", title: "Calendario del equipo", icon: Calendar },
   avisos:  { label: "Avisos", title: "Avisos del equipo", icon: Megaphone },
 };
 
@@ -194,7 +196,7 @@ const TAB_GROUPS = [
   { id: "operacion", label: "Operación", tabs: ["pos", "cocina", "premios"] },
   { id: "turno", label: "Mi turno", tabs: ["inicio", "consumo", "tareas", "temp"] },
   { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv", "mermas", "corte"] },
-  { id: "equipo", label: "Equipo", tabs: ["horario", "avisos"] },
+  { id: "equipo", label: "Equipo", tabs: ["calendario", "horario", "avisos"] },
   { id: "gestion", label: "Administración", tabs: ["resumen", "clientes", "ventas", "fin", "costeo", "recetas", "fiscal", "panel"] },
 ];
 
@@ -544,7 +546,7 @@ export default function UnifiedStaffApp() {
     return <PasskeyOffer halloween={halloween} me={me} token={token} onDone={() => setPasskeyOffer(false)} />;
   }
 
-  const isWideTab = ["pos", "cocina", "hist", "resumen", "ventas", "inv", "fin", "panel"].includes(tab);
+  const isWideTab = ["pos", "cocina", "hist", "resumen", "ventas", "inv", "fin", "panel", "calendario"].includes(tab);
 
   return (
     <StaffAuthContext.Provider value={staffContextValue}>
@@ -610,6 +612,7 @@ export default function UnifiedStaffApp() {
             {tab === "tareas"  && <TasksTab employees={employees} checklist={checklist} onToggle={toggleTask} />}
             {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
             {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
+            {tab === "calendario" && <TeamCalendarPage locationId={LOCATION_ID} />}
             {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
             {tab === "premios" && <RewardsRedeemTab token={token} />}
             {tab === "disponibilidad" && <AvailabilityTab token={token} role={me?.role} />}
@@ -2843,4 +2846,3 @@ function BottomNav({ role, tab, setTab, tabs, openEntry, lowStockCount }) {
     </>
   );
 }
-
