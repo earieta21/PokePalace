@@ -5,7 +5,7 @@ import Receipt, { RECEIPT_KINDS, RECEIPT_PAYMENT_METHODS } from "../models/Recei
 import Expense, { EXPENSE_CATEGORIES } from "../models/Expense.js";
 import StoreSettings from "../models/StoreSettings.js";
 import { uploadImageToCloudinary, deleteImageFromCloudinary, cloudinaryConfigured } from "../utils/cloudinary.js";
-import { emailConfigured } from "../utils/notify.js";
+import { emailConfigured, explainEmailError } from "../utils/notify.js";
 import {
   sendReceiptsToAccountant, nextAccountantSendKey, summarizeReceipts,
   RECEIPT_KIND_LABEL, dayLabel,
@@ -259,9 +259,11 @@ export const sendReceiptsNow = async (req, res) => {
       case "busy":
         return res.status(409).json({ ...result, message: "Ya se está enviando un paquete; espera un momento." });
       case "partial":
-        return res.status(502).json({ ...result, message: `Se enviaron ${result.sent}, pero falló una parte. Lo demás se reintenta en el próximo envío.` });
+        logServerError(new Error(`Brevo: ${result.error}`), "POST /api/staff/receipts/send-now");
+        return res.status(502).json({ ...result, message: `Se enviaron ${result.sent}, pero falló una parte. ${explainEmailError(result.error)}` });
       default:
-        return res.status(502).json({ ...result, message: "No se pudo enviar el correo. Intenta de nuevo más tarde." });
+        logServerError(new Error(`Brevo: ${result.error}`), "POST /api/staff/receipts/send-now");
+        return res.status(502).json({ ...result, message: `No se pudo enviar el correo. ${explainEmailError(result.error)}` });
     }
   } catch (err) {
     logServerError(err, "POST /api/staff/receipts/send-now");

@@ -213,7 +213,7 @@ function startAccountantReportScheduler() {
   const run = () => checkAndSendWeeklyAccountantReport()
     .then((result) => {
       if (result?.sent) console.log(`🧾 Comprobantes enviados al contador: ${result.sent} (semana ${result.weekKey})`);
-      else if (result && result.status !== "nothing_pending") console.error(`checkAndSendWeeklyAccountantReport: ${result.status}`);
+      else if (result && result.status !== "nothing_pending") console.error(`checkAndSendWeeklyAccountantReport: ${result.status}${result.error ? ` — ${result.error}` : ""}`);
     })
     .catch((err) => console.error("checkAndSendWeeklyAccountantReport:", err.message));
   run();

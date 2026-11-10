@@ -11,13 +11,14 @@ export const emailConfigured = () => Boolean(process.env.BREVO_API_KEY && proces
 
 /* `to` acepta un correo o una lista. `attachments`: [{ name, content }] con
    content en base64 (Brevo: máx. 4 MB por archivo y 20 MB por correo).
-   Regresa true solo si Brevo aceptó el correo -- quien necesite saber si
-   salió (p. ej. el envío al contador) lo revisa; los demás lo ignoran. */
-export async function sendEmail({ to, subject, html, attachments } = {}) {
+   Regresa { ok, error }: `error` es la respuesta de Brevo cuando lo rechaza,
+   para poder decirle a quien envía qué falló (ver explainEmailError). */
+export async function sendEmailDetailed({ to, subject, html, attachments } = {}) {
   const apiKey = process.env.BREVO_API_KEY;
   const from   = process.env.EMAIL_FROM;
   const recipients = (Array.isArray(to) ? to : [to]).filter(Boolean);
-  if (!apiKey || !from || recipients.length === 0) return false;
+  if (!apiKey || !from) return { ok: false, error: "not_configured" };
+  if (recipients.length === 0) return { ok: false, error: "no_recipient" };
 
   try {
     const res = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -32,14 +33,44 @@ export async function sendEmail({ to, subject, html, attachments } = {}) {
       }),
     });
     if (!res.ok) {
-      console.error("sendEmail failed:", res.status, await res.text());
-      return false;
+      const body = await res.text().catch(() => "");
+      console.error("sendEmail failed:", res.status, body);
+      return { ok: false, error: `${res.status} ${body}`.trim().slice(0, 500) };
     }
-    return true;
+    return { ok: true, error: null };
   } catch (err) {
     console.error("sendEmail error:", err.message);
-    return false;
+    return { ok: false, error: err.message };
   }
+}
+
+/* Igual que sendEmailDetailed pero solo regresa true/false (para quien no
+   necesita el motivo, p. ej. la confirmación de pedido). */
+export async function sendEmail(options) {
+  return (await sendEmailDetailed(options)).ok;
+}
+
+/* Traduce la respuesta de Brevo a algo que el dueño pueda arreglar. */
+export function explainEmailError(error) {
+  const raw = String(error || "");
+  if (!raw) return "No se pudo enviar el correo. Intenta de nuevo más tarde.";
+  if (raw === "not_configured") return "El envío de correos (Brevo) no está configurado en el servidor.";
+  if (/unrecogni[sz]ed ip|authori[sz]ed_?ips/i.test(raw)) {
+    return "Brevo bloqueó el envío porque no reconoce la IP del servidor. En Brevo entra a Security → Authorised IPs y desactiva el bloqueo (o autoriza la IP que aparece en el correo que te mandó Brevo).";
+  }
+  if (/key not found|invalid api key|api[- ]?key/i.test(raw)) {
+    return "Brevo no reconoce la clave. En Render, BREVO_API_KEY debe ser una API key de Brevo (empieza con xkeysib-), no la clave SMTP.";
+  }
+  if (/not yet activated|activation|account.*(suspend|blocked)/i.test(raw)) {
+    return "Tu cuenta de Brevo todavía no puede enviar correos transaccionales. Revisa en Brevo si te piden activar la cuenta o contacta a su soporte.";
+  }
+  if (/sender/i.test(raw)) {
+    return "Brevo rechazó el remitente. En Render, EMAIL_FROM debe ser exactamente un remitente verificado en Brevo (p. ej. hola@pokepalace.org).";
+  }
+  if (/fetch failed|timeout|ENOTFOUND|ECONN|EAI_AGAIN/i.test(raw)) {
+    return "No se pudo conectar con Brevo. Intenta de nuevo en unos minutos.";
+  }
+  return `Brevo rechazó el correo: ${raw.slice(0, 200)}`;
 }
 
 /* Normaliza teléfono mexicano a formato E.164 (+52XXXXXXXXXX) */

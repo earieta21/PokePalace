@@ -10,6 +10,20 @@ import {
 } from "../utils/accountantReport.js";
 import { parseReceiptMeta, detectImageType } from "../controllers/receiptController.js";
 import { cloudinaryResizedUrl } from "../utils/cloudinary.js";
+import { explainEmailError } from "../utils/notify.js";
+
+test("los rechazos de Brevo se explican con qué hay que arreglar", () => {
+  const ip = explainEmailError('401 {"code":"unauthorized","message":"We have detected you are using an unrecognised IP address 1.2.3.4. If you performed this action make sure to add the new IP address in this link: https://app.brevo.com/security/authorised_ips"}');
+  assert.match(ip, /Authorised IPs/);
+
+  assert.match(explainEmailError('401 {"code":"unauthorized","message":"Key not found"}'), /xkeysib-/);
+  assert.match(explainEmailError('400 {"code":"invalid_parameter","message":"Sender is invalid / inactive"}'), /EMAIL_FROM/);
+  assert.match(explainEmailError("403 Unable to send email. Your SMTP account is not yet activated."), /activar/);
+  assert.match(explainEmailError("fetch failed"), /conectar con Brevo/);
+  assert.match(explainEmailError("not_configured"), /no está configurado/);
+  assert.match(explainEmailError(null), /Intenta de nuevo/);
+  assert.match(explainEmailError('400 {"code":"bad_request","message":"otra cosa"}'), /^Brevo rechazó el correo: 400/);
+});
 
 const receipt = (overrides = {}) => ({
   kind: "ticket",

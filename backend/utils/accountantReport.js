@@ -10,7 +10,7 @@
    revisión lo reintenta. */
 import Receipt from "../models/Receipt.js";
 import StoreSettings from "../models/StoreSettings.js";
-import { sendEmail, emailConfigured } from "./notify.js";
+import { sendEmailDetailed, emailConfigured } from "./notify.js";
 import { cloudinaryResizedUrl } from "./cloudinary.js";
 import { dateKeyInTimeZone, zonedParts } from "./timeZone.js";
 import { mondayOf, weekEndKeyOf } from "./weeks.js";
@@ -234,20 +234,21 @@ async function sendBatch(receipts, { to, periodLabel, partLabel }) {
   const withImages = buildAccountantEmail({
     files, periodLabel, partLabel, attachedNames: new Set(images.map((a) => a.name)),
   });
-  const ok = await sendEmail({ to, ...withImages, attachments: [csv, ...images] });
-  if (ok || images.length === 0) return ok;
+  const first = await sendEmailDetailed({ to, ...withImages, attachments: [csv, ...images] });
+  if (first.ok || images.length === 0) return first;
 
   // Si Brevo rechazó el correo con fotos (tamaño, formato…), se manda solo
   // con enlaces: mejor que el contador reciba algo esta semana.
   const linksOnly = buildAccountantEmail({ files, periodLabel, partLabel });
-  return sendEmail({ to, ...linksOnly, attachments: [csv] });
+  return sendEmailDetailed({ to, ...linksOnly, attachments: [csv] });
 }
 
 let sendingNow = false;
 
 /* Manda todo lo pendiente subido antes de `before`. Regresa
-   { status, sent, emails } con status: sent | nothing_pending | no_recipient |
-   email_not_configured | failed | partial | busy. */
+   { status, sent, emails, error? } con status: sent | nothing_pending |
+   no_recipient | email_not_configured | failed | partial | busy; en failed y
+   partial, `error` trae la respuesta de Brevo. */
 export async function sendReceiptsToAccountant({ before = new Date(), periodLabel }) {
   // Se toma antes del primer await: un "Enviar ahora" y la revisión semanal
   // al mismo tiempo podrían mandar los mismos comprobantes dos veces.
@@ -275,8 +276,8 @@ export async function sendReceiptsToAccountant({ before = new Date(), periodLabe
       if (batch.length === 0) break;
 
       const partLabel = parts > 1 ? ` (parte ${part} de ${parts})` : "";
-      const ok = await sendBatch(batch, { to, periodLabel, partLabel });
-      if (!ok) return { status: sent > 0 ? "partial" : "failed", sent, emails };
+      const result = await sendBatch(batch, { to, periodLabel, partLabel });
+      if (!result.ok) return { status: sent > 0 ? "partial" : "failed", sent, emails, error: result.error };
 
       await Receipt.updateMany(
         { _id: { $in: batch.map((r) => r._id) }, sentToAccountantAt: null },
