@@ -29,6 +29,7 @@ import staffCostingRoutes from "./routes/staffCosting.js";
 import staffPreparationRoutes from "./routes/staffPreparations.js";
 import staffConsumptionRoutes from "./routes/staffConsumption.js";
 import staffFixedExpenseRoutes from "./routes/staffFixedExpenses.js";
+import staffReceiptRoutes from "./routes/staffReceipts.js";
 import staffCalendarRoutes from "./routes/staffCalendar.js";
 import whatsappRoutes from "./routes/whatsapp.js";
 import telegramFinanceRoutes from "./routes/telegramFinance.js";
@@ -39,6 +40,7 @@ import { sanitizeMongo } from "./middleware/sanitizeMongo.js";
 import { startOrderChangeStream } from "./utils/orderEvents.js";
 import { registerDueFixedExpenses } from "./utils/fixedExpenses.js";
 import { checkAndSendFiscalReminder } from "./utils/fiscalReminder.js";
+import { checkAndSendWeeklyAccountantReport } from "./utils/accountantReport.js";
 import { startUberEatsWebhookWorker } from "./services/uberEats.js";
 import StoreSettings from "./models/StoreSettings.js";
 import { dateKeyInTimeZone } from "./utils/timeZone.js";
@@ -121,6 +123,7 @@ app.use("/api/staff/costing", staffCostingRoutes);
 app.use("/api/staff/preparations", staffPreparationRoutes);
 app.use("/api/staff/consumption",staffConsumptionRoutes);
 app.use("/api/staff/fixed-expenses",staffFixedExpenseRoutes);
+app.use("/api/staff/receipts", staffReceiptRoutes);
 app.use("/api/staff/calendar", staffCalendarRoutes);
 app.use("/api/telegram",       telegramFinanceRoutes);
 app.use("/api/kiosk-pairing",  kioskPairingRoutes);
@@ -203,6 +206,20 @@ function startFiscalReminderScheduler() {
   setInterval(run, 60 * 60 * 1000);
 }
 
+// Comprobantes para el contador: cada lunes desde las 8:00 manda por correo
+// lo que se subió la semana anterior. Idempotente por semana y por
+// comprobante, igual que los dos schedulers de arriba.
+function startAccountantReportScheduler() {
+  const run = () => checkAndSendWeeklyAccountantReport()
+    .then((result) => {
+      if (result?.sent) console.log(`🧾 Comprobantes enviados al contador: ${result.sent} (semana ${result.weekKey})`);
+      else if (result && result.status !== "nothing_pending") console.error(`checkAndSendWeeklyAccountantReport: ${result.status}`);
+    })
+    .catch((err) => console.error("checkAndSendWeeklyAccountantReport:", err.message));
+  run();
+  setInterval(run, 60 * 60 * 1000);
+}
+
 const start = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
@@ -216,6 +233,7 @@ const start = async () => {
       startKeepAlive();
       startFixedExpenseScheduler();
       startFiscalReminderScheduler();
+      startAccountantReportScheduler();
     });
   } catch (err) {
     console.error("❌ Error conectando a MongoDB:", err.message);
@@ -224,3 +242,4 @@ const start = async () => {
 };
 
 start();
+

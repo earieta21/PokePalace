@@ -50,3 +50,36 @@ export async function uploadImageToCloudinary(buffer, { folder = "facturas", mim
   }
   return { url: data.secure_url, publicId: data.public_id };
 }
+
+/* Borra una imagen subida por nosotros. Regresa true si Cloudinary la borró
+   o ya no existía; nunca lanza por un "no encontrado". */
+export async function deleteImageFromCloudinary(publicId) {
+  if (!cloudinaryConfigured() || !publicId) return false;
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const form = new FormData();
+  form.append("public_id", publicId);
+  form.append("api_key", process.env.CLOUDINARY_API_KEY);
+  form.append("timestamp", String(timestamp));
+  form.append("signature", signParams({ public_id: publicId, timestamp }));
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/destroy`,
+    { method: "POST", body: form }
+  );
+  const data = await res.json().catch(() => null);
+  return res.ok && (data?.result === "ok" || data?.result === "not found");
+}
+
+/* Misma imagen, entregada más ligera (máx. `width` px, JPG, calidad auto)
+   insertando una transformación en la URL. Sirve para adjuntar fotos a un
+   correo sin pasarse del tamaño máximo. URLs que no son de Cloudinary se
+   regresan tal cual. */
+export function cloudinaryResizedUrl(url, { width = 1600 } = {}) {
+  if (typeof url !== "string" || !url.startsWith("https://res.cloudinary.com/")) return url;
+  const marker = "/image/upload/";
+  const at = url.indexOf(marker);
+  if (at === -1) return url;
+  const head = url.slice(0, at + marker.length);
+  return `${head}c_limit,w_${width},q_auto:good,f_jpg/${url.slice(head.length)}`;
+}

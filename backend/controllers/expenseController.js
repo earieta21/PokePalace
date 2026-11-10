@@ -1,5 +1,6 @@
 import Expense from "../models/Expense.js";
 import Order   from "../models/Order.js";
+import Receipt from "../models/Receipt.js";
 import { nextDateKey, startOfDateKey } from "../utils/timeZone.js";
 
 const validateDateRange = (from, to) => {
@@ -148,6 +149,9 @@ export const updateExpense = async (req, res) => {
 export const deleteExpense = async (req, res) => {
   try {
     await Expense.findByIdAndDelete(req.params.id);
+    // La foto sigue en Comprobantes (y le llega al contador); solo se suelta
+    // la liga al gasto que ya no existe.
+    await Receipt.updateMany({ expenseId: req.params.id }, { $set: { expenseId: null } });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ message: "Error al eliminar gasto", err: err.message });

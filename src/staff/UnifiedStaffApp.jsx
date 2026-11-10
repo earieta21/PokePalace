@@ -4,7 +4,7 @@ import {
   TrendingUp, Delete, Plus, AlertTriangle, Snowflake,
   Refrigerator, Flame, Trash2, Leaf, ShieldCheck, User, Download,
   ShoppingCart, UtensilsCrossed, ClipboardList, BarChart3, Activity, Package,
-  ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard, Landmark,
+  ToggleRight, Gift, Coffee, Copy, QrCode, Share2, LayoutDashboard, Landmark, Receipt,
   Menu, X, Wallet, Pencil, Users, Calculator, ChefHat, ScanFace, Check,
 } from "lucide-react";
 import {
@@ -31,6 +31,7 @@ import PendingPayments from "../pos/PendingPayments";
 import KDSPage from "../pos/pages/KDSPage";
 import OrderHistoryPage from "../pos/pages/OrderHistoryPage";
 import FinancePage from "../pos/pages/FinancePage";
+import ReceiptsPage from "../pos/pages/ReceiptsPage";
 import CashCutPage from "../pos/pages/CashCutPage";
 import FiscalPage from "../pos/pages/FiscalPage";
 import SalesDashboardPage from "../pos/pages/SalesDashboardPage";
@@ -160,9 +161,9 @@ const TABS_BY_ROLE = {
   employee: ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "calendario", "horario", "avisos"],
   cashier:  ["pos", "premios", "inicio", "consumo", "tareas", "temp", "hist", "corte", "calendario", "horario", "avisos"],
   kitchen:  ["cocina", "inicio", "consumo", "tareas", "temp", "hist", "mermas", "calendario", "horario", "avisos"],
-  manager:  ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "calendario", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "recetas", "panel"],
-  admin:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "calendario", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "recetas", "fiscal", "panel"],
-  owner:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "calendario", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "costeo", "recetas", "fiscal", "panel"],
+  manager:  ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "calendario", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "comprobantes", "costeo", "recetas", "panel"],
+  admin:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "calendario", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "comprobantes", "costeo", "recetas", "fiscal", "panel"],
+  owner:    ["pos", "cocina", "premios", "inicio", "consumo", "tareas", "temp", "disponibilidad", "hist", "inv", "mermas", "corte", "calendario", "horario", "avisos", "resumen", "clientes", "ventas", "fin", "comprobantes", "costeo", "recetas", "fiscal", "panel"],
 };
 
 const TAB_META = {
@@ -177,6 +178,7 @@ const TAB_META = {
   mermas:  { label: "Mermas", title: "Registro de merma", icon: Trash2 },
   corte:   { label: "Corte", title: "Corte de caja", icon: Wallet },
   fin:     { label: "Finanzas", title: "Finanzas", icon: BarChart3 },
+  comprobantes: { label: "Comprobantes", title: "Comprobantes para el contador", icon: Receipt },
   costeo:  { label: "Costeo", title: "Costeo de bowls", icon: Calculator },
 
   recetas: { label: "Recetas", title: "Recetas estándar", icon: ChefHat },
@@ -197,7 +199,7 @@ const TAB_GROUPS = [
   { id: "turno", label: "Mi turno", tabs: ["inicio", "consumo", "tareas", "temp"] },
   { id: "control", label: "Control del local", tabs: ["disponibilidad", "hist", "inv", "mermas", "corte"] },
   { id: "equipo", label: "Equipo", tabs: ["calendario", "horario", "avisos"] },
-  { id: "gestion", label: "Administración", tabs: ["resumen", "clientes", "ventas", "fin", "costeo", "recetas", "fiscal", "panel"] },
+  { id: "gestion", label: "Administración", tabs: ["resumen", "clientes", "ventas", "fin", "comprobantes", "costeo", "recetas", "fiscal", "panel"] },
 ];
 
 const MOBILE_PRIMARY_BY_ROLE = {
@@ -628,6 +630,7 @@ export default function UnifiedStaffApp() {
             {tab === "mermas"  && <WastePage styles={posStyles} />}
             {tab === "corte"   && <CashCutPage styles={posStyles} />}
             {tab === "fin"     && <FinancePage styles={posStyles} />}
+            {tab === "comprobantes" && <ReceiptsPage styles={posStyles} />}
             {tab === "costeo"  && <CostingPage styles={posStyles} />}
 
             {tab === "recetas" && <PreparationsPage styles={posStyles} />}
@@ -2846,3 +2849,4 @@ function BottomNav({ role, tab, setTab, tabs, openEntry, lowStockCount }) {
     </>
   );
 }
+

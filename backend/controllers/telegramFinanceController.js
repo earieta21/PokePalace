@@ -7,6 +7,7 @@
 import { timingSafeEqual } from "node:crypto";
 import FinanceBotSession from "../models/FinanceBotSession.js";
 import Expense from "../models/Expense.js";
+import Receipt from "../models/Receipt.js";
 import { sendTelegramMessage, downloadTelegramFile, financeBotConfigured } from "../utils/telegramFinanceBot.js";
 import { uploadImageToCloudinary, cloudinaryConfigured } from "../utils/cloudinary.js";
 import { extractExpenseFromReceipt } from "../services/financeAgent.js";
@@ -68,6 +69,25 @@ async function runExtraction(session, chatId, imageBuffer, mimeType) {
     hasFactura: true,
     facturaIva: extracted.iva,
   });
+
+  // También entra a Comprobantes para que salga en el paquete semanal del
+  // contador. Si esto falla, el gasto ya quedó: solo se registra el error.
+  if (expense.receiptUrl) {
+    try {
+      await Receipt.create({
+        kind: "factura",
+        amount: expense.amount,
+        date: expense.date,
+        note: expense.description.slice(0, 300),
+        imageUrl: expense.receiptUrl,
+        source: "telegram",
+        uploadedBy: expense.createdBy,
+        expenseId: expense._id,
+      });
+    } catch (err) {
+      logServerError(err, "telegram finance: Receipt.create");
+    }
+  }
 
   const ivaNote = extracted.iva != null
     ? `\nIVA: $${extracted.iva.toLocaleString("es-MX")} (acreditable)`

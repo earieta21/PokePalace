@@ -25,6 +25,7 @@ const SOURCE_LABEL = {
   fijo: "Gasto fijo automático",
   nomina: "Nómina",
   telegram: "Telegram",
+  comprobante: "Comprobante",
 };
 
 const PERIODS = [
@@ -782,6 +783,7 @@ export default function FinancePage({ styles }) {
                   {e.source === "fijo" && <span className={ui.sourceBadge}>🔁 Automático</span>}
                   {e.source === "nomina" && <span className={ui.sourceBadge}>👥 Nómina</span>}
                   {e.source === "telegram" && <span className={ui.sourceBadge}>🤖 Telegram</span>}
+                  {e.source === "comprobante" && <span className={ui.sourceBadge}>📷 Comprobante</span>}
                   <button
                     type="button"
                     onClick={() => toggleFactura(e)}

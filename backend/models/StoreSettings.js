@@ -13,6 +13,11 @@ const schema = new mongoose.Schema({
   // "YYYY-MM-17" del último recordatorio fiscal ya enviado -- evita mandarlo
   // dos veces para la misma fecha límite (ver utils/fiscalReminder.js).
   lastFiscalReminderSentFor: { type: String, default: null },
+  // Correos del contador para el paquete semanal de comprobantes, y el lunes
+  // ("YYYY-MM-DD") de la última semana ya procesada -- evita mandarlo dos
+  // veces (ver utils/accountantReport.js).
+  accountantEmails: { type: [String], default: [] },
+  lastAccountantReportWeek: { type: String, default: null },
   // Comisión (%) que cobra cada app de delivery sobre el total del pedido.
   // Gerencia la edita desde Ventas; cada orden guarda la tasa vigente al
   // venderse (Order.deliveryCommissionRate) para no reescribir el historial.

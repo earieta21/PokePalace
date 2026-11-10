@@ -42,6 +42,22 @@ export function createStaffApi(token) {
         body: JSON.stringify(body),
       }).then(handleRes),
 
+    put: (path, body) =>
+      fetch(`${BASE}${path}`, {
+        method: "PUT",
+        headers: headers(),
+        body: JSON.stringify(body),
+      }).then(handleRes),
+
+    // Sube un archivo (Blob) tal cual como cuerpo de la petición; los datos
+    // que lo acompañan van en el query string de `path`.
+    upload: (path, blob) =>
+      fetch(`${BASE}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": blob.type || "application/octet-stream", Authorization: `Bearer ${token}` },
+        body: blob,
+      }).then(handleRes),
+
     delete: (path, body) =>
       fetch(`${BASE}${path}`, {
         method: "DELETE",

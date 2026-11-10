@@ -7,10 +7,17 @@ const SITE_URL = process.env.SITE_URL || "https://pokepalace.org";
 
 /* ── Email via Brevo (https://www.brevo.com — plan gratis: 300 emails/día) ──
    Env vars: BREVO_API_KEY, EMAIL_FROM (remitente verificado en Brevo) */
-export async function sendEmail({ to, subject, html }) {
+export const emailConfigured = () => Boolean(process.env.BREVO_API_KEY && process.env.EMAIL_FROM);
+
+/* `to` acepta un correo o una lista. `attachments`: [{ name, content }] con
+   content en base64 (Brevo: máx. 4 MB por archivo y 20 MB por correo).
+   Regresa true solo si Brevo aceptó el correo -- quien necesite saber si
+   salió (p. ej. el envío al contador) lo revisa; los demás lo ignoran. */
+export async function sendEmail({ to, subject, html, attachments } = {}) {
   const apiKey = process.env.BREVO_API_KEY;
   const from   = process.env.EMAIL_FROM;
-  if (!apiKey || !from || !to) return;
+  const recipients = (Array.isArray(to) ? to : [to]).filter(Boolean);
+  if (!apiKey || !from || recipients.length === 0) return false;
 
   try {
     const res = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -18,14 +25,20 @@ export async function sendEmail({ to, subject, html }) {
       headers: { "api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({
         sender: { name: "Poke Palace", email: from },
-        to: [{ email: to }],
+        to: recipients.map((email) => ({ email })),
         subject,
         htmlContent: html,
+        ...(attachments?.length ? { attachment: attachments } : {}),
       }),
     });
-    if (!res.ok) console.error("sendEmail failed:", res.status, await res.text());
+    if (!res.ok) {
+      console.error("sendEmail failed:", res.status, await res.text());
+      return false;
+    }
+    return true;
   } catch (err) {
     console.error("sendEmail error:", err.message);
+    return false;
   }
 }
 

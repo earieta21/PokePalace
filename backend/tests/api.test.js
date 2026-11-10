@@ -19,6 +19,7 @@ import AuditLog from "../models/AuditLog.js";
 import TimeRecord from "../models/TimeRecord.js";
 import Redemption from "../models/Redemption.js";
 import StoreSettings from "../models/StoreSettings.js";
+import Receipt from "../models/Receipt.js";
 import { dateKeyInTimeZone, nextDateKey, zonedDateTimeToUtc } from "../utils/timeZone.js";
 import { stableCustomerOrderObjectId } from "../utils/orderReservations.js";
 import { hashPin } from "../utils/staffPin.js";
@@ -1985,4 +1986,81 @@ test("una corrección no puede dejar la salida en o antes de la entrada", async 
   assert.equal(new Date(unchanged.clockOut).toISOString(), "2026-01-08T23:00:00.000Z");
 
   await TimeRecord.deleteOne({ _id: original._id });
+});
+
+test("comprobantes: solo gerencia los ve y suben; solo dueño/admin elige al contador", async () => {
+  assert.equal((await staffRequest("cashier", "/api/staff/receipts")).status, 403);
+  const list = await staffRequest("manager", "/api/staff/receipts?status=pending");
+  assert.equal(list.status, 200);
+  const body = await list.json();
+  assert.ok(Array.isArray(body.receipts));
+  assert.equal(typeof body.pendingSummary.count, "number");
+
+  // Un PDF o texto con Content-Type de imagen no pasa: se revisan los bytes.
+  const notAnImage = await fetch(`${BASE}/api/staff/receipts?kind=ticket`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${staffTokens.manager}`, "Content-Type": "image/jpeg" },
+    body: Buffer.from("%PDF-1.7 esto no es una foto"),
+  });
+  assert.equal(notAnImage.status, 400);
+
+  const badKind = await fetch(`${BASE}/api/staff/receipts?kind=pizza`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${staffTokens.manager}`, "Content-Type": "image/jpeg" },
+    body: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]),
+  });
+  assert.equal(badKind.status, 400);
+
+  const original = await StoreSettings.findOne({ key: "main" }).select("accountantEmails").lean();
+  try {
+    const byManager = await staffRequest("manager", "/api/staff/receipts/settings", {
+      method: "PUT", body: { accountantEmails: "contador@example.test" },
+    });
+    assert.equal(byManager.status, 403);
+
+    const invalid = await staffRequest("owner", "/api/staff/receipts/settings", {
+      method: "PUT", body: { accountantEmails: "contador@example.test, no-es-correo" },
+    });
+    assert.equal(invalid.status, 400);
+
+    const saved = await staffRequest("owner", "/api/staff/receipts/settings", {
+      method: "PUT", body: { accountantEmails: " Contador@Example.test ; copia@example.test" },
+    });
+    assert.equal(saved.status, 200);
+    assert.deepEqual((await saved.json()).accountantEmails, ["contador@example.test", "copia@example.test"]);
+
+    const settings = await (await staffRequest("manager", "/api/staff/receipts/settings")).json();
+    assert.deepEqual(settings.accountantEmails, ["contador@example.test", "copia@example.test"]);
+    assert.match(settings.nextSendDate, /^\d{4}-\d{2}-\d{2}$/);
+  } finally {
+    await StoreSettings.updateOne(
+      { key: "main" },
+      { $set: { accountantEmails: original?.accountantEmails ?? [] } }
+    );
+  }
+});
+
+test("comprobantes: lo que ya se le mandó al contador no se puede borrar", async () => {
+  const base = {
+    date: "2026-01-05",
+    imageUrl: "https://res.cloudinary.com/demo/image/upload/v1/ci/receipt.jpg",
+    note: "ci-receipt",
+  };
+  const sent = await Receipt.create({ ...base, sentToAccountantAt: new Date() });
+  const pending = await Receipt.create(base);
+
+  try {
+    const blocked = await staffRequest("manager", `/api/staff/receipts/${sent._id}`, { method: "DELETE" });
+    assert.equal(blocked.status, 409);
+    assert.ok(await Receipt.exists({ _id: sent._id }));
+
+    const removed = await staffRequest("manager", `/api/staff/receipts/${pending._id}`, { method: "DELETE" });
+    assert.equal(removed.status, 200);
+    assert.equal(await Receipt.exists({ _id: pending._id }), null);
+
+    const missing = await staffRequest("manager", "/api/staff/receipts/no-es-un-id", { method: "DELETE" });
+    assert.equal(missing.status, 404);
+  } finally {
+    await Receipt.deleteMany({ note: "ci-receipt" });
+  }
 });
