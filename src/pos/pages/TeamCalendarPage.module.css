@@ -16,6 +16,7 @@
 .eyebrow > span { width: 6px; height: 6px; border-radius: 50%; background: #34d399; box-shadow: 0 0 10px #34d39955; }
 .heading h1 { margin: 7px 0 5px; font-size: clamp(23px, 3vw, 30px); font-weight: 700; letter-spacing: -.035em; color: #f8fafc; }
 .heading p { margin: 0; font-size: 13px; color: #94a3b8; }
+.headerActions { display: flex; flex-shrink: 0; flex-wrap: wrap; gap: 8px; }
 .primary, .secondary, .danger, .iconButton, .textButton {
   min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   border: 1px solid rgba(148, 163, 184, .2); border-radius: 9px; padding: 9px 13px;
@@ -36,7 +37,8 @@
 .stats small { display: block; margin-top: 4px; color: #94a3b8; font-size: 11px; }
 .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; }
 .monthNavigation { display: flex; align-items: center; gap: 8px; }
-.monthNavigation h2 { min-width: 160px; margin: 0; font-size: 18px; font-weight: 600; text-transform: capitalize; text-align: center; color: #f1f5f9; }
+.monthNavigation h2 { min-width: 160px; margin: 0; font-size: 18px; font-weight: 600; text-align: center; color: #f1f5f9; }
+.monthNavigation h2::first-letter { text-transform: uppercase; }
 .viewSwitch { display: flex; gap: 3px; padding: 4px; border: 1px solid var(--calendar-border); border-radius: 10px; background: #0f172a; }
 .viewSwitch button { display: flex; align-items: center; gap: 7px; min-height: 33px; padding: 7px 10px; border: 0; border-radius: 7px; background: transparent; color: #94a3b8; font-size: 12px; }
 .viewSwitch button[aria-pressed="true"] { background: #26334a; color: #f8fafc; }
@@ -47,12 +49,17 @@
 .search input { width: 100%; min-width: 0; padding: 9px 0; border: 0; background: transparent; color: #e2e8f0; font: inherit; }
 .checkbox { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #94a3b8; cursor: pointer; }
 .checkbox input { accent-color: #34d399; }
+.quickFilters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: -3px 0 18px; }
+.quickFilters button { min-height: 36px; padding: 6px 12px; border: 1px solid var(--calendar-border); border-radius: 20px; background: transparent; color: #cbd5e1; font-size: 12px; }
+.quickFilters button[aria-pressed="true"] { border-color: #34d39988; color: #6ee7b7; background: #10b98115; }
+.quickFilters > span { margin-left: auto; color: #94a3b8; font-size: 11px; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 290px; align-items: start; gap: 18px; }
+.agendaWorkspace { grid-template-columns: minmax(0, 1fr); }
 .calendarPanel { min-width: 0; overflow: hidden; border: 1px solid var(--calendar-border); border-radius: 14px; background: #0c1526; }
 .weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: #111d30; border-bottom: 1px solid var(--calendar-border); }
 .weekdays span { padding: 13px 8px; text-align: center; font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.day { position: relative; min-width: 0; min-height: 113px; padding: 7px 5px; border: 0; border-right: 1px solid #94a3b818; border-bottom: 1px solid #94a3b818; background: transparent; color: #cbd5e1; text-align: left; transition: background .15s; }
+.day { position: relative; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; min-width: 0; min-height: 113px; padding: 7px 5px; border: 0; border-radius: 0; border-right: 1px solid #94a3b818; border-bottom: 1px solid #94a3b818; background: transparent; color: #cbd5e1; text-align: left; transition: background .15s; }
 .day:nth-child(7n) { border-right: 0; }
 .day:nth-last-child(-n+7) { border-bottom: 0; }
 .day:hover { background: #17243a; }
@@ -76,12 +83,15 @@
 .hint { margin: 0; color: #94a3b8; font-size: 11px; line-height: 1.7; }
 .eventCard { display: flex; flex-direction: column; align-items: stretch; width: 100%; gap: 7px; min-width: 0; padding: 13px; border: 1px solid #94a3b81f; border-left: 3px solid var(--event-color); border-radius: 9px; background: #152136; color: #e2e8f0; text-align: left; }
 .eventCard:hover { border-color: var(--event-color); background: #1a2940; }
+.savedEvent { box-shadow: 0 0 0 1px #34d399; }
+.savedLabel { color: #6ee7b7; font-size: 10px; }
 .eventCard strong { color: #f1f5f9; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .cardTop { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 5px; color: #6ee7b7; }
 .kind { color: var(--event-color, #7dd3fc); font-size: 10px; font-weight: 700; }
 .priority { color: #fcd34d; font-size: 10px; }
 .eventMeta { display: flex; align-items: flex-start; gap: 5px; color: #94a3b8; font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
 .eventMeta svg, .warningText svg { flex-shrink: 0; margin-top: 1px; }
+.returnDate { color: #fecdd3; font-size: 11px; line-height: 1.6; }
 .completed { opacity: .6; }
 .completed strong, .completed.dayEvent { text-decoration: line-through; }
 .warningText { display: flex; align-items: flex-start; gap: 6px; color: #fcd34d; font-size: 11px; line-height: 1.6; }
@@ -91,6 +101,13 @@
 .agenda { padding: 20px; }
 .agenda h3 { margin: 0 0 18px; color: #e2e8f0; font-size: 15px; }
 .agendaList { display: grid; gap: 10px; }
+.agendaGroup + .agendaGroup { margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--calendar-border); }
+.agendaGroup { scroll-margin-top: 24px; }
+.agendaGroup h4 { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; color: #cbd5e1; font-size: 14px; font-weight: 600; }
+.agendaGroup h4 > span::first-letter { text-transform: uppercase; }
+.agendaGroup h4 small { color: #6ee7b7; background: #10b98118; padding: 2px 8px; border-radius: 20px; font-size: 10px; }
+.agendaGroup .agendaList { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
+.agendaGroup .eventCard { max-width: 580px; }
 .overdue { margin-bottom: 18px; padding: 13px 16px; border: 1px solid #f59e0b44; border-radius: 10px; background: #f59e0b0a; }
 .overdue summary { cursor: pointer; color: #fcd34d; font-size: 12px; line-height: 1.7; }
 .overdue summary svg { display: inline-block; vertical-align: middle; margin-right: 5px; }
@@ -110,6 +127,8 @@
 .form textarea { resize: vertical; }
 .formRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .form > .hint { margin-top: 14px; }
+.absenceSummary { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid #fda4af33; border-radius: 9px; background: #fda4af0a; color: #fecdd3; font-size: 12px; line-height: 1.6; }
+.absenceSummary small { color: #cbd5e1; font-size: 11px; }
 .actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
 .detail > p { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.7; }
 .detail > p svg { flex-shrink: 0; margin-top: 3px; color: #94a3b8; }
@@ -118,7 +137,8 @@
 @media (max-width: 1150px) { .workspace { grid-template-columns: minmax(0, 1fr); } .dayList { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); } .dayPanel > button { width: auto; } }
 @media (max-width: 640px) {
   .heading { align-items: flex-start; flex-direction: column; gap: 15px; }
-  .heading > button { width: 100%; }
+  .headerActions { width: 100%; }
+  .headerActions > button { flex: 1; padding: 10px 8px; min-height: 44px; }
   .heading p { font-size: 12px; }
   .stats { gap: 7px; margin-bottom: 20px; }
   .stats > div { flex-direction: column; align-items: flex-start; gap: 8px; padding: 11px; }
@@ -131,6 +151,13 @@
   .search { flex-basis: 100%; }
   .filters > select { flex: 1; min-width: 0; }
   .checkbox { width: 100%; padding: 3px 0; }
+  .quickFilters > span { width: 100%; margin: 3px 0 0; }
+  .quickFilters button { min-height: 40px; }
+  .eventCard strong { font-size: 14px; }
+  .eventMeta, .kind, .returnDate { font-size: 12px; }
+  .eventCard { padding: 15px; gap: 9px; }
+  .form input, .form textarea, .form select { font-size: 16px; }
+  .formRow { gap: 10px; }
   .day { min-height: 88px; padding: 4px 2px; }
   .dayNumber { margin-left: 1px; width: 23px; height: 23px; font-size: 11px; }
   .dayItems { gap: 3px; }

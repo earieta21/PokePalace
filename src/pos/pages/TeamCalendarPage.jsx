@@ -3,7 +3,7 @@ import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronR
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { tijuanaDateKey } from "../../utils/date";
-import { CALENDAR_KINDS, absenceConflicts, canComplete, canEdit, formatDay, isManager, isTask, matchesCalendarFilters, monthDays, shiftMonth, spansDay } from "../../utils/teamCalendar";
+import { CALENDAR_KINDS, absenceConflicts, canComplete, canEdit, formatDay, isManager, isTask, matchesCalendarFilters, monthDays, shiftDay, shiftMonth, spansDay } from "../../utils/teamCalendar";
 import styles from "./TeamCalendarPage.module.css";
 
 const DAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -31,30 +31,38 @@ function Dialog({ title, children, onClose, busy = false }) {
   </dialog>;
 }
 
-function EventCard({ entry, onOpen, today, absences }) {
+function EventCard({ entry, onOpen, today, absences, highlighted = false }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!highlighted) return;
+    ref.current?.focus({ preventScroll: true });
+    ref.current?.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, [highlighted]);
   const kind = CALENDAR_KINDS[entry.type];
   const overdue = isTask(entry) && entry.status !== "done" && entry.endDate < today;
   const conflict = absenceConflicts(entry, absences).length > 0;
-  return <button type="button" onClick={() => onOpen(entry)} className={`${styles.eventCard} ${entry.status === "done" ? styles.completed : ""}`}
+  return <button ref={ref} type="button" onClick={() => onOpen(entry)} className={`${styles.eventCard} ${entry.status === "done" ? styles.completed : ""} ${highlighted ? styles.savedEvent : ""}`}
     style={{ "--event-color": kind.color }}>
     <span className={styles.cardTop}><span className={styles.kind}>{kind.label}</span>
+      {highlighted && <span className={styles.savedLabel}>Guardado</span>}
       {entry.priority === "high" && <span className={styles.priority}>Prioridad alta</span>}
       {entry.status === "done" && <CheckCircle2 size={16} aria-label="Completado" />}
     </span>
     <strong>{entry.title}</strong>
     <span className={styles.eventMeta}><Users size={13} /> {entry.assigneeName}</span>
     <span className={styles.eventMeta}><Clock size={13} /> {dateRange(entry)} · {timeRange(entry)}</span>
+    {entry.type === "absence" && <span className={styles.returnDate}>Regreso: {formatDay(shiftDay(entry.endDate, 1), { weekday: "short", day: "numeric", month: "short" })}</span>}
     {overdue && <span className={styles.warningText}>Pendiente vencido</span>}
     {conflict && <span className={styles.warningText}><AlertTriangle size={13} /> Coincide con una ausencia del responsable</span>}
   </button>;
 }
 
-function EventForm({ entry, date, people, user, busy, error, onSave, onClose }) {
+function EventForm({ entry, date, initialType = "task", people, user, busy, error, onSave, onClose }) {
   const [form, setForm] = useState(() => entry ? {
     title: entry.title, description: entry.description, type: entry.type,
     startDate: entry.startDate, endDate: entry.endDate, startTime: entry.startTime,
     endTime: entry.endTime, assigneeId: String(entry.assigneeId), priority: entry.priority, status: entry.status,
-  } : { title: "", description: "", type: "task", startDate: date, endDate: date,
+  } : { title: initialType === "absence" ? "Ausencia" : "", description: "", type: initialType, startDate: date, endDate: date,
     startTime: "", endTime: "", assigneeId: String(user.id), priority: "normal", status: "pending" });
   const [localError, setLocalError] = useState("");
   const [clientRequestId] = useState(requestId);
@@ -62,11 +70,12 @@ function EventForm({ entry, date, people, user, busy, error, onSave, onClose }) 
     const value = event.target.value;
     setLocalError("");
     setForm((previous) => {
-      const next = { ...previous, [name]: value };
+      const next = { ...previous, [name === "returnDate" ? "endDate" : name]: name === "returnDate" && value ? shiftDay(value, -1) : value };
       if (name === "startDate" && next.endDate < value) next.endDate = value;
       if (name === "type") {
         if (value === "absence") {
           next.startTime = ""; next.endTime = "";
+          if (!next.title.trim()) next.title = "Ausencia";
           if (!isManager(user)) next.assigneeId = String(user.id);
         }
         if (!["task", "maintenance"].includes(value)) next.status = "pending";
@@ -77,7 +86,7 @@ function EventForm({ entry, date, people, user, busy, error, onSave, onClose }) 
   const submit = (event) => {
     event.preventDefault();
     if (!form.title.trim()) return setLocalError("Escribe un título para el evento.");
-    if (form.endDate < form.startDate) return setLocalError("Revisa el periodo del evento.");
+    if (form.endDate < form.startDate) return setLocalError(form.type === "absence" ? "El regreso debe ser posterior al primer día de ausencia." : "Revisa el periodo del evento.");
     if (form.endTime && !form.startTime) return setLocalError("Indica la hora inicial.");
     if (form.startDate === form.endDate && form.endTime && form.endTime <= form.startTime) {
       return setLocalError("La hora final debe ser posterior a la inicial.");
@@ -88,24 +97,31 @@ function EventForm({ entry, date, people, user, busy, error, onSave, onClose }) 
   if (entry && !options.some((person) => String(person._id) === String(entry.assigneeId))) {
     options.push({ _id: entry.assigneeId, name: `${entry.assigneeName} (inactivo)` });
   }
-  return <Dialog title={entry ? "Editar evento" : "Nuevo evento"} onClose={onClose} busy={busy}>
+  const absenceDays = form.startDate && form.endDate ? Math.round((Date.parse(form.endDate) - Date.parse(form.startDate)) / 86400000) + 1 : 0;
+  return <Dialog title={entry ? "Editar evento" : initialType === "absence" ? "Avisar ausencia" : "Nuevo evento"} onClose={onClose} busy={busy}>
     <form onSubmit={submit} className={styles.form}>
       <fieldset disabled={busy}>
-        <label>Tipo<select value={form.type} onChange={field("type")}>
+        <label>Tipo<select aria-label="Tipo de evento" value={form.type} onChange={field("type")}>
           {Object.entries(CALENDAR_KINDS).map(([key, kind]) => <option key={key} value={key}>{kind.label}</option>)}
         </select></label>
-        <label>Título<input autoFocus required maxLength={120} value={form.title} onChange={field("title")}
+        <label>Título<input autoFocus={initialType !== "absence"} required maxLength={120} value={form.title} onChange={field("title")}
           placeholder={form.type === "absence" ? "Ej. Día personal" : "Ej. Revisar inventario de la semana"} /></label>
         <div className={styles.formRow}>
-          <label>Desde<input required type="date" min="2000-01-01" max="2100-12-31" value={form.startDate} onChange={field("startDate")} /></label>
-          <label>Hasta<input required type="date" min={form.startDate} max="2100-12-31" value={form.endDate} onChange={field("endDate")} /></label>
+          <label>{form.type === "absence" ? "Primer día ausente" : "Desde"}<input autoFocus={initialType === "absence"} required type="date" min="2000-01-01" max="2100-12-31" value={form.startDate} onChange={field("startDate")} /></label>
+          {form.type === "absence"
+            ? <label>Fecha de regreso<input required type="date" min={form.startDate ? shiftDay(form.startDate, 1) : "2000-01-02"} max="2101-01-01" value={form.endDate ? shiftDay(form.endDate, 1) : ""} onChange={field("returnDate")} /></label>
+            : <label>Hasta<input required type="date" min={form.startDate} max="2100-12-31" value={form.endDate} onChange={field("endDate")} /></label>}
         </div>
+        {form.type === "absence" && <div className={styles.absenceSummary} role="status">
+          {absenceDays > 0 && <><strong>{absenceDays} día{absenceDays === 1 ? "" : "s"} de ausencia</strong><span>Del {formatDay(form.startDate)} al {formatDay(form.endDate)}, incluidos.</span></>}
+          <small>El día de regreso ya no se marca como ausencia.</small>
+        </div>}
         {form.type !== "absence" && <div className={styles.formRow}>
           <label>Hora inicial <small>(opcional)</small><input type="time" value={form.startTime} onChange={field("startTime")} /></label>
           <label>Hora final <small>(opcional)</small><input type="time" value={form.endTime} onChange={field("endTime")} /></label>
         </div>}
         <label>{form.type === "absence" ? "Quién se ausenta" : "Responsable"}
-          <select value={form.assigneeId} onChange={field("assigneeId")} required disabled={form.type === "absence" && !isManager(user)}>
+          <select aria-label={form.type === "absence" ? "Quién se ausenta" : "Responsable"} value={form.assigneeId} onChange={field("assigneeId")} required disabled={form.type === "absence" && !isManager(user)}>
             {options.map((person) => <option key={person._id} value={person._id}>{person.name}{String(person._id) === String(user.id) ? " (tú)" : ""}</option>)}
           </select>
         </label>
@@ -116,7 +132,7 @@ function EventForm({ entry, date, people, user, busy, error, onSave, onClose }) 
         <label>Detalles <small>(opcional · visibles para el equipo)</small><textarea rows={3} maxLength={2000}
           value={form.description} onChange={field("description")} placeholder="Instrucciones, acuerdos o información para organizar la cobertura" /></label>
       </fieldset>
-      <p className={styles.hint}>Fechas y horarios de Tijuana. Las ausencias abarcan los días completos del periodo.</p>
+      <p className={styles.hint}>Fechas y horarios de Tijuana. {form.type === "absence" ? "Las ausencias se registran por día completo." : "Deja las horas vacías si es un evento de todo el día."}</p>
       {(error || localError) && <p role="alert" className={styles.error}>{error || localError}</p>}
       <div className={styles.actions}><button type="button" onClick={onClose} disabled={busy} className={styles.secondary}>Cancelar</button>
         <button type="submit" disabled={busy} className={styles.primary}>{busy ? "Guardando…" : "Guardar evento"}</button></div>
@@ -130,7 +146,7 @@ export default function TeamCalendarPage({ locationId }) {
   const [today, setToday] = useState(tijuanaDateKey);
   const [month, setMonth] = useState(() => `${tijuanaDateKey().slice(0, 7)}-01`);
   const [selectedDay, setSelectedDay] = useState(tijuanaDateKey);
-  const [view, setView] = useState("month");
+  const [view, setView] = useState(() => window.matchMedia("(max-width: 640px)").matches ? "agenda" : "month");
   const [filters, setFilters] = useState({ type: "", person: "", search: "", showDone: false });
   const [data, setData] = useState({ key: "", events: [], people: [], overdue: [] });
   const [loading, setLoading] = useState(true);
@@ -139,6 +155,9 @@ export default function TeamCalendarPage({ locationId }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [modal, setModal] = useState(null);
+  const [savedEventId, setSavedEventId] = useState(null);
+  const [agendaDayToReveal, setAgendaDayToReveal] = useState(null);
+  const agendaRef = useRef(null);
   const requestSequence = useRef(0);
   const days = useMemo(() => monthDays(month), [month]);
   const base = `/api/staff/calendar?locationId=${encodeURIComponent(locationId)}`;
@@ -170,20 +189,36 @@ export default function TeamCalendarPage({ locationId }) {
   const current = data.key === path;
   const events = useMemo(() => current ? data.events : [], [current, data.events]);
   const visible = useMemo(() => events.filter((entry) => matchesCalendarFilters(entry, filters)), [events, filters]);
-  const monthEvents = visible.filter((entry) => entry.startDate < shiftMonth(month, 1) && entry.endDate >= month);
+  const allMonthEvents = events.filter((entry) => entry.startDate < shiftMonth(month, 1) && entry.endDate >= month);
+  const monthEvents = allMonthEvents.filter((entry) => matchesCalendarFilters(entry, filters));
+  const agendaGroups = new Map();
+  for (const entry of monthEvents) {
+    const day = entry.startDate < month ? month : entry.startDate;
+    if (!agendaGroups.has(day)) agendaGroups.set(day, []);
+    agendaGroups.get(day).push(entry);
+  }
   const dayEvents = visible.filter((entry) => spansDay(entry, selectedDay));
   const overdue = data.overdue.filter((entry) => matchesCalendarFilters(entry, filters));
   const absences = events.filter((entry) => entry.type === "absence");
-  const pending = monthEvents.filter((entry) => isTask(entry) && entry.status === "pending").length;
+  const pending = allMonthEvents.filter((entry) => isTask(entry) && entry.status === "pending").length;
   const updateFilter = (key, value) => setFilters((previous) => ({ ...previous, [key]: value }));
   const hasFilters = Boolean(filters.type || filters.person || filters.search.trim() || filters.showDone);
   const clearFilters = () => setFilters({ type: "", person: "", search: "", showDone: false });
 
-  function openModal(next) { setMutationError(""); setModal(next); }
+  useEffect(() => {
+    if (!current || view !== "agenda" || !agendaDayToReveal) return;
+    const groups = [...(agendaRef.current?.querySelectorAll("[data-agenda-day]") || [])];
+    const target = groups.find((group) => group.dataset.agendaDay >= agendaDayToReveal) || groups.at(-1);
+    target?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    setAgendaDayToReveal(null);
+  }, [current, view, agendaDayToReveal]);
+
+  function openModal(next) { setSavedEventId(null); setMutationError(""); setModal(next); }
   function closeModal() { if (!busy) { setModal(null); setMutationError(""); } }
   function navigateMonth(offset) {
     const next = shiftMonth(month, offset);
     if (next < "2000-01-01" || next > "2100-12-01") return;
+    setSavedEventId(null);
     setMonth(next); setSelectedDay(next);
   }
   async function mutate(operation, message, focusSavedEvent = false) {
@@ -194,6 +229,7 @@ export default function TeamCalendarPage({ locationId }) {
       setModal(null); setNotice(message);
       if (focusSavedEvent && result?.event) {
         const saved = result.event;
+        setSavedEventId(saved._id);
         const nextMonth = `${saved.startDate.slice(0, 7)}-01`;
         const nextDays = monthDays(nextMonth);
         // A pending refresh must not replace the event just returned by POST/PATCH.
@@ -224,26 +260,29 @@ export default function TeamCalendarPage({ locationId }) {
     : api.post(base, body), modal.entry ? "Evento actualizado." : "Evento agregado al calendario del equipo.", true);
   const entryPath = (entry) => `/api/staff/calendar/${entry._id}?locationId=${encodeURIComponent(locationId)}`;
   const selected = modal?.entry;
-  const cards = (entries) => entries.map((entry) => <EventCard key={entry._id} entry={entry} today={today} absences={absences}
+  const cards = (entries, highlightSaved = true) => entries.map((entry) => <EventCard key={entry._id} entry={entry} today={today} absences={absences} highlighted={highlightSaved && entry._id === savedEventId}
     onOpen={(event) => openModal({ mode: "detail", entry: event })} />);
 
   return <section className={styles.page} aria-label="Calendario del equipo">
     <div className={styles.heading}>
       <div><span className={styles.eyebrow}><span /> ESPACIO COMPARTIDO</span>
         <h1>Calendario del equipo</h1><p>Pendientes claros, ausencias a tiempo y un equipo coordinado.</p></div>
-      <button className={styles.primary} onClick={() => openModal({ mode: "form" })} disabled={!current || loading || busy}><Plus size={18} /> Nuevo evento</button>
+      <div className={styles.headerActions}>
+        <button className={styles.secondary} onClick={() => openModal({ mode: "form", initialType: "absence" })} disabled={!current || loading || busy}><Users size={17} /> Avisar ausencia</button>
+        <button className={styles.primary} onClick={() => openModal({ mode: "form" })} disabled={!current || loading || busy}><Plus size={18} /> Nuevo evento</button>
+      </div>
     </div>
     <div className={styles.stats}>
-      <div><ClipboardList /><span><strong>{pending}</strong><small>Pendientes del mes</small></span></div>
-      <div><Users /><span><strong>{monthEvents.filter((entry) => entry.type === "absence").length}</strong><small>Avisos de ausencia del mes</small></span></div>
-      <div><CalendarDays /><span><strong>{monthEvents.filter((entry) => ["meeting", "maintenance"].includes(entry.type)).length}</strong><small>Reuniones y mantenimiento</small></span></div>
+      <div><ClipboardList /><span><strong>{current ? pending : "—"}</strong><small>Pendientes del mes</small></span></div>
+      <div><Users /><span><strong>{current ? allMonthEvents.filter((entry) => entry.type === "absence").length : "—"}</strong><small>Avisos de ausencia del mes</small></span></div>
+      <div><CalendarDays /><span><strong>{current ? allMonthEvents.filter((entry) => ["meeting", "maintenance"].includes(entry.type)).length : "—"}</strong><small>Reuniones y mantenimiento del mes</small></span></div>
     </div>
     <div className={styles.toolbar}>
       <div className={styles.monthNavigation}>
         <button className={styles.iconButton} onClick={() => navigateMonth(-1)} aria-label="Mes anterior"><ChevronLeft size={20} /></button>
         <h2 aria-live="polite">{formatDay(month, { month: "long", year: "numeric" })}</h2>
         <button className={styles.iconButton} onClick={() => navigateMonth(1)} aria-label="Mes siguiente"><ChevronRight size={20} /></button>
-        <button className={styles.secondary} onClick={() => { const key = tijuanaDateKey(); setToday(key); setMonth(`${key.slice(0, 7)}-01`); setSelectedDay(key); }}>Hoy</button>
+        <button className={styles.secondary} onClick={() => { const key = tijuanaDateKey(); setSavedEventId(null); setToday(key); setMonth(`${key.slice(0, 7)}-01`); setSelectedDay(key); if (view === "agenda") setAgendaDayToReveal(key); }}>Hoy</button>
       </div>
       <div className={styles.viewSwitch} role="group" aria-label="Vista del calendario">
         <button onClick={() => setView("month")} aria-pressed={view === "month"}><CalendarDays size={16} /> Mes</button>
@@ -260,15 +299,20 @@ export default function TeamCalendarPage({ locationId }) {
       <label className={styles.checkbox}><input type="checkbox" checked={filters.showDone} onChange={(event) => updateFilter("showDone", event.target.checked)} /> Ver completados</label>
       {hasFilters && <button type="button" className={styles.secondary} onClick={clearFilters}><X size={14} /> Limpiar filtros</button>}
     </div>
+    <div className={styles.quickFilters} role="group" aria-label="Filtros rápidos">
+      <button aria-pressed={filters.person === String(user.id)} onClick={() => updateFilter("person", filters.person === String(user.id) ? "" : String(user.id))}>Lo mío</button>
+      <button aria-pressed={filters.type === "absence"} onClick={() => updateFilter("type", filters.type === "absence" ? "" : "absence")}>Ausencias</button>
+      {current && <span>{monthEvents.length} de {allMonthEvents.length} eventos del mes visibles</span>}
+    </div>
     <div aria-live="polite">{notice && <p className={styles.success}><Check size={16} /> {notice}</p>}</div>
     {loadError && <p className={styles.error} role="alert">{loadError} <button className={styles.textButton} onClick={() => load(true)}>Reintentar</button></p>}
     {current && (data.truncated || data.overdueTruncated) && <p className={styles.warningText}>Se muestran hasta 1,000 eventos por vista y 50 pendientes vencidos. Completa o reprograma los pendientes para consultar los siguientes.</p>}
     {current && overdue.length > 0 && <details className={styles.overdue}>
       <summary><AlertTriangle size={16} /> {overdue.length}{data.overdueTruncated ? "+" : ""} pendiente{overdue.length === 1 ? " vencido" : "s vencidos"} · revisar y reprogramar</summary>
-      <div className={styles.agendaList}>{cards(overdue)}</div>
+      <div className={styles.agendaList}>{cards(overdue, false)}</div>
     </details>}
     {loading && !current ? <div className={styles.empty} role="status">Cargando calendario del equipo…</div>
-      : current && <div className={styles.workspace} aria-busy={loading}>
+      : current && <div className={`${styles.workspace} ${view === "agenda" ? styles.agendaWorkspace : ""}`} aria-busy={loading}>
         <div className={styles.calendarPanel}>
           {view === "month" ? <>
             <div className={styles.weekdays}>{DAYS.map((day) => <span key={day}>{day}</span>)}</div>
@@ -291,25 +335,31 @@ export default function TeamCalendarPage({ locationId }) {
               })}
             </div>
             <div className={styles.legend}>{Object.entries(CALENDAR_KINDS).map(([key, kind]) => <span key={key}><i style={{ background: kind.color }} />{kind.plural}</span>)}</div>
-          </> : <div className={styles.agenda}><h3>Agenda de {formatDay(month, { month: "long" })}</h3>
-            <div className={styles.agendaList}>{monthEvents.length ? cards(monthEvents) : <p className={styles.empty}>No hay eventos con estos filtros.</p>}</div>
+          </> : <div ref={agendaRef} className={styles.agenda}><h3>Agenda de {formatDay(month, { month: "long", year: "numeric" })}</h3>
+            {monthEvents.length ? [...agendaGroups.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([day, entries]) =>
+              <section className={styles.agendaGroup} key={day} data-agenda-day={day} aria-label={formatDay(day, { weekday: "long", day: "numeric", month: "long" })}>
+                <h4><span>{formatDay(day, { weekday: "long", day: "numeric", month: "long" })}</span>{day === today && <small>Hoy</small>}</h4>
+                <div className={styles.agendaList}>{cards(entries)}</div>
+              </section>
+            ) : <p className={styles.empty}>{hasFilters ? "No hay eventos con estos filtros. Prueba quitarlos para ver el resto del equipo." : "El mes está libre. Agrega el primer pendiente, reunión o ausencia."}</p>}
           </div>}
         </div>
-        <aside className={styles.dayPanel}>
+        {view === "month" && <aside className={styles.dayPanel}>
           <span className={styles.eyebrow}>{formatDay(selectedDay, { weekday: "long" })}</span>
           <h2>{formatDay(selectedDay, { day: "numeric", month: "long" })}</h2>
           <p className={styles.hint}>{dayEvents.length} evento{dayEvents.length === 1 ? "" : "s"} para este día</p>
-          <div className={styles.dayList}>{dayEvents.length ? cards(dayEvents) : <div className={styles.empty}><CalendarDays size={28} /><strong>Un día por organizar</strong><span>Agrega un pendiente, una ausencia o una reunión.</span></div>}</div>
+          <div className={styles.dayList}>{dayEvents.length ? cards(dayEvents) : <div className={styles.empty}><CalendarDays size={28} /><strong>{hasFilters ? "Sin coincidencias para este día" : "Un día por organizar"}</strong><span>{hasFilters ? "Quita los filtros para consultar todos los eventos del día." : "Agrega un pendiente, una ausencia o una reunión."}</span>{hasFilters && <button className={styles.secondary} onClick={clearFilters}>Ver todo el equipo</button>}</div>}</div>
           <button className={styles.secondary} disabled={busy} onClick={() => openModal({ mode: "form" })}><Plus size={16} /> Agregar para este día</button>
           <p className={styles.hint}>El calendario se actualiza cada minuto mientras está visible. Horario de Tijuana.</p>
-        </aside>
+        </aside>}
       </div>}
 
-    {modal?.mode === "form" && <EventForm entry={selected} date={selectedDay} people={data.people} user={user} busy={busy} error={mutationError} onSave={save} onClose={closeModal} />}
+    {modal?.mode === "form" && <EventForm entry={selected} date={selectedDay} initialType={modal.initialType} people={data.people} user={user} busy={busy} error={mutationError} onSave={save} onClose={closeModal} />}
     {modal?.mode === "detail" && <Dialog title={selected.title} onClose={closeModal} busy={busy}>
       <div className={styles.detail}>
         <span className={styles.kind} style={{ "--event-color": CALENDAR_KINDS[selected.type].color }}>{CALENDAR_KINDS[selected.type].label}{selected.status === "done" ? " · Completado" : ""}</span>
         <p><CalendarDays size={17} /> {dateRange(selected)}</p><p><Clock size={17} /> {timeRange(selected)} · Tijuana</p>
+        {selected.type === "absence" && <p className={styles.returnDate}>Regreso: {formatDay(shiftDay(selected.endDate, 1), { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>}
         <p><Users size={17} /> {selected.assigneeName}</p>
         {selected.priority === "high" && <p className={styles.priority}>Prioridad alta</p>}
         {selected.description && <div className={styles.description}>{selected.description}</div>}
