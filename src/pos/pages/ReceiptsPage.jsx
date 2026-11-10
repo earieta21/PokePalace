@@ -262,6 +262,14 @@ export default function ReceiptsPage({ styles }) {
 
   const pendingCount = pendingSummary?.count ?? 0;
   const emails = settings?.accountantEmails ?? [];
+  // El botón siempre se ve para dueño/admin; si no se puede enviar, se dice
+  // por qué en vez de esconderlo.
+  const sendBlockReason = !settings || loading ? ""
+    : emails.length === 0 ? "Primero agrega el correo del contador."
+    : pendingCount === 0 ? "No hay comprobantes por enviar."
+    : !settings.emailConfigured ? "Falta configurar el correo en el servidor."
+    : "";
+  const sendDisabled = sending || !settings || loading || Boolean(sendBlockReason);
   const methodTotals = PAYMENTS.map((p) => p.id).concat("sin_dato")
     .filter((id) => pendingSummary?.byPaymentMethod?.[id])
     .map((id) => ({ id, ...pendingSummary.byPaymentMethod[id] }));
@@ -277,10 +285,13 @@ export default function ReceiptsPage({ styles }) {
         </div>
         <div className={ui.headerActions}>
           <button className={styles.btnGhost} type="button" onClick={refresh}>↻ Actualizar</button>
-          {canManage && emails.length > 0 && pendingCount > 0 && (
-            <button className={styles.btnGhost} type="button" onClick={sendNow} disabled={sending}>
-              {sending ? "Enviando…" : `✉ Enviar ahora (${pendingCount})`}
-            </button>
+          {canManage && (
+            <div className={ui.sendNow}>
+              <button className={styles.btnGhost} type="button" onClick={sendNow} disabled={sendDisabled}>
+                {sending ? "Enviando…" : `✉ Enviar ahora${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
+              </button>
+              {sendBlockReason && <small className={ui.sendHint}>{sendBlockReason}</small>}
+            </div>
           )}
         </div>
       </div>

@@ -33,6 +33,24 @@
   flex-wrap: wrap;
 }
 
+.sendNow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.sendNow button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sendHint {
+  color: var(--p-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
 /* ── Avisos ── */
 .notice {
   display: flex;
@@ -597,6 +615,10 @@
   .headerActions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .sendNow {
+    align-items: flex-start;
   }
 }
 
