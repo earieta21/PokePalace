@@ -11,6 +11,10 @@ const requestId = () => `calendar:${globalThis.crypto?.randomUUID?.() || `${Date
 const dateRange = (entry) => entry.startDate === entry.endDate ? formatDay(entry.startDate)
   : `${formatDay(entry.startDate)} – ${formatDay(entry.endDate)}`;
 const timeRange = (entry) => entry.startTime ? `${entry.startTime}${entry.endTime ? ` – ${entry.endTime}` : ""}` : "Todo el día";
+const pathForMonth = (base, month) => {
+  const days = monthDays(month);
+  return `${base}&from=${days[0] < "2000-01-01" ? "2000-01-01" : days[0]}&to=${days[41] > "2100-12-31" ? "2100-12-31" : days[41]}`;
+};
 
 function Dialog({ title, children, onClose, busy = false }) {
   const ref = useRef(null);
@@ -138,7 +142,7 @@ export default function TeamCalendarPage({ locationId }) {
   const requestSequence = useRef(0);
   const days = useMemo(() => monthDays(month), [month]);
   const base = `/api/staff/calendar?locationId=${encodeURIComponent(locationId)}`;
-  const path = `${base}&from=${days[0] < "2000-01-01" ? "2000-01-01" : days[0]}&to=${days[41] > "2100-12-31" ? "2100-12-31" : days[41]}`;
+  const path = pathForMonth(base, month);
 
   const load = useCallback(async (showLoading = false) => {
     const sequence = ++requestSequence.current;
@@ -172,6 +176,8 @@ export default function TeamCalendarPage({ locationId }) {
   const absences = events.filter((entry) => entry.type === "absence");
   const pending = monthEvents.filter((entry) => isTask(entry) && entry.status === "pending").length;
   const updateFilter = (key, value) => setFilters((previous) => ({ ...previous, [key]: value }));
+  const hasFilters = Boolean(filters.type || filters.person || filters.search.trim() || filters.showDone);
+  const clearFilters = () => setFilters({ type: "", person: "", search: "", showDone: false });
 
   function openModal(next) { setMutationError(""); setModal(next); }
   function closeModal() { if (!busy) { setModal(null); setMutationError(""); } }
@@ -180,12 +186,32 @@ export default function TeamCalendarPage({ locationId }) {
     if (next < "2000-01-01" || next > "2100-12-01") return;
     setMonth(next); setSelectedDay(next);
   }
-  async function mutate(operation, message) {
+  async function mutate(operation, message, focusSavedEvent = false) {
     if (busy) return;
     setBusy(true); setMutationError(""); setNotice("");
     try {
-      await operation();
+      const result = await operation();
       setModal(null); setNotice(message);
+      if (focusSavedEvent && result?.event) {
+        const saved = result.event;
+        const nextMonth = `${saved.startDate.slice(0, 7)}-01`;
+        const nextDays = monthDays(nextMonth);
+        // A pending refresh must not replace the event just returned by POST/PATCH.
+        ++requestSequence.current;
+        setSelectedDay(saved.startDate);
+        setFilters((previous) => ({ type: "", person: "", search: "", showDone: previous.showDone || saved.status === "done" }));
+        setData((previous) => ({ ...previous, key: pathForMonth(base, nextMonth),
+          events: [...previous.events.filter((entry) => entry._id !== saved._id
+            && entry.startDate <= nextDays[41] && entry.endDate >= nextDays[0]), saved]
+            .sort((left, right) => `${left.startDate} ${left.startTime}`.localeCompare(`${right.startDate} ${right.startTime}`)),
+        }));
+        setNotice(`${message} ${dateRange(saved)}.`);
+        if (nextMonth !== month) {
+          // The month effect fetches the new range; don't reload the old month.
+          setMonth(nextMonth);
+          return;
+        }
+      }
       await load();
     } catch (error) {
       setMutationError(error.message);
@@ -195,7 +221,7 @@ export default function TeamCalendarPage({ locationId }) {
   }
   const save = (body) => mutate(() => modal.entry
     ? api.patch(`/api/staff/calendar/${modal.entry._id}?locationId=${encodeURIComponent(locationId)}`, body)
-    : api.post(base, body), modal.entry ? "Evento actualizado." : "Evento agregado al calendario del equipo.");
+    : api.post(base, body), modal.entry ? "Evento actualizado." : "Evento agregado al calendario del equipo.", true);
   const entryPath = (entry) => `/api/staff/calendar/${entry._id}?locationId=${encodeURIComponent(locationId)}`;
   const selected = modal?.entry;
   const cards = (entries) => entries.map((entry) => <EventCard key={entry._id} entry={entry} today={today} absences={absences}
@@ -232,6 +258,7 @@ export default function TeamCalendarPage({ locationId }) {
       <select aria-label="Filtrar por responsable" value={filters.person} onChange={(event) => updateFilter("person", event.target.value)}><option value="">Todo el equipo</option>
         {data.people.map((person) => <option key={person._id} value={person._id}>{person.name}{String(person._id) === String(user.id) ? " (tú)" : ""}</option>)}</select>
       <label className={styles.checkbox}><input type="checkbox" checked={filters.showDone} onChange={(event) => updateFilter("showDone", event.target.checked)} /> Ver completados</label>
+      {hasFilters && <button type="button" className={styles.secondary} onClick={clearFilters}><X size={14} /> Limpiar filtros</button>}
     </div>
     <div aria-live="polite">{notice && <p className={styles.success}><Check size={16} /> {notice}</p>}</div>
     {loadError && <p className={styles.error} role="alert">{loadError} <button className={styles.textButton} onClick={() => load(true)}>Reintentar</button></p>}
@@ -250,12 +277,14 @@ export default function TeamCalendarPage({ locationId }) {
                 const items = visible.filter((entry) => spansDay(entry, day));
                 return <button key={day} className={`${styles.day} ${day.slice(0, 7) !== month.slice(0, 7) ? styles.outside : ""} ${day === selectedDay ? styles.selected : ""}`}
                   aria-pressed={day === selectedDay} aria-current={day === today ? "date" : undefined}
-                  aria-label={`${formatDay(day, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}, ${items.length} eventos`}
+                  aria-label={`${formatDay(day, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}, ${items.length} eventos${items.length ? `: ${items.slice(0, 3).map((entry) => `${CALENDAR_KINDS[entry.type].label}: ${entry.title}, ${entry.assigneeName}`).join("; ")}` : ""}`}
                   disabled={day < "2000-01-01" || day > "2100-12-31"} onClick={() => setSelectedDay(day)}>
                   <span className={`${styles.dayNumber} ${day === today ? styles.today : ""}`}>{Number(day.slice(-2))}</span>
                   <span className={styles.dayItems}>{items.slice(0, 3).map((entry) => <span key={entry._id}
                     className={`${styles.dayEvent} ${entry.status === "done" ? styles.completed : ""}`} style={{ "--event-color": CALENDAR_KINDS[entry.type].color }}>
-                    <i /> <span>{entry.startTime ? `${entry.startTime} ` : ""}{entry.title}</span>
+                    <i /> <span title={`${CALENDAR_KINDS[entry.type].label}: ${entry.title} · ${entry.assigneeName}`}>
+                      {entry.type === "absence" ? `Ausente: ${entry.assigneeName}` : `${entry.startTime ? `${entry.startTime} ` : ""}${entry.title}`}
+                    </span>
                   </span>)}</span>
                   {items.length > 3 && <small className={styles.more}>+{items.length - 3} más</small>}
                 </button>;
