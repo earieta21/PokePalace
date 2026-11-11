@@ -2,11 +2,15 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "r
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
 import { PROTEIN_LABELS } from "../../order/OrderLabels";
+import { downloadCSV, textCell } from "../../utils/csv";
+import { tijuanaDateKey } from "../../utils/date";
 import { itemBrief } from "../orderLines";
 import ui from "./CustomersPage.module.css";
 
 const PAGE_SIZE = 25;
 const DAY_MS = 24 * 60 * 60 * 1000;
+// Igual que en el servidor: bajar la lista completa queda para dueño/admin.
+const EXPORT_ROLES = ["owner", "admin"];
 
 // El servidor manda los umbrales reales; estos solo sirven mientras carga.
 const DEFAULT_THRESHOLDS = {
@@ -56,7 +60,12 @@ const REDEMPTION_STATUS = {
 };
 
 const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 });
+const wholeMoney = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 const number = (value) => Number(value || 0).toLocaleString("es-MX");
+const percent = (part, whole) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : "—");
+const monthName = (value) => new Date(value).toLocaleDateString("es-MX", { month: "long", timeZone: "America/Tijuana" });
+const csvDate = (value) => (value ? tijuanaDateKey(new Date(value)) : "");
+const slug = (text) => text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, "-");
 
 const dateOnly = (value, emptyLabel = "—") => value
   ? new Date(value).toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" })
@@ -100,9 +109,68 @@ function Tags({ tags, styles }) {
   );
 }
 
+function CustomerKpis({ summary, error }) {
+  if (error) return <p className={ui.errorText}>No se pudieron cargar los indicadores: {error}</p>;
+  if (!summary) {
+    return (
+      <div className={ui.kpis} aria-busy="true" aria-label="Cargando indicadores">
+        {Array.from({ length: 5 }, (_, index) => <div key={index} className={`${ui.kpi} ${ui.kpiLoading}`} />)}
+      </div>
+    );
+  }
+
+  const { accounts, buyers, repeatBuyers, sales } = summary;
+  const { member, guest, memberShare, windowDays } = sales;
+  const ticketGap = member.avgTicket != null && guest.avgTicket > 0
+    ? Math.round((member.avgTicket / guest.avgTicket - 1) * 100)
+    : null;
+
+  return (
+    <>
+      <div className={ui.kpis}>
+        <div className={ui.kpi}>
+          <small>Cuentas nuevas este mes</small>
+          <strong>{number(accounts.newThisMonth)}</strong>
+          <span>{number(accounts.newLastMonth)} en {monthName(summary.previousMonthStart)} · {number(accounts.total)} en total</span>
+        </div>
+        <div className={ui.kpi}>
+          <small>Ya compraron</small>
+          <strong>{percent(buyers, accounts.total)}</strong>
+          <span>{number(buyers)} de {number(accounts.total)} cuentas</span>
+        </div>
+        <div className={ui.kpi}>
+          <small>Regresan</small>
+          <strong>{percent(repeatBuyers, buyers)}</strong>
+          <span>{number(repeatBuyers)} de {number(buyers)} compraron 2 veces o más</span>
+        </div>
+        <div className={ui.kpi}>
+          <small>Ventas de clientes con cuenta</small>
+          <strong>{memberShare == null ? "—" : `${Math.round(memberShare * 100)}%`}</strong>
+          <span>{wholeMoney.format(member.revenue)} de {wholeMoney.format(member.revenue + guest.revenue)}</span>
+        </div>
+        <div className={ui.kpi}>
+          <small>Ticket promedio con cuenta</small>
+          <strong>{member.avgTicket == null ? "—" : money.format(member.avgTicket)}</strong>
+          <span>
+            Sin cuenta: {guest.avgTicket == null ? "—" : money.format(guest.avgTicket)}
+            {ticketGap != null && ticketGap !== 0 && ` (${Math.abs(ticketGap)}% ${ticketGap > 0 ? "más" : "menos"} con cuenta)`}
+          </span>
+        </div>
+      </div>
+      <p className={ui.kpiNote}>
+        Ventas pagadas de los últimos {windowDays} días, sin contar Uber Eats, DiDi Food ni Rappi.
+      </p>
+    </>
+  );
+}
+
 export default function CustomersPage({ styles }) {
-  const { staffToken } = useContext(StaffAuthContext);
+  const { staffToken, staffUser } = useContext(StaffAuthContext);
   const api = useMemo(() => createStaffApi(staffToken), [staffToken]);
+  const canExport = EXPORT_ROLES.includes(staffUser?.role);
+  const [summary, setSummary] = useState(null);
+  const [summaryError, setSummaryError] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [customers, setCustomers] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [segmentCounts, setSegmentCounts] = useState(null);
@@ -115,6 +183,14 @@ export default function CustomersPage({ styles }) {
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const closeDetail = useCallback(() => setSelectedId(null), []);
+
+  useEffect(() => {
+    let active = true;
+    api.get("/api/staff/customers/summary")
+      .then((result) => { if (active) setSummary(result); })
+      .catch((requestError) => { if (active) setSummaryError(requestError.message); });
+    return () => { active = false; };
+  }, [api]);
 
   useEffect(() => {
     let active = true;
@@ -160,6 +236,38 @@ export default function CustomersPage({ styles }) {
     ? "Cargando…"
     : `${number(totalAccounts ?? pagination.total)} cuentas registradas en la página`;
 
+  // Baja todos los clientes de la vista actual (filtro, búsqueda y orden),
+  // no solo la página que se ve.
+  const exportView = async () => {
+    setExporting(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ segment, sort, ...(search.trim() ? { q: search.trim() } : {}) });
+      const data = await api.get(`/api/staff/customers/export?${params}`);
+      const segmentLabel = Object.fromEntries(SEGMENTS.map((option) => [option.id, option.label]));
+      downloadCSV(`clientes_${slug(activeSegment.label)}_${tijuanaDateKey()}.csv`, [
+        ["Nombre", "Correo", "Teléfono", "Compras", "Total gastado", "Última compra", "Puntos", "Puntos históricos", "Puntos vencen", "Etiquetas", "Registro"],
+        ...(data.customers ?? []).map((customer) => [
+          textCell(customer.name),
+          textCell(customer.email),
+          textCell(customer.phone),
+          customer.purchaseCount,
+          customer.totalSpent,
+          csvDate(customer.lastPurchaseAt),
+          customer.points,
+          customer.lifetimePoints,
+          csvDate(customer.pointsExpireAt),
+          (customer.tags ?? []).map((tag) => segmentLabel[tag]).filter(Boolean).join(", "),
+          csvDate(customer.createdAt),
+        ]),
+      ]);
+    } catch (requestError) {
+      setError(`No se pudo exportar: ${requestError.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
       <div className={styles.pageHeader}>
@@ -167,7 +275,20 @@ export default function CustomersPage({ styles }) {
           <h1 className={styles.pageTitle}>Clientes registrados</h1>
           <p className={styles.pageSubtitle}>{subtitle}</p>
         </div>
+        {canExport && (
+          <button
+            type="button"
+            className={styles.btnGhost}
+            onClick={exportView}
+            disabled={exporting || loading || pagination.total === 0}
+            title={`Descarga los ${number(pagination.total)} clientes de esta vista en un archivo que abre en Excel`}
+          >
+            {exporting ? "Exportando…" : "↓ Exportar"}
+          </button>
+        )}
       </div>
+
+      <CustomerKpis summary={summary} error={summaryError} />
 
       <div className={ui.toolbar}>
         <input
@@ -214,7 +335,7 @@ export default function CustomersPage({ styles }) {
       {error && <p className={ui.errorText} role="alert">{error}</p>}
 
       <div className={styles.tableWrap}>
-        <table className={styles.table}>
+        <table className={`${styles.table} ${ui.cardTable}`}>
           <thead>
             <tr>
               <th>Cliente</th>
@@ -233,7 +354,7 @@ export default function CustomersPage({ styles }) {
               <tr><td colSpan={7} className={ui.tableMessage}>No hay clientes en esta vista</td></tr>
             ) : customers.map((customer) => (
               <tr key={customer._id} className={ui.clickableRow} onClick={() => setSelectedId(customer._id)}>
-                <td>
+                <td className={ui.cardMain}>
                   <button
                     type="button"
                     className={ui.nameButton}
@@ -247,19 +368,19 @@ export default function CustomersPage({ styles }) {
                   <Tags tags={customer.tags} styles={styles} />
                   <small className={ui.email}>{customer.email}</small>
                 </td>
-                <td className={styles.tdMono}>{customer.phone || "Sin teléfono"}</td>
-                <td className={styles.tdMono}>{number(customer.purchaseCount)}</td>
-                <td className={styles.tdMono}>{money.format(Number(customer.totalSpent || 0))}</td>
-                <td className={styles.tdMuted} title={dateTime(customer.lastPurchaseAt, "")}>
+                <td className={styles.tdMono} data-label="Teléfono">{customer.phone || "Sin teléfono"}</td>
+                <td className={styles.tdMono} data-label="Compras">{number(customer.purchaseCount)}</td>
+                <td className={styles.tdMono} data-label="Total gastado">{money.format(Number(customer.totalSpent || 0))}</td>
+                <td className={styles.tdMuted} data-label="Última compra" title={dateTime(customer.lastPurchaseAt, "")}>
                   {customer.lastPurchaseAt ? relativeDays(customer.lastPurchaseAt) : "Sin compras"}
                 </td>
-                <td className={styles.tdMono}>
+                <td className={styles.tdMono} data-label="Puntos">
                   {number(customer.points)}
                   {customer.pointsExpireAt && customer.tags?.includes("expiring") && (
                     <small className={ui.expiryNote}>{expiryText(customer.pointsExpireAt)}</small>
                   )}
                 </td>
-                <td className={styles.tdMuted}>{dateOnly(customer.createdAt)}</td>
+                <td className={styles.tdMuted} data-label="Registro">{dateOnly(customer.createdAt)}</td>
               </tr>
             ))}
           </tbody>

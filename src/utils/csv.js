@@ -1,3 +1,11 @@
+// Para texto que escribió alguien de fuera (nombre, correo, teléfono de un
+// cliente): si empieza con = + - @ Excel lo ejecutaría como fórmula al abrir
+// el archivo, así que se le antepone un apóstrofo. No usar en números.
+export function textCell(value) {
+  const text = String(value ?? "");
+  return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+}
+
 // Genera un CSV a partir de un arreglo de arreglos (filas) y dispara la
 // descarga en el navegador. Sin dependencias — Excel abre .csv de forma nativa.
 export function downloadCSV(filename, rows) {

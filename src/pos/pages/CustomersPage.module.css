@@ -1,6 +1,58 @@
 /* Pestaña Clientes del portal. Los colores (--p-*) vienen de .staffEmbed en
    EmployeePortal.module.css; los valores después de la coma son respaldo. */
 
+/* ── Indicadores ── */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 10px;
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 92px;
+  padding: 14px 16px;
+  border: 1px solid var(--p-border, rgba(45, 106, 79, 0.13));
+  border-radius: var(--p-radius, 12px);
+  background: var(--p-surface, #fff);
+  box-shadow: var(--p-shadow, none);
+}
+
+.kpi small {
+  color: var(--p-muted, #6b7b6e);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.kpi strong {
+  color: var(--p-ink, #0d1b0f);
+  font-family: "DM Mono", monospace;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.kpi span {
+  color: var(--p-muted, #6b7b6e);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.kpiLoading {
+  background: rgba(45, 106, 79, 0.05);
+  box-shadow: none;
+}
+
+.kpiNote {
+  margin: 6px 0 18px;
+  color: var(--p-muted, #6b7b6e);
+  font-size: 11.5px;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -353,6 +405,104 @@
 
   .sortLabel {
     flex: 1 1 100%;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .kpi {
+    min-height: 0;
+    padding: 11px 12px;
+  }
+
+  .kpi strong {
+    font-size: 20px;
+  }
+
+  /* El último indicador queda solo en su renglón: que ocupe todo el ancho. */
+  .kpi:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  /* Los filtros se deslizan de lado en vez de ocupar tres renglones. */
+  .chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chips button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* Cada cliente es una tarjeta: nombre arriba y sus datos en dos columnas,
+     cada uno con su etiqueta (data-label), porque los encabezados no caben. */
+  .cardTable,
+  .cardTable tbody {
+    display: block;
+  }
+
+  .cardTable thead {
+    display: none;
+  }
+
+  .cardTable tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
+    padding: 14px;
+    border-bottom: 1px solid var(--p-border, rgba(45, 106, 79, 0.13));
+  }
+
+  .cardTable tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .cardTable tbody tr td {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow-wrap: anywhere;
+  }
+
+  .cardTable tbody tr:hover td {
+    background: transparent;
+  }
+
+  .cardTable tbody tr td[data-label]::before {
+    content: attr(data-label);
+    color: var(--p-muted, #6b7b6e);
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+
+  .cardTable tbody tr td.cardMain,
+  .cardTable tbody tr td.tableMessage {
+    grid-column: 1 / -1;
+  }
+
+  .cardTable tbody tr td.cardMain {
+    display: block;
+    font-size: 14px;
+  }
+
+  .cardTable tbody tr td.tableMessage {
+    display: block;
   }
 
   .overlay {

@@ -5,6 +5,7 @@ import {
   customerFlags,
   maskRewardCode,
   pointsExpiryDate,
+  summarizeCustomerBase,
   summarizeCustomerOrders,
 } from "../utils/customerSegments.js";
 
@@ -127,6 +128,39 @@ test("lo que más pide se cuenta sin repetir el primer bowl de los carritos", ()
   assert.equal(summary.topItems.find((item) => item.key === "Bowl personalizado").count, 2);
   assert.deepEqual(summary.bySource, { online: 1, pos: 2 });
   assert.deepEqual(summarizeCustomerOrders([]), { topProteins: [], topItems: [], bySource: {} });
+});
+
+test("los indicadores separan cuentas nuevas, compradores, repetidores y ventas con y sin cuenta", () => {
+  const monthStart = new Date("2026-11-01T07:00:00.000Z");
+  const previousMonthStart = new Date("2026-10-01T07:00:00.000Z");
+  const customers = [
+    customer({ _id: "a", createdAt: new Date("2026-11-05T12:00:00.000Z") }),
+    customer({ _id: "b", createdAt: new Date("2026-10-20T12:00:00.000Z") }),
+    // 1 nov a las 5 a.m. UTC sigue siendo 31 de octubre en Tijuana.
+    customer({ _id: "c", createdAt: new Date("2026-11-01T05:00:00.000Z") }),
+    customer({ _id: "d", createdAt: new Date("2026-06-01T12:00:00.000Z") }),
+  ];
+  const summary = summarizeCustomerBase(customers, [
+    { _id: "a", purchaseCount: 1, windowOrders: 1, windowRevenue: 200 },
+    { _id: "b", purchaseCount: 4, windowOrders: 2, windowRevenue: 300 },
+    { _id: "c", purchaseCount: 2, windowOrders: 0, windowRevenue: 0 },
+    // Cuenta borrada o de otro rol: cuenta como venta sin cuenta.
+    { _id: "zzz", purchaseCount: 3, windowOrders: 1, windowRevenue: 100 },
+    { _id: null, purchaseCount: 50, windowOrders: 4, windowRevenue: 400 },
+  ], { monthStart, previousMonthStart });
+
+  assert.deepEqual(summary.accounts, { total: 4, newThisMonth: 1, newLastMonth: 2 });
+  assert.equal(summary.buyers, 3);
+  assert.equal(summary.repeatBuyers, 2);
+  assert.deepEqual(summary.sales.member, { orders: 3, revenue: 500, avgTicket: 166.67 });
+  assert.deepEqual(summary.sales.guest, { orders: 5, revenue: 500, avgTicket: 100 });
+  assert.equal(summary.sales.memberShare, 0.5);
+  assert.equal(summary.sales.windowDays, 30);
+
+  const empty = summarizeCustomerBase([], [], { monthStart, previousMonthStart });
+  assert.deepEqual(empty.accounts, { total: 0, newThisMonth: 0, newLastMonth: 0 });
+  assert.equal(empty.sales.member.avgTicket, null);
+  assert.equal(empty.sales.memberShare, null);
 });
 
 test("el código del premio se muestra enmascarado", () => {

@@ -3,15 +3,19 @@ import User from "../models/User.js";
 import Order from "../models/Order.js";
 import Redemption from "../models/Redemption.js";
 import { GOLD_TIER_MIN_POINTS } from "../utils/loyalty.js";
+import { DELIVERY_APP_PLATFORMS } from "../config/posCatalog.js";
+import { startOfDateKey, zonedParts } from "../utils/timeZone.js";
 import {
   CUSTOMER_SEGMENTS,
   CUSTOMER_SORTS,
   FREQUENT_WINDOW_DAYS,
+  SALES_WINDOW_DAYS,
   SEGMENT_THRESHOLDS,
   buildCustomerDirectory,
   customerFlags,
   maskRewardCode,
   pointsExpiryDate,
+  summarizeCustomerBase,
   summarizeCustomerOrders,
 } from "../utils/customerSegments.js";
 
@@ -29,54 +33,60 @@ const purchaseStatsGroup = (recentCutoff) => ({
   recentPurchaseCount: { $sum: { $cond: [{ $gte: ["$createdAt", recentCutoff] }, 1, 0] } },
 });
 
-const recentCutoffFrom = (now) => new Date(now.getTime() - FREQUENT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+const DAY_MS = 24 * 60 * 60 * 1000;
+const recentCutoffFrom = (now) => new Date(now.getTime() - FREQUENT_WINDOW_DAYS * DAY_MS);
+
+// Los segmentos dependen de las compras de cada cliente, así que se calculan
+// sobre todos los que coinciden con la búsqueda y luego se pagina (o se
+// exporta) — sobra para el tamaño de un restaurante (miles de cuentas, no
+// millones). Lo usan la lista y la exportación para que salga lo mismo.
+async function loadDirectory(params) {
+  const query = String(params.q || "").trim().slice(0, 80);
+  const segment = CUSTOMER_SEGMENTS.includes(params.segment) ? params.segment : "all";
+  const sort = CUSTOMER_SORTS.includes(params.sort) ? params.sort : "recent";
+  const filter = { role: "user" };
+
+  if (query) {
+    const safeQuery = escapeRegex(query);
+    const digits = query.replace(/\D/g, "");
+    filter.$or = [
+      { name: { $regex: safeQuery, $options: "i" } },
+      { email: { $regex: safeQuery, $options: "i" } },
+      ...(digits.length >= 3
+        ? [{ phone: { $regex: digits.split("").join("\\D*"), $options: "i" } }]
+        : []),
+    ];
+  }
+
+  const customers = await User.find(filter)
+    .select("_id name email phone points lifetimePoints pointsLastEarnedAt createdAt")
+    .lean();
+
+  const now = new Date();
+  const purchaseStats = customers.length > 0
+    ? await Order.aggregate([
+        {
+          $match: {
+            ...PURCHASE_MATCH,
+            user: query ? { $in: customers.map((customer) => customer._id) } : { $type: "objectId" },
+          },
+        },
+        { $group: { _id: "$user", ...purchaseStatsGroup(recentCutoffFrom(now)) } },
+      ])
+    : [];
+  const statsByCustomer = new Map(purchaseStats.map((stats) => [String(stats._id), stats]));
+
+  return { segment, sort, ...buildCustomerDirectory(customers, statsByCustomer, { segment, sort, now }) };
+}
 
 // GET /api/staff/customers?q=&segment=all&sort=recent&page=1&limit=25
 // Administrative customer directory. Only the fields required by the staff
 // screen are selected; passwords and internal ledgers never leave the API.
-// Los segmentos dependen de las compras de cada cliente, así que se calculan
-// sobre todos los que coinciden con la búsqueda y luego se pagina — sobra
-// para el tamaño de un restaurante (miles de cuentas, no millones).
 export const getRegisteredCustomers = async (req, res) => {
   try {
-    const query = String(req.query.q || "").trim().slice(0, 80);
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
-    const segment = CUSTOMER_SEGMENTS.includes(req.query.segment) ? req.query.segment : "all";
-    const sort = CUSTOMER_SORTS.includes(req.query.sort) ? req.query.sort : "recent";
-    const filter = { role: "user" };
-
-    if (query) {
-      const safeQuery = escapeRegex(query);
-      const digits = query.replace(/\D/g, "");
-      filter.$or = [
-        { name: { $regex: safeQuery, $options: "i" } },
-        { email: { $regex: safeQuery, $options: "i" } },
-        ...(digits.length >= 3
-          ? [{ phone: { $regex: digits.split("").join("\\D*"), $options: "i" } }]
-          : []),
-      ];
-    }
-
-    const customers = await User.find(filter)
-      .select("_id name email phone points lifetimePoints pointsLastEarnedAt createdAt")
-      .lean();
-
-    const now = new Date();
-    const purchaseStats = customers.length > 0
-      ? await Order.aggregate([
-          {
-            $match: {
-              ...PURCHASE_MATCH,
-              user: query ? { $in: customers.map((customer) => customer._id) } : { $type: "objectId" },
-            },
-          },
-          { $group: { _id: "$user", ...purchaseStatsGroup(recentCutoffFrom(now)) } },
-        ])
-      : [];
-    const statsByCustomer = new Map(purchaseStats.map((stats) => [String(stats._id), stats]));
-
-    const { counts, rows } = buildCustomerDirectory(customers, statsByCustomer, { segment, sort, now });
+    const { segment, sort, counts, rows } = await loadDirectory(req.query);
     const total = rows.length;
 
     return res.json({
@@ -95,6 +105,91 @@ export const getRegisteredCustomers = async (req, res) => {
   } catch (err) {
     console.error("getRegisteredCustomers error:", err.message);
     return res.status(500).json({ message: "No se pudo cargar la lista de clientes" });
+  }
+};
+
+// GET /api/staff/customers/export?q=&segment=&sort= — todas las filas de la
+// vista actual (sin paginar) para descargarlas como CSV. Solo dueño/admin:
+// es la lista completa de correos y teléfonos de una sola vez.
+export const exportCustomers = async (req, res) => {
+  try {
+    const { segment, sort, rows } = await loadDirectory(req.query);
+    console.info(`Exportación de clientes: ${rows.length} filas (${segment}) por ${req.staff?.role} ${req.staff?.id}`);
+    return res.json({
+      segment,
+      sort,
+      customers: rows.map((row) => ({
+        name: row.name,
+        email: row.email,
+        phone: row.phone || "",
+        purchaseCount: row.purchaseCount,
+        totalSpent: row.totalSpent,
+        lastPurchaseAt: row.lastPurchaseAt,
+        points: row.points || 0,
+        lifetimePoints: row.lifetimePoints || 0,
+        pointsExpireAt: row.pointsExpireAt,
+        tags: row.tags,
+        createdAt: row.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("exportCustomers error:", err.message);
+    return res.status(500).json({ message: "No se pudo exportar la lista de clientes" });
+  }
+};
+
+// Inicio de este mes y del anterior, en la hora del restaurante.
+function monthStartsInRestaurantTime(now) {
+  const { year, month } = zonedParts(now);
+  const firstOf = (y, m) => startOfDateKey(`${y}-${String(m).padStart(2, "0")}-01`);
+  return {
+    monthStart: firstOf(year, month),
+    previousMonthStart: month === 1 ? firstOf(year - 1, 12) : firstOf(year, month - 1),
+  };
+}
+
+// Ventas directas: las de Uber Eats, DiDi y Rappi no pueden ligarse a una
+// cuenta, así que compararlas con las de clientes registrados no dice nada.
+const directSaleSince = (windowStart) => ({
+  $and: [
+    { $gte: ["$createdAt", windowStart] },
+    { $not: [{ $in: [{ $ifNull: ["$deliveryPlatform", null] }, [...DELIVERY_APP_PLATFORMS]] }] },
+    { $eq: [{ $ifNull: ["$externalProvider", null] }, null] },
+  ],
+});
+
+// GET /api/staff/customers/summary — indicadores arriba de la tabla: cuentas
+// nuevas, cuántos compran, cuántos repiten y cuánto venden los clientes con
+// cuenta frente a los que no tienen.
+export const getCustomerSummary = async (req, res) => {
+  try {
+    const now = new Date();
+    const { monthStart, previousMonthStart } = monthStartsInRestaurantTime(now);
+    const directSale = directSaleSince(new Date(now.getTime() - SALES_WINDOW_DAYS * DAY_MS));
+
+    const [customers, purchaseRows] = await Promise.all([
+      User.find({ role: "user" }).select("_id createdAt").lean(),
+      Order.aggregate([
+        { $match: PURCHASE_MATCH },
+        {
+          $group: {
+            _id: { $cond: [{ $eq: [{ $type: "$user" }, "objectId"] }, "$user", null] },
+            purchaseCount: { $sum: 1 },
+            windowOrders: { $sum: { $cond: [directSale, 1, 0] } },
+            windowRevenue: { $sum: { $cond: [directSale, { $ifNull: ["$total", 0] }, 0] } },
+          },
+        },
+      ]),
+    ]);
+
+    return res.json({
+      ...summarizeCustomerBase(customers, purchaseRows, { monthStart, previousMonthStart }),
+      monthStart,
+      previousMonthStart,
+    });
+  } catch (err) {
+    console.error("getCustomerSummary error:", err.message);
+    return res.status(500).json({ message: "No se pudieron cargar los indicadores de clientes" });
   }
 };
 

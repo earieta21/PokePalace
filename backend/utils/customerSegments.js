@@ -160,6 +160,64 @@ export function summarizeCustomerOrders(orders) {
   return { topProteins: top(proteins, 3), topItems: top(items, 4), bySource };
 }
 
+export const SALES_WINDOW_DAYS = 30;
+
+const round2 = (value) => Math.round(value * 100) / 100;
+
+/* Indicadores de la base de clientes (tarjetas arriba de la tabla).
+   `purchaseRows` trae una fila por cuenta (o `_id: null` para las ventas sin
+   cuenta) con `purchaseCount` (compras pagadas de siempre) y
+   `windowOrders`/`windowRevenue` (ventas directas de los últimos
+   SALES_WINDOW_DAYS; el controlador ya deja fuera las apps de delivery).
+   Lo vendido a cuentas que ya no existen o que no son de cliente cuenta como
+   "sin cuenta". */
+export function summarizeCustomerBase(customers, purchaseRows, { monthStart, previousMonthStart }) {
+  const customerIds = new Set(customers.map((customer) => String(customer._id)));
+  const monthMs = time(monthStart);
+  const previousMonthMs = time(previousMonthStart);
+
+  let newThisMonth = 0;
+  let newLastMonth = 0;
+  for (const customer of customers) {
+    const created = time(customer.createdAt);
+    if (created === null) continue;
+    if (created >= monthMs) newThisMonth += 1;
+    else if (created >= previousMonthMs) newLastMonth += 1;
+  }
+
+  let buyers = 0;
+  let repeatBuyers = 0;
+  const member = { orders: 0, revenue: 0 };
+  const guest = { orders: 0, revenue: 0 };
+  for (const row of purchaseRows || []) {
+    const isMember = row._id != null && customerIds.has(String(row._id));
+    if (isMember && row.purchaseCount >= 1) buyers += 1;
+    if (isMember && row.purchaseCount >= 2) repeatBuyers += 1;
+    const bucket = isMember ? member : guest;
+    bucket.orders += row.windowOrders || 0;
+    bucket.revenue += row.windowRevenue || 0;
+  }
+
+  const withTicket = ({ orders, revenue }) => ({
+    orders,
+    revenue: round2(revenue),
+    avgTicket: orders > 0 ? round2(revenue / orders) : null,
+  });
+  const totalRevenue = member.revenue + guest.revenue;
+
+  return {
+    accounts: { total: customers.length, newThisMonth, newLastMonth },
+    buyers,
+    repeatBuyers,
+    sales: {
+      windowDays: SALES_WINDOW_DAYS,
+      member: withTicket(member),
+      guest: withTicket(guest),
+      memberShare: totalRevenue > 0 ? member.revenue / totalRevenue : null,
+    },
+  };
+}
+
 // El código del premio lo ve el cliente en su cuenta; al personal le basta
 // con reconocerlo.
 export const maskRewardCode = (code) => (code ? `••••${String(code).slice(-4)}` : null);

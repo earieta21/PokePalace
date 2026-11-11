@@ -272,6 +272,32 @@ test("solo gerencia puede consultar clientes registrados y sus puntos", async ()
     assert.equal((await staffRequest("owner", "/api/staff/customers/no-es-un-id")).status, 404);
     assert.equal((await staffRequest("owner", "/api/staff/customers/000000000000000000000000")).status, 404);
 
+    // Indicadores: "summary" no se confunde con un id de cliente.
+    const summaryResponse = await staffRequest("manager", "/api/staff/customers/summary");
+    assert.equal(summaryResponse.status, 200);
+    const summary = await summaryResponse.json();
+    assert.ok(summary.accounts.total >= 1);
+    assert.ok(summary.accounts.newThisMonth >= 1);
+    assert.ok(summary.buyers >= 1 && summary.repeatBuyers >= 1);
+    assert.equal(summary.sales.windowDays, 30);
+    assert.ok(summary.monthStart && summary.previousMonthStart);
+    assert.equal((await staffRequest("cashier", "/api/staff/customers/summary")).status, 403);
+
+    // Exportar: todas las filas de la vista, solo dueño/admin, sin datos internos.
+    const exportPath = `/api/staff/customers/export?q=${encodeURIComponent(customer.email)}&segment=dormant`;
+    const exportResponse = await staffRequest("owner", exportPath);
+    assert.equal(exportResponse.status, 200);
+    const exported = await exportResponse.json();
+    assert.equal(exported.customers.length, 1);
+    assert.equal(exported.customers[0].email, customer.email);
+    assert.equal(exported.customers[0].phone, "+52 664 123 4567");
+    assert.equal(exported.customers[0].totalSpent, 310);
+    assert.deepEqual(exported.customers[0].tags, ["new", "dormant"]);
+    assert.equal("password" in exported.customers[0], false);
+    assert.equal("_id" in exported.customers[0], false);
+    assert.equal((await staffRequest("manager", exportPath)).status, 403);
+    assert.equal((await staffRequest("cashier", exportPath)).status, 403);
+
     const cashierResponse = await staffRequest("cashier", "/api/staff/customers");
     assert.equal(cashierResponse.status, 403);
   } finally {
