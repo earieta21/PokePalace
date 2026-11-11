@@ -234,6 +234,43 @@ test("solo gerencia puede consultar clientes registrados y sus puntos", async ()
       countedOrders[1].createdAt.getTime()
     );
     assert.equal("password" in body.customers[0], false);
+    // Se registró hoy y su última compra fue en enero: nuevo y dormido a la vez.
+    assert.deepEqual(body.customers[0].tags, ["new", "dormant"]);
+    assert.equal(body.segments.all, 1);
+    assert.equal(body.segments.dormant, 1);
+    assert.equal(body.segments.never, 0);
+
+    const bySegment = async (segment) => {
+      const response = await staffRequest(
+        "owner",
+        `/api/staff/customers?q=${encodeURIComponent(customer.email)}&segment=${segment}&sort=spent`
+      );
+      assert.equal(response.status, 200);
+      return (await response.json()).pagination.total;
+    };
+    assert.equal(await bySegment("dormant"), 1);
+    assert.equal(await bySegment("never"), 0);
+    assert.equal(await bySegment("gold"), 0);
+
+    const detailResponse = await staffRequest("owner", `/api/staff/customers/${customer._id}`);
+    assert.equal(detailResponse.status, 200);
+    const detail = await detailResponse.json();
+    assert.equal(detail.customer.name, customer.name);
+    assert.equal("password" in detail.customer, false);
+    assert.equal(detail.stats.purchaseCount, 2);
+    assert.equal(detail.stats.totalSpent, 310);
+    assert.equal(detail.stats.avgTicket, 155);
+    assert.equal(detail.loyalty.isGold, false);
+    assert.equal(detail.loyalty.pointsToGold, 25);
+    // La ficha muestra todos sus pedidos (también cancelados y sin pagar);
+    // las estadísticas solo cuentan los pagados.
+    assert.equal(detail.orders.length, 4);
+    assert.deepEqual(detail.favorites.bySource, { online: 1, pos: 1 });
+
+    assert.equal((await staffRequest("manager", `/api/staff/customers/${customer._id}`)).status, 200);
+    assert.equal((await staffRequest("cashier", `/api/staff/customers/${customer._id}`)).status, 403);
+    assert.equal((await staffRequest("owner", "/api/staff/customers/no-es-un-id")).status, 404);
+    assert.equal((await staffRequest("owner", "/api/staff/customers/000000000000000000000000")).status, 404);
 
     const cashierResponse = await staffRequest("cashier", "/api/staff/customers");
     assert.equal(cashierResponse.status, 403);

@@ -233,4 +233,8 @@ orderSchema.index(
   }
 );
 
+// Pedidos de un cliente, los más recientes primero (ficha del cliente en el
+// portal y estadísticas de compra del directorio).
+orderSchema.index({ user: 1, createdAt: -1 }, { name: "user_recent_orders" });
+
 export default mongoose.model("Order", orderSchema);
