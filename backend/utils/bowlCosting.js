@@ -165,6 +165,7 @@ export function resolveComplementCosts(inventoryItems = [], captured = {}) {
     const costPerUnit = manualCost > 0 ? manualCost : inventoryCost;
     byKey[key] = {
       costPerUnit,
+      inventoryCostPerUnit: inventoryCost,
       portionsPerUnit: portions,
       unit: match?.unit || null,
       itemName: match?.item || null,

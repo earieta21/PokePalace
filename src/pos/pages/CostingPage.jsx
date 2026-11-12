@@ -34,10 +34,16 @@ export default function CostingPage({ styles }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [savedMsg, setSavedMsg] = useState("");
+  const [view, setView] = useState("summary");
+  const [savedForm, setSavedForm] = useState("");
+  const [search, setSearch] = useState("");
+  const [onlyMissing, setOnlyMissing] = useState(false);
+  const [loadVersion, setLoadVersion] = useState(0);
+  const dirty = Boolean(form && JSON.stringify(form) !== savedForm);
 
   const hydrate = useCallback((report) => {
     setData(report);
-    setForm({
+    const nextForm = {
       ...Object.fromEntries(PARTS.map(({ key }) => [key, {
         costPerUnit: String(report.config[key]?.costPerUnit ?? 0),
         unitsPerBowl: String(report.config[key]?.unitsPerBowl ?? 0),
@@ -49,7 +55,7 @@ export default function CostingPage({ styles }) {
       promoMinMarginPct: String(report.config.promoMinMarginPct ?? 25),
       promoEligibleMinMarginPct: String(report.config.promoEligibleMinMarginPct ?? 40),
       complementCosts: Object.fromEntries(
-        (report.complementUsage?.keys || []).map((key) => [key, {
+        (report.complementUsage?.allKeys || report.complementUsage?.keys || []).map((key) => [key, {
           costPerUnit: String(report.config.complementCosts?.[key]?.costPerUnit || ""),
           portionsPerUnit: String(report.config.complementCosts?.[key]?.portionsPerUnit || ""),
         }])
@@ -57,42 +63,59 @@ export default function CostingPage({ styles }) {
       disabledProteins: report.config.disabledProteins || [],
       disabledComplements: report.config.disabledComplements || [],
       proteinCostPerKgOverride: Object.fromEntries(
-        (report.bowls || []).map((b) => [
-          b.proteinKey,
-          String(report.config.proteinCostPerKgOverride?.[b.proteinKey] ?? ""),
+        Object.keys(report.proteinLabels || {}).map((key) => [
+          key,
+          String(report.config.proteinCostPerKgOverride?.[key] ?? ""),
         ])
       ),
-    });
+    };
+    setForm(nextForm);
+    setSavedForm(JSON.stringify(nextForm));
   }, []);
 
   useEffect(() => {
     let alive = true;
-    api.get("/api/staff/costing")
+    setLoading(true);
+    setError("");
+    createStaffApi(staffToken).get("/api/staff/costing")
       .then((report) => { if (alive) hydrate(report); })
       .catch((e) => { if (alive) setError(e.message); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [staffToken, hydrate, loadVersion]);
 
-  // Prender/apagar un ingrediente guarda de inmediato: es un cambio de una
-  // sola decisión y esperar al botón "Guardar" haría que la tabla se vea
-  // desactualizada mientras tanto.
-  const toggleIngredient = async (field, key) => {
-    const current = form[field] || [];
-    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
-    setForm((prev) => ({ ...prev, [field]: next }));
-    try {
-      hydrate(await api.put("/api/staff/costing", { [field]: next }));
-    } catch (e) {
-      setError(e.message);
-    }
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  // Todas las ediciones comparten borrador: cambiar disponibilidad no debe
+  // reemplazar los costos que todavía se están capturando.
+  const toggleIngredient = (field, key) => {
+    setSavedMsg("");
+    setForm((prev) => ({ ...prev, [field]: prev[field].includes(key)
+      ? prev[field].filter((value) => value !== key) : [...prev[field], key] }));
   };
 
   const setPart = (partKey, field, value) =>
     setForm((prev) => ({ ...prev, [partKey]: { ...prev[partKey], [field]: value } }));
 
   const save = async () => {
+    if (saving || !dirty) return;
+    const inputs = document.querySelectorAll("#costing-editor input[type=number]");
+    const invalid = [...inputs].find((input) => !input.validity.valid);
+    if (invalid) {
+      setView("costs");
+      setSearch("");
+      setOnlyMissing(false);
+      const section = invalid.closest("details");
+      if (section) section.open = true;
+      setError("Revisa el campo señalado: usa un número válido, mayor o igual a cero. Los porcentajes no pueden superar 100.");
+      requestAnimationFrame(() => { invalid.focus(); invalid.reportValidity(); });
+      return;
+    }
     setSaving(true);
     setError("");
     setSavedMsg("");
@@ -128,27 +151,59 @@ export default function CostingPage({ styles }) {
   };
 
   if (loading) return <p className={ui.muted}>Cargando costeo…</p>;
-  if (!data || !form) return <p className={ui.error}>{error || "No se pudo cargar el costeo."}</p>;
+  if (!data || !form) return <div className={ui.page}><p className={ui.error} role="alert">{error || "No se pudo cargar el costeo."}</p><button type="button" className={ui.secondaryBtn} onClick={() => setLoadVersion((value) => value + 1)}>Reintentar</button></div>;
 
   const bowls = data.bowls || [];
   const usage = data.complementUsage || {};
   const missingCosts = bowls.filter((b) => b.proteinSource === "falta");
+  const zeroParts = [
+    ...(!bowls[0]?.rows.base ? ["base"] : []),
+    ...PARTS.filter(({ key }) => !bowls[0]?.rows[key]).map(({ label }) => label.toLowerCase()),
+  ];
+  const incompleteComplements = (usage.keys || []).filter((key) =>
+    (usage.frequency?.[key] || 0) > 0 && !(data.complementCosts?.[key]?.costPerPortion > 0)
+  );
   // Cuántos de cada cosa lleva un bowl de verdad, para no capturar a ojo.
   const realAvg = usage.averagePerBowl || {};
+  const normalize = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const visibleComplements = (usage.keys || []).filter((key) => {
+    const matches = normalize(usage.labels?.[key] || key).includes(normalize(search));
+    const resolved = data.complementCosts?.[key] || {};
+    const entry = form.complementCosts?.[key] || {};
+    const inventoryCost = resolved.inventoryCostPerUnit ?? (resolved.source === "inventario" ? resolved.costPerUnit : 0);
+    const missing = !(Number(entry.costPerUnit) > 0 || inventoryCost > 0)
+      || !(Number(entry.portionsPerUnit) > 0);
+    return matches && (!onlyMissing || missing);
+  });
 
   return (
     <section className={styles?.portalSurface}>
       <div className={ui.page}>
         <header className={ui.header}>
           <h2 className={ui.title}>Costeo de bowls</h2>
-          <p className={ui.subtitle}>
-            Cuánto cuesta producir cada bowl y cuánto margen deja. El costo de la proteína
-            se lee solo del inventario; el resto se captura aquí una vez.
-          </p>
+          <p className={ui.subtitle}>Consulta el margen de tus bowls y actualiza costos y porciones en un solo lugar. Todos los importes están en MXN.</p>
         </header>
 
-        {error && <p className={ui.error}>{error}</p>}
-        {savedMsg && <p className={ui.success}>{savedMsg}</p>}
+        <nav className={ui.tabs} aria-label="Secciones de costeo">
+          {[["summary", "Resumen"], ["costs", "Editar costos"], ["ingredients", "Ingredientes del menú"]].map(([key, label]) => (
+            <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}>{label}</button>
+          ))}
+        </nav>
+        {error && <p className={ui.error} role="alert">{error}</p>}
+        {savedMsg && !dirty && <p className={ui.success} role="status">{savedMsg}</p>}
+
+        <div hidden={view !== "summary"}>
+        <div className={ui.overview}>
+          <div><span className={ui.eyebrow}>Costo por bowl mediano</span><h3 className={ui.sectionTitle}>¿Cuánto te deja cada proteína?</h3>
+          <p className={ui.subtitle}>Cada opción supone un bowl con una sola proteína ({(bowls[0]?.proteinKg ?? 0.1) * 1000} g). El margen es antes de renta, nómina y otros gastos.</p></div>
+          <button type="button" className={ui.secondaryBtn} onClick={() => setView("costs")}>Actualizar costos →</button>
+        </div>
+        {dirty && <p className={ui.warnBox}>Tienes cambios pendientes. Este resumen muestra los últimos costos guardados.</p>}
+        {bowls.length > 0 && zeroParts.length > 0 && <p className={ui.warnBox}>Costos en cero: {zeroParts.join(", ")}. Revisa si faltan datos; el margen puede parecer mayor al real.</p>}
+        {incompleteComplements.length > 0 && <div className={ui.warnBox}>
+          <p>Hay {incompleteComplements.length} complemento(s) con uso registrado sin costo por porción. Completa sus costos y rendimientos antes de tomar decisiones con estos márgenes.</p>
+          <button type="button" className={ui.secondaryBtn} onClick={() => { setView("costs"); setOnlyMissing(true); setSearch(""); requestAnimationFrame(() => { const section = document.getElementById("costing-complements"); if (section) { section.open = true; section.scrollIntoView({ block: "start" }); } }); }}>Revisar complementos pendientes →</button>
+        </div>}
 
         {missingCosts.length > 0 && (
           <div className={ui.warnBox}>
@@ -158,10 +213,26 @@ export default function CostingPage({ styles }) {
                 <li key={b.proteinKey}>{b.label} — {b.proteinNote}</li>
               ))}
             </ul>
+            <button type="button" className={ui.secondaryBtn} onClick={() => { setView("costs"); requestAnimationFrame(() => { const section = document.getElementById("costing-proteins"); if (section) { section.open = true; section.scrollIntoView({ block: "center" }); section.querySelector("input")?.focus({ preventScroll: true }); } }); }}>Completar costos de proteína →</button>
           </div>
         )}
 
+        {bowls.length === 0 && <p className={ui.warnBox}>No hay proteínas activas. Actívalas en Ingredientes del menú para ver su costeo.</p>}
+        <div className={ui.bowlCards}>
+          {bowls.map((b) => {
+            const missing = b.proteinSource === "falta";
+            return <article key={b.proteinKey} className={ui.bowlCard}>
+              <div className={ui.complementHead}><h3>{b.label}</h3><span className={ui.badge}>{missing ? "Falta costo" : b.proteinSource === "inventario" ? "Inventario" : "Costo manual"}</span></div>
+              <dl><div><dt>Costo estimado</dt><dd>{missing ? "Por completar" : money(b.total)}</dd></div><div><dt>Precio de venta</dt><dd>{money(b.price)}</dd></div>
+              <div className={ui.cardMargin}><dt>Margen por bowl</dt><dd>{missing ? "—" : <>{money(b.margin)} <small>{pct(b.marginPct)}</small></>}</dd></div></dl>
+              <p className={`${ui.verdict} ${VERDICT_STYLE[missing || incompleteComplements.length ? "sin_datos" : b.verdict.status]}`}>{missing ? "Captura el costo de esta proteína para evaluar su margen." : incompleteComplements.length ? "Estimación parcial: completa los costos de complementos para evaluar promociones." : b.verdict.message}</p>
+            </article>;
+          })}
+        </div>
+
         {/* ---- Tabla principal: la del documento de estrategia ---- */}
+        <details className={ui.disclosure}>
+        <summary>Ver desglose por ingrediente y comparar proteínas</summary>
         <div className={ui.tableWrap}>
           <table className={ui.table}>
             <thead>
@@ -170,7 +241,7 @@ export default function CostingPage({ styles }) {
                 {bowls.map((b) => (
                   <th key={b.proteinKey}>
                     {b.label}
-                    <span className={ui.sold}>{b.sold30d} vendidos / 30d</span>
+                    <span className={ui.sold}>{b.sold30d} registros / 30d</span>
                   </th>
                 ))}
               </tr>
@@ -191,7 +262,7 @@ export default function CostingPage({ styles }) {
                 </td>
                 {bowls.map((b) => (
                   <td key={b.proteinKey}>
-                    {money(b.rows.protein)}
+                    {b.proteinSource === "falta" ? "Sin costo" : money(b.rows.protein)}
                     <span className={`${ui.badge} ${b.proteinSource === "inventario" ? ui.badgeAuto : ui.badgeManual}`}>
                       {b.proteinSource === "inventario" ? "auto" : b.proteinSource}
                     </span>
@@ -206,7 +277,7 @@ export default function CostingPage({ styles }) {
               ))}
               <tr className={ui.totalRow}>
                 <td className={ui.stickyCol}>Costo total del bowl</td>
-                {bowls.map((b) => <td key={b.proteinKey}>{money(b.total)}</td>)}
+                {bowls.map((b) => <td key={b.proteinKey}>{b.proteinSource === "falta" ? "Incompleto" : money(b.total)}</td>)}
               </tr>
               <tr>
                 <td className={ui.stickyCol}>Precio de venta</td>
@@ -216,55 +287,46 @@ export default function CostingPage({ styles }) {
                 <td className={ui.stickyCol}>Margen $ / %</td>
                 {bowls.map((b) => (
                   <td key={b.proteinKey} className={b.marginPct >= 40 ? ui.good : b.marginPct >= 25 ? ui.ok : ui.bad}>
-                    {money(b.margin)} <span className={ui.pctChip}>{pct(b.marginPct)}</span>
+                    {b.proteinSource === "falta" ? "—" : <>{money(b.margin)} <span className={ui.pctChip}>{pct(b.marginPct)}</span></>}
                   </td>
                 ))}
               </tr>
               <tr>
                 <td className={ui.stickyCol}>Costo de producto (food cost)</td>
-                {bowls.map((b) => <td key={b.proteinKey}>{pct(b.foodCostPct)}</td>)}
+                {bowls.map((b) => <td key={b.proteinKey}>{b.proteinSource === "falta" ? "—" : pct(b.foodCostPct)}</td>)}
               </tr>
               <tr>
                 <td className={ui.stickyCol}>Margen en 2x1 <span className={ui.hint}>$125 c/u</span></td>
                 {bowls.map((b) => (
                   <td key={b.proteinKey} className={b.scenarios.promo2x1.marginPct >= 25 ? ui.ok : ui.bad}>
-                    {money(b.scenarios.promo2x1.margin)} <span className={ui.pctChip}>{pct(b.scenarios.promo2x1.marginPct)}</span>
+                    {b.proteinSource === "falta" ? "—" : <>{money(b.scenarios.promo2x1.margin)} <span className={ui.pctChip}>{pct(b.scenarios.promo2x1.marginPct)}</span></>}
                   </td>
                 ))}
               </tr>
             </tbody>
           </table>
         </div>
-
-        {/* ---- Reglas de decisión ---- */}
-        <div className={ui.verdicts}>
-          {bowls.map((b) => (
-            <div key={b.proteinKey} className={`${ui.verdict} ${VERDICT_STYLE[b.verdict.status]}`}>
-              <strong>{b.label}</strong>
-              <span>{b.verdict.message}</span>
-            </div>
-          ))}
-        </div>
+        </details>
 
         {/* ---- Margen real ponderado ---- */}
-        {data.weighted && (
+        {data.weighted && missingCosts.length === 0 && (
           <div className={ui.weighted}>
-            <h3 className={ui.sectionTitle}>Margen real de los últimos {data.salesMixWindowDays} días</h3>
+            <h3 className={ui.sectionTitle}>Estimación según las proteínas más pedidas</h3>
             <p className={ui.subtitle}>
-              Ponderado por lo que de verdad se vendió ({data.weighted.units} bowls), no por un promedio teórico.
+              Usa {data.weighted.units} registros de proteínas de los últimos {data.salesMixWindowDays} días y los costos actuales. Un bowl puede registrar varias proteínas; estos importes no son las ventas ni la utilidad contable del periodo.
             </p>
             <div className={ui.kpis}>
-              <div className={ui.kpi}><span>Venta</span><strong>{money(data.weighted.revenue)}</strong></div>
+              <div className={ui.kpi}><span>Venta estimada</span><strong>{money(data.weighted.revenue)}</strong></div>
               <div className={ui.kpi}><span>Costo de producto</span><strong>{money(data.weighted.cost)}</strong></div>
               <div className={ui.kpi}><span>Margen</span><strong>{money(data.weighted.margin)}</strong></div>
               <div className={ui.kpi}><span>Margen %</span><strong>{pct(data.weighted.marginPct)}</strong></div>
-              <div className={ui.kpi}><span>Food cost %</span><strong>{pct(data.weighted.foodCostPct)}</strong></div>
+              <div className={ui.kpi}><span>Costo / venta</span><strong>{pct(data.weighted.foodCostPct)}</strong></div>
             </div>
           </div>
         )}
 
         {/* ---- Combo Palace ---- */}
-        {data.combo && (
+        {data.combo && !missingCosts.some((b) => b.label === data.combo.basedOn) && (
           <div className={ui.combo}>
             <h3 className={ui.sectionTitle}>Combo Palace</h3>
             <p className={ui.subtitle}>Bowl ({data.combo.basedOn}) + bebida + rice cake, contra el precio de {money(data.combo.price)}.</p>
@@ -275,22 +337,25 @@ export default function CostingPage({ styles }) {
             </div>
           </div>
         )}
+        </div>
 
         {/* ---- Captura ---- */}
-        <div className={ui.editor}>
+        <fieldset id="costing-editor" className={ui.editor} disabled={saving} hidden={view !== "costs"}>
           <h3 className={ui.sectionTitle}>Costos capturados</h3>
           <p className={ui.subtitle}>
             Cuánto cuesta cada parte y cuántas van en un bowl. Para sacar el costo por porción:
             lo que costó el paquete ÷ cuántas porciones rinde.
           </p>
 
+          <details className={ui.disclosure} open>
+          <summary>1. Base y costos por bowl <small>Porciones, salsas y empaque</small></summary>
           <div className={ui.baseBlock}>
             <label>Base <span className={ui.hint}>Arroz, quinoa o ensalada</span></label>
             <div className={ui.baseRow}>
               <div className={ui.field}>
                 <span className={ui.hint}>Costo por kilo</span>
                 <input
-                  type="number" min="0" step="0.5" inputMode="decimal"
+                  type="number" min="0" step="any" inputMode="decimal"
                   value={form.baseCostPerKg}
                   onChange={(e) => setForm((p) => ({ ...p, baseCostPerKg: e.target.value }))}
                   aria-label="Costo por kilo de la base"
@@ -299,7 +364,7 @@ export default function CostingPage({ styles }) {
               <div className={ui.field}>
                 <span className={ui.hint}>Gramos por porción</span>
                 <input
-                  type="number" min="0" step="10" inputMode="decimal"
+                  type="number" min="0" step="any" inputMode="decimal"
                   value={form.baseGramsPerPortion}
                   onChange={(e) => setForm((p) => ({ ...p, baseGramsPerPortion: e.target.value }))}
                   aria-label="Gramos por porción de la base"
@@ -323,19 +388,23 @@ export default function CostingPage({ styles }) {
                   {realAvg[key] !== undefined && ` · promedio real: ${realAvg[key]} por bowl`}
                 </span>
                 <div className={ui.inputRow}>
+                  <label><span className={ui.hint}>Costo ($)</span>
                   <input
-                    type="number" min="0" step="0.01" inputMode="decimal"
+                    type="number" min="0" step="any" inputMode="decimal"
                     value={form[key].costPerUnit}
                     onChange={(e) => setPart(key, "costPerUnit", e.target.value)}
                     aria-label={`Costo por unidad de ${label}`}
                   />
+                  </label>
                   <span className={ui.times}>×</span>
+                  <label><span className={ui.hint}>Por bowl</span>
                   <input
-                    type="number" min="0" step="0.5" inputMode="decimal"
+                    type="number" min="0" step="any" inputMode="decimal"
                     value={form[key].unitsPerBowl}
                     onChange={(e) => setPart(key, "unitsPerBowl", e.target.value)}
                     aria-label={`Unidades por bowl de ${label}`}
                   />
+                  </label>
                   <span className={ui.subtotal}>
                     = {money((Number(form[key].costPerUnit) || 0) * (Number(form[key].unitsPerBowl) || 0))}
                   </span>
@@ -343,7 +412,11 @@ export default function CostingPage({ styles }) {
               </div>
             ))}
           </div>
+          <p className={ui.hint}>El costo general de complementos se usa como respaldo cuando no hay costos individuales disponibles.</p>
 
+          </details>
+          <details id="costing-complements" className={ui.disclosure} open>
+          <summary>2. Complementos <small>Costo de compra y rendimiento</small></summary>
           <h4 className={ui.subhead}>
             Costo por complemento
             <span className={ui.hint}>
@@ -353,17 +426,23 @@ export default function CostingPage({ styles }) {
               {" "}{usage.bowls} bowls reales de los últimos {usage.windowDays} días.
             </span>
           </h4>
+          <div className={ui.filters}>
+            <label>Buscar complemento<input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ej. aguacate, pepino…" /></label>
+            <label className={ui.checkbox}><input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} /> Solo pendientes de completar</label>
+          </div>
+          {visibleComplements.length === 0 && <p className={ui.muted}>No hay complementos que coincidan con estos filtros.</p>}
           <div className={ui.complementGrid}>
             {(usage.keys || []).map((key) => {
               const label = usage.labels?.[key] || key;
               const freq = usage.frequency?.[key] || 0;
               const resolved = data.complementCosts?.[key] || {};
               const entry = form.complementCosts?.[key] || {};
-              const costPerUnit = Number(entry.costPerUnit) || resolved.costPerUnit || 0;
+              const inventoryCost = resolved.inventoryCostPerUnit ?? (resolved.source === "inventario" ? resolved.costPerUnit : 0);
+              const costPerUnit = Number(entry.costPerUnit) || inventoryCost || 0;
               const portions = Number(entry.portionsPerUnit) || 0;
               const perPortion = costPerUnit > 0 && portions > 0 ? costPerUnit / portions : 0;
               return (
-                <div key={key} className={ui.complementCard}>
+                <div key={key} className={ui.complementCard} hidden={!visibleComplements.includes(key)}>
                   <div className={ui.complementHead}>
                     <span className={ui.complementLabel}>{label}</span>
                     <span className={ui.freq}>{Math.round(freq * 100)}% de los bowls</span>
@@ -372,11 +451,11 @@ export default function CostingPage({ styles }) {
                     <label>
                       <span className={ui.hint}>
                         Costo por {resolved.unit || "unidad"}
-                        {resolved.source === "inventario" && " · del inventario"}
+                        {!Number(entry.costPerUnit) && inventoryCost > 0 && " · del inventario"}
                       </span>
                       <input
-                        type="number" min="0" step="0.5" inputMode="decimal"
-                        placeholder={resolved.costPerUnit ? String(resolved.costPerUnit) : "0"}
+                        type="number" min="0" step="any" inputMode="decimal"
+                        placeholder={inventoryCost ? String(inventoryCost) : "0"}
                         value={entry.costPerUnit ?? ""}
                         onChange={(e) => setForm((p) => ({
                           ...p,
@@ -391,7 +470,7 @@ export default function CostingPage({ styles }) {
                     <label>
                       <span className={ui.hint}>Porciones que rinde</span>
                       <input
-                        type="number" min="0" step="1" inputMode="decimal"
+                        type="number" min="0" step="any" inputMode="decimal"
                         placeholder="0"
                         value={entry.portionsPerUnit ?? ""}
                         onChange={(e) => setForm((p) => ({
@@ -406,19 +485,22 @@ export default function CostingPage({ styles }) {
                     </label>
                   </div>
                   <div className={ui.complementFoot}>
-                    <span>{money(perPortion)} por porción</span>
-                    <strong>{money(perPortion * freq)}</strong>
+                    <span>{costPerUnit > 0 && portions > 0 ? `${money(perPortion)} por porción` : "Falta costo o rendimiento"}</span>
+                    <strong title="Costo por porción multiplicado por la frecuencia de uso">{money(perPortion * freq)} / bowl promedio</strong>
                   </div>
                 </div>
               );
             })}
           </div>
           <p className={ui.complementTotal}>
-            Costo de complementos por bowl promedio:
+            Costo guardado de complementos por bowl promedio:
             <strong>{money(data.bowls[0]?.rows.complements || 0)}</strong>
           </p>
+          </details>
 
-          <h4 className={ui.subhead}>Proteínas sin costo en el inventario ($ por kg)</h4>
+          <details id="costing-proteins" className={ui.disclosure} open>
+          <summary>3. Proteínas <small>Costo por kilo · inventario o captura manual</small></summary>
+          <p className={ui.subtitle}>El costo del inventario se usa automáticamente. Un importe manual lo reemplaza; déjalo vacío para volver a usar el inventario.</p>
           <div className={ui.grid}>
             {bowls.map((b) => (
               <div key={b.proteinKey} className={ui.field}>
@@ -429,7 +511,7 @@ export default function CostingPage({ styles }) {
                     : "Captura el costo por kg"}
                 </span>
                 <input
-                  type="number" min="0" step="1" inputMode="decimal"
+                  type="number" min="0" step="any" inputMode="decimal" aria-label={`Costo por kilo de ${b.label}`}
                   placeholder={b.proteinSource === "inventario" ? String(b.proteinCostPerKg) : "0"}
                   value={form.proteinCostPerKgOverride[b.proteinKey] ?? ""}
                   onChange={(e) => setForm((prev) => ({
@@ -440,12 +522,30 @@ export default function CostingPage({ styles }) {
               </div>
             ))}
           </div>
+          </details>
+          <details className={ui.disclosure}>
+          <summary>4. Combo y reglas de margen <small>Bebida, rice cake y objetivos</small></summary>
 
+          <div className={ui.grid}>
+            {[
+              ["comboDrinkCost", "Costo de la bebida del combo", "Importe por bebida"],
+              ["comboRiceCakeCost", "Costo del rice cake", "Importe por pieza"],
+              ["promoMinMarginPct", "Margen mínimo con promoción (%)", "Por debajo de este porcentaje, la promoción no alcanza tu objetivo"],
+              ["promoEligibleMinMarginPct", "Margen mínimo para entrar al 2x1 (%)", "Margen sin promoción que debe tener la proteína"],
+            ].map(([key, label, hint]) => <label className={ui.field} key={key}>
+              <span>{label}</span><span className={ui.hint}>{hint}</span>
+              <input type="number" min="0" max={key.includes("Margin") ? 100 : undefined} step="any" inputMode="decimal" value={form[key]} onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))} />
+            </label>)}
+          </div>
+          </details>
+        </fieldset>
+
+        <fieldset className={ui.editor} disabled={saving} hidden={view !== "ingredients"}>
           <h4 className={ui.subhead}>
             Ingredientes que manejas
             <span className={ui.hint}>
               Apaga los que no vendes: desaparecen del costeo <strong>y dejan de ofrecerse</strong>
-              {" "}a los clientes en el sitio, el kiosco y el POS. Esto es permanente — para algo
+              {" "}a los clientes en el sitio, el kiosco y el POS al guardar. Puedes volver a activarlos — para algo
               agotado solo hoy, usa la pestaña Tienda.
             </span>
           </h4>
@@ -476,52 +576,21 @@ export default function CostingPage({ styles }) {
                   onClick={() => toggleIngredient("disabledComplements", key)}
                 >
                   <span>{off ? "○" : "●"}</span> {usage.labels?.[key] || key}
-                  {freq === 0 && !off && <em className={ui.neverUsed}>nadie lo pide</em>}
+                  {freq === 0 && !off && <em className={ui.neverUsed}>sin registros</em>}
                 </button>
               );
             })}
           </div>
 
-          <h4 className={ui.subhead}>Combo y reglas</h4>
-          <div className={ui.grid}>
-            <div className={ui.field}>
-              <label>Costo de la bebida del combo</label>
-              <input type="number" min="0" step="0.5" inputMode="decimal"
-                value={form.comboDrinkCost}
-                onChange={(e) => setForm((p) => ({ ...p, comboDrinkCost: e.target.value }))} />
-            </div>
-            <div className={ui.field}>
-              <label>Costo del rice cake</label>
-              <input type="number" min="0" step="0.5" inputMode="decimal"
-                value={form.comboRiceCakeCost}
-                onChange={(e) => setForm((p) => ({ ...p, comboRiceCakeCost: e.target.value }))} />
-            </div>
-            <div className={ui.field}>
-              <label>Margen mínimo con promoción</label>
-              <span className={ui.hint}>Abajo de esto, la promo no se sostiene</span>
-              <input type="number" min="0" max="100" step="1" inputMode="decimal"
-                value={form.promoMinMarginPct}
-                onChange={(e) => setForm((p) => ({ ...p, promoMinMarginPct: e.target.value }))} />
-            </div>
-            <div className={ui.field}>
-              <label>Margen mínimo para entrar al 2x1</label>
-              <span className={ui.hint}>Margen sin promo que debe tener la proteína</span>
-              <input type="number" min="0" max="100" step="1" inputMode="decimal"
-                value={form.promoEligibleMinMarginPct}
-                onChange={(e) => setForm((p) => ({ ...p, promoEligibleMinMarginPct: e.target.value }))} />
-            </div>
+        </fieldset>
+        <footer className={`${ui.saveBar} ${!dirty ? ui.saveBarIdle : ""}`}>
+          <div role="status"><strong>{saving ? "Guardando cambios…" : dirty ? "Tienes cambios sin guardar" : "Costos guardados"}</strong>
+          <span>{dirty ? "Guarda para recalcular los márgenes y aplicar los cambios del menú." : data.config.updatedAt ? `Actualizado: ${new Date(data.config.updatedAt).toLocaleString("es-MX")}${data.config.updatedBy ? ` · ${data.config.updatedBy}` : ""}` : "Edita un costo para comenzar."}</span></div>
+          <div className={ui.saveActions}>
+            {dirty && <button type="button" className={ui.secondaryBtn} disabled={saving} onClick={() => { if (window.confirm("¿Descartar todos los cambios sin guardar?")) { hydrate(data); setError(""); setSavedMsg(""); } }}>Descartar</button>}
+            <button type="button" className={ui.saveBtn} onClick={save} disabled={saving || !dirty}>{saving ? "Guardando…" : "Guardar cambios"}</button>
           </div>
-
-          <button className={ui.saveBtn} onClick={save} disabled={saving}>
-            {saving ? "Guardando…" : "Guardar costos"}
-          </button>
-          {data.config.updatedAt && (
-            <p className={ui.muted}>
-              Última actualización: {new Date(data.config.updatedAt).toLocaleString("es-MX")}
-              {data.config.updatedBy ? ` · ${data.config.updatedBy}` : ""}
-            </p>
-          )}
-        </div>
+        </footer>
       </div>
     </section>
   );
