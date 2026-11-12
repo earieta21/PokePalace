@@ -26,6 +26,30 @@ const schema = new mongoose.Schema({
     didi_food: { type: Number, default: 0 },
     rappi:     { type: Number, default: 0 },
   },
+  // Vinculación de la tienda con Uber Eats (ver services/uberEatsProvisioning.js).
+  // El token del dueño solo sirve para listar tiendas y activar la
+  // integración; se borra en cuanto se activa una tienda.
+  uberEats: {
+    connectedAt:     { type: Date, default: null },
+    connectedBy:     { type: String, default: null },
+    stores: {
+      type: [{
+        _id: false,
+        storeId: String,
+        name: String,
+        address: String,
+      }],
+      default: [],
+    },
+    activeStoreId:   { type: String, default: null },
+    activeStoreName: { type: String, default: null },
+    activatedAt:     { type: Date, default: null },
+    activatedBy:     { type: String, default: null },
+    // Lo marca el webhook store.deprovisioned si Uber desconecta la tienda.
+    deactivatedAt:   { type: Date, default: null },
+  },
+  uberEatsUserToken:          { type: String, default: null, select: false },
+  uberEatsUserTokenExpiresAt: { type: Date, default: null },
 });
 schema.index({ key: 1 }, { unique: true });
 

@@ -28,6 +28,7 @@ import {
 // POS pages — unchanged, work via StaffAuthContext.Provider
 import POSPage from "../pos/pages/POSPage";
 import PendingPayments from "../pos/PendingPayments";
+import UberEatsConnect from "./UberEatsConnect";
 import KDSPage from "../pos/pages/KDSPage";
 import OrderHistoryPage from "../pos/pages/OrderHistoryPage";
 import FinancePage from "../pos/pages/FinancePage";
@@ -383,7 +384,9 @@ export default function UnifiedStaffApp() {
       setEmployees([{ _id: user.id, name: user.name, role: user.role, color: user.color }]);
     }
     const tabs = TABS_BY_ROLE[user.role] || TABS_BY_ROLE.employee;
-    setTab(tabs[0]);
+    // Al regresar de autorizar Uber se abre Tienda, donde está la vinculación.
+    const returningFromUber = new URLSearchParams(window.location.search).has("uber");
+    setTab(returningFromUber && tabs.includes("disponibilidad") ? "disponibilidad" : tabs[0]);
   }
 
   function handleLogout() {
@@ -2003,6 +2006,8 @@ function AvailabilityTab({ token, role }) {
 
   return (
     <div>
+      {canBackup && <UberEatsConnect token={token} />}
+
       {/* Pausar pedidos en línea */}
       <div className={`mb-6 rounded-2xl border p-4 ${storeStatus.ordersPaused ? "bg-rose-500/10 border-rose-500/30" : "bg-slate-900 border-white/5"}`}>
         <div className="flex items-center justify-between gap-3">
