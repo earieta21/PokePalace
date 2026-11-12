@@ -11,12 +11,12 @@ export default function Register() {
   const location = useLocation();
   const from = location.state?.from || "/order";
 
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", marketingOptIn: false });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm({ ...form, [e.target.name]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -90,6 +90,29 @@ export default function Register() {
               minLength={8}
             />
           </div>
+
+          {/* Opcional y sin marcar: sin este permiso no se le mandan promociones. */}
+          <label className={styles.checkbox}>
+            <input
+              type="checkbox"
+              name="marketingOptIn"
+              checked={form.marketingOptIn}
+              onChange={handleChange}
+            />
+            <span>{t("auth.marketingOptIn")}</span>
+          </label>
+
+          {/* Se abren en otra pestaña para no perder lo que ya escribió. */}
+          <p className={styles.legal}>
+            {t("auth.legalBefore")}{" "}
+            <Link className={styles.link} to="/aviso-de-privacidad" target="_blank" rel="noopener noreferrer">
+              {t("footer.privacyLink")}
+            </Link>{" "}
+            {t("auth.legalAnd")}{" "}
+            <Link className={styles.link} to="/terminos-de-servicio" target="_blank" rel="noopener noreferrer">
+              {t("auth.termsLink")}
+            </Link>.
+          </p>
 
           <button className={styles.button} disabled={loading}>
             {loading ? t("auth.creating") : t("auth.create")}

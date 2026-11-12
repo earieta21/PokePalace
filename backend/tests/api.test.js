@@ -293,6 +293,7 @@ test("solo gerencia puede consultar clientes registrados y sus puntos", async ()
     assert.equal(exported.customers[0].phone, "+52 664 123 4567");
     assert.equal(exported.customers[0].totalSpent, 310);
     assert.deepEqual(exported.customers[0].tags, ["new", "dormant"]);
+    assert.equal(exported.customers[0].marketingOptIn, false);
     assert.equal("password" in exported.customers[0], false);
     assert.equal("_id" in exported.customers[0], false);
     assert.equal((await staffRequest("manager", exportPath)).status, 403);
@@ -579,6 +580,10 @@ test("solo el dueño ve su orden y cancelar revierte puntos/promo exactamente un
   });
   assert.equal(ownerRegistration.status, 201);
   const owner = await ownerRegistration.json();
+  // Sin marcar la casilla no hay permiso para promociones.
+  const notOptedIn = await User.findById(owner.user.id).select("marketingOptIn marketingOptInAt").lean();
+  assert.equal(notOptedIn.marketingOptIn, false);
+  assert.equal(notOptedIn.marketingOptInAt, null);
 
   const strangerRegistration = await postJSON("/api/auth/register", {
     name: "Otro cliente CI",
@@ -878,9 +883,14 @@ test("el QR temporal identifica al miembro y autoriza un solo canje en caja", as
     name: "Miembro QR CI",
     email: `ci-pos-security-member-${suffix}@example.test`,
     password: "prueba-segura-123",
+    marketingOptIn: true,
   });
   assert.equal(registration.status, 201);
   const account = await registration.json();
+  // Marcó la casilla de promociones: queda guardado con la fecha.
+  const optedIn = await User.findById(account.user.id).select("marketingOptIn marketingOptInAt").lean();
+  assert.equal(optedIn.marketingOptIn, true);
+  assert.ok(optedIn.marketingOptInAt instanceof Date);
   await User.updateOne({ _id: account.user.id }, { $set: { points: 150, lifetimePoints: 150 } });
 
   const cardResponse = await fetch(`${BASE}/api/rewards/member-card`, {

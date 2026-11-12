@@ -47,6 +47,11 @@ const userSchema = new mongoose.Schema(
     points: { type: Number, default: 0 },          // saldo gastable — sube y baja al canjear
     lifetimePoints: { type: Number, default: 0 },   // nivel — solo sube, nunca baja al gastar
     pointsLastEarnedAt: { type: Date, default: null }, // para expirar saldo inactivo
+    // Permiso para mandarle promociones por correo (finalidad secundaria del
+    // Aviso de Privacidad). Solo se activa si el cliente marca la casilla al
+    // registrarse; sin esto no se le manda publicidad.
+    marketingOptIn: { type: Boolean, default: false },
+    marketingOptInAt: { type: Date, default: null },
     // Idempotency ledger for customer-order cancellation refunds. The order id
     // and point increment are written atomically to this same document.
     cancelledOrderRefunds: {

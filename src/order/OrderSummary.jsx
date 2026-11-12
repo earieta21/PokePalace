@@ -6,6 +6,7 @@ import { API_URL } from "../config";
 import { PREMIUM_PROTEIN_PRICES, computeCartPricing } from "./pricing";
 import { useLanguage } from "../i18n/LanguageContext";
 import { comboPalaceSelectionLabels } from "../data/comboPalace";
+import { MXN_PER_POINT, REWARDS, SIGNUP_BONUS_POINTS } from "../data/rewardsCatalog";
 import KioskPairingQr from "../kiosk/KioskPairingQr";
 import kioskPairStyles from "../kiosk/KioskPairingQr.module.css";
 import styles from "./OrderSummary.module.css";
@@ -120,6 +121,14 @@ const OrderSummary = ({
   const pricing = computeCartPricing(cart, promoApplied);
   const appliedPointsDiscount = Math.min(Math.max(0, pointsDiscount), pricing.total);
   const finalTotal = Math.max(0, pricing.total - appliedPointsDiscount);
+  // Para el invitado: lo que se llevaría si crea su cuenta antes de pedir
+  // (bono de bienvenida + los puntos de este pedido) y el mejor premio que ya
+  // le alcanzaría con eso.
+  const signupOrderPoints = Math.floor(finalTotal / MXN_PER_POINT);
+  const signupTotalPoints = SIGNUP_BONUS_POINTS + signupOrderPoints;
+  const signupReward = REWARDS
+    .filter((reward) => reward.cost <= signupTotalPoints)
+    .sort((a, b) => b.cost - a.cost)[0];
   // 2x1 en Bowls es solo para comer en el restaurante — el servidor rechaza
   // igual esta combinación, pero bloquear aquí evita que el cliente llegue
   // hasta el envío para enterarse.
@@ -493,10 +502,22 @@ const OrderSummary = ({
         {!isKiosk && !isLoggedIn && (
           <div className={styles.signupPrompt}>
             <span className={styles.signupPromptIcon} aria-hidden="true">🎁</span>
-            <div className={styles.signupPromptText}>
-              <p className={styles.signupPromptTitle}>{t("summary.signupPromptTitle")}</p>
-              <p className={styles.signupPromptSubtitle}>{t("summary.signupPromptSubtitle")}</p>
-            </div>
+            {signupOrderPoints > 0 ? (
+              <div className={styles.signupPromptText}>
+                <p className={styles.signupPromptTitle}>
+                  {t("summary.signupPromptOrderTitle", { points: signupTotalPoints })}
+                </p>
+                <p className={styles.signupPromptSubtitle}>
+                  {t("summary.signupPromptOrderSubtitle", { bonus: SIGNUP_BONUS_POINTS, earned: signupOrderPoints })}
+                  {signupReward && ` ${t("summary.signupPromptReward", { reward: signupReward.name[language] ?? signupReward.name.es })}`}
+                </p>
+              </div>
+            ) : (
+              <div className={styles.signupPromptText}>
+                <p className={styles.signupPromptTitle}>{t("summary.signupPromptTitle")}</p>
+                <p className={styles.signupPromptSubtitle}>{t("summary.signupPromptSubtitle")}</p>
+              </div>
+            )}
             <Link
               className={styles.signupPromptButton}
               to="/register"

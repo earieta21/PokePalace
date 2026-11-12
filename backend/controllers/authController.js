@@ -51,6 +51,10 @@ export const register = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    // Solo un true explícito cuenta como permiso para promociones: la casilla
+    // es opcional y empieza sin marcar.
+    const marketingOptIn = req.body.marketingOptIn === true;
+    const now = new Date();
 
     const user = await User.create({
       name: cleanName,
@@ -58,7 +62,9 @@ export const register = async (req, res) => {
       password: hashedPassword,
       points: SIGNUP_BONUS_POINTS,
       lifetimePoints: SIGNUP_BONUS_POINTS,
-      pointsLastEarnedAt: new Date(),
+      pointsLastEarnedAt: now,
+      marketingOptIn,
+      marketingOptInAt: marketingOptIn ? now : null,
     });
 
     const token = signToken(user._id);

@@ -59,7 +59,7 @@ async function loadDirectory(params) {
   }
 
   const customers = await User.find(filter)
-    .select("_id name email phone points lifetimePoints pointsLastEarnedAt createdAt")
+    .select("_id name email phone points lifetimePoints pointsLastEarnedAt marketingOptIn createdAt")
     .lean();
 
   const now = new Date();
@@ -129,6 +129,7 @@ export const exportCustomers = async (req, res) => {
         lifetimePoints: row.lifetimePoints || 0,
         pointsExpireAt: row.pointsExpireAt,
         tags: row.tags,
+        marketingOptIn: row.marketingOptIn === true,
         createdAt: row.createdAt,
       })),
     });
@@ -208,7 +209,7 @@ export const getCustomerDetail = async (req, res) => {
       return res.status(404).json({ message: "Cliente no encontrado" });
     }
     const customer = await User.findOne({ _id: req.params.id, role: "user" })
-      .select("_id name email phone points lifetimePoints pointsLastEarnedAt createdAt favoriteBowls")
+      .select("_id name email phone points lifetimePoints pointsLastEarnedAt marketingOptIn createdAt favoriteBowls")
       .lean();
     if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
 
@@ -249,6 +250,7 @@ export const getCustomerDetail = async (req, res) => {
         phone: customer.phone || "",
         points: customer.points || 0,
         lifetimePoints: customer.lifetimePoints || 0,
+        marketingOptIn: customer.marketingOptIn === true,
         createdAt: customer.createdAt,
         favoriteBowls: (customer.favoriteBowls || []).map((bowl) => ({
           name: bowl.name,

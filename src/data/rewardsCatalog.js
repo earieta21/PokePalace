@@ -2,6 +2,13 @@
 // (backend/config/rewardsCatalog.js) tiene su propia copia — es la que
 // realmente se usa para cobrar puntos, nunca se confía en esta.
 // Si cambias un premio (costo, nombre, ícono), actualiza ambos archivos.
+
+// Solo para mostrar cuánto ganaría alguien al crear su cuenta. Las reglas
+// reales viven en el backend: SIGNUP_BONUS_POINTS (authController.js) y
+// 1 punto por cada $10 (awardLoyaltyPoints en utils/loyalty.js).
+export const SIGNUP_BONUS_POINTS = 50;
+export const MXN_PER_POINT = 10;
+
 export const REWARDS = [
   {
     id: 1,

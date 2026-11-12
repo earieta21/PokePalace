@@ -8,7 +8,7 @@ const LEGAL_RFC = "AINE020521HN6";
 const CONTENT = {
   es: {
     title: "Aviso de Privacidad",
-    updated: "Última actualización: 4 de noviembre de 2026",
+    updated: "Última actualización: 11 de noviembre de 2026",
     sections: [
       {
         title: "1. Responsable de los datos",
@@ -31,7 +31,7 @@ const CONTENT = {
       },
       {
         title: "3. Uso de tus datos",
-        body: ["Utilizamos tus datos personales para:"],
+        body: ["Utilizamos tus datos personales para estas finalidades, necesarias para darte el servicio:"],
         list: [
           "Crear y administrar tu cuenta y programa de recompensas.",
           "Procesar y dar seguimiento a tus pedidos (en tienda, kiosco o en línea).",
@@ -40,6 +40,9 @@ const CONTENT = {
           "Mejorar nuestros productos, menú y experiencia dentro de la app.",
           "Medir de forma agregada el rendimiento del sitio y el avance por las etapas del proceso de compra.",
           "Cumplir obligaciones legales y fiscales.",
+        ],
+        after: [
+          `Finalidad adicional (opcional): enviarte promociones, novedades y ofertas de Poke Palace por correo electrónico. Solo lo haremos si lo aceptas marcando la casilla correspondiente al crear tu cuenta; si no la marcas, no te enviaremos publicidad y tu cuenta, tus pedidos y tus puntos funcionan igual. Puedes retirar este consentimiento en cualquier momento escribiendo a ${CONTACT_EMAIL}.`,
         ],
       },
       {
@@ -52,6 +55,7 @@ const CONTENT = {
           "OpenStreetMap para mostrar el mapa de nuestra ubicación dentro de la app.",
           "Google Maps, si eliges el botón \"Cómo llegar\", para abrir la ruta hacia nuestra sucursal.",
           "Google Analytics para medir el uso del sitio y generar estadísticas agregadas de navegación y conversión.",
+          "Brevo, para enviarte por correo la confirmación de tus pedidos y, solo si lo aceptaste, promociones.",
           "Proveedores de hospedaje e infraestructura tecnológica que almacenan nuestros datos de forma segura.",
           "Autoridades competentes cuando así lo exija la ley.",
         ],
@@ -78,7 +82,7 @@ const CONTENT = {
   },
   en: {
     title: "Privacy Policy",
-    updated: "Last updated: November 4, 2026",
+    updated: "Last updated: November 11, 2026",
     sections: [
       {
         title: "1. Data controller",
@@ -101,7 +105,7 @@ const CONTENT = {
       },
       {
         title: "3. How we use your data",
-        body: ["We use your personal data to:"],
+        body: ["We use your personal data for these purposes, which are necessary to provide the service:"],
         list: [
           "Create and manage your account and rewards program.",
           "Process and track your orders (in-store, kiosk, or online).",
@@ -110,6 +114,9 @@ const CONTENT = {
           "Improve our products, menu, and in-app experience.",
           "Measure aggregate site performance and progress through the purchase funnel.",
           "Comply with legal and tax obligations.",
+        ],
+        after: [
+          `Additional purpose (optional): sending you Poke Palace deals, news, and offers by email. We only do this if you agree by checking the box when you create your account; if you don't, we won't send you marketing and your account, orders, and points work the same. You can withdraw this consent at any time by writing to ${CONTACT_EMAIL}.`,
         ],
       },
       {
@@ -122,6 +129,7 @@ const CONTENT = {
           "OpenStreetMap to display our location map within the app.",
           "Google Maps, if you tap the \"Get Directions\" button, to open the route to our store.",
           "Google Analytics to measure site usage and produce aggregate navigation and conversion statistics.",
+          "Brevo, to email you order confirmations and, only if you agreed, deals.",
           "Hosting and technology infrastructure providers that securely store our data.",
           "Competent authorities when required by law.",
         ],
@@ -172,6 +180,9 @@ export default function PrivacyPolicy() {
               ))}
             </ul>
           )}
+          {section.after?.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
         </section>
       ))}
     </div>

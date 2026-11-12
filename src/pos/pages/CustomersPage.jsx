@@ -246,7 +246,7 @@ export default function CustomersPage({ styles }) {
       const data = await api.get(`/api/staff/customers/export?${params}`);
       const segmentLabel = Object.fromEntries(SEGMENTS.map((option) => [option.id, option.label]));
       downloadCSV(`clientes_${slug(activeSegment.label)}_${tijuanaDateKey()}.csv`, [
-        ["Nombre", "Correo", "Teléfono", "Compras", "Total gastado", "Última compra", "Puntos", "Puntos históricos", "Puntos vencen", "Etiquetas", "Registro"],
+        ["Nombre", "Correo", "Teléfono", "Compras", "Total gastado", "Última compra", "Puntos", "Puntos históricos", "Puntos vencen", "Etiquetas", "Acepta promociones", "Registro"],
         ...(data.customers ?? []).map((customer) => [
           textCell(customer.name),
           textCell(customer.email),
@@ -258,6 +258,7 @@ export default function CustomersPage({ styles }) {
           customer.lifetimePoints,
           csvDate(customer.pointsExpireAt),
           (customer.tags ?? []).map((tag) => segmentLabel[tag]).filter(Boolean).join(", "),
+          customer.marketingOptIn ? "Sí" : "No",
           csvDate(customer.createdAt),
         ]),
       ]);
@@ -479,6 +480,7 @@ function CustomerDetailBody({ data, styles }) {
         Cliente desde el {dateOnly(customer.createdAt)}
         {stats.firstPurchaseAt ? ` · primera compra el ${dateOnly(stats.firstPurchaseAt)}` : " · todavía no compra"}
         {sources ? ` · ${sources}` : ""}
+        {customer.marketingOptIn ? " · Acepta promociones por correo" : " · No aceptó recibir promociones"}
       </p>
 
       <section className={ui.section}>
