@@ -4,7 +4,7 @@
 import Receipt, { RECEIPT_KINDS, RECEIPT_PAYMENT_METHODS } from "../models/Receipt.js";
 import Expense, { EXPENSE_CATEGORIES } from "../models/Expense.js";
 import StoreSettings from "../models/StoreSettings.js";
-import { uploadImageToCloudinary, deleteImageFromCloudinary, cloudinaryConfigured } from "../utils/cloudinary.js";
+import { uploadImageToCloudinary, uploadFileToCloudinary, deleteImageFromCloudinary, cloudinaryConfigured } from "../utils/cloudinary.js";
 import { emailConfigured, explainEmailError } from "../utils/notify.js";
 import {
   sendReceiptsToAccountant, nextAccountantSendKey, summarizeReceipts,
@@ -25,6 +25,22 @@ export function detectImageType(buffer) {
   if (buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") return "image/webp";
   return null;
 }
+
+// Facturas guardadas en la computadora: el PDF y el XML del CFDI. Igual que
+// con las fotos, se reconocen por su contenido y no por el Content-Type.
+export function detectDocumentType(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 5) return null;
+  if (buffer.toString("ascii", 0, 5) === "%PDF-") return { mimeType: "application/pdf", extension: "pdf" };
+  // El XML puede traer BOM o espacios antes de la declaración.
+  const head = buffer.subarray(0, 256).toString("utf8").replace(/^\uFEFF/, "").trimStart();
+  if (/^<\?xml[\s?]/i.test(head) || /^<cfdi:Comprobante[\s>]/.test(head)) {
+    return { mimeType: "application/xml", extension: "xml" };
+  }
+  return null;
+}
+
+// Los documentos viven en Cloudinary como "raw"; se reconoce por su URL.
+export const isRawReceiptUrl = (url) => typeof url === "string" && url.includes("/raw/upload/");
 
 const cleanText = (value, max) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
@@ -71,13 +87,17 @@ const expenseDescription = (meta) =>
   ([meta.vendor, meta.note].filter(Boolean).join(" — ") || `${RECEIPT_KIND_LABEL[meta.kind]} ${meta.date}`).slice(0, 200);
 
 /* POST /api/staff/receipts?kind=&paymentMethod=&amount=&date=&vendor=&note=&registerExpense=&category=
-   Cuerpo: la foto (image/jpeg | image/png | image/webp). */
+   Cuerpo: la foto (image/jpeg | image/png | image/webp) o el documento de
+   la factura (application/pdf | XML del CFDI). */
 export const uploadReceipt = async (req, res) => {
   const meta = parseReceiptMeta(req.query);
   if (meta.error) return res.status(400).json({ message: meta.error });
 
   const mimeType = detectImageType(req.body);
-  if (!mimeType) return res.status(400).json({ message: "Sube una foto en JPG, PNG o WEBP." });
+  const document = mimeType ? null : detectDocumentType(req.body);
+  if (!mimeType && !document) {
+    return res.status(400).json({ message: "Sube una foto (JPG, PNG o WEBP) o la factura en PDF o XML." });
+  }
 
   if (!cloudinaryConfigured()) {
     return res.status(503).json({ message: "El almacenamiento de fotos (Cloudinary) no está configurado en el servidor." });
@@ -85,7 +105,9 @@ export const uploadReceipt = async (req, res) => {
 
   let uploaded;
   try {
-    uploaded = await uploadImageToCloudinary(req.body, { folder: "comprobantes", mimeType });
+    uploaded = document
+      ? await uploadFileToCloudinary(req.body, { folder: "comprobantes", ...document })
+      : await uploadImageToCloudinary(req.body, { folder: "comprobantes", mimeType });
   } catch (err) {
     logServerError(err, "POST /api/staff/receipts: cloudinary");
     return res.status(502).json({ message: "No se pudo guardar la foto. Intenta de nuevo en un momento." });
@@ -129,7 +151,7 @@ export const uploadReceipt = async (req, res) => {
   } catch (err) {
     // Que no quede ni un gasto ni una foto huérfana de un registro a medias.
     if (expense) await Expense.deleteOne({ _id: expense._id }).catch(() => {});
-    await deleteImageFromCloudinary(uploaded.publicId).catch(() => {});
+    await deleteImageFromCloudinary(uploaded.publicId, { resourceType: document ? "raw" : "image" }).catch(() => {});
     logServerError(err, "POST /api/staff/receipts");
     res.status(500).json({ message: "No se pudo registrar el comprobante." });
   }
@@ -177,7 +199,7 @@ export const deleteReceipt = async (req, res) => {
       expenseRemoved = result.deletedCount > 0;
     }
     if (receipt.source === "portal" && receipt.publicId) {
-      deleteImageFromCloudinary(receipt.publicId)
+      deleteImageFromCloudinary(receipt.publicId, { resourceType: isRawReceiptUrl(receipt.imageUrl) ? "raw" : "image" })
         .catch((err) => logServerError(err, "DELETE /api/staff/receipts: cloudinary"));
     }
 

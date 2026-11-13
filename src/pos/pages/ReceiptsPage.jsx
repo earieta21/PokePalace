@@ -85,6 +85,25 @@ async function compressImage(file, { maxSide = 2000, quality = 0.82 } = {}) {
   }
 }
 
+// Facturas guardadas en la computadora: el PDF o el XML del CFDI se suben
+// tal cual (no se comprimen como foto). Mismo límite que el servidor.
+const MAX_DOCUMENT_MB = 8;
+const DOCUMENT_TYPES = {
+  pdf: { mimeType: "application/pdf", label: "PDF", icon: "📄" },
+  xml: { mimeType: "application/xml", label: "XML (CFDI)", icon: "🧾" },
+};
+function documentTypeOf(file) {
+  const extension = (file.name.split(".").pop() || "").toLowerCase();
+  if (file.type === "application/pdf" || extension === "pdf") return "pdf";
+  if (["application/xml", "text/xml"].includes(file.type) || extension === "xml") return "xml";
+  return null;
+}
+// Los documentos viven en Cloudinary como "raw" (no tienen miniatura).
+const documentKindOfUrl = (url) => {
+  const match = typeof url === "string" && url.includes("/raw/upload/") && url.match(/\.(pdf|xml)(?:$|\?)/i);
+  return match ? match[1].toLowerCase() : null;
+};
+
 const emptyForm = (keep = {}) => ({
   kind: keep.kind ?? "ticket",
   paymentMethod: keep.paymentMethod ?? "",
@@ -111,7 +130,7 @@ export default function ReceiptsPage({ styles }) {
   const [notice, setNotice] = useState("");
 
   const [form, setForm] = useState(() => emptyForm());
-  const [photo, setPhoto] = useState(null); // { blob, previewUrl, size }
+  const [photo, setPhoto] = useState(null); // { blob, previewUrl, size } o { blob, size, document, name }
   const [preparing, setPreparing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [formError, setFormError] = useState("");
@@ -151,6 +170,7 @@ export default function ReceiptsPage({ styles }) {
 
   // Libera la vista previa al cambiar de foto o salir de la pestaña.
   useEffect(() => () => { if (photo?.previewUrl) URL.revokeObjectURL(photo.previewUrl); }, [photo]);
+  // (los documentos no crean vista previa, así que no hay nada que liberar)
 
   const refresh = () => { setError(""); loadSettings(); loadReceipts(); };
 
@@ -159,6 +179,21 @@ export default function ReceiptsPage({ styles }) {
     event.target.value = ""; // permite volver a elegir la misma foto
     if (!file) return;
     setFormError("");
+    const document = documentTypeOf(file);
+    if (document) {
+      if (file.size > MAX_DOCUMENT_MB * 1024 * 1024) {
+        setFormError(`El archivo pesa demasiado (máximo ${MAX_DOCUMENT_MB} MB).`);
+        return;
+      }
+      // Se manda con el tipo correcto aunque la compu no lo reporte.
+      const blob = new Blob([file], { type: DOCUMENT_TYPES[document].mimeType });
+      setPhoto({ blob, size: file.size, document, name: file.name });
+      return;
+    }
+    if (file.type && !file.type.startsWith("image/")) {
+      setFormError("Ese archivo no es foto, PDF ni XML. Sube la foto del comprobante o la factura en PDF o XML.");
+      return;
+    }
     setPreparing(true);
     try {
       const blob = await compressImage(file);
@@ -178,7 +213,7 @@ export default function ReceiptsPage({ styles }) {
   };
 
   const saveReceipt = async () => {
-    if (!photo) return setFormError("Primero toma o elige la foto del comprobante.");
+    if (!photo) return setFormError("Primero toma una foto o elige el archivo del comprobante.");
     if (!form.paymentMethod) return setFormError("Elige cómo se pagó (efectivo, tarjeta…).");
     const amount = form.amount === "" ? null : Number(form.amount);
     if (amount !== null && (!Number.isFinite(amount) || amount < 0)) return setFormError("El monto no es válido.");
@@ -280,7 +315,7 @@ export default function ReceiptsPage({ styles }) {
         <div>
           <h1 className={styles.pageTitle}>Comprobantes</h1>
           <p className={styles.pageSubtitle}>
-            Sube la foto de cada factura, ticket o voucher. Cada lunes se le mandan solos a tu contador.
+            Sube la foto o el PDF/XML de cada factura, ticket o voucher. Cada lunes se le mandan solos a tu contador.
           </p>
         </div>
         <div className={ui.headerActions}>
@@ -375,16 +410,24 @@ export default function ReceiptsPage({ styles }) {
             <input
               ref={fileInput}
               type="file"
-              accept="image/*"
+              accept="image/*,application/pdf,.pdf,application/xml,text/xml,.xml"
               className={ui.hiddenInput}
               onChange={pickPhoto}
-              aria-label="Foto del comprobante"
+              aria-label="Foto o archivo del comprobante"
             />
             {photo ? (
               <div className={ui.preview}>
-                <img src={photo.previewUrl} alt="Vista previa del comprobante" />
+                {photo.document ? (
+                  <div className={ui.documentPreview}>
+                    <span aria-hidden="true">{DOCUMENT_TYPES[photo.document].icon}</span>
+                    <strong>{photo.name}</strong>
+                    <small>{DOCUMENT_TYPES[photo.document].label}</small>
+                  </div>
+                ) : (
+                  <img src={photo.previewUrl} alt="Vista previa del comprobante" />
+                )}
                 <div className={ui.previewActions}>
-                  <button type="button" className={styles.btnGhost} onClick={() => fileInput.current?.click()}>Cambiar foto</button>
+                  <button type="button" className={styles.btnGhost} onClick={() => fileInput.current?.click()}>{photo.document ? "Cambiar archivo" : "Cambiar foto"}</button>
                   <button type="button" className={styles.btnGhost} onClick={() => setPhoto(null)}>Quitar</button>
                 </div>
                 <small>{Math.round(photo.size / 1024)} KB listos para subir</small>
@@ -397,8 +440,8 @@ export default function ReceiptsPage({ styles }) {
                 disabled={preparing}
               >
                 <span aria-hidden="true">📷</span>
-                <strong>{preparing ? "Preparando foto…" : "Tomar o elegir foto"}</strong>
-                <small>Que se lean bien el total, la fecha y el RFC</small>
+                <strong>{preparing ? "Preparando foto…" : "Tomar foto o elegir archivo"}</strong>
+                <small>Foto (JPG, PNG) o la factura en PDF o XML</small>
               </button>
             )}
           </div>
@@ -569,10 +612,18 @@ export default function ReceiptsPage({ styles }) {
         <ul className={ui.list}>
           {receipts.map((r) => {
             const kind = kindOf(r.kind);
+            const document = documentKindOfUrl(r.imageUrl);
             return (
               <li key={r._id} className={ui.item}>
-                <a href={r.imageUrl} target="_blank" rel="noopener noreferrer" className={ui.thumb} title="Ver foto completa">
-                  <img src={thumbUrl(r.imageUrl)} alt={`Foto: ${kind.label} ${r.date}`} loading="lazy" />
+                <a href={r.imageUrl} target="_blank" rel="noopener noreferrer" className={ui.thumb} title={document ? `Abrir ${DOCUMENT_TYPES[document].label}` : "Ver foto completa"}>
+                  {document ? (
+                    <span className={ui.thumbDocument}>
+                      <span aria-hidden="true">{DOCUMENT_TYPES[document].icon}</span>
+                      {document.toUpperCase()}
+                    </span>
+                  ) : (
+                    <img src={thumbUrl(r.imageUrl)} alt={`Foto: ${kind.label} ${r.date}`} loading="lazy" />
+                  )}
                 </a>
                 <div className={ui.itemBody}>
                   <div className={ui.itemTop}>

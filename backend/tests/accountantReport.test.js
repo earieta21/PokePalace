@@ -8,7 +8,7 @@ import {
   rangeLabel,
   nextAccountantSendKey,
 } from "../utils/accountantReport.js";
-import { parseReceiptMeta, detectImageType } from "../controllers/receiptController.js";
+import { parseReceiptMeta, detectImageType, detectDocumentType } from "../controllers/receiptController.js";
 import { cloudinaryResizedUrl } from "../utils/cloudinary.js";
 import { explainEmailError } from "../utils/notify.js";
 
@@ -85,7 +85,7 @@ test("el correo escapa lo que captura el equipo y explica qué fotos van adjunta
   assert.equal(subject, "Poke Palace — comprobantes de la semana del 2 al 8 de noviembre de 2026");
   assert.ok(!html.includes("<script>"));
   assert.ok(html.includes("&lt;script&gt;"));
-  assert.ok(html.includes("1 fotos van adjuntas; las otras 1"));
+  assert.ok(html.includes("1 comprobantes van adjuntos; los otros 1"));
   assert.ok(html.includes("Efectivo") && html.includes("Tarjeta"));
 });
 
@@ -153,4 +153,29 @@ test("las fotos se adjuntan en versión ligera de Cloudinary", () => {
     "https://res.cloudinary.com/demo/image/upload/c_limit,w_1600,q_auto:good,f_jpg/v17/comprobantes/abc.jpg"
   );
   assert.equal(cloudinaryResizedUrl("https://example.com/a.jpg"), "https://example.com/a.jpg");
+});
+
+test("reconoce el PDF y el XML de una factura por su contenido", () => {
+  assert.deepEqual(detectDocumentType(Buffer.from("%PDF-1.7 contenido")), { mimeType: "application/pdf", extension: "pdf" });
+  assert.deepEqual(detectDocumentType(Buffer.from('\uFEFF<?xml version="1.0" encoding="UTF-8"?><cfdi:Comprobante/>')), { mimeType: "application/xml", extension: "xml" });
+  assert.deepEqual(detectDocumentType(Buffer.from('<cfdi:Comprobante Version="4.0">')), { mimeType: "application/xml", extension: "xml" });
+  assert.equal(detectDocumentType(Buffer.from("texto cualquiera")), null);
+  assert.equal(detectDocumentType(Buffer.from("<html><body>hola</body></html>")), null);
+  assert.equal(detectDocumentType({}), null);
+});
+
+test("el archivo para el contador conserva la extensión del PDF o XML", () => {
+  const base = { date: "2026-11-03", kind: "factura", paymentMethod: "tarjeta", vendor: "Costco" };
+  assert.equal(
+    receiptFileName({ ...base, imageUrl: "https://res.cloudinary.com/x/raw/upload/v1/comprobantes/comprobante_1_ab.pdf" }, 0),
+    "01_2026-11-03_factura_tarjeta_costco.pdf",
+  );
+  assert.equal(
+    receiptFileName({ ...base, imageUrl: "https://res.cloudinary.com/x/raw/upload/v1/comprobantes/comprobante_1_ab.xml" }, 1),
+    "02_2026-11-03_factura_tarjeta_costco.xml",
+  );
+  assert.equal(
+    receiptFileName({ ...base, imageUrl: "https://res.cloudinary.com/x/image/upload/v1/comprobantes/abc.jpg" }, 2),
+    "03_2026-11-03_factura_tarjeta_costco.jpg",
+  );
 });

@@ -104,7 +104,9 @@ export function receiptFileName(receipt, index) {
     receipt.paymentMethod || "sin-pago",
     slug(receipt.vendor),
   ].filter(Boolean);
-  return `${parts.join("_")}.jpg`;
+  // Los documentos (PDF/XML de la factura) conservan su extensión.
+  const extension = String(receipt.imageUrl || "").match(/\/raw\/upload\/.*\.(pdf|xml)(?:$|\?)/i)?.[1]?.toLowerCase() || "jpg";
+  return `${parts.join("_")}.${extension}`;
 }
 
 const csvCell = (value) => {
@@ -153,16 +155,16 @@ export function buildAccountantEmail({ files, periodLabel, partLabel = "", attac
         <td style="padding:6px 4px">${escapeHtml(RECEIPT_PAYMENT_LABEL[r.paymentMethod || "sin_dato"])}</td>
         <td style="padding:6px 4px">${escapeHtml(r.vendor || r.note || "—")}</td>
         <td style="padding:6px 4px;text-align:right;font-family:monospace;white-space:nowrap">${Number.isFinite(r.amount) ? fmtMXN(r.amount) : "—"}</td>
-        <td style="padding:6px 4px;white-space:nowrap"><a href="${escapeHtml(r.imageUrl)}">${attachedNames.has(name) ? "adjunta · ver" : "ver foto"}</a></td>
+        <td style="padding:6px 4px;white-space:nowrap"><a href="${escapeHtml(r.imageUrl)}">${attachedNames.has(name) ? "adjunta · ver" : "ver archivo"}</a></td>
       </tr>`).join("");
 
   const attachedCount = files.filter((f) => attachedNames.has(f.name)).length;
   const linkedOnly = files.length - attachedCount;
   const attachmentNote = attachedCount === files.length
-    ? "Todas las fotos van adjuntas a este correo."
+    ? "Todos los comprobantes van adjuntos a este correo."
     : attachedCount > 0
-      ? `${attachedCount} fotos van adjuntas; las otras ${linkedOnly} no cupieron en el correo y están en su enlace "ver foto".`
-      : `Las fotos están en el enlace "ver foto" de cada renglón.`;
+      ? `${attachedCount} comprobantes van adjuntos; los otros ${linkedOnly} no cupieron en el correo y están en su enlace "ver archivo".`
+      : `Los comprobantes están en el enlace "ver archivo" de cada renglón.`;
 
   const html = `
 <div style="font-family:ui-sans-serif,system-ui,sans-serif;max-width:720px;margin:0 auto;color:#222">
