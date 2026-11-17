@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext, useCallback } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import {
-  MARINADE_LABELS, SAUCE_LABELS, COMPLEMENT_LABELS, PROTEIN_LABELS,
+  BASE_LABELS, MARINADE_LABELS, SAUCE_LABELS, COMPLEMENT_LABELS, PROTEIN_LABELS, TOPPING_LABELS,
 } from "../../order/OrderLabels";
 import { createStaffApi } from "../api";
 import ui from "./PreparationsPage.module.css";
@@ -13,10 +13,18 @@ const TIPOLOGIAS = ["aderezo", "marinado", "mezcla", "otro"];
 // Lo que el cliente puede pedir. Amarrar la receta a una de estas llaves es lo
 // que después deja que el costeo del bowl use el costo real en vez de un
 // numero capturado a mano.
+// "mixed_greens" es un nombre viejo de la misma ensalada (spring_mix): no se
+// ofrece aparte para no tener dos recetas de lo mismo.
+const MENU_BASE_LABELS = Object.fromEntries(
+  Object.entries(BASE_LABELS).filter(([key]) => key !== "mixed_greens")
+);
+
 const MENU_GROUPS = [
+  { id: "base",        label: "Bases",             tipologia: "mezcla",   labels: MENU_BASE_LABELS },
   { id: "marinado",    label: "Marinados",         tipologia: "marinado", labels: MARINADE_LABELS },
   { id: "aderezo",     label: "Aderezos y salsas", tipologia: "aderezo",  labels: SAUCE_LABELS },
   { id: "complemento", label: "Complementos",      tipologia: "mezcla",   labels: COMPLEMENT_LABELS },
+  { id: "topping",     label: "Toppings",          tipologia: "otro",     labels: TOPPING_LABELS },
   { id: "proteina",    label: "Proteínas",         tipologia: "mezcla",   labels: PROTEIN_LABELS },
 ];
 

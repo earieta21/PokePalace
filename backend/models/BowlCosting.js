@@ -13,6 +13,25 @@ const partSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Un desechable que lleva el bowl (contenedor, tapa, cuchara, bolsa…). El
+// catálogo de Desechables no tiene precio a propósito (lo ve todo el
+// personal), así que el precio del paquete vive aquí, junto con los demás
+// costos que solo ve la gerencia. Nombre y piezas por paquete se copian al
+// guardar para que el costo no se pierda si borran el artículo del catálogo.
+const disposableLineSchema = new mongoose.Schema(
+  {
+    disposableId: { type: mongoose.Schema.Types.ObjectId, ref: "Disposable", required: true },
+    name: { type: String, default: "", trim: true, maxlength: 80 },
+    piecesPerPack: { type: Number, default: 0, min: 0 },
+    packPrice: { type: Number, default: 0, min: 0 },
+    piecesPerBowl: { type: Number, default: 1, min: 0 },
+    // all: va en todos los bowls · togo: solo para llevar y delivery ·
+    // per_sauce: una pieza por cada salsa (vasito de aderezo aparte).
+    appliesTo: { type: String, enum: ["all", "togo", "per_sauce"], default: "all" },
+  },
+  { _id: false }
+);
+
 const bowlCostingSchema = new mongoose.Schema(
   {
     _id: { type: String, default: "bowl-costing" },
@@ -55,6 +74,15 @@ const bowlCostingSchema = new mongoose.Schema(
     // Costo por kg de cada proteína cuando el inventario no lo puede dar solo
     // (p. ej. Tofu se lleva por pieza, no por kg). { tofu: 120 }
     proteinCostPerKgOverride: { type: Map, of: Number, default: {} },
+
+    // Qué porcentaje del kilo comprado termina en un bowl, después de limpiar,
+    // quitar piel/sangre y porcionar. Un lomo de salmón que rinde 85% cuesta
+    // en realidad 1/0.85 de lo que dice la factura. Sin dato = 100%.
+    proteinYieldPct: { type: Map, of: Number, default: {} },
+
+    // Desechables desglosados. Cuando hay al menos uno, reemplazan al monto
+    // general de `packaging` (que se queda como respaldo de lo de antes).
+    disposables: { type: [disposableLineSchema], default: [] },
 
     // Para costear el Combo Palace completo contra su precio de venta.
     comboDrinkCost: { type: Number, default: 0, min: 0 },

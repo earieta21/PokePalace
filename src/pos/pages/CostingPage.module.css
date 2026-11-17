@@ -125,3 +125,29 @@
   .saveActions > button { flex: 1; }
   .bowlCard { padding: 16px; }
 }
+/* ---- Qué tan exacto es el costo ---- */
+.checklist ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 12px 20px; margin: 0; padding: 0; list-style: none; }
+.checklist li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; }
+.checklist li strong { display: block; color: var(--ink); }
+.checkIcon { flex: 0 0 22px; height: 22px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; }
+.checkOk .checkIcon { background: #e6f3e9; color: #226144; }
+.checkPartial .checkIcon { background: #fff5dd; color: #805b14; }
+.checkMissing .checkIcon { background: #fff0ed; color: #a93730; }
+.coverage { margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.stickyCol .badge { margin-left: 6px; }
+/* ---- Desechables ---- */
+.dispList { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 12px; }
+.dispRow { display: grid; grid-template-columns: minmax(180px, 2fr) repeat(2, minmax(100px, 1fr)) minmax(170px, 1.4fr) minmax(80px, auto) auto; gap: 10px; align-items: end; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fafbf8; }
+.dispRow label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dispRow select { padding: 10px 12px; min-height: 44px; border-radius: 9px; border: 1px solid #bdcdbf; background: #fff; color: var(--ink); font: inherit; font-size: 14px; width: 100%; min-width: 0; }
+.dispRow select:focus-visible { outline: 3px solid #7fab8e; outline-offset: 3px; }
+.dispCost { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding-bottom: 8px; }
+.dispCost strong { font-size: 15px; color: var(--green); }
+.removeBtn { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; }
+.removeBtn:hover { color: #a93730; border-color: #eecac1; }
+.spaced { margin-top: 16px; }
+@media (max-width: 760px) {
+  .dispRow { grid-template-columns: 1fr 1fr; }
+  .dispName { grid-column: 1 / -1; }
+  .dispCost { align-items: flex-start; }
+}

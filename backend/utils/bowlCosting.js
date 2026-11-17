@@ -1,12 +1,24 @@
 import {
   MEDIUM_BOWL_PROTEIN_KG,
   LARGE_BOWL_PROTEIN_KG,
+  BOWL_CHOICE_KEYS,
 } from "../config/posCatalog.js";
+import {
+  BOWL_BASE_PRICE,
+  LARGE_BOWL_UPCHARGE,
+  PREMIUM_PROTEIN_PRICES,
+  PROMO_2X1_BOWLS_PRICE,
+} from "../pricing.js";
 
-export const BOWL_PRICE = 230;         // bowl mediano
-export const LARGE_BOWL_PRICE = 250;   // 3 proteínas
-export const PROMO_2X1_PRICE = 250;    // 2 bowls medianos
+export const BOWL_PRICE = BOWL_BASE_PRICE;                                // bowl mediano
+export const LARGE_BOWL_PRICE = BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE;   // 3 proteínas
+export const PROMO_2X1_PRICE = PROMO_2X1_BOWLS_PRICE;                     // 2 bowls medianos
 export const COMBO_PALACE_PRICE = 289;
+
+// Los precios del menú traen el IVA incluido (pricing.js: TAX_RATE = 0) y el
+// negocio sí lo paga (ver services/fiscalCalc.js). De cada $230 solo $198.28
+// son del negocio: el margen se mide contra eso, no contra el precio de menú.
+export const IVA_RATE = 0.16;
 
 export const PROTEIN_KEYS = ["tuna", "salmon", "shrimp", "tofu", "octopus", "seared_tuna"];
 
@@ -15,6 +27,15 @@ export const COMPLEMENT_KEYS = [
   "edamame", "red_onion", "beet", "surimi", "spicy_surimi",
   "kale", "peas", "corn", "pineapple", "chia_seeds",
 ];
+
+// Las demás partes del bowl que el cliente elige. Cada una se pondera por qué
+// tan seguido la piden y, si ya tiene receta estándar, usa su costo real.
+export const RECIPE_PARTS = {
+  base: [...BOWL_CHOICE_KEYS.base],
+  marinades: [...BOWL_CHOICE_KEYS.marinades],
+  sauces: [...BOWL_CHOICE_KEYS.sauces],
+  toppings: [...BOWL_CHOICE_KEYS.toppings],
+};
 
 export const COMPLEMENT_LABELS = {
   shredded_carrots: "Zanahoria Rallada",
@@ -85,6 +106,12 @@ const normalize = (value) => String(value || "")
 
 const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
+export const withoutIva = (price) => round2((Number(price) || 0) / (1 + IVA_RATE));
+
+/** Precio de menú (con IVA) de un bowl de una sola proteína. */
+export const bowlMenuPrice = (proteinKey, size = "normal") =>
+  (size === "large" ? LARGE_BOWL_PRICE : BOWL_PRICE) + (PREMIUM_PROTEIN_PRICES[proteinKey] || 0);
+
 /**
  * Costo por kg de cada proteína, resuelto en este orden:
  *   1. override manual capturado en el costeo,
@@ -128,6 +155,12 @@ export function resolveProteinCosts(inventoryItems = [], overrides = {}) {
   return byKey;
 }
 
+/** Rendimiento capturado (1–100%). Sin dato o fuera de rango cuenta como 100%. */
+export const proteinYieldOf = (yields, key) => {
+  const value = Number(yields?.[key]);
+  return Number.isFinite(value) && value > 0 && value <= 100 ? value : 100;
+};
+
 const partCost = (part) => round2((Number(part?.costPerUnit) || 0) * (Number(part?.unitsPerBowl) || 0));
 
 /**
@@ -143,12 +176,14 @@ export function baseCost(config) {
 }
 
 /**
- * Costo por porción de cada complemento. Se arma igual que las proteínas: el
- * precio de la unidad (kilo, pieza o paquete) sale del inventario cuando se
- * puede, y quien captura solo dice cuántas porciones rinde esa unidad — que es
- * el dato que el inventario no tiene y nadie más puede saber.
+ * Costo por porción de cada complemento. Si el complemento tiene receta
+ * estándar (Spicy Surimi, Ensalada de Alga…), su costo por porción manda. Si
+ * no, se arma igual que las proteínas: el precio de la unidad (kilo, pieza o
+ * paquete) sale del inventario cuando se puede, y quien captura solo dice
+ * cuántas porciones rinde esa unidad — que es el dato que el inventario no
+ * tiene y nadie más puede saber.
  */
-export function resolveComplementCosts(inventoryItems = [], captured = {}) {
+export function resolveComplementCosts(inventoryItems = [], captured = {}, recipeCosts = {}) {
   const byKey = {};
 
   for (const key of COMPLEMENT_KEYS) {
@@ -163,14 +198,17 @@ export function resolveComplementCosts(inventoryItems = [], captured = {}) {
     const inventoryCost = Number(match?.cost) > 0 ? Number(match.cost) : 0;
 
     const costPerUnit = manualCost > 0 ? manualCost : inventoryCost;
+    const recipe = Number(recipeCosts?.[key]) || 0;
     byKey[key] = {
       costPerUnit,
       inventoryCostPerUnit: inventoryCost,
       portionsPerUnit: portions,
       unit: match?.unit || null,
       itemName: match?.item || null,
-      source: manualCost > 0 ? "manual" : inventoryCost > 0 ? "inventario" : "falta",
-      costPerPortion: costPerUnit > 0 && portions > 0 ? round2(costPerUnit / portions) : 0,
+      source: recipe > 0 ? "receta" : manualCost > 0 ? "manual" : inventoryCost > 0 ? "inventario" : "falta",
+      costPerPortion: recipe > 0
+        ? round2(recipe)
+        : costPerUnit > 0 && portions > 0 ? round2(costPerUnit / portions) : 0,
     };
   }
 
@@ -196,39 +234,188 @@ export function complementsCost(config, usage, complementCosts) {
   return round2(total);
 }
 
+/**
+ * Costo de una parte del bowl (base, marinados, salsas, toppings) en un bowl
+ * promedio. Cada opción pesa según qué tan seguido la piden: las que ya tienen
+ * receta estándar usan su costo por porción real, las que todavía no, el costo
+ * por porción capturado a mano. Sin ninguna receta (o sin ventas para saber
+ * qué piden) queda exactamente como antes: el monto capturado a mano.
+ */
+export function recipeWeightedCost({ keys, frequency, recipeCosts, fallbackPerServing, fallbackTotal }) {
+  const hasRecipe = keys.some((key) => (Number(recipeCosts?.[key]) || 0) > 0);
+  const hasUsage = keys.some((key) => (Number(frequency?.[key]) || 0) > 0);
+  if (!hasRecipe || !hasUsage) {
+    return { cost: round2(fallbackTotal), source: "manual", coveragePct: 0, missing: [] };
+  }
+
+  let cost = 0;
+  let covered = 0;
+  let uncovered = 0;
+  const missing = [];
+  for (const key of keys) {
+    const freq = Number(frequency?.[key]) || 0;
+    const recipe = Number(recipeCosts?.[key]) || 0;
+    if (freq <= 0) continue;
+    if (recipe > 0) {
+      cost += recipe * freq;
+      covered += freq;
+    } else {
+      cost += (Number(fallbackPerServing) || 0) * freq;
+      uncovered += freq;
+      missing.push({ key, frequency: freq });
+    }
+  }
+
+  return {
+    cost: round2(cost),
+    source: uncovered > 0 ? "mixto" : "receta",
+    // Qué parte de lo que de verdad se sirve ya está costeado con receta.
+    coveragePct: round2((covered / (covered + uncovered)) * 100),
+    missing: missing.sort((a, b) => b.frequency - a.frequency),
+  };
+}
+
+/**
+ * Costo de los desechables de un bowl promedio. Cada pieza cuesta lo que el
+ * paquete ÷ las piezas que trae; luego se pondera por cuándo se usa:
+ *   - all:       en todos los bowls,
+ *   - togo:      solo en los que se van (para llevar + delivery),
+ *   - per_sauce: una pieza por salsa (vasito de aderezo aparte).
+ * Las piezas por paquete se leen en vivo del catálogo de Desechables; la copia
+ * guardada solo se usa si el artículo ya no existe.
+ */
+export function disposablesCost(lines = [], catalogById = new Map(), { togoShare = 1, saucesPerBowl = 1 } = {}) {
+  let total = 0;
+  const detail = lines.map((line) => {
+    const item = catalogById.get(String(line.disposableId));
+    const piecesPerPack = Number(item?.piecesPerPack) || Number(line.piecesPerPack) || 0;
+    const packPrice = Number(line.packPrice) || 0;
+    const piecesPerBowl = Number(line.piecesPerBowl) || 0;
+    const appliesTo = line.appliesTo || "all";
+    const weight = appliesTo === "togo" ? togoShare : appliesTo === "per_sauce" ? saucesPerBowl : 1;
+    const piecePrice = piecesPerPack > 0 ? packPrice / piecesPerPack : 0;
+    const perBowl = piecePrice * piecesPerBowl * weight;
+    total += perBowl;
+    return {
+      disposableId: String(line.disposableId),
+      name: item?.name || line.name || "Desechable",
+      category: item?.category || null,
+      piecesPerPack,
+      packPrice,
+      piecesPerBowl,
+      appliesTo,
+      weight: Math.round(weight * 10000) / 10000,
+      piecePrice: Math.round(piecePrice * 10000) / 10000,
+      perBowl: round2(perBowl),
+      missingFromCatalog: !item,
+      missingPrice: packPrice <= 0,
+    };
+  });
+  return { total: round2(total), detail };
+}
+
+/**
+ * Todo lo que cuesta un bowl sin contar la proteína: es igual para cualquier
+ * proteína, así que se calcula una vez y se reparte a cada columna.
+ */
+export function computeSharedParts({
+  config,
+  usage = null,
+  complementCosts = null,
+  recipeCosts = {},
+  disposableCatalog = new Map(),
+}) {
+  const freq = usage?.frequencyBy || {};
+
+  const base = recipeWeightedCost({
+    keys: RECIPE_PARTS.base,
+    frequency: freq.base,
+    recipeCosts,
+    // La base se sirve una por bowl: lo capturado por kilo ya es "por porción".
+    fallbackPerServing: baseCost(config),
+    fallbackTotal: baseCost(config),
+  });
+
+  const fromParts = (field, keys) => recipeWeightedCost({
+    keys,
+    frequency: freq[field],
+    recipeCosts,
+    fallbackPerServing: Number(config?.[field]?.costPerUnit) || 0,
+    fallbackTotal: partCost(config?.[field]),
+  });
+
+  const marinades = fromParts("marinades", RECIPE_PARTS.marinades);
+  const sauces = fromParts("sauces", RECIPE_PARTS.sauces);
+  const toppings = fromParts("toppings", RECIPE_PARTS.toppings);
+
+  const lines = config?.disposables || [];
+  const disposables = disposablesCost(lines, disposableCatalog, {
+    togoShare: usage?.bowls > 0 ? usage.togoShare : 1,
+    saucesPerBowl: usage?.bowls > 0
+      ? Number(usage.averagePerBowl?.sauces) || 0
+      : Number(config?.sauces?.unitsPerBowl) || 0,
+  });
+  const packaging = lines.length > 0
+    ? { cost: disposables.total, source: "desglose", detail: disposables.detail }
+    : { cost: partCost(config?.packaging), source: "manual", detail: [] };
+
+  return {
+    rows: {
+      base: base.cost,
+      marinades: marinades.cost,
+      complements: complementsCost(config, usage, complementCosts),
+      sauces: sauces.cost,
+      toppings: toppings.cost,
+      packaging: packaging.cost,
+    },
+    detail: { base, marinades, sauces, toppings, packaging },
+  };
+}
+
 /** Desglose de costo de un bowl con una proteína, igual que la tabla de costeo. */
-export function computeBowlCost({ config, proteinCosts, proteinKey, size = "normal", complementUsage = null, complementCosts = null }) {
+export function computeBowlCost({ proteinCosts, proteinKey, proteinYields = {}, size = "normal", shared }) {
   const kg = size === "large" ? LARGE_BOWL_PROTEIN_KG : MEDIUM_BOWL_PROTEIN_KG;
   const proteinCostPerKg = proteinCosts?.[proteinKey]?.costPerKg || 0;
+  const yieldPct = proteinYieldOf(proteinYields, proteinKey);
+  // Lo que de verdad cuesta un kilo servido, ya descontada la merma.
+  const usableCostPerKg = round2(proteinCostPerKg / (yieldPct / 100));
 
   const rows = {
-    base: baseCost(config),
-    protein: round2(proteinCostPerKg * kg),
-    marinades: partCost(config.marinades),
-    complements: complementsCost(config, complementUsage, complementCosts),
-    sauces: partCost(config.sauces),
-    toppings: partCost(config.toppings),
-    packaging: partCost(config.packaging),
+    base: shared.rows.base,
+    protein: round2(usableCostPerKg * kg),
+    marinades: shared.rows.marinades,
+    complements: shared.rows.complements,
+    sauces: shared.rows.sauces,
+    toppings: shared.rows.toppings,
+    packaging: shared.rows.packaging,
   };
 
   const total = round2(Object.values(rows).reduce((sum, value) => sum + value, 0));
-  const price = size === "large" ? LARGE_BOWL_PRICE : BOWL_PRICE;
+  const menuPrice = bowlMenuPrice(proteinKey, size);
+  const price = withoutIva(menuPrice);
+  const promoMenuPrice = round2(PROMO_2X1_PRICE / 2);
+  const halfMenuPrice = round2(BOWL_PRICE * 0.5);
 
   return {
     proteinKey,
     label: PROTEIN_LABELS[proteinKey] || proteinKey,
     proteinKg: kg,
     proteinCostPerKg,
+    proteinYieldPct: yieldPct,
+    proteinUsableCostPerKg: usableCostPerKg,
     proteinSource: proteinCosts?.[proteinKey]?.source || "falta",
     proteinNote: proteinCosts?.[proteinKey]?.reason || null,
     rows,
     total,
+    menuPrice,
+    // `price` es lo que le queda al negocio (sin IVA): contra eso se mide todo.
     price,
+    iva: round2(menuPrice - price),
     ...marginOf(price, total),
     // Escenarios de promoción, con el mismo costo y distinto precio efectivo.
     scenarios: {
-      promo2x1: { price: round2(PROMO_2X1_PRICE / 2), ...marginOf(PROMO_2X1_PRICE / 2, total) },
-      halfPriceSecond: { price: round2(BOWL_PRICE * 0.5), ...marginOf(BOWL_PRICE * 0.5, total) },
+      promo2x1: { menuPrice: promoMenuPrice, price: withoutIva(promoMenuPrice), ...marginOf(withoutIva(promoMenuPrice), total) },
+      halfPriceSecond: { menuPrice: halfMenuPrice, price: withoutIva(halfMenuPrice), ...marginOf(withoutIva(halfMenuPrice), total) },
     },
   };
 }
@@ -243,10 +430,11 @@ function marginOf(price, cost) {
   };
 }
 
-/** Costo del Combo Palace (bowl + bebida + rice cake) contra su precio. */
+/** Costo del Combo Palace (bowl + bebida + rice cake) contra su precio sin IVA. */
 export function computeComboCost({ config, bowlTotal }) {
   const total = round2(bowlTotal + (Number(config.comboDrinkCost) || 0) + (Number(config.comboRiceCakeCost) || 0));
-  return { total, price: COMBO_PALACE_PRICE, ...marginOf(COMBO_PALACE_PRICE, total) };
+  const price = withoutIva(COMBO_PALACE_PRICE);
+  return { total, menuPrice: COMBO_PALACE_PRICE, price, ...marginOf(price, total) };
 }
 
 /**

@@ -25,6 +25,27 @@ export function ingredientCost(line) {
   return round2((recipe / presentationBase) * price);
 }
 
+/**
+ * El precio unitario de una línea ligada al inventario se lee en vivo: así la
+ * receta no se queda con un precio viejo cuando cambia el del proveedor, que
+ * es justo lo que pasaba en la hoja de cálculo.
+ */
+export function withLivePrices(prep, inventoryById) {
+  const doc = typeof prep.toObject === "function" ? prep.toObject() : { ...prep };
+  doc.ingredients = (doc.ingredients || []).map((line) => {
+    const linked = line.inventoryItemId && inventoryById.get(String(line.inventoryItemId));
+    if (!linked) return { ...line, priceSource: "manual" };
+    return {
+      ...line,
+      unitPrice: Number(linked.cost) || 0,
+      unit: line.unit || linked.unit,
+      priceSource: "inventario",
+      inventoryItemName: linked.item,
+    };
+  });
+  return doc;
+}
+
 /** Costo del lote completo y por porción. */
 export function preparationCost(prep) {
   const lines = (prep?.ingredients || []).map((line) => ({

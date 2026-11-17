@@ -400,6 +400,12 @@ const BOWL_RULES = Object.freeze({
   },
 });
 
+// Lo que el cliente puede elegir en cada paso del bowl, como listas simples.
+// El costeo las usa para ponderar cada opción por qué tan seguido la piden.
+export const BOWL_CHOICE_KEYS = Object.freeze(Object.fromEntries(
+  Object.entries(BOWL_RULES).map(([step, rule]) => [step, Object.freeze([...rule.allowed])])
+));
+
 export const POS_TOPPING_LABELS = Object.freeze({
   black_olives: "Aceitunas Negras",
   toasted_peanuts: "Cacahuate Tostado",
