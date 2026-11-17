@@ -295,6 +295,7 @@ const orderResponseForRole = (order, role) => {
 export const getAllOrders = async (req, res) => {
   try {
     const { status, source, limit = 100, skip = 0 } = req.query;
+    const activeQueue = req.query.queue === "active";
     const validStatuses = new Set(["pending", "preparing", "ready", "completed", "cancelled"]);
     const requestedStatuses = typeof status === "string"
       ? status.split(",").filter((value) => validStatuses.has(value))
@@ -321,10 +322,13 @@ export const getAllOrders = async (req, res) => {
     }
     if (source) filter.source = source;
 
+    // The kitchen queue is the complete set of outstanding orders. Historical
+    // searches remain paginated; applying that cap here hides old tickets.
+    if (activeQueue) filter.status = { $in: ["pending", "preparing", "ready"] };
+
     let query = Order.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(safeSkip)
-      .limit(safeLimit);
+      .sort(activeQueue ? { createdAt: 1, _id: 1 } : { createdAt: -1 });
+    if (!activeQueue) query = query.skip(safeSkip).limit(safeLimit);
 
     if (isKitchen) {
       // Kitchen needs preparation details, not customer contact, account or
@@ -336,6 +340,7 @@ export const getAllOrders = async (req, res) => {
 
     const orders = await query;
 
+    if (activeQueue) res.set("Cache-Control", "no-store");
     res.json({ orders });
   } catch (err) {
     res.status(500).json({ message: "Error fetching orders", err: err.message });

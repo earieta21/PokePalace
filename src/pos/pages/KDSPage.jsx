@@ -211,12 +211,16 @@ export default function KDSPage({ styles, role }) {
   const firstLoad  = useRef(true);
   const alertTimer = useRef(null);
   const flashTimer = useRef(null);
+  const loadVersion = useRef(0);
 
   const load = useCallback(() => {
-    api.get("/api/staff/orders?status=pending,preparing,ready&limit=30")
+    const version = ++loadVersion.current;
+    api.get("/api/staff/orders?queue=active")
       .then((d) => {
+        if (version !== loadVersion.current) return;
         const incoming = d.orders ?? [];
         setOrders(incoming);
+        setError("");
 
         if (firstLoad.current) {
           firstLoad.current = false;
@@ -240,8 +244,8 @@ export default function KDSPage({ styles, role }) {
           flashTimer.current = setTimeout(() => setScreenFlash(false), 900);
         }
       })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((e) => { if (version === loadVersion.current) setError(e.message); })
+      .finally(() => { if (version === loadVersion.current) setLoading(false); });
   }, [api]);
 
   useEffect(() => {
@@ -259,8 +263,10 @@ export default function KDSPage({ styles, role }) {
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
+    const invalidateLoads = () => { loadVersion.current++; };
 
     return () => {
+      invalidateLoads();
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);

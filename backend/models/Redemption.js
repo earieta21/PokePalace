@@ -31,6 +31,7 @@ const redemptionSchema = new mongoose.Schema(
 );
 
 redemptionSchema.index({ order: 1 }, { unique: true, sparse: true });
+redemptionSchema.index({ user: 1, status: 1, expiresAt: 1 });
 redemptionSchema.index(
   { user: 1, clientRedemptionId: 1 },
   {

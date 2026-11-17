@@ -11,6 +11,9 @@ const socialStoryParticipantSchema = new mongoose.Schema(
     displayHandle: { type: String, required: true },
     lastClaimAt: { type: Date, required: true },
     nextEligibleAt: { type: Date, required: true },
+    // Reserve the document identity before issuing it so a retry can finish
+    // after a lost response or an interrupted insert without issuing twice.
+    lastRedemptionId: { type: mongoose.Schema.Types.ObjectId, ref: "Redemption", default: null },
     lastVerifiedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "StaffUser",

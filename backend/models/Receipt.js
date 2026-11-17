@@ -22,6 +22,13 @@ const receiptSchema = new mongoose.Schema(
     vendor:        { type: String, trim: true, maxlength: 120, default: "" },
     note:          { type: String, trim: true, maxlength: 300, default: "" },
     imageUrl:      { type: String, required: true },
+    documents: { type: [{
+      url: { type: String, required: true },
+      publicId: { type: String, required: true },
+      mimeType: { type: String, required: true },
+      resourceType: { type: String, enum: ["image", "raw"], required: true },
+      name: { type: String, required: true },
+    }], default: [] },
     // Solo las fotos subidas desde el portal se pueden borrar de Cloudinary;
     // las de Telegram las comparte el gasto que creó el bot.
     publicId:      { type: String, default: null },
@@ -30,6 +37,10 @@ const receiptSchema = new mongoose.Schema(
     uploadedBy:    { type: String, default: "staff" },
     // Gasto de Finanzas que se creó junto con este comprobante (si se pidió).
     expenseId:     { type: mongoose.Schema.Types.ObjectId, ref: "Expense", default: null },
+    expenseMode:   { type: String, enum: ["created", "existing", null], default: null },
+    revision:      { type: Number, default: 0 },
+    // A claim prevents an edit/delete from changing a document being emailed.
+    processing:    { type: String, default: null },
     // null = pendiente; se llena cuando el correo al contador salió bien.
     sentToAccountantAt: { type: Date, default: null },
   },

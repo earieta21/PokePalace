@@ -8,6 +8,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./MiCuenta.module.css";
 import { comboPalaceSelectionSummary } from "../data/comboPalace";
 import MemberQrCard from "../components/MemberQrCard";
+import { rewardStatus, rewardStatusLabel } from "../utils/rewardStatus";
 
 const getProteinsText = (order, language) => {
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
@@ -55,7 +56,7 @@ export default function MiCuenta() {
   const [redeemLoading, setRedeemLoading] = useState(false);
 
   // Refresh points on mount so balance is always current
-  useEffect(() => { if (isLoggedIn) refreshUser?.(); }, [isLoggedIn]);
+  useEffect(() => { if (isLoggedIn) refreshUser?.(); }, [isLoggedIn, refreshUser]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -218,7 +219,7 @@ export default function MiCuenta() {
                 </div>
               );
             })()}
-            <MemberQrCard token={token} onBalanceRefresh={refreshUser} language={language} />
+            <MemberQrCard key={token} token={token} points={user?.points ?? 0} onBalanceRefresh={refreshUser} language={language} />
           </div>
 
           <div className={styles.actions}>
@@ -446,30 +447,34 @@ export default function MiCuenta() {
               </div>
             ) : (
               <div className={styles.orders}>
-                {redemptions.map((r) => (
+                {redemptions.map((r) => {
+                  const status = rewardStatus(r);
+                  return (
                   <div key={r._id} className={styles.orderCard}>
                     <div className={styles.orderTop}>
                       <p className={styles.orderDate}>{r.rewardName}</p>
                       <span className={`${styles.status} ${
-                        r.status === "used" ? styles.status_completed
-                        : r.status === "expired" ? styles.status_cancelled
+                        status === "used" ? styles.status_completed
+                        : status !== "active" ? styles.status_cancelled
                         : ""
                       }`}>
-                        {r.status === "used" ? "Usado" : r.status === "expired" ? "Vencido" : "Activo"}
+                        {rewardStatusLabel(status, language)}
                       </span>
                     </div>
-                    <p className={styles.rewardCode}>{r.code}</p>
+                    {status === "active" && <p className={styles.rewardCode}>{r.code}</p>}
                     <p className={styles.line}>
-                      {r.status === "used"
+                      {status === "used"
                         ? `Usado el ${new Date(r.usedAt).toLocaleString("es-MX")}`
-                        : r.status === "expired"
+                        : status === "expired"
                         ? "Este código ya venció."
+                        : status === "cancelled" ? "Este premio fue cancelado y no puede usarse."
+                        : status === "unavailable" ? "Este premio no está disponible para usarlo."
                         : r.expiresAt
                         ? `Válido hasta el ${new Date(r.expiresAt).toLocaleDateString("es-MX")} · muéstralo en el mostrador.`
                         : "Muestra este código en el mostrador para reclamarlo."}
                     </p>
                   </div>
-                ))}
+                ); })}
               </div>
             )}
           </>

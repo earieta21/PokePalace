@@ -1,30 +1,9 @@
 import Preparation from "../models/Preparation.js";
 import Inventory from "../models/Inventory.js";
-import { preparationCost } from "../utils/preparationCost.js";
+import { preparationCost, withLivePrices } from "../utils/preparationCost.js";
 
 const clean = (value, max = 120) => String(value ?? "").trim().slice(0, max);
 const positive = (value) => Math.max(0, Number(value) || 0);
-
-/**
- * El precio unitario de una línea ligada al inventario se lee en vivo: así la
- * receta no se queda con un precio viejo cuando cambia el del proveedor, que
- * es justo lo que pasaba en la hoja de cálculo.
- */
-const withLivePrices = (prep, inventoryById) => {
-  const doc = typeof prep.toObject === "function" ? prep.toObject() : prep;
-  doc.ingredients = (doc.ingredients || []).map((line) => {
-    const linked = line.inventoryItemId && inventoryById.get(String(line.inventoryItemId));
-    if (!linked) return { ...line, priceSource: "manual" };
-    return {
-      ...line,
-      unitPrice: Number(linked.cost) || 0,
-      unit: line.unit || linked.unit,
-      priceSource: "inventario",
-      inventoryItemName: linked.item,
-    };
-  });
-  return doc;
-};
 
 const buildResponse = async () => {
   const [preps, inventory] = await Promise.all([

@@ -17,6 +17,7 @@ export function createStaffApi(token) {
     if (!res.ok) {
       const error = new Error(data?.msg || data?.message || `HTTP ${res.status}`);
       error.status = res.status;
+      error.code = data?.code || null;
       error.retryable = Boolean(data?.retryable || res.status >= 500);
       error.orderId = data?.orderId || data?.order?._id || null;
       throw error;

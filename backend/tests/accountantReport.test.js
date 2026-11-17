@@ -85,7 +85,7 @@ test("el correo escapa lo que captura el equipo y explica qué fotos van adjunta
   assert.equal(subject, "Poke Palace — comprobantes de la semana del 2 al 8 de noviembre de 2026");
   assert.ok(!html.includes("<script>"));
   assert.ok(html.includes("&lt;script&gt;"));
-  assert.ok(html.includes("1 fotos van adjuntas; las otras 1"));
+  assert.ok(html.includes("1 archivos van adjuntos; los otros 1"));
   assert.ok(html.includes("Efectivo") && html.includes("Tarjeta"));
 });
 

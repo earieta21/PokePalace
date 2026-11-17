@@ -16,6 +16,7 @@ import {
 } from "../utils/staffRoles.js";
 import { dateKeyInTimeZone } from "../utils/timeZone.js";
 import { recordAudit, diffFields, actorFromStaff } from "../utils/auditLog.js";
+import { ensureOpenShiftIndex } from "../utils/openShiftIndex.js";
 
 const LOCATION_ERROR_MSG = `Debes estar en el restaurante para marcar tu entrada/salida (dentro de ${MAX_DISTANCE_METERS}m).`;
 
@@ -238,14 +239,25 @@ export const clockIn = async (req, res) => {
   const locationError = checkStaffLocation(req);
   if (locationError) return res.status(403).json({ message: locationError });
   try {
-    const existing = await TimeRecord.findOne({ employeeId, clockOut: null, locationId });
-    if (existing) return res.status(409).json({ message: "Ya tienes turno activo" });
-    const record = await TimeRecord.create({
-      employeeId,
-      clockIn: new Date(),
-      date: dateKeyInTimeZone(),
-      locationId,
-    });
+    const existing = await TimeRecord.findOne({ employeeId, clockOut: null });
+    if (existing) {
+      if (existing.locationId !== locationId) return res.status(409).json({ message: "Tienes un turno abierto en otra sucursal." });
+      return res.json({ record: existing, recovered: true });
+    }
+    try { await ensureOpenShiftIndex(); }
+    catch {
+      return res.status(503).json({ message: "No se pudo asegurar un único turno abierto. Gerencia debe revisar los registros de asistencia antes de registrar nuevas entradas." });
+    }
+    let record;
+    try {
+      record = await TimeRecord.create({ employeeId, clockIn: new Date(), date: dateKeyInTimeZone(), locationId });
+    } catch (error) {
+      // Covers both a concurrent insert and an acknowledged write whose
+      // response was lost. Never create another record to recover it.
+      const recovered = await TimeRecord.findOne({ employeeId, clockOut: null, locationId });
+      if (recovered) return res.json({ record: recovered, recovered: true });
+      throw error;
+    }
     res.status(201).json({ record });
   } catch (err) {
     res.status(500).json({ message: "Error", err: err.message });
@@ -257,37 +269,63 @@ export const clockOut = async (req, res) => {
   const locationError = checkStaffLocation(req);
   if (locationError) return res.status(403).json({ message: locationError });
   try {
-    const open = await TimeRecord.findOne({ employeeId, clockOut: null });
+    const target = timeRecordTarget(req, employeeId);
+    const open = await TimeRecord.findOne(target);
     if (!open) return res.status(404).json({ message: "No hay turno activo" });
+    if (open.clockOut) return res.json({ record: open, recovered: true });
     const openBreak = open.breaks.find((b) => !b.end);
     if (openBreak) {
       return res.status(400).json({ message: "Termina tu lonche antes de marcar salida" });
     }
-    open.clockOut = new Date();
-    await open.save();
-    res.json({ record: open });
+    const record = await TimeRecord.findOneAndUpdate(
+      { _id: open._id, clockOut: null, breaks: { $not: { $elemMatch: { end: null } } } },
+      { $set: { clockOut: new Date() } }, { new: true }
+    );
+    if (!record) {
+      const latest = await TimeRecord.findOne(target);
+      if (latest?.clockOut) return res.json({ record: latest, recovered: true });
+      return res.status(409).json({ message: "El turno cambió. Actualiza y termina tu lonche antes de salir." });
+    }
+    res.json({ record });
   } catch (err) {
-    res.status(500).json({ message: "Error", err: err.message });
+    res.status(err.status || 500).json({ message: err.status ? err.message : "No se pudo registrar la salida.", err: err.message });
   }
 };
 
 /* ── LONCHE (break) ─────────────────────────────────────────────────────── */
+
+function timeRecordTarget(req, employeeId) {
+  const { recordId } = req.body;
+  if (recordId !== undefined && !/^[a-f\d]{24}$/i.test(recordId)) {
+    throw Object.assign(new Error("Turno inválido"), { status: 400 });
+  }
+  return { employeeId, ...(req.staff.locationId ? { locationId: req.staff.locationId } : {}),
+    ...(recordId ? { _id: recordId } : { clockOut: null }) };
+}
 
 export const startBreak = async (req, res) => {
   const employeeId = req.staff.id;
   const locationError = checkStaffLocation(req);
   if (locationError) return res.status(403).json({ message: locationError });
   try {
-    const open = await TimeRecord.findOne({ employeeId, clockOut: null });
-    if (!open) return res.status(404).json({ message: "No tienes turno activo" });
+    const target = timeRecordTarget(req, employeeId);
+    const open = await TimeRecord.findOne(target);
+    if (!open || open.clockOut) return res.status(404).json({ message: "No tienes turno activo" });
     if (open.breaks.some((b) => !b.end)) {
-      return res.status(409).json({ message: "Ya tienes un lonche en curso" });
+      return res.json({ record: open, recovered: true });
     }
-    open.breaks.push({ start: new Date() });
-    await open.save();
-    res.status(201).json({ record: open });
+    const record = await TimeRecord.findOneAndUpdate(
+      { _id: open._id, clockOut: null, breaks: { $not: { $elemMatch: { end: null } } } },
+      { $push: { breaks: { start: new Date(), end: null } } }, { new: true }
+    );
+    if (!record) {
+      const latest = await TimeRecord.findOne(target);
+      if (latest && !latest.clockOut && latest.breaks.some((b) => !b.end)) return res.json({ record: latest, recovered: true });
+      return res.status(409).json({ message: "El turno cambió. Actualiza antes de iniciar el lonche." });
+    }
+    res.status(201).json({ record });
   } catch (err) {
-    res.status(500).json({ message: "Error", err: err.message });
+    res.status(err.status || 500).json({ message: err.status ? err.message : "No se pudo iniciar el lonche.", err: err.message });
   }
 };
 
@@ -296,15 +334,27 @@ export const endBreak = async (req, res) => {
   const locationError = checkStaffLocation(req);
   if (locationError) return res.status(403).json({ message: locationError });
   try {
-    const open = await TimeRecord.findOne({ employeeId, clockOut: null });
+    const target = timeRecordTarget(req, employeeId);
+    const open = await TimeRecord.findOne(target);
     if (!open) return res.status(404).json({ message: "No tienes turno activo" });
-    const openBreak = open.breaks.find((b) => !b.end);
-    if (!openBreak) return res.status(404).json({ message: "No tienes un lonche en curso" });
-    openBreak.end = new Date();
-    await open.save();
-    res.json({ record: open });
+    const expectedStart = req.body.breakStartedAt;
+    const openBreak = expectedStart
+      ? open.breaks.find((b) => new Date(b.start).toISOString() === expectedStart)
+      : open.breaks.find((b) => !b.end);
+    if (!openBreak) return res.status(409).json({ message: "El lonche cambió. Actualiza los datos del turno." });
+    if (openBreak.end) return res.json({ record: open, recovered: true });
+    const record = await TimeRecord.findOneAndUpdate(
+      { _id: open._id, clockOut: null, breaks: { $elemMatch: { start: openBreak.start, end: null } } },
+      { $set: { "breaks.$.end": new Date() } }, { new: true }
+    );
+    if (!record) {
+      const latest = await TimeRecord.findOne(target);
+      if (latest?.breaks.some((b) => +new Date(b.start) === +new Date(openBreak.start) && b.end)) return res.json({ record: latest, recovered: true });
+      return res.status(409).json({ message: "El turno cambió. Actualiza antes de terminar el lonche." });
+    }
+    res.json({ record });
   } catch (err) {
-    res.status(500).json({ message: "Error", err: err.message });
+    res.status(err.status || 500).json({ message: err.status ? err.message : "No se pudo terminar el lonche.", err: err.message });
   }
 };
 
@@ -386,6 +436,7 @@ export const updateTimeRecord = async (req, res) => {
       }
     }
 
+    if (updates.clockOut === null) await ensureOpenShiftIndex();
     const record = await TimeRecord.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
 
     const changes = diffFields(
@@ -434,19 +485,23 @@ export const toggleChecklistItem = async (req, res) => {
   if (date !== dateKeyInTimeZone()) {
     return res.status(400).json({ message: "Solo puedes actualizar la lista del día de hoy" });
   }
+  const itemCounts = { apertura: 9, cierre: 9, limpieza: 7 };
+  if (!Object.hasOwn(itemCounts, listId) || !Number.isInteger(idx) || idx < 0 || idx >= itemCounts[listId] || typeof checked !== "boolean") {
+    return res.status(400).json({ message: "Tarea inválida" });
+  }
   try {
-    const doc = await ChecklistRecord.findOneAndUpdate(
-      { locationId, date, listId },
-      {},
-      { upsert: true, new: true }
-    );
-    if (checked) {
-      doc.items.set(String(idx), { by, ts: new Date() });
-    } else {
-      doc.items.delete(String(idx));
+    const filter = { locationId, date, listId };
+    const update = checked
+      ? { $set: { [`items.${idx}`]: { by, ts: new Date() } } }
+      : { $unset: { [`items.${idx}`]: 1 } };
+    let doc;
+    try {
+      doc = await ChecklistRecord.findOneAndUpdate(filter, update, { upsert: true, new: true, setDefaultsOnInsert: false });
+    } catch (err) {
+      if (err.code !== 11000) throw err;
+      doc = await ChecklistRecord.findOneAndUpdate(filter, update, { new: true });
     }
-    await doc.save();
-    res.json({ items: Object.fromEntries(doc.items) });
+    res.json({ items: Object.fromEntries(doc.items || []) });
   } catch (err) {
     res.status(500).json({ message: "Error", err: err.message });
   }
@@ -459,6 +514,9 @@ export const addTempRecord = async (req, res) => {
   const by = req.staff.id;
   if (!locationId || !requestedLocationIsAllowed(req, locationId)) {
     return res.status(403).json({ message: "Sucursal no permitida" });
+  }
+  if (!["refri-prot", "barra-fria", "congelador", "linea"].includes(stationId) || typeof value !== "number" || !Number.isFinite(value) || value < -100 || value > 150) {
+    return res.status(400).json({ message: "Revisa la estación y escribe una temperatura válida." });
   }
   try {
     const record = await TempRecord.create({

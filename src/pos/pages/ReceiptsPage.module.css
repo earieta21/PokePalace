@@ -21,6 +21,41 @@
   font-family: "Inter", system-ui, sans-serif;
 }
 
+.editorFields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.editorFields:disabled { opacity: 0.7; }
+.editPreview { width: 100%; max-height: 220px; object-fit: contain; }
+.filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 20px 0 16px; }
+.filters label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; flex: 1 1 145px; min-width: 0; }
+.filters label:first-child { flex-basis: 220px; }
+.filters .checkFilter { flex-direction: row; align-items: center; flex: 0 1 auto; min-height: 40px; }
+.filters input, .filters select { width: 100%; min-width: 0; box-sizing: border-box; }
+.filters input[type="checkbox"] { width: auto; }
+.summaryLine { display: block; font-size: 12px; margin-top: 5px; }
+.textButton { display: block; margin-top: 8px; padding: 8px 0; border: 0; background: transparent; color: var(--p-g2); text-align: left; text-decoration: underline; cursor: pointer; font: inherit; }
+.history { margin-top: 20px; }
+.history h2 { font-size: 16px; }
+.history > p { margin-bottom: 12px; }
+.viewer { width: min(950px, 94vw); max-width: 94vw; max-height: 92dvh; padding: 16px; border: 0; border-radius: 12px; background: #faf7f0; color: #0d1b0f; box-sizing: border-box; }
+.viewer::backdrop { background: rgba(0, 0, 0, 0.65); }
+.viewerToolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.viewerToolbar h2 { font-size: 16px; flex: 1; margin: 0; overflow-wrap: anywhere; }
+.viewerToolbar button, .viewerToolbar a { min-height: 40px; padding: 8px 12px; border: 1px solid #b5c5ba; border-radius: 8px; background: #fff; color: #204e39; cursor: pointer; font: inherit; }
+.viewerCanvas { overflow: auto; height: 65dvh; background: #e6e6e6; padding: 24px; }
+.viewerImageStage { position: relative; margin: auto; }
+.viewerCanvas img { display: block; position: absolute; left: 50%; top: 50%; height: auto; max-width: none; transform-origin: center; }
+.viewerCanvas iframe { width: 100%; height: 90%; border: 0; background: white; }
+.viewerCanvas pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.viewerToolbar select { max-width: min(65vw, 400px); padding: 8px; }
+.filePreview { display: grid; place-items: center; gap: 12px; min-height: 150px; background: var(--p-bg); border-radius: 12px; }
+.filePreview strong { font-size: 30px; }
+.fileQueue { margin-top: 12px; font-size: 12px; overflow-wrap: anywhere; }
+.fileQueue ul { padding-left: 18px; }
+.fileQueue li { margin: 8px 0; }
+.fileQueue button { margin-left: 8px; border: 0; cursor: pointer; min-width: 32px; min-height: 32px; }
+.thumb span { display: grid; place-items: center; height: 100%; font-weight: bold; color: var(--p-g2); }
+.root button:focus-visible, .viewer button:focus-visible { outline: 3px solid #2d6a4f; outline-offset: 3px; }
+.root button:disabled { cursor: not-allowed; }
+
 .pageHeader {
   margin-bottom: 16px;
 }
@@ -350,6 +385,7 @@
 
 .pendingTotal,
 .methodTotal {
+  box-sizing: border-box;
   min-width: 130px;
   padding: 11px 14px;
   border: 1px solid var(--p-border);
@@ -469,6 +505,9 @@
 }
 
 .thumb {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
   flex-shrink: 0;
   width: 64px;
   height: 64px;
@@ -553,8 +592,8 @@
 .deleteButton {
   display: grid;
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   place-items: center;
   border: 0;
   border-radius: 6px;

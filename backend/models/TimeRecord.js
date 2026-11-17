@@ -20,4 +20,11 @@ const timeRecordSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Only one open shift per person, including simultaneous requests from tablets.
+timeRecordSchema.index({ employeeId: 1 }, {
+  name: "one_open_shift_per_employee",
+  unique: true,
+  partialFilterExpression: { clockOut: null },
+});
+
 export default mongoose.model("TimeRecord", timeRecordSchema);

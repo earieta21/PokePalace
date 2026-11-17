@@ -92,7 +92,7 @@ const normalizeSearch = (value) => value.normalize("NFD").replace(/[\u0300-\u036
 
 const IVA = 0; // IVA incluido en precio
 
-export default function POSPage({ styles }) {
+export default function POSPage({ styles, active = true }) {
   const { staffToken } = useContext(StaffAuthContext);
   const { promo2x1Active, comboPalaceActive, unavailableItems = [], hiddenIngredients = [] } = useAvailability();
   const api = createStaffApi(staffToken);
@@ -139,6 +139,8 @@ export default function POSPage({ styles }) {
   const [memberRedeeming, setMemberRedeeming] = useState(null);
   const [lastReceipt, setLastReceipt] = useState(null);
   const [printRequested, setPrintRequested] = useState(false);
+
+  useEffect(() => { if (!active) setShowMemberScanner(false); }, [active]);
 
   const printLastReceipt = () => {
     if (!lastReceipt) return;

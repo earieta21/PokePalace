@@ -5,6 +5,7 @@ import { redeemReward } from "./rewardsController.js";
 import { verifyMemberQr } from "../utils/memberQr.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const STORY_CODE_EXPIRY_DAYS = 7;
@@ -25,7 +26,7 @@ function normalizeHandle(value) {
 // Marca como "expired" (lazy) un redemption activo cuya fecha ya pasó.
 // Devuelve el documento ya actualizado si aplicó el cambio.
 async function markExpiredIfNeeded(redemption) {
-  if (redemption && redemption.status === "active" && redemption.expiresAt && redemption.expiresAt < new Date()) {
+  if (redemption && redemption.status === "active" && redemption.expiresAt && redemption.expiresAt <= new Date()) {
     redemption.status = "expired";
     await redemption.save();
   }
@@ -65,15 +66,10 @@ export const redeemMemberReward = async (req, res) => {
 
 export const createSocialStoryReward = async (req, res) => {
   const now = new Date();
-  let participantBefore = undefined;
-  let participantClaimed = false;
-  let platform = "";
-  let handleNormalized = "";
-
   try {
-    platform = String(req.body.platform || "").toLowerCase();
+    const platform = String(req.body.platform || "").toLowerCase();
     const displayHandle = String(req.body.handle || "").trim();
-    handleNormalized = normalizeHandle(displayHandle);
+    const handleNormalized = normalizeHandle(displayHandle);
     const confirmedTagged = req.body.confirmedTagged === true;
     const confirmedDisclosure = req.body.confirmedDisclosure === true;
 
@@ -87,10 +83,10 @@ export const createSocialStoryReward = async (req, res) => {
       return res.status(400).json({ msg: "Confirma la etiqueta y el aviso de promoción" });
     }
 
-    const nextEligibleAt = new Date(now.getTime() + STORY_COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
-
+    let participant;
+    let recovered = false;
     try {
-      participantBefore = await SocialStoryParticipant.findOneAndUpdate(
+      participant = await SocialStoryParticipant.findOneAndUpdate(
         {
           platform,
           handleNormalized,
@@ -103,28 +99,36 @@ export const createSocialStoryReward = async (req, res) => {
           $set: {
             displayHandle: `@${handleNormalized}`,
             lastClaimAt: now,
-            nextEligibleAt,
+            nextEligibleAt: new Date(now.getTime() + STORY_COOLDOWN_DAYS * 24 * 60 * 60 * 1000),
             lastVerifiedBy: req.staff.id,
+            lastRedemptionId: new mongoose.Types.ObjectId(),
           },
           $setOnInsert: { platform, handleNormalized },
         },
-        { new: false, upsert: true, setDefaultsOnInsert: true }
+        { new: true, upsert: true, setDefaultsOnInsert: true }
       );
-      participantClaimed = true;
     } catch (err) {
       if (err.code !== 11000) throw err;
-      const existing = await SocialStoryParticipant.findOne({ platform, handleNormalized });
-      return res.status(409).json({
-        msg: "Esta cuenta ya recibió el premio en los últimos 30 días",
-        nextEligibleAt: existing?.nextEligibleAt || null,
-      });
+      participant = await SocialStoryParticipant.findOne({ platform, handleNormalized });
+      recovered = true;
     }
+    if (!participant) throw new Error("No se pudo recuperar la reserva del premio");
 
-    const expiresAt = new Date(now.getTime() + STORY_CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
-    let redemption = null;
+    const { nextEligibleAt } = participant;
+    const expiresAt = new Date(new Date(participant.lastClaimAt).getTime() + STORY_CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+    let redemption = participant.lastRedemptionId
+      ? await Redemption.findById(participant.lastRedemptionId)
+      : await Redemption.findOne({ source: "social_story", socialPlatform: platform, socialHandle: `@${handleNormalized}`, verifiedAt: participant.lastClaimAt });
+    if (!redemption && (!participant.lastRedemptionId || expiresAt <= now)) {
+      return res.status(409).json({ msg: "Esta cuenta ya participó y no tiene un premio vigente para recuperar.", nextEligibleAt });
+    }
+    // The reserved _id makes simultaneous retries converge on one document.
+    // Keep the reservation on failure: a later retry completes it, preserving
+    // the original expiry and cooldown instead of starting a new campaign.
     for (let attempt = 0; attempt < 5 && !redemption; attempt++) {
       try {
         redemption = await Redemption.create({
+          _id: participant.lastRedemptionId,
           rewardId: STORY_REWARD.id,
           rewardName: STORY_REWARD.name.es,
           pointsCost: 0,
@@ -133,20 +137,26 @@ export const createSocialStoryReward = async (req, res) => {
           source: "social_story",
           socialPlatform: platform,
           socialHandle: `@${handleNormalized}`,
-          verifiedBy: req.staff.id,
-          verifiedAt: now,
+          verifiedBy: participant.lastVerifiedBy,
+          verifiedAt: participant.lastClaimAt,
         });
       } catch (err) {
-        if (err.code !== 11000) throw err;
+        redemption = await Redemption.findById(participant.lastRedemptionId);
+        if (!redemption && err.code !== 11000) throw err;
+        if (redemption) recovered = true;
       }
     }
     if (!redemption) throw new Error("No se pudo generar un código único");
-
-    // The QR contains a signed, single-purpose token instead of the reward code.
-    // It remains valid only while the reward is valid and can attach this
-    // social-story reward to a single customer account.
-    const claimExpiresInSeconds = Math.max(60, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
-    const claimToken = jwt.sign(
+    redemption = await markExpiredIfNeeded(redemption);
+    if (redemption.status !== "active") {
+      const reason = { used: "ya fue utilizado", expired: "ya venció", cancelled: "fue cancelado" }[redemption.status] || "no está disponible";
+      return res.status(409).json({ msg: `El premio de esta cuenta ${reason}. No se generó otro código.`, nextEligibleAt });
+    }
+    // A recovered link never outlives the original reward. Already-linked
+    // rewards only need their existing code, not another account-claim link.
+    const claimExpiresInSeconds = Math.floor((new Date(redemption.expiresAt).getTime() - Date.now()) / 1000);
+    if (claimExpiresInSeconds <= 0) return res.status(409).json({ msg: "El premio acaba de vencer.", nextEligibleAt });
+    const claimToken = redemption.user ? null : jwt.sign(
       {
         purpose: "reward_claim",
         redemptionId: redemption._id.toString(),
@@ -155,31 +165,10 @@ export const createSocialStoryReward = async (req, res) => {
       { expiresIn: claimExpiresInSeconds }
     );
 
-    res.status(201).json({ redemption, nextEligibleAt, claimToken });
+    res.status(recovered ? 200 : 201).json({ redemption, nextEligibleAt, claimToken, recovered });
   } catch (err) {
-    if (participantClaimed) {
-      try {
-        if (participantBefore) {
-          await SocialStoryParticipant.updateOne(
-            { platform, handleNormalized, lastClaimAt: now },
-            {
-              $set: {
-                displayHandle: participantBefore.displayHandle,
-                lastClaimAt: participantBefore.lastClaimAt,
-                nextEligibleAt: participantBefore.nextEligibleAt,
-                lastVerifiedBy: participantBefore.lastVerifiedBy,
-              },
-            }
-          );
-        } else {
-          await SocialStoryParticipant.deleteOne({ platform, handleNormalized, lastClaimAt: now });
-        }
-      } catch (rollbackError) {
-        console.error("Social story cooldown rollback failed:", rollbackError.message);
-      }
-    }
     console.error("createSocialStoryReward error:", err.message);
-    res.status(500).json({ msg: "No se pudo generar el premio de historia" });
+    res.status(503).json({ msg: "No se pudo terminar la entrega. Reintenta con la misma cuenta para recuperar el premio.", retryable: true });
   }
 };
 

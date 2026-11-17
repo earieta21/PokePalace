@@ -34,26 +34,28 @@ export async function uploadImageToCloudinary(buffer, { folder = "facturas", mim
   const signature = signParams({ folder, timestamp });
 
   const form = new FormData();
-  form.append("file", new Blob([buffer], { type: mimeType }), "factura.jpg");
+  const resourceType = mimeType.startsWith("image/") ? "image" : "raw";
+  const extension = { "application/pdf": "pdf", "application/xml": "xml", "image/png": "png", "image/webp": "webp" }[mimeType] || "jpg";
+  form.append("file", new Blob([buffer], { type: mimeType }), `comprobante.${extension}`);
   form.append("api_key", process.env.CLOUDINARY_API_KEY);
   form.append("timestamp", String(timestamp));
   form.append("folder", folder);
   form.append("signature", signature);
 
   const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/upload`,
+    `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`,
     { method: "POST", body: form }
   );
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.secure_url) {
     throw new Error(`Cloudinary upload falló: ${res.status} ${JSON.stringify(data)}`);
   }
-  return { url: data.secure_url, publicId: data.public_id };
+  return { url: data.secure_url, publicId: data.public_id, resourceType };
 }
 
 /* Borra una imagen subida por nosotros. Regresa true si Cloudinary la borró
    o ya no existía; nunca lanza por un "no encontrado". */
-export async function deleteImageFromCloudinary(publicId) {
+export async function deleteImageFromCloudinary(publicId, resourceType = "image") {
   if (!cloudinaryConfigured() || !publicId) return false;
 
   const timestamp = Math.floor(Date.now() / 1000);
@@ -64,7 +66,7 @@ export async function deleteImageFromCloudinary(publicId) {
   form.append("signature", signParams({ public_id: publicId, timestamp }));
 
   const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/destroy`,
+    `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/${resourceType === "raw" ? "raw" : "image"}/destroy`,
     { method: "POST", body: form }
   );
   const data = await res.json().catch(() => null);

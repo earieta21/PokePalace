@@ -4,11 +4,13 @@
    pago y un CSV para Excel.
 
    Mismo patrón que los gastos fijos y el recordatorio fiscal: se revisa cada
-   hora y es idempotente. Cada comprobante se marca como enviado
-   (Receipt.sentToAccountantAt) solo cuando Brevo aceptó el correo, así que
-   nada se manda dos veces y nada se pierde si un envío falla: la siguiente
-   revisión lo reintenta. */
+   hora. Cada comprobante se reserva mientras se prepara el paquete y se
+   marca como enviado (Receipt.sentToAccountantAt) cuando Brevo acepta el
+   correo. Los fallos y envíos parciales quedan en ReceiptDelivery; si no
+   se puede confirmar la escritura posterior al envío, se pide revisión. */
 import Receipt from "../models/Receipt.js";
+import ReceiptDelivery from "../models/ReceiptDelivery.js";
+import { receiptDocuments } from "./receiptDocuments.js";
 import StoreSettings from "../models/StoreSettings.js";
 import { sendEmailDetailed, emailConfigured } from "./notify.js";
 import { cloudinaryResizedUrl } from "./cloudinary.js";
@@ -70,12 +72,18 @@ export function summarizeReceipts(receipts) {
   const byKind = {};
   let total = 0;
   let withoutAmount = 0;
+  const groups = Object.fromEntries(["purchases", "vouchers", "other"].map((key) => [key, { count: 0, total: 0, withoutAmount: 0, byPaymentMethod: {} }]));
 
   for (const receipt of receipts) {
     const amount = Number.isFinite(receipt.amount) ? receipt.amount : null;
+    const group = groups[receipt.kind === "voucher" ? "vouchers" : ["factura", "ticket"].includes(receipt.kind) ? "purchases" : "other"];
+    group.count += 1;
+    if (amount === null) group.withoutAmount += 1;
+    else group.total = roundMoney(group.total + amount);
     const buckets = [
       [byPaymentMethod, receipt.paymentMethod || "sin_dato"],
       [byKind, receipt.kind || "otro"],
+      [group.byPaymentMethod, receipt.paymentMethod || "sin_dato"],
     ];
     for (const [bucket, key] of buckets) {
       bucket[key] ??= { count: 0, total: 0 };
@@ -86,7 +94,7 @@ export function summarizeReceipts(receipts) {
     else total = roundMoney(total + amount);
   }
 
-  return { count: receipts.length, total, withoutAmount, byPaymentMethod, byKind };
+  return { count: receipts.length, total, withoutAmount, byPaymentMethod, byKind, groups };
 }
 
 const slug = (value) => String(value || "")
@@ -107,6 +115,15 @@ export function receiptFileName(receipt, index) {
   return `${parts.join("_")}.jpg`;
 }
 
+export function receiptDocumentEntries(receipt, index) {
+  const base = receiptFileName(receipt, index).replace(/\.jpg$/, "");
+  return receiptDocuments(receipt).map((doc, documentIndex) => ({
+    ...doc,
+    name: `${base}${documentIndex ? `_${documentIndex + 1}` : ""}.${doc.mimeType === "application/pdf" ? "pdf" : doc.mimeType === "application/xml" ? "xml" : "jpg"}`,
+  }));
+}
+const fileDocuments = (file) => file.documents || [{ url: file.receipt.imageUrl, mimeType: "image/jpeg", name: file.name }];
+
 const csvCell = (value) => {
   let text = value == null ? "" : String(value);
   // Texto capturado por el equipo: que Excel no lo ejecute como fórmula.
@@ -116,7 +133,9 @@ const csvCell = (value) => {
 
 export function buildReceiptsCsv(files) {
   const header = ["#", "Fecha", "Tipo", "Forma de pago", "Proveedor", "Monto", "Nota", "Archivo", "Enlace", "Subido por", "Origen"];
-  const rows = files.map(({ receipt: r, name }, i) => [
+  const rows = files.map((file, i) => {
+    const r = file.receipt;
+    return [
     i + 1,
     r.date,
     RECEIPT_KIND_LABEL[r.kind] ?? r.kind,
@@ -124,28 +143,32 @@ export function buildReceiptsCsv(files) {
     r.vendor || "",
     Number.isFinite(r.amount) ? r.amount : "",
     r.note || "",
-    name,
-    r.imageUrl,
+    fileDocuments(file).map((doc) => doc.name).join(" | "),
+    fileDocuments(file).map((doc) => doc.url).join(" | "),
     r.uploadedBy || "",
     r.source === "telegram" ? "Telegram" : "Portal",
-  ]);
+  ]; });
   // BOM para que Excel respete los acentos.
-  return `﻿${[header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
+  return `\uFEFF${[header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
 }
 
 export function buildAccountantEmail({ files, periodLabel, partLabel = "", attachedNames = new Set() }) {
   const summary = summarizeReceipts(files.map((f) => f.receipt));
   const subject = `Poke Palace — comprobantes ${periodLabel}${partLabel}`;
 
-  const methodRows = Object.keys(RECEIPT_PAYMENT_LABEL)
-    .filter((key) => summary.byPaymentMethod[key])
+  const groupLabels = { purchases: "Compras (facturas y tickets)", vouchers: "Vouchers de ventas", other: "Otros documentos" };
+  const methodRows = Object.entries(summary.groups).filter(([, group]) => group.count).map(([name, group]) =>
+    `<tr><th colspan="3" style="text-align:left;padding-top:12px">${groupLabels[name]} · ${fmtMXN(group.total)}</th></tr>` + Object.keys(RECEIPT_PAYMENT_LABEL)
+    .filter((key) => group.byPaymentMethod[key])
     .map((key) => {
-      const { count, total } = summary.byPaymentMethod[key];
+      const { count, total } = group.byPaymentMethod[key];
       return `<tr><td style="padding:4px 0">${RECEIPT_PAYMENT_LABEL[key]}</td><td style="text-align:right">${count}</td><td style="text-align:right;font-family:monospace">${fmtMXN(total)}</td></tr>`;
     })
-    .join("");
+    .join("")).join("");
 
-  const rows = files.map(({ receipt: r, name }, i) => `
+  const rows = files.map((file, i) => {
+    const r = file.receipt;
+    return `
       <tr style="border-top:1px solid #eee">
         <td style="padding:6px 4px;color:#888">${String(i + 1).padStart(2, "0")}</td>
         <td style="padding:6px 4px;white-space:nowrap">${escapeHtml(r.date)}</td>
@@ -153,16 +176,17 @@ export function buildAccountantEmail({ files, periodLabel, partLabel = "", attac
         <td style="padding:6px 4px">${escapeHtml(RECEIPT_PAYMENT_LABEL[r.paymentMethod || "sin_dato"])}</td>
         <td style="padding:6px 4px">${escapeHtml(r.vendor || r.note || "—")}</td>
         <td style="padding:6px 4px;text-align:right;font-family:monospace;white-space:nowrap">${Number.isFinite(r.amount) ? fmtMXN(r.amount) : "—"}</td>
-        <td style="padding:6px 4px;white-space:nowrap"><a href="${escapeHtml(r.imageUrl)}">${attachedNames.has(name) ? "adjunta · ver" : "ver foto"}</a></td>
-      </tr>`).join("");
+        <td style="padding:6px 4px">${fileDocuments(file).map((doc, docIndex) => `<a href="${escapeHtml(doc.url)}">${attachedNames.has(doc.name) ? "adjunto · ver" : "ver archivo"} ${docIndex + 1}</a>`).join("<br>")}</td>
+      </tr>`; }).join("");
 
-  const attachedCount = files.filter((f) => attachedNames.has(f.name)).length;
-  const linkedOnly = files.length - attachedCount;
-  const attachmentNote = attachedCount === files.length
-    ? "Todas las fotos van adjuntas a este correo."
+  const allDocuments = files.flatMap(fileDocuments);
+  const attachedCount = allDocuments.filter((doc) => attachedNames.has(doc.name)).length;
+  const linkedOnly = allDocuments.length - attachedCount;
+  const attachmentNote = attachedCount === allDocuments.length
+    ? "Todos los archivos van adjuntos a este correo."
     : attachedCount > 0
-      ? `${attachedCount} fotos van adjuntas; las otras ${linkedOnly} no cupieron en el correo y están en su enlace "ver foto".`
-      : `Las fotos están en el enlace "ver foto" de cada renglón.`;
+      ? `${attachedCount} archivos van adjuntos; los otros ${linkedOnly} están disponibles mediante los enlaces de cada renglón.`
+      : "Los archivos están disponibles mediante los enlaces de cada renglón.";
 
   const html = `
 <div style="font-family:ui-sans-serif,system-ui,sans-serif;max-width:720px;margin:0 auto;color:#222">
@@ -176,7 +200,6 @@ export function buildAccountantEmail({ files, periodLabel, partLabel = "", attac
     <table style="width:100%;max-width:380px;font-size:13px;border-collapse:collapse;margin-bottom:6px">
       <tr style="color:#888"><td>Forma de pago</td><td style="text-align:right">Cant.</td><td style="text-align:right">Monto</td></tr>
       ${methodRows}
-      <tr style="border-top:1px solid #ddd;font-weight:700"><td style="padding:4px 0">Total</td><td style="text-align:right">${summary.count}</td><td style="text-align:right;font-family:monospace">${fmtMXN(summary.total)}</td></tr>
     </table>
     ${summary.withoutAmount > 0 ? `<p style="font-size:12px;color:#8a6d1f;margin:0 0 14px">${summary.withoutAmount} comprobante${summary.withoutAmount !== 1 ? "s" : ""} sin monto capturado — revisa la foto.</p>` : ""}
 
@@ -184,13 +207,13 @@ export function buildAccountantEmail({ files, periodLabel, partLabel = "", attac
       <tr style="color:#888;text-align:left">
         <th style="padding:4px">#</th><th style="padding:4px">Fecha</th><th style="padding:4px">Tipo</th>
         <th style="padding:4px">Pago</th><th style="padding:4px">Proveedor / nota</th>
-        <th style="padding:4px;text-align:right">Monto</th><th style="padding:4px">Foto</th>
+        <th style="padding:4px;text-align:right">Monto</th><th style="padding:4px">Archivos</th>
       </tr>
       ${rows}
     </table>
 
-    <p style="font-size:12px;color:#555;margin:16px 0 0">${escapeHtml(attachmentNote)} También va adjunto un CSV con el detalle para Excel; el número # coincide con el inicio del nombre de cada foto.</p>
-    <p style="font-size:11px;color:#999;margin:14px 0 0">Correo automático del portal de Poke Palace. Los montos los captura el equipo al subir cada foto; el documento que vale es la foto.</p>
+    <p style="font-size:12px;color:#555;margin:16px 0 0">${escapeHtml(attachmentNote)} También va adjunto un CSV con el detalle para Excel; el número # coincide con el inicio del nombre de cada archivo.</p>
+    <p style="font-size:11px;color:#999;margin:14px 0 0">Correo automático del portal de Poke Palace. Los montos los captura el equipo; revisa los documentos originales.</p>
   </div>
 </div>`;
 
@@ -213,18 +236,18 @@ async function fetchReceiptImage(url) {
 async function collectImageAttachments(files) {
   const attachments = [];
   let used = 0;
-  for (const { receipt, name } of files) {
+  for (const doc of files.flatMap(fileDocuments)) {
     if (used >= ATTACHMENT_BUDGET_BYTES) break;
-    const buffer = await fetchReceiptImage(receipt.imageUrl);
+    const buffer = await fetchReceiptImage(doc.url);
     if (!buffer || buffer.length > MAX_ATTACHMENT_BYTES || used + buffer.length > ATTACHMENT_BUDGET_BYTES) continue;
     used += buffer.length;
-    attachments.push({ name, content: buffer.toString("base64") });
+    attachments.push({ name: doc.name, content: buffer.toString("base64") });
   }
   return attachments;
 }
 
 async function sendBatch(receipts, { to, periodLabel, partLabel }) {
-  const files = receipts.map((receipt, i) => ({ receipt, name: receiptFileName(receipt, i) }));
+  const files = receipts.map((receipt, i) => ({ receipt, name: receiptFileName(receipt, i), documents: receiptDocumentEntries(receipt, i) }));
   const csv = {
     name: `comprobantes_${dateKeyInTimeZone()}.csv`,
     content: Buffer.from(buildReceiptsCsv(files), "utf8").toString("base64"),
@@ -254,6 +277,14 @@ export async function sendReceiptsToAccountant({ before = new Date(), periodLabe
   // al mismo tiempo podrían mandar los mismos comprobantes dos veces.
   if (sendingNow) return { status: "busy", sent: 0, emails: 0 };
   sendingNow = true;
+  let delivery;
+  let claim;
+  let accepted = false;
+  let sent = 0;
+  let emails = 0;
+  const finish = async (status, error = "") => {
+    if (delivery) await ReceiptDelivery.updateOne({ _id: delivery._id }, { $set: { status, sent, emails, error, completedAt: new Date() } });
+  };
 
   try {
     const settings = await StoreSettings.findOne({ key: "main" }).select("accountantEmails").lean();
@@ -261,33 +292,56 @@ export async function sendReceiptsToAccountant({ before = new Date(), periodLabe
     if (to.length === 0) return { status: "no_recipient", sent: 0, emails: 0 };
     if (!emailConfigured()) return { status: "email_not_configured", sent: 0, emails: 0 };
 
-    const pendingFilter = { sentToAccountantAt: null, createdAt: { $lt: before } };
+    const pendingFilter = { sentToAccountantAt: null, processing: null, createdAt: { $lt: before } };
     const pendingTotal = await Receipt.countDocuments(pendingFilter);
-    if (pendingTotal === 0) return { status: "nothing_pending", sent: 0, emails: 0 };
+    if (pendingTotal === 0) {
+      const processing = await Receipt.countDocuments({ sentToAccountantAt: null, createdAt: { $lt: before } });
+      return { status: processing > 0 ? "busy" : "nothing_pending", sent: 0, emails: 0 };
+    }
 
     const parts = Math.min(Math.ceil(pendingTotal / BATCH_SIZE), MAX_BATCHES);
-    let sent = 0;
-    let emails = 0;
+    delivery = await ReceiptDelivery.create({ recipients: to, periodLabel, total: pendingTotal });
+    claim = String(delivery._id);
     for (let part = 1; part <= parts; part += 1) {
-      const batch = await Receipt.find(pendingFilter)
+      const candidates = await Receipt.find(pendingFilter)
         .sort({ date: 1, createdAt: 1 })
         .limit(BATCH_SIZE)
         .lean();
+      await Receipt.updateMany({ ...pendingFilter, _id: { $in: candidates.map((r) => r._id) } }, { $set: { processing: claim } });
+      const batch = await Receipt.find({ processing: claim, sentToAccountantAt: null }).sort({ date: 1, createdAt: 1 }).lean();
       if (batch.length === 0) break;
 
       const partLabel = parts > 1 ? ` (parte ${part} de ${parts})` : "";
       const result = await sendBatch(batch, { to, periodLabel, partLabel });
-      if (!result.ok) return { status: sent > 0 ? "partial" : "failed", sent, emails, error: result.error };
+      if (!result.ok) {
+        const status = sent > 0 ? "partial" : "failed";
+        await finish(status, "No se pudo completar el envío. Los pendientes se pueden reintentar.");
+        return { status, sent, emails, error: result.error };
+      }
 
+      accepted = true;
       await Receipt.updateMany(
-        { _id: { $in: batch.map((r) => r._id) }, sentToAccountantAt: null },
-        { $set: { sentToAccountantAt: new Date() } }
+        { _id: { $in: batch.map((r) => r._id) }, sentToAccountantAt: null, processing: claim },
+        { $set: { sentToAccountantAt: new Date(), processing: null } }
       );
+      accepted = false;
       sent += batch.length;
       emails += 1;
+      await ReceiptDelivery.updateOne({ _id: delivery._id }, { $set: { sent, emails } });
     }
-    return { status: "sent", sent, emails };
+    const remaining = await Receipt.countDocuments({ sentToAccountantAt: null, createdAt: { $lt: before } });
+    const status = remaining > 0 ? "partial" : "sent";
+    await finish(status, remaining > 0 ? "Quedan documentos pendientes; se enviarán en otra revisión." : "");
+    return { status, sent, emails, ...(remaining > 0 && { error: "Quedan documentos pendientes para otra revisión." }) };
+  } catch (err) {
+    await finish(accepted ? "uncertain" : sent > 0 ? "partial" : "failed", accepted
+      ? "El correo fue aceptado, pero no se pudo confirmar el registro. Revisa el envío antes de reintentar."
+      : "El envío se interrumpió. Revisa los pendientes antes de reintentar.").catch(() => {});
+    throw err;
   } finally {
+    // An accepted email with an unconfirmed DB write stays claimed to avoid
+    // sending it twice. Its delivery history explicitly requires review.
+    if (claim && !accepted) await Receipt.updateMany({ processing: claim }, { $set: { processing: null } }).catch(() => {});
     sendingNow = false;
   }
 }

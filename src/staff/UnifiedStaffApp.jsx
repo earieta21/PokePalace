@@ -15,6 +15,9 @@ import { StaffAuthContext } from "../context/StaffAuthContext";
 import { API_URL } from "../config";
 import { downloadCSV } from "../utils/csv";
 import { tijuanaDateKey } from "../utils/date";
+import { rewardStatus, rewardStatusLabel } from "../utils/rewardStatus";
+import useStaffAction from "./useStaffAction";
+import { readStaffResponse } from "./staffRequest";
 import RewardQrCode from "../components/RewardQrCode";
 import { Bat, Pumpkin } from "../components/HalloweenDecor";
 import { useHalloweenTheme } from "../data/seasonalTheme";
@@ -51,6 +54,7 @@ import posStyles from "../pos/EmployeePortal.module.css";
    ========================================================================== */
 const LOCATION_ID = "tij-centro-01";
 const todayKey = () => tijuanaDateKey();
+const todayWeekday = () => (new Date(`${todayKey()}T12:00:00Z`).getUTCDay() + 6) % 7;
 
 // Ubicación GPS del dispositivo — el backend valida que esté dentro del
 // radio del restaurante antes de dejar marcar entrada/salida/lonche.
@@ -67,7 +71,7 @@ function getDeviceLocation() {
     );
   });
 }
-const fmtTime = (d) => new Date(d).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+const fmtTime = (d) => new Date(d).toLocaleTimeString("es-MX", { timeZone: "America/Tijuana", hour: "2-digit", minute: "2-digit" });
 const fmtHM = (mins) => `${Math.floor(mins / 60)}h ${String(Math.round(mins % 60)).padStart(2, "0")}m`;
 const initials = (name) => name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 const sid = (id) => String(id);
@@ -242,37 +246,89 @@ export default function UnifiedStaffApp() {
   const [lowStockCount, setLowStockCount] = useState(0);
   const [clockError, setClockError] = useState("");
   const [clockBusy, setClockBusy] = useState(false);
+  const clockLock = useRef(false);
+  const [syncError, setSyncError] = useState("");
+  const [lastSynced, setLastSynced] = useState(null);
+  const [loadedFor, setLoadedFor] = useState(null);
+  const [syncRevision, setSyncRevision] = useState(0);
+  const [posVisited, setPosVisited] = useState(false);
+  const mutationVersion = useRef(0);
+  const pendingWrites = useRef(0);
+  const currentToken = useRef(token);
+  currentToken.current = token;
+  const currentDay = tijuanaDateKey(new Date(now));
+  const managesTeam = Boolean(me?.isManager);
+  const kioskReady = loadedFor?.token === token && loadedFor?.day === currentDay;
 
-  // Load low-stock count after login (for badge on Inventario tab)
+  useEffect(() => { if (tab === "pos") setPosVisited(true); }, [tab]);
+
+  // Refresh independent sections without turning failures into empty data.
   useEffect(() => {
     if (!token) return;
-    fetch(`${API_URL}/api/staff/inventory/low-stock`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.json())
-      .then((d) => setLowStockCount(d.count ?? 0))
-      .catch(() => {});
-  }, [token]);
-
-  // Load kiosk data after login
-  useEffect(() => {
-    if (!token) return;
+    const controller = new AbortController();
+    let running = false;
     const h = { Authorization: `Bearer ${token}` };
-    const today = todayKey();
-    Promise.all([
-      fetch(`${API_URL}/api/kiosk/time?locationId=${LOCATION_ID}`, { headers: h }).then((r) => r.json()),
-      fetch(`${API_URL}/api/kiosk/checklist?locationId=${LOCATION_ID}&date=${today}`, { headers: h }).then((r) => r.json()),
-      fetch(`${API_URL}/api/kiosk/temps?locationId=${LOCATION_ID}`, { headers: h }).then((r) => r.json()),
-      fetch(`${API_URL}/api/kiosk/schedule?locationId=${LOCATION_ID}`, { headers: h }).then((r) => r.json()),
-      fetch(`${API_URL}/api/kiosk/announcements?locationId=${LOCATION_ID}`, { headers: h }).then((r) => r.json()),
-    ]).then(([td, cd, pd, sd, ad]) => {
-      setTime(td.records || []);
-      setChecklist(cd.checklist || {});
-      setTemps(pd.records || []);
-      setSchedule(sd.schedule || {});
-      setAnnouncements(ad.announcements || []);
-    }).catch(console.error);
-  }, [token]);
+    const sections = [
+      ["Asistencia", `/api/kiosk/time?locationId=${LOCATION_ID}`, "records", setTime],
+      ["Tareas", `/api/kiosk/checklist?locationId=${LOCATION_ID}&date=${currentDay}`, "checklist", setChecklist],
+      ["Temperaturas", `/api/kiosk/temps?locationId=${LOCATION_ID}&date=${currentDay}`, "records", setTemps],
+      ["Horario", `/api/kiosk/schedule?locationId=${LOCATION_ID}`, "schedule", setSchedule],
+      ["Avisos", `/api/kiosk/announcements?locationId=${LOCATION_ID}`, "announcements", setAnnouncements],
+      ["Equipo", `/api/kiosk/employees${managesTeam ? "/manage" : ""}?locationId=${LOCATION_ID}`, "employees", setEmployees],
+      ["Inventario", "/api/staff/inventory/low-stock", "count", setLowStockCount],
+    ];
+    async function refresh() {
+      if (running || pendingWrites.current || controller.signal.aborted) return;
+      running = true;
+      const version = mutationVersion.current;
+      const results = await Promise.allSettled(sections.map(async ([, path, key]) => {
+        const data = await fetch(`${API_URL}${path}`, { headers: h, signal: controller.signal, cache: "no-store" }).then(readStaffResponse);
+        if (data[key] == null) throw new Error("Respuesta incompleta");
+        return data[key];
+      }));
+      running = false;
+      if (controller.signal.aborted || version !== mutationVersion.current) return;
+      const failures = [];
+      results.forEach((result, i) => {
+        if (result.status === "fulfilled") sections[i][3](result.value);
+        else failures.push(`${sections[i][0]}: ${result.reason.message}`);
+      });
+      setSyncError(failures.join(" · "));
+      if (results.slice(0, 6).every((result) => result.status === "fulfilled")) setLoadedFor({ token, day: currentDay });
+      if (!failures.length) setLastSynced(new Date());
+    }
+    refresh();
+    const interval = setInterval(refresh, 30000);
+    const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      controller.abort(); clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [token, currentDay, syncRevision, managesTeam]);
+
+  useEffect(() => { setChecklist({}); setTemps([]); }, [currentDay]);
+
+  async function saveStaff(path, method, body) {
+    const session = token;
+    if (!session || currentToken.current !== session) throw new Error("La sesión cambió. Vuelve a ingresar.");
+    mutationVersion.current++; pendingWrites.current++;
+    try {
+      const data = await fetch(`${API_URL}${path}`, {
+        method, headers: authHeaders,
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      }).then(readStaffResponse);
+      if (currentToken.current !== session) throw new Error("La sesión cambió. Vuelve a consultar los datos.");
+      return data;
+    } finally {
+      mutationVersion.current++; pendingWrites.current--;
+      if (currentToken.current === session) setSyncRevision((v) => v + 1);
+    }
+  }
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -370,29 +426,22 @@ export default function UnifiedStaffApp() {
     rememberPinLength(pinLengthForRole(user.role));
     setToken(t);
     setMe(user);
-    const employeePath = user.isManager ? "/api/kiosk/employees/manage" : "/api/kiosk/employees";
-    try {
-      const employeeResponse = await fetch(
-        `${API_URL}${employeePath}?locationId=${LOCATION_ID}`,
-        { headers: { Authorization: `Bearer ${t}` } }
-      );
-      if (!employeeResponse.ok) throw new Error("No se pudo cargar el personal");
-      const data = await employeeResponse.json();
-      setEmployees(data.employees || []);
-    } catch {
-      setEmployees([{ _id: user.id, name: user.name, role: user.role, color: user.color }]);
-    }
     const tabs = TABS_BY_ROLE[user.role] || TABS_BY_ROLE.employee;
     setTab(tabs[0]);
   }
 
   function handleLogout() {
+    currentToken.current = null;
+    mutationVersion.current++;
+    setPosVisited(false); setSyncError(""); setLastSynced(null); setLoadedFor(null);
     setToken(null); setMe(null); setTab(null); setLowStockCount(0); setPasskeyOffer(false);
     setEmployees([]);
     setTime([]); setChecklist({}); setTemps([]); setSchedule({}); setAnnouncements([]);
   }
 
   async function withDeviceLocation(fn) {
+    if (clockLock.current) return;
+    clockLock.current = true;
     setClockError(""); setClockBusy(true);
     try {
       // El dueño no está atado al candado GPS: ni se le pide permiso de
@@ -406,128 +455,89 @@ export default function UnifiedStaffApp() {
     } catch (err) {
       setClockError(err.message || "No se pudo completar la acción.");
     } finally {
+      clockLock.current = false;
       setClockBusy(false);
     }
   }
 
   async function clockIn() {
     await withDeviceLocation(async ({ lat, lng }) => {
-      const r = await fetch(`${API_URL}/api/kiosk/time/clock-in`, {
-        method: "POST", headers: authHeaders,
-        body: JSON.stringify({ locationId: LOCATION_ID, date: todayKey(), lat, lng }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.message || "No se pudo marcar tu entrada.");
-      if (data.record) setTime((p) => [data.record, ...p]);
+      const data = await saveStaff("/api/kiosk/time/clock-in", "POST", { locationId: LOCATION_ID, date: todayKey(), lat, lng });
+      if (data.record) setTime((p) => [data.record, ...p.filter((t) => sid(t._id) !== sid(data.record._id))]);
     });
   }
 
   async function clockOut() {
+    const recordId = openEntry?._id;
+    if (!recordId) return;
     await withDeviceLocation(async ({ lat, lng }) => {
-      const r = await fetch(`${API_URL}/api/kiosk/time/clock-out`, {
-        method: "POST", headers: authHeaders, body: JSON.stringify({ lat, lng }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.message || "No se pudo marcar tu salida.");
+      const data = await saveStaff("/api/kiosk/time/clock-out", "POST", { lat, lng, recordId });
       if (data.record) setTime((p) => p.map((t) => sid(t._id) === sid(data.record._id) ? data.record : t));
     });
   }
 
   async function startBreak() {
+    const recordId = openEntry?._id;
+    if (!recordId) return;
     await withDeviceLocation(async ({ lat, lng }) => {
-      const r = await fetch(`${API_URL}/api/kiosk/time/break-start`, {
-        method: "POST", headers: authHeaders, body: JSON.stringify({ lat, lng }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.message || "No se pudo iniciar tu lonche.");
+      const data = await saveStaff("/api/kiosk/time/break-start", "POST", { lat, lng, recordId });
       if (data.record) setTime((p) => p.map((t) => sid(t._id) === sid(data.record._id) ? data.record : t));
     });
   }
 
   async function endBreak() {
+    const recordId = openEntry?._id;
+    const breakStartedAt = openEntry?.breaks?.find((b) => !b.end)?.start;
+    if (!recordId || !breakStartedAt) return;
     await withDeviceLocation(async ({ lat, lng }) => {
-      const r = await fetch(`${API_URL}/api/kiosk/time/break-end`, {
-        method: "POST", headers: authHeaders, body: JSON.stringify({ lat, lng }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.message || "No se pudo terminar tu lonche.");
+      const data = await saveStaff("/api/kiosk/time/break-end", "POST", { lat, lng, recordId, breakStartedAt });
       if (data.record) setTime((p) => p.map((t) => sid(t._id) === sid(data.record._id) ? data.record : t));
     });
   }
 
   async function toggleTask(listId, idx) {
     const currently = Boolean(checklist?.[listId]?.[String(idx)]);
-    const r = await fetch(`${API_URL}/api/kiosk/checklist`, {
-      method: "PATCH", headers: authHeaders,
-      body: JSON.stringify({ locationId: LOCATION_ID, date: todayKey(), listId, idx, checked: !currently }),
-    });
-    const { items } = await r.json();
+    const { items } = await saveStaff("/api/kiosk/checklist", "PATCH", { locationId: LOCATION_ID, date: todayKey(), listId, idx, checked: !currently });
     if (items) setChecklist((p) => ({ ...p, [listId]: items }));
   }
 
   async function addTemp(stationId, value) {
-    const r = await fetch(`${API_URL}/api/kiosk/temps`, {
-      method: "POST", headers: authHeaders,
-      body: JSON.stringify({ stationId, value: Number(value), date: todayKey(), locationId: LOCATION_ID }),
-    });
-    const { record } = await r.json();
+    const { record } = await saveStaff("/api/kiosk/temps", "POST", { stationId, value: Number(value), date: todayKey(), locationId: LOCATION_ID });
     if (record) setTemps((p) => [record, ...p]);
   }
 
   async function addAnnouncement(text) {
-    const r = await fetch(`${API_URL}/api/kiosk/announcements`, {
-      method: "POST", headers: authHeaders,
-      body: JSON.stringify({ text, locationId: LOCATION_ID }),
-    });
-    const { announcement } = await r.json();
+    const { announcement } = await saveStaff("/api/kiosk/announcements", "POST", { text, locationId: LOCATION_ID });
     if (announcement) setAnnouncements((p) => [announcement, ...p]);
   }
 
   async function removeAnnouncement(id) {
-    await fetch(`${API_URL}/api/kiosk/announcements/${id}`, { method: "DELETE", headers: authHeaders });
+    await saveStaff(`/api/kiosk/announcements/${id}`, "DELETE");
     setAnnouncements((p) => p.filter((a) => sid(a._id) !== sid(id)));
   }
 
   async function saveSchedule(draft) {
-    await fetch(`${API_URL}/api/kiosk/schedule`, {
-      method: "PUT", headers: authHeaders,
-      body: JSON.stringify({ locationId: LOCATION_ID, schedule: draft }),
-    });
-    setSchedule(draft);
+    const data = await saveStaff("/api/kiosk/schedule", "PUT", { locationId: LOCATION_ID, schedule: draft });
+    setSchedule(data.schedule);
   }
 
   async function updateEmployee(id, patch) {
-    const r = await fetch(`${API_URL}/api/kiosk/employees/${id}`, {
-      method: "PATCH", headers: authHeaders,
-      body: JSON.stringify(patch),
-    });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || "Error"); }
-    const { employee } = await r.json();
+    const { employee } = await saveStaff(`/api/kiosk/employees/${id}`, "PATCH", patch);
     if (employee) setEmployees((p) => p.map((e) => sid(e._id) === sid(id) ? { ...e, ...employee } : e));
   }
 
   async function addEmployee(form) {
-    const r = await fetch(`${API_URL}/api/kiosk/employees`, {
-      method: "POST", headers: authHeaders,
-      body: JSON.stringify({ ...form, locationId: LOCATION_ID }),
-    });
-    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || "Error"); }
-    const { employee } = await r.json();
+    const { employee } = await saveStaff("/api/kiosk/employees", "POST", { ...form, locationId: LOCATION_ID });
     if (employee) setEmployees((p) => [...p, employee]);
   }
 
   async function removeEmployee(id) {
-    await fetch(`${API_URL}/api/kiosk/employees/${id}`, { method: "DELETE", headers: authHeaders });
+    await saveStaff(`/api/kiosk/employees/${id}`, "DELETE");
     setEmployees((p) => p.filter((e) => sid(e._id) !== sid(id)));
   }
 
   async function updateTimeRecord(id, patch) {
-    const r = await fetch(`${API_URL}/api/kiosk/time/${id}`, {
-      method: "PATCH", headers: authHeaders,
-      body: JSON.stringify(patch),
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.message || "No se pudo corregir el registro.");
+    const data = await saveStaff(`/api/kiosk/time/${id}`, "PATCH", patch);
     if (data.record) setTime((p) => p.map((t) => sid(t._id) === sid(data.record._id) ? data.record : t));
     return data.record;
   }
@@ -609,18 +619,24 @@ export default function UnifiedStaffApp() {
 
           {/* Main content */}
           <main className={`${shellStyles.main} ${isWideTab ? shellStyles.mainWide : shellStyles.mainStandard} ${posStyles.staffEmbed}`}>
-            {tab === "inicio"  && <HomeTab halloween={halloween} me={me} now={now} openEntry={openEntry} time={time} schedule={schedule} checklist={checklist} onClockIn={clockIn} onClockOut={clockOut} onBreakStart={startBreak} onBreakEnd={endBreak} clockError={clockError} clockBusy={clockBusy} />}
+            {syncError && <div role="alert" className="mb-4 rounded-xl border border-amber-500/40 bg-amber-950 p-3 text-sm text-amber-100">
+              <p>No se pudieron actualizar algunos datos. {syncError}</p>
+              <p>{lastSynced ? `Última actualización completa: ${fmtTime(lastSynced)}` : "Aún no se ha completado la carga inicial."}</p>
+              <button type="button" className="mt-2 underline" onClick={() => setSyncRevision((v) => v + 1)}>Reintentar</button>
+            </div>}
+            {!kioskReady && ["inicio", "tareas", "temp", "horario", "avisos", "panel"].includes(tab) && <p role="status" className="p-4 text-sm">{syncError ? "Los controles estarán disponibles cuando termine la carga. Puedes reintentar arriba." : "Cargando datos del turno…"}</p>}
+            {kioskReady && tab === "inicio" && <HomeTab halloween={halloween} me={me} now={now} openEntry={openEntry} time={time} schedule={schedule} checklist={checklist} onClockIn={clockIn} onClockOut={clockOut} onBreakStart={startBreak} onBreakEnd={endBreak} clockError={clockError} clockBusy={clockBusy} />}
             {tab === "consumo" && <ConsumptionPage styles={posStyles} staffUser={{ id: me.id, name: me.name, role: me.role }} employees={employees} />}
-            {tab === "tareas"  && <TasksTab employees={employees} checklist={checklist} onToggle={toggleTask} />}
-            {tab === "temp"    && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
-            {tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
+            {kioskReady && tab === "tareas" && <TasksTab employees={employees} checklist={checklist} onToggle={toggleTask} />}
+            {kioskReady && tab === "temp" && <TempsTab employees={employees} temps={temps} onAdd={addTemp} />}
+            {kioskReady && tab === "horario" && <ScheduleTab employees={employees} schedule={schedule} isManager={isManager} onSave={saveSchedule} />}
             {tab === "calendario" && <TeamCalendarPage locationId={LOCATION_ID} />}
-            {tab === "avisos"  && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
+            {kioskReady && tab === "avisos" && <AnnouncementsTab employees={employees} announcements={announcements} isManager={isManager} onAdd={addAnnouncement} onRemove={removeAnnouncement} />}
             {tab === "premios" && <RewardsRedeemTab token={token} />}
             {tab === "disponibilidad" && <AvailabilityTab token={token} role={me?.role} />}
-            {tab === "panel"   && <PanelTab actor={me} employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} onUpdateTimeRecord={updateTimeRecord} />}
+            {kioskReady && tab === "panel" && <PanelTab actor={me} employees={employees} time={time} now={now} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onUpdateEmployee={updateEmployee} onUpdateTimeRecord={updateTimeRecord} />}
             {tab === "pos"     && me.role !== "kitchen" && <PendingPayments />}
-            {tab === "pos"     && <POSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} />}
+            {myTabs.includes("pos") && (tab === "pos" || posVisited) && <div hidden={tab !== "pos"}><POSPage active={tab === "pos"} styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} /></div>}
             {tab === "cocina"  && <section className={shellStyles.portalSurface}><KDSPage styles={posStyles} role={me.role} staffUser={{ id: me.id, name: me.name, role: me.role }} /></section>}
             {tab === "hist"    && <section className={shellStyles.portalSurface}><OrderHistoryPage styles={posStyles} /></section>}
             {tab === "resumen" && <SummaryPage styles={posStyles} />}
@@ -1120,7 +1136,7 @@ function HomeTab({ halloween, me, now, openEntry, time, schedule, checklist, onC
   const forgotToClockOut = openEntry && !openBreak &&
     (now - new Date(openEntry.clockIn).getTime()) > FORGOT_CLOCKOUT_HOURS * 3600 * 1000;
 
-  const myShift = schedule?.[sid(me.id)]?.[(new Date().getDay() + 6) % 7];
+  const myShift = schedule?.[sid(me.id)]?.[todayWeekday()];
   const totalTasks = Object.values(CHECKLISTS).reduce((a, l) => a + l.items.length, 0);
   const doneTasks = CHECK_IDS.reduce((a, lid) => a + Object.keys(checklist?.[lid] || {}).length, 0);
 
@@ -1257,6 +1273,7 @@ function HomeTab({ halloween, me, now, openEntry, time, schedule, checklist, onC
    TAREAS
    ========================================================================== */
 function TasksTab({ employees, checklist, onToggle }) {
+  const action = useStaffAction();
   const [active, setActive] = useState("apertura");
   const list = CHECKLISTS[active];
   const done = checklist?.[active] || {};
@@ -1291,12 +1308,15 @@ function TasksTab({ employees, checklist, onToggle }) {
         </div>
       </div>
       <div className="bg-slate-800 rounded-2xl border border-white/5 overflow-hidden">
+        {action.error && <p role="alert" className="p-3 text-sm text-rose-300">{action.error}</p>}
         <ul className="divide-y divide-white/5">
           {list.items.map((item, idx) => {
             const rec = done[String(idx)];
             return (
-              <li key={idx} onClick={() => onToggle(active, idx)}
-                className="flex items-start gap-3 px-4 py-3.5 cursor-pointer hover:bg-white/3 transition-colors">
+              <li key={idx}>
+                <button type="button" role="checkbox" aria-checked={Boolean(rec)} disabled={action.busy}
+                  onClick={() => action.run(() => onToggle(active, idx))}
+                  className="flex w-full text-left items-start gap-3 px-4 py-3.5 hover:bg-white/3 transition-colors disabled:opacity-50 focus-visible:outline focus-visible:outline-emerald-400">
                 <span className={`mt-0.5 w-5 h-5 rounded-md flex items-center justify-center border-2 shrink-0 transition-all ${rec ? "bg-emerald-500 border-emerald-500" : "border-slate-600"}`}>
                   {rec && <CheckSquare className="w-3.5 h-3.5 text-white" />}
                 </span>
@@ -1304,6 +1324,7 @@ function TasksTab({ employees, checklist, onToggle }) {
                   <span className={`text-sm ${rec ? "line-through text-slate-500" : "text-slate-200"}`}>{item}</span>
                   {rec && <span className="block text-[11px] text-emerald-500 mt-0.5">✓ {empName(rec.by)} · {fmtTime(rec.ts)}</span>}
                 </span>
+                </button>
               </li>
             );
           })}
@@ -1318,6 +1339,7 @@ function TasksTab({ employees, checklist, onToggle }) {
    ========================================================================== */
 function TempsTab({ employees, temps, onAdd }) {
   const [vals, setVals] = useState({});
+  const action = useStaffAction();
   const dk = todayKey();
   const empName = (id) => employees.find((e) => sid(e._id) === sid(id))?.name.split(" ")[0] || "?";
 
@@ -1327,6 +1349,8 @@ function TempsTab({ employees, temps, onAdd }) {
         <h2 className="text-2xl font-black tracking-tight">Temperaturas</h2>
         <p className="text-sm text-slate-400 mt-0.5">Registra al abrir y cerrar. Fuera de rango = alerta.</p>
       </div>
+      {action.error && <p role="alert" className="text-sm text-rose-300">{action.error}</p>}
+      {action.saved && <p role="status" className="text-sm text-emerald-300">Temperatura registrada.</p>}
       {TEMP_STATIONS.map((st) => {
         const Icon = st.icon;
         const todays = temps.filter((t) => t.stationId === st.id && t.date === dk);
@@ -1358,9 +1382,12 @@ function TempsTab({ employees, temps, onAdd }) {
               )}
               <div className="flex gap-2">
                 <input type="number" inputMode="decimal" placeholder={`Temperatura en ${st.unit}`}
+                  aria-label={`Temperatura de ${st.label}`} disabled={action.busy}
                   value={vals[st.id] ?? ""} onChange={(e) => setVals((p) => ({ ...p, [st.id]: e.target.value }))}
                   className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500" />
-                <button onClick={() => { if (!vals[st.id] && vals[st.id] !== 0) return; onAdd(st.id, vals[st.id]); setVals((p) => ({ ...p, [st.id]: "" })); }}
+                <button disabled={action.busy || vals[st.id] == null || vals[st.id] === ""} onClick={async () => {
+                  if (await action.run(() => onAdd(st.id, vals[st.id]))) setVals((p) => ({ ...p, [st.id]: "" }));
+                }}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 rounded-xl transition">Registrar</button>
               </div>
               {todays.length > 0 && (
@@ -1384,10 +1411,11 @@ function TempsTab({ employees, temps, onAdd }) {
    HORARIO
    ========================================================================== */
 function ScheduleTab({ employees, schedule, isManager, onSave }) {
+  const action = useStaffAction();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(schedule);
-  useEffect(() => setDraft(schedule), [schedule]);
-  const todayIdx = (new Date().getDay() + 6) % 7;
+  useEffect(() => { if (!editing) setDraft(schedule); }, [schedule, editing]);
+  const todayIdx = todayWeekday();
 
   return (
     <div className="space-y-4">
@@ -1398,12 +1426,14 @@ function ScheduleTab({ employees, schedule, isManager, onSave }) {
         </div>
         {isManager && (editing
           ? <div className="flex gap-2">
-              <button onClick={() => { setDraft(schedule); setEditing(false); }} className="text-sm px-3 py-2 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 transition">Cancelar</button>
-              <button onClick={() => { onSave(draft); setEditing(false); }} className="text-sm px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition">Guardar</button>
+              <button disabled={action.busy} onClick={() => { setDraft(schedule); setEditing(false); }} className="text-sm px-3 py-2 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 transition">Cancelar</button>
+              <button disabled={action.busy} onClick={async () => { if (await action.run(() => onSave(draft))) setEditing(false); }} className="text-sm px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition">{action.busy ? "Guardando…" : "Guardar"}</button>
             </div>
           : <button onClick={() => setEditing(true)} className="text-sm px-4 py-2 rounded-xl bg-slate-700 text-white font-semibold hover:bg-slate-600 transition">Editar</button>
         )}
       </div>
+      {action.error && <p role="alert" className="text-sm text-rose-300">{action.error}</p>}
+      {action.saved && !editing && <p role="status" className="text-sm text-emerald-300">Horario guardado.</p>}
       <div className="overflow-x-auto bg-slate-800 rounded-2xl border border-white/5">
         <table className="w-full text-sm">
           <thead>
@@ -1426,7 +1456,7 @@ function ScheduleTab({ employees, schedule, isManager, onSave }) {
                   {DAYS.map((_, di) => (
                     <td key={di} className={`px-1 py-2 text-center ${di === todayIdx ? "bg-emerald-900/20" : ""}`}>
                       {editing
-                        ? <input value={draft?.[sid(e._id)]?.[di] || ""} onChange={(ev) => setDraft((p) => ({ ...p, [sid(e._id)]: { ...(p[sid(e._id)] || {}), [di]: ev.target.value } }))}
+                        ? <input disabled={action.busy} aria-label={`${e.name}, ${DAYS[di]}`} value={draft?.[sid(e._id)]?.[di] || ""} onChange={(ev) => setDraft((p) => ({ ...p, [sid(e._id)]: { ...(p[sid(e._id)] || {}), [di]: ev.target.value } }))}
                             placeholder="—" className="w-14 text-center text-xs bg-slate-900 border border-white/10 rounded-lg px-1 py-1 text-white" />
                         : <span className={`text-xs ${schedule?.[sid(e._id)]?.[di] ? "text-slate-200" : "text-slate-600"}`}>{schedule?.[sid(e._id)]?.[di] || "—"}</span>
                       }
@@ -1447,6 +1477,7 @@ function ScheduleTab({ employees, schedule, isManager, onSave }) {
    AVISOS
    ========================================================================== */
 function AnnouncementsTab({ employees, announcements, isManager, onAdd, onRemove }) {
+  const action = useStaffAction();
   const [text, setText] = useState("");
   const [confirmId, setConfirmId] = useState(null);
   const empName = (id) => employees.find((e) => sid(e._id) === sid(id))?.name.split(" ")[0] || "?";
@@ -1458,12 +1489,14 @@ function AnnouncementsTab({ employees, announcements, isManager, onAdd, onRemove
         <h2 className="text-2xl font-black tracking-tight">Avisos del equipo</h2>
         <p className="text-sm text-slate-400 mt-0.5">Comunicados y novedades del día.</p>
       </div>
+      {action.error && <p role="alert" className="text-sm text-rose-300">{action.error}</p>}
+      {action.saved && <p role="status" className="text-sm text-emerald-300">Cambio guardado.</p>}
       {isManager && (
         <div className="bg-slate-800 rounded-2xl border border-white/5 p-4">
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} placeholder="Escribe un aviso…"
+          <textarea aria-label="Nuevo aviso" disabled={action.busy} value={text} onChange={(e) => setText(e.target.value)} rows={2} placeholder="Escribe un aviso…"
             className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 resize-none" />
           <div className="flex justify-end mt-3">
-            <button disabled={!text.trim()} onClick={() => { onAdd(text.trim()); setText(""); }}
+            <button disabled={action.busy || !text.trim()} onClick={async () => { if (await action.run(() => onAdd(text.trim()))) setText(""); }}
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-xl disabled:opacity-40 transition">
               <Plus className="w-4 h-4" /> Publicar
             </button>
@@ -1489,9 +1522,9 @@ function AnnouncementsTab({ employees, announcements, isManager, onAdd, onRemove
                     {isManager && (confirmId === sid(a._id)
                       ? <div className="flex gap-1 shrink-0">
                           <button onClick={() => setConfirmId(null)} className="text-xs px-2 py-1 rounded-lg bg-slate-700 text-slate-300">No</button>
-                          <button onClick={() => { onRemove(a._id); setConfirmId(null); }} className="text-xs px-2 py-1 rounded-lg bg-rose-500 text-white">Sí</button>
+                          <button disabled={action.busy} onClick={async () => { if (await action.run(() => onRemove(a._id))) setConfirmId(null); }} className="text-xs px-2 py-1 rounded-lg bg-rose-500 text-white">Eliminar aviso</button>
                         </div>
-                      : <button onClick={() => setConfirmId(sid(a._id))} className="text-slate-600 hover:text-rose-400 shrink-0 transition"><Trash2 className="w-4 h-4" /></button>
+                      : <button aria-label="Eliminar aviso" disabled={action.busy} onClick={() => setConfirmId(sid(a._id))} className="text-slate-600 hover:text-rose-400 shrink-0 transition"><Trash2 className="w-4 h-4" /></button>
                     )}
                   </div>
                 </div>
@@ -1552,7 +1585,7 @@ function RewardsRedeemTab({ token }) {
           : "";
         throw new Error(`${data.msg || "No se pudo generar el premio"}${retryDate}`);
       }
-      setIssuedStory({ ...data.redemption, claimToken: data.claimToken });
+      setIssuedStory({ ...data.redemption, claimToken: data.claimToken, recovered: data.recovered });
       setStoryHandle("");
       setConfirmedTagged(false);
       setConfirmedDisclosure(false);
@@ -1611,6 +1644,7 @@ function RewardsRedeemTab({ token }) {
   };
 
   const reset = () => { setCode(""); setRedemption(null); setError(""); };
+  const redemptionState = rewardStatus(redemption);
 
   return (
     <div>
@@ -1671,12 +1705,13 @@ function RewardsRedeemTab({ token }) {
             disabled={issuingStory || !storyHandle.trim() || !confirmedTagged || !confirmedDisclosure}
             className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:hover:bg-violet-600 text-white font-semibold transition"
           >
-            {issuingStory ? "Generando…" : "Generar código de bebida"}
+            {issuingStory ? "Consultando premio…" : "Generar o recuperar código de bebida"}
           </button>
+          <p className="text-xs text-slate-400">Si se perdió la respuesta, vuelve a ingresar la misma cuenta y confirma la verificación. Recuperaremos el premio vigente con su código y vencimiento originales.</p>
         </form>
 
         {storyError && (
-          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm rounded-xl px-4 py-3 mt-3">
+          <div role="alert" className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm rounded-xl px-4 py-3 mt-3">
             {storyError}
           </div>
         )}
@@ -1684,11 +1719,13 @@ function RewardsRedeemTab({ token }) {
         {issuedStory && (
           <div className="mt-3 bg-violet-500/10 border border-violet-500/20 rounded-2xl p-5">
             <div className="text-center">
-              <p className="text-violet-300 text-sm font-semibold">Código generado para {issuedStory.socialHandle}</p>
+              <p className="text-violet-300 text-sm font-semibold" role="status">{issuedStory.recovered ? "Premio recuperado" : "Código generado"} para {issuedStory.socialHandle}</p>
               <p className="my-2 text-3xl font-mono font-bold tracking-widest text-white">{issuedStory.code}</p>
               <p className="text-slate-400 text-xs">
                 Agua del día. Válido hasta el {new Date(issuedStory.expiresAt).toLocaleDateString("es-MX")} con la compra de un bowl.
               </p>
+              {issuedStory.recovered && <p className="text-slate-400 text-xs mt-2">Se conserva el mismo premio. No cambian su vencimiento ni el plazo de 30 días.</p>}
+              {!claimUrl && <><p className="text-slate-400 text-xs mt-2">Este premio ya está guardado en la cuenta del cliente.</p><button type="button" onClick={copyStoryCode} className="mt-3 rounded-xl bg-white/10 px-4 py-3 text-white">Copiar código</button>{storyShareStatus && <p role="status" className="text-emerald-300 text-xs mt-2">{storyShareStatus}</p>}</>}
             </div>
 
             {claimUrl && (
@@ -1755,11 +1792,11 @@ function RewardsRedeemTab({ token }) {
           <div className="flex items-center justify-between mb-4">
             <span className="text-2xl font-mono font-bold tracking-widest text-white">{redemption.code}</span>
             <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-              redemption.status === "used"    ? "bg-slate-500/20 text-slate-400"
-              : redemption.status === "expired" ? "bg-rose-500/20 text-rose-400"
+              redemptionState === "used"    ? "bg-slate-500/20 text-slate-400"
+              : redemptionState !== "active" ? "bg-rose-500/20 text-rose-400"
               : "bg-emerald-500/20 text-emerald-400"
             }`}>
-              {redemption.status === "used" ? "Ya usado" : redemption.status === "expired" ? "Vencido" : "Activo"}
+              {rewardStatusLabel(redemptionState)}
             </span>
           </div>
 
@@ -1770,24 +1807,26 @@ function RewardsRedeemTab({ token }) {
                 ? `${redemption.socialPlatform === "facebook" ? "Facebook" : "Instagram"}: ${redemption.socialHandle}`
                 : `Cliente: ${redemption.user?.name || "—"} · ${redemption.pointsCost} pts`}
             </p>
-            {redemption.status === "used" && (
+            {redemptionState === "used" && (
               <p className="text-slate-500 text-xs">
                 Usado el {new Date(redemption.usedAt).toLocaleString("es-MX")}
               </p>
             )}
-            {redemption.status === "expired" && (
+            {redemptionState === "expired" && (
               <p className="text-rose-400 text-xs">
                 Venció el {new Date(redemption.expiresAt).toLocaleDateString("es-MX")}
               </p>
             )}
-            {redemption.status === "active" && redemption.expiresAt && (
+            {redemptionState === "cancelled" && <p className="text-rose-400 text-xs">Este premio fue cancelado y no puede aplicarse a una orden.</p>}
+            {redemptionState === "unavailable" && <p className="text-rose-400 text-xs">Este premio no está disponible para usarlo.</p>}
+            {redemptionState === "active" && redemption.expiresAt && (
               <p className="text-slate-500 text-xs">
                 Válido hasta el {new Date(redemption.expiresAt).toLocaleDateString("es-MX")}
               </p>
             )}
           </div>
 
-          {redemption.status === "active" ? (
+          {redemptionState === "active" ? (
             <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-amber-300 text-sm">
               Aplica este código dentro de la orden en la pestaña POS. El sistema verificará las condiciones y calculará el descuento.
             </div>
@@ -1860,6 +1899,8 @@ function AvailabilityTab({ token, role }) {
   const [storeStatus, setStoreStatus] = useState(null); // { ordersPaused, pausedMessage }
   const [pauseSaving, setPauseSaving] = useState(false);
   const [pauseMsgDraft, setPauseMsgDraft] = useState("");
+  const [loadRevision, setLoadRevision] = useState(0);
+  const pauseLock = useRef(false);
 
   // Respaldo de datos — solo dueño/admin
   const canBackup = role === "owner" || role === "admin";
@@ -1868,19 +1909,21 @@ function AvailabilityTab({ token, role }) {
   const [backupError, setBackupError] = useState("");
 
   useEffect(() => {
+    const controller = new AbortController();
+    setSaveError("");
     fetch(`${API_URL}/api/settings/availability`)
-      .then((r) => r.json())
-      .then((d) => setAvailability(availabilityFromResponse(d)))
+      .then(readStaffResponse)
+      .then((d) => { if (!controller.signal.aborted) setAvailability(availabilityFromResponse(d)); })
       .catch(() => {
-        setAvailability({ today: [], season: [] });
-        setSaveError("No se pudo cargar la disponibilidad. Recarga la página.");
+        if (!controller.signal.aborted) setSaveError("No se pudo cargar la disponibilidad. Intenta de nuevo.");
       });
 
     fetch(`${API_URL}/api/settings/store-status`)
-      .then((r) => r.json())
-      .then((d) => { setStoreStatus(d); setPauseMsgDraft(d.pausedMessage || ""); })
-      .catch(() => setStoreStatus({ ordersPaused: false, pausedMessage: "" }));
-  }, []);
+      .then(readStaffResponse)
+      .then((d) => { if (!controller.signal.aborted) { setStoreStatus(d); setPauseMsgDraft(d.pausedMessage || ""); } })
+      .catch(() => { if (!controller.signal.aborted) setSaveError("No se pudo consultar si la tienda está pausada. Intenta de nuevo."); });
+    return () => controller.abort();
+  }, [loadRevision]);
 
   useEffect(() => {
     if (!canBackup) return;
@@ -1920,34 +1963,42 @@ function AvailabilityTab({ token, role }) {
   const backupOverdue = canBackup && backupInfo && (daysSinceBackup === null || daysSinceBackup >= 7);
 
   const togglePause = async () => {
+    if (pauseLock.current || !storeStatus) return;
+    pauseLock.current = true;
     const next = { ordersPaused: !storeStatus.ordersPaused, pausedMessage: pauseMsgDraft };
-    setStoreStatus(next);
+    setSaveError("");
     setPauseSaving(true);
     try {
-      await fetch(`${API_URL}/api/settings/store-status`, {
+      const data = await fetch(`${API_URL}/api/settings/store-status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(next),
-      });
-    } catch {
-      setSaveError("Error al guardar. Intenta de nuevo.");
+      }).then(readStaffResponse);
+      setStoreStatus(data);
+    } catch (err) {
+      setSaveError(err.message);
     } finally {
+      pauseLock.current = false;
       setPauseSaving(false);
     }
   };
 
   const savePauseMessage = async () => {
+    if (pauseLock.current || !storeStatus) return;
+    pauseLock.current = true;
+    setSaveError("");
     setPauseSaving(true);
     try {
-      await fetch(`${API_URL}/api/settings/store-status`, {
+      const data = await fetch(`${API_URL}/api/settings/store-status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ ordersPaused: storeStatus.ordersPaused, pausedMessage: pauseMsgDraft }),
-      });
-      setStoreStatus((p) => ({ ...p, pausedMessage: pauseMsgDraft }));
-    } catch {
-      setSaveError("Error al guardar. Intenta de nuevo.");
+      }).then(readStaffResponse);
+      setStoreStatus(data);
+    } catch (err) {
+      setSaveError(err.message);
     } finally {
+      pauseLock.current = false;
       setPauseSaving(false);
     }
   };
@@ -1998,7 +2049,7 @@ function AvailabilityTab({ token, role }) {
   const seasonCount = availability?.season.length ?? 0;
 
   if (availability === null || storeStatus === null) {
-    return <p className="text-slate-400 text-sm mt-4">Cargando…</p>;
+    return <div className="text-slate-300 text-sm mt-4">{saveError ? <><p role="alert">{saveError}</p><button className="mt-2 underline" onClick={() => setLoadRevision((v) => v + 1)}>Reintentar</button></> : <p role="status">Cargando…</p>}</div>;
   }
 
   return (
@@ -2473,6 +2524,7 @@ function TimeRecordEditForm({ record, onSave, onCancel }) {
 }
 
 function PayrollView({ actor, hoursByEmp, totalPayroll, onUpdate }) {
+  const [error, setError] = useState("");
   const [editId, setEditId]     = useState(null);
   const [editType, setEditType] = useState("hourly");
   const [editRate, setEditRate] = useState("");
@@ -2489,6 +2541,7 @@ function PayrollView({ actor, hoursByEmp, totalPayroll, onUpdate }) {
   };
 
   const saveRate = async (emp) => {
+    setError("");
     setSaving(true);
     try {
       await onUpdate(emp._id, {
@@ -2497,7 +2550,7 @@ function PayrollView({ actor, hoursByEmp, totalPayroll, onUpdate }) {
         weeklySalary: parseFloat(editSalary) || 0,
       });
       setEditId(null);
-    } catch { /* silently ignore */ }
+    } catch (err) { setError(err.message || "No se pudo guardar el sueldo."); }
     finally { setSaving(false); }
   };
 
@@ -2519,6 +2572,7 @@ function PayrollView({ actor, hoursByEmp, totalPayroll, onUpdate }) {
 
   return (
     <div className="space-y-3">
+      {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
       <div className="bg-slate-800 rounded-2xl border border-emerald-500/20 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -2637,6 +2691,7 @@ function PayrollView({ actor, hoursByEmp, totalPayroll, onUpdate }) {
 }
 
 function TeamManager({ actor, employees, onAdd, onRemove }) {
+  const removeAction = useStaffAction();
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: "", role: "employee", pin: "", color: "emerald", hourlyRate: "" });
   const [error, setError] = useState("");
@@ -2671,6 +2726,7 @@ function TeamManager({ actor, employees, onAdd, onRemove }) {
         </div>
       </div>
 
+      {removeAction.error && <p role="alert" className="text-sm text-rose-300">{removeAction.error}</p>}
       <div className="bg-slate-800 rounded-2xl border border-white/5 divide-y divide-white/5">
         {employees.map((e) => {
           const col = getColor(e.color);
@@ -2686,9 +2742,9 @@ function TeamManager({ actor, employees, onAdd, onRemove }) {
                 confirmId === sid(e._id)
                   ? <div className="flex gap-1 shrink-0">
                       <button onClick={() => setConfirmId(null)} className="text-xs px-2 py-1.5 rounded-lg bg-slate-700 text-slate-300">No</button>
-                      <button onClick={() => { onRemove(e._id); setConfirmId(null); }} className="text-xs px-2 py-1.5 rounded-lg bg-rose-500 text-white font-semibold">Eliminar</button>
+                      <button disabled={removeAction.busy} onClick={async () => { if (await removeAction.run(() => onRemove(e._id))) setConfirmId(null); }} className="text-xs px-2 py-1.5 rounded-lg bg-rose-500 text-white font-semibold">Dar de baja</button>
                     </div>
-                  : <button onClick={() => setConfirmId(sid(e._id))} className="text-slate-600 hover:text-rose-400 transition shrink-0"><Trash2 className="w-4 h-4" /></button>
+                  : <button aria-label={`Dar de baja a ${e.name}`} disabled={removeAction.busy} onClick={() => setConfirmId(sid(e._id))} className="text-slate-600 hover:text-rose-400 transition shrink-0"><Trash2 className="w-4 h-4" /></button>
               )}
             </div>
           );
