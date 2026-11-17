@@ -4,6 +4,7 @@ import {
   computeExtrasSubtotal,
   PROMO_2X1_BOWLS_PRICE,
   PROMO_2X1_MAX_COMPLEMENTS,
+  isPromo2x1Protein,
 } from "../pricing.js";
 import { getUnavailablePosSelections, resolvePosItems } from "../config/posCatalog.js";
 
@@ -145,6 +146,9 @@ function sanitizePromo2x1Bowl({ base, bases, marinades, complements, sauces, top
 export function sanitizeCustomerPromo2x1({ protein, bowls }) {
   if (typeof protein !== "string" || !BOWL_CATALOG.proteins.has(protein)) {
     throw new TypeError("2x1 en Bowls: selecciona 1 proteína válida");
+  }
+  if (!isPromo2x1Protein(protein)) {
+    throw new TypeError("2x1 en Bowls: el salmón y el atún sellado no entran en la promo, elige otra proteína");
   }
   if (!Array.isArray(bowls) || bowls.length !== 2) {
     throw new TypeError("2x1 en Bowls: se requieren 2 bowls");

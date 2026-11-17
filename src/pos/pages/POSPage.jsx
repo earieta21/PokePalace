@@ -15,7 +15,7 @@ import { getRewardById, REWARDS } from "../../data/rewardsCatalog.js";
 import { REFERRAL_SOURCES } from "../../data/referralSources.js";
 import { DELIVERY_PLATFORMS, DELIVERY_PLATFORM_LABELS, isDeliveryApp } from "../../data/deliveryPlatforms.js";
 import { COMPLEMENT_LABELS, SAUCE_LABELS, TOPPING_LABELS, PROTEIN_LABELS } from "../../order/OrderLabels.jsx";
-import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, EXTRA_COMPLEMENT_PRICE, EXTRA_SAUCE_PRICE, PREMIUM_PROTEIN_PRICES } from "../../order/pricing.js";
+import { BOWL_BASE_PRICE, LARGE_BOWL_UPCHARGE, EXTRA_SCOOP_PRICE, EXTRA_COMPLEMENT_PRICE, EXTRA_SAUCE_PRICE, PREMIUM_PROTEIN_PRICES, isPromo2x1Protein } from "../../order/pricing.js";
 import {
   COMBO_PALACE_OPTIONS,
   COMBO_PALACE_PRICE,
@@ -1014,12 +1014,18 @@ export default function POSPage({ styles, active = true }) {
           hint="Toca la proteína para agregar el producto a la orden."
           options={QUICK_PROTEINS
             .filter((p) => !hiddenIngredients.includes(p.id))
-            .map((p) => ({
-              ...p,
-              label: `${p.label}${!proteinPickerItem.promo2x1 && PREMIUM_PROTEIN_PRICES[p.id] ? ` (+$${PREMIUM_PROTEIN_PRICES[p.id]})` : ""}`,
-              disabled: unavailableItems.includes(p.id),
-              note: unavailableItems.includes(p.id) ? "Agotado" : "",
-            }))}
+            .map((p) => {
+              // El salmón y el atún sellado no entran al 2x1 (el servidor
+              // también lo rechaza): se ven, pero apagados y con el motivo.
+              const outOfPromo = proteinPickerItem.promo2x1 && !isPromo2x1Protein(p.id);
+              const soldOut = unavailableItems.includes(p.id);
+              return {
+                ...p,
+                label: `${p.label}${!proteinPickerItem.promo2x1 && PREMIUM_PROTEIN_PRICES[p.id] ? ` (+$${PREMIUM_PROTEIN_PRICES[p.id]})` : ""}`,
+                disabled: soldOut || outOfPromo,
+                note: outOfPromo ? "No entra en el 2x1" : soldOut ? "Agotado" : "",
+              };
+            })}
           onPick={(proteinId) => confirmProteinPick([proteinId])}
           onClose={() => { setProteinPickerItem(null); setProteinSelection([]); }}
         />

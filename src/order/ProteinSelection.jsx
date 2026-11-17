@@ -5,6 +5,7 @@ import {
   EXTRA_SCOOP_PRICE,
   EXTRA_SCOOP_MAX,
   PREMIUM_PROTEIN_PRICES,
+  isPromo2x1Protein,
 } from "./pricing";
 import { getItemLabel } from "./OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -34,13 +35,15 @@ const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
     { id: "shrimp", image: shrimp },
     { id: "tofu", image: tofu },
     // El atún sellado cuesta $20 extra (PREMIUM_PROTEIN_PRICES), que la
-    // tarjeta muestra y el servidor cobra. Se excluye de la promo 2x1
-    // porque esa se cobra a precio plano y el extra nunca se sumaría: sería
-    // prometer un cargo que no llega, o regalar el atún sellado.
-    ...(isPromo2x1 ? [] : [{ id: "seared_tuna", image: searedTuna }]),
+    // tarjeta muestra y el servidor cobra.
+    { id: "seared_tuna", image: searedTuna },
+  ]
     // Lo que el negocio no maneja ni se ofrece — no es lo mismo que agotado,
     // que sí se muestra marcado.
-  ].filter((protein) => !hiddenIngredients.includes(protein.id));
+    .filter((protein) => !hiddenIngredients.includes(protein.id))
+    // El salmón y el atún sellado no entran al 2x1 (PROMO_2X1_EXCLUDED_PROTEINS);
+    // el servidor también los rechaza.
+    .filter((protein) => !isPromo2x1 || isPromo2x1Protein(protein.id));
 
   const [selectedProteins, setSelectedProteins] = useState(() => {
     if (Array.isArray(order.proteins) && order.proteins.length > 0) return order.proteins;
@@ -123,7 +126,9 @@ const ProteinSelection = ({ onNext, onBack, isKiosk = false }) => {
         <span>{t("order.proteinCount", { count: selectedProteins.length, max: MAX_PROTEINS })}</span>
         <strong>
           {isPromo2x1
-            ? "Se usa en tus 2 bowls (60 g + 60 g)"
+            ? (language === "en"
+              ? "Used in both bowls (60 g + 60 g). Salmon and seared tuna aren't part of the promo."
+              : "Se usa en tus 2 bowls (60 g + 60 g). El salmón y el atún sellado no entran en la promo.")
             : selectedProteins.length === MAX_PROTEINS
               ? t("order.proteinInfoLarge")
               : t("order.proteinInfoNormal")}

@@ -20,6 +20,7 @@ import {
   weightedMargin,
 } from "../utils/bowlCosting.js";
 import { preparationCost, withLivePrices } from "../utils/preparationCost.js";
+import { PROMO_2X1_MAX_COMPLEMENTS } from "../pricing.js";
 
 const CONFIG_ID = "bowl-costing";
 const MIX_WINDOW_DAYS = 30;
@@ -44,17 +45,22 @@ const bowlsOf = (order) => {
     if (line.kind === "bowl") fromCart.push(line);
     if (line.kind === "promo2x1") {
       // Los bowls de la promo comparten la proteína de la línea.
-      for (const bowl of line.bowls || []) fromCart.push({ ...bowl, proteins: line.protein ? [line.protein] : [] });
+      for (const bowl of line.bowls || []) {
+        fromCart.push({ ...bowl, proteins: line.protein ? [line.protein] : [], promo2x1: true });
+      }
     }
   }
   if (fromCart.length > 0) return fromCart;
   return order.base || (order.proteins || []).length > 0 ? [order] : [];
 };
 
+const POS_PROMO_2X1_ID = "promo-2x1-dinein";
+
 /**
  * Cuántos bowls de cada proteína se vendieron en el periodo. Se cuenta cada
  * proteína del bowl por separado: un bowl de atún+salmón suma 1 a cada una,
- * que es justo como se reparte su costo.
+ * que es justo como se reparte su costo. Los bowls del 2x1 van aparte
+ * (`promoMix`) porque cuestan y se cobran distinto.
  */
 const loadSalesMix = async (sinceDays = MIX_WINDOW_DAYS) => {
   const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
@@ -64,23 +70,32 @@ const loadSalesMix = async (sinceDays = MIX_WINDOW_DAYS) => {
   ).lean();
 
   const mix = {};
-  const bump = (key) => {
-    if (PROTEIN_KEYS.includes(key)) mix[key] = (mix[key] || 0) + 1;
+  const promoMix = {};
+  const bump = (target, key, count = 1) => {
+    if (PROTEIN_KEYS.includes(key)) target[key] = (target[key] || 0) + count;
+  };
+  // Venta rápida (caja o artículo del carrito): no trae receta, pero sí la
+  // proteína capturada. La 2x1 de caja son 2 bowls por cada una cobrada.
+  const bumpQuickSale = (line) => {
+    // El extra de proteína trae proteína pero no es un bowl.
+    if (line.catalogId === "extra-protein-scoop") return;
+    const qty = Math.max(1, Number(line.qty) || 1);
+    const isPromo = line.catalogId === POS_PROMO_2X1_ID;
+    const target = isPromo ? promoMix : mix;
+    const proteins = (line.proteins || []).length > 0 ? line.proteins : line.protein ? [line.protein] : [];
+    for (const key of proteins) bump(target, key, isPromo ? qty * 2 : qty);
   };
 
   for (const order of orders) {
-    for (const bowl of bowlsOf(order)) (bowl.proteins || []).forEach(bump);
-    // Los bowls de venta rápida no traen receta, pero sí la proteína capturada.
+    for (const bowl of bowlsOf(order)) {
+      for (const key of bowl.proteins || []) bump(bowl.promo2x1 ? promoMix : mix, key);
+    }
     for (const line of order.cartItems || []) {
-      if (line.kind === "item" && line.protein) bump(line.protein);
-      if (line.kind === "item") (line.proteins || []).forEach(bump);
+      if (line.kind === "item") bumpQuickSale(line);
     }
-    for (const item of order.items || []) {
-      if (item.protein) bump(item.protein);
-      (item.proteins || []).forEach(bump);
-    }
+    for (const item of order.items || []) bumpQuickSale(item);
   }
-  return mix;
+  return { mix, promoMix };
 };
 
 const ratio = (count, total) => Number(((count || 0) / Math.max(total, 1)).toFixed(4));
@@ -107,6 +122,8 @@ const loadBowlUsage = async (sinceDays = 60) => {
   const fulfillment = { pickup: 0, dine_in: 0, delivery: 0 };
   let bowls = 0;
   let servedBases = 0;
+  // Cuántos complementos quedarían si cada bowl tuviera el tope del 2x1.
+  let cappedComplements = 0;
 
   for (const order of orders) {
     const type = fulfillment[order.fulfillment] !== undefined ? order.fulfillment : "pickup";
@@ -123,6 +140,7 @@ const loadBowlUsage = async (sinceDays = 60) => {
         for (const key of bowl[field] || []) counts[field][key] = (counts[field][key] || 0) + 1;
         totals[field] += (bowl[field] || []).length;
       }
+      cappedComplements += Math.min((bowl.complements || []).length, PROMO_2X1_MAX_COMPLEMENTS);
     }
   }
 
@@ -147,6 +165,9 @@ const loadBowlUsage = async (sinceDays = 60) => {
     fulfillment,
     // Los que salen del local llevan bolsa, cubiertos, etc.
     togoShare: ratio(fulfillment.pickup + fulfillment.delivery, bowls),
+    // Qué parte del costo de complementos se queda en un bowl del 2x1 (tope de
+    // PROMO_2X1_MAX_COMPLEMENTS): quien pide 6 se queda con 4.
+    complementsCapFactor: totals.complements > 0 ? ratio(cappedComplements, totals.complements) : 1,
   };
 };
 
@@ -186,7 +207,7 @@ const disposableLinesOf = (config) => (config.disposables || []).map((line) => (
 }));
 
 const buildReport = async (config) => {
-  const [inventoryItems, salesMix, usage, disposableItems] = await Promise.all([
+  const [inventoryItems, { mix: salesMix, promoMix }, usage, disposableItems] = await Promise.all([
     Inventory.find({}, { item: 1, unit: 1, cost: 1, menuKeys: 1 }).lean(),
     loadSalesMix(),
     loadBowlUsage(),
@@ -222,7 +243,12 @@ const buildReport = async (config) => {
 
   const bowls = PROTEIN_KEYS.filter((key) => !disabledProteins.has(key)).map((proteinKey) => {
     const bowl = computeBowlCost({ proteinCosts, proteinKey, proteinYields, shared });
-    return { ...bowl, verdict: promoVerdict(bowl, config), sold30d: salesMix[proteinKey] || 0 };
+    return {
+      ...bowl,
+      verdict: promoVerdict(bowl, config),
+      sold30d: salesMix[proteinKey] || 0,
+      soldPromo30d: promoMix[proteinKey] || 0,
+    };
   });
 
   // El combo se costea sobre la proteína más vendida: es el costo que de
@@ -266,7 +292,7 @@ const buildReport = async (config) => {
       piecesPerPack: item.piecesPerPack,
     })),
     combo: topBowl ? { ...computeComboCost({ config, bowlTotal: topBowl.total }), basedOn: topBowl.label } : null,
-    weighted: weightedMargin(bowls, salesMix),
+    weighted: weightedMargin(bowls, salesMix, promoMix),
     salesMixWindowDays: MIX_WINDOW_DAYS,
     complementUsage: {
       ...usage,

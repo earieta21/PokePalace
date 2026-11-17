@@ -321,13 +321,28 @@ test("2x1 en Bowls exige 1 proteína válida y exactamente 2 bowls", () => {
     /1 proteína válida/
   );
   assert.throws(
-    () => sanitizeCustomerPromo2x1({ protein: "salmon", bowls: [validBowl] }),
+    () => sanitizeCustomerPromo2x1({ protein: "tuna", bowls: [validBowl] }),
     /se requieren 2 bowls/
   );
   assert.throws(
-    () => sanitizeCustomerPromo2x1({ protein: "salmon", bowls: [validBowl, validBowl, validBowl] }),
+    () => sanitizeCustomerPromo2x1({ protein: "tuna", bowls: [validBowl, validBowl, validBowl] }),
     /se requieren 2 bowls/
   );
+});
+
+test("2x1 en Bowls no acepta salmón ni atún sellado, ni desde el carrito", () => {
+  const validBowl = { base: "white_rice", complements: ["avocado"] };
+  for (const protein of ["salmon", "seared_tuna"]) {
+    assert.throws(
+      () => sanitizeCustomerPromo2x1({ protein, bowls: [validBowl, validBowl] }),
+      /no entran en la promo/
+    );
+    assert.throws(
+      () => sanitizeCustomerCart([{ kind: "promo2x1", protein, bowls: [validBowl, validBowl] }]),
+      /no entran en la promo/
+    );
+  }
+  assert.equal(sanitizeCustomerPromo2x1({ protein: "shrimp", bowls: [validBowl, validBowl] }).protein, "shrimp");
 });
 
 test("2x1 en Bowls limita cada bowl a 4 complementos aunque el catálogo permita más", () => {
@@ -337,20 +352,20 @@ test("2x1 en Bowls limita cada bowl a 4 complementos aunque el catálogo permita
   };
   assert.throws(
     () => sanitizeCustomerPromo2x1({
-      protein: "salmon",
+      protein: "tuna",
       bowls: [tooManyComplements, { base: "quinoa" }],
     }),
     /Selección inválida en complements/
   );
 
   const promo = sanitizeCustomerPromo2x1({
-    protein: "salmon",
+    protein: "tuna",
     bowls: [
       { base: "white_rice", complements: ["avocado", "edamame", "cucumber", "mango"] },
       { base: "quinoa", complements: [] },
     ],
   });
-  assert.equal(promo.protein, "salmon");
+  assert.equal(promo.protein, "tuna");
   assert.equal(promo.bowls.length, 2);
   assert.equal(promo.bowls[0].complements.length, 4);
 });
@@ -358,7 +373,7 @@ test("2x1 en Bowls limita cada bowl a 4 complementos aunque el catálogo permita
 test("el carrito acepta 2x1 en Bowls, ignora el precio enviado por el cliente y revisa disponibilidad de ambos bowls", () => {
   const [promoLine] = sanitizeCustomerCart([{
     kind: "promo2x1",
-    protein: "salmon",
+    protein: "tuna",
     price: 1, // el cliente podría mandar cualquier cosa — el servidor manda
     bowls: [
       { base: "white_rice", complements: ["avocado"] },
@@ -371,7 +386,7 @@ test("el carrito acepta 2x1 en Bowls, ignora el precio enviado por el cliente y 
   assert.equal(promoLine.price, PROMO_2X1_BOWLS_PRICE);
   assert.equal(promoLine.qty, 1);
 
-  assert.deepEqual(findUnavailablePromo2x1Items(promoLine, ["salmon"]), ["salmon"]);
+  assert.deepEqual(findUnavailablePromo2x1Items(promoLine, ["tuna"]), ["tuna"]);
   assert.deepEqual(findUnavailablePromo2x1Items(promoLine, ["edamame"]), ["edamame"]);
   assert.deepEqual(findUnavailablePromo2x1Items(promoLine, ["not_in_promo"]), []);
   assert.deepEqual(findUnavailableCustomerCartItems([promoLine], ["quinoa"]), ["quinoa"]);

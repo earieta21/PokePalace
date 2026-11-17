@@ -8,11 +8,15 @@ import {
   LARGE_BOWL_UPCHARGE,
   PREMIUM_PROTEIN_PRICES,
   PROMO_2X1_BOWLS_PRICE,
+  isPromo2x1Protein,
 } from "../pricing.js";
 
 export const BOWL_PRICE = BOWL_BASE_PRICE;                                // bowl mediano
 export const LARGE_BOWL_PRICE = BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE;   // 3 proteínas
 export const PROMO_2X1_PRICE = PROMO_2X1_BOWLS_PRICE;                     // 2 bowls medianos
+// Cada bowl del 2x1 lleva 60 g: los 120 g de un bowl grande repartidos en 2,
+// igual que los descuenta el inventario (posCatalog.addItemDemand).
+export const PROMO_2X1_PROTEIN_KG = LARGE_BOWL_PROTEIN_KG / 2;
 export const COMBO_PALACE_PRICE = 289;
 
 // Los precios del menú traen el IVA incluido (pricing.js: TAX_RATE = 0) y el
@@ -359,14 +363,37 @@ export function computeSharedParts({
     ? { cost: disposables.total, source: "desglose", detail: disposables.detail }
     : { cost: partCost(config?.packaging), source: "manual", detail: [] };
 
+  const complements = complementsCost(config, usage, complementCosts);
+
+  // Un bowl del 2x1 es distinto de uno normal en dos cosas que sí cuestan:
+  //   - máximo PROMO_2X1_MAX_COMPLEMENTS complementos: se recorta lo que
+  //     pasa del tope según cuántos piden de verdad (complementsCapFactor);
+  //   - solo es para comer aquí: no lleva los desechables "para llevar".
+  // El empaque capturado como un solo monto no se puede separar y se deja igual.
+  const capFactor = usage?.bowls > 0 && Number.isFinite(usage.complementsCapFactor)
+    ? usage.complementsCapFactor
+    : 1;
+  const dineInDisposables = lines.length > 0
+    ? disposablesCost(lines, disposableCatalog, {
+      togoShare: 0,
+      saucesPerBowl: usage?.bowls > 0
+        ? Number(usage.averagePerBowl?.sauces) || 0
+        : Number(config?.sauces?.unitsPerBowl) || 0,
+    }).total
+    : packaging.cost;
+
   return {
     rows: {
       base: base.cost,
       marinades: marinades.cost,
-      complements: complementsCost(config, usage, complementCosts),
+      complements,
       sauces: sauces.cost,
       toppings: toppings.cost,
       packaging: packaging.cost,
+    },
+    promoRows: {
+      complements: round2(complements * capFactor),
+      packaging: dineInDisposables,
     },
     detail: { base, marinades, sauces, toppings, packaging },
   };
@@ -396,6 +423,18 @@ export function computeBowlCost({ proteinCosts, proteinKey, proteinYields = {}, 
   const promoMenuPrice = round2(PROMO_2X1_PRICE / 2);
   const halfMenuPrice = round2(BOWL_PRICE * 0.5);
 
+  // Lo que de verdad cuesta cada bowl del 2x1 (60 g, tope de complementos,
+  // para comer aquí). Se calcula también para las proteínas que no entran,
+  // para saber cuánto dejarían si entraran.
+  const promoRows = {
+    ...rows,
+    protein: round2(usableCostPerKg * PROMO_2X1_PROTEIN_KG),
+    complements: shared.promoRows?.complements ?? rows.complements,
+    packaging: shared.promoRows?.packaging ?? rows.packaging,
+  };
+  const promoTotal = round2(Object.values(promoRows).reduce((sum, value) => sum + value, 0));
+  const promoPrice = withoutIva(promoMenuPrice);
+
   return {
     proteinKey,
     label: PROTEIN_LABELS[proteinKey] || proteinKey,
@@ -412,9 +451,18 @@ export function computeBowlCost({ proteinCosts, proteinKey, proteinYields = {}, 
     price,
     iva: round2(menuPrice - price),
     ...marginOf(price, total),
-    // Escenarios de promoción, con el mismo costo y distinto precio efectivo.
     scenarios: {
-      promo2x1: { menuPrice: promoMenuPrice, price: withoutIva(promoMenuPrice), ...marginOf(withoutIva(promoMenuPrice), total) },
+      // Cada bowl del 2x1, con su propio costo (más chico que el normal).
+      promo2x1: {
+        eligible: isPromo2x1Protein(proteinKey),
+        proteinKg: PROMO_2X1_PROTEIN_KG,
+        rows: promoRows,
+        total: promoTotal,
+        menuPrice: promoMenuPrice,
+        price: promoPrice,
+        ...marginOf(promoPrice, promoTotal),
+      },
+      // El segundo bowl a mitad de precio es un bowl normal: mismo costo.
       halfPriceSecond: { menuPrice: halfMenuPrice, price: withoutIva(halfMenuPrice), ...marginOf(withoutIva(halfMenuPrice), total) },
     },
   };
@@ -440,24 +488,38 @@ export function computeComboCost({ config, bowlTotal }) {
 /**
  * Margen real ponderado por lo que de verdad se vende. Un margen "promedio"
  * simple miente cuando el atún (barato) se vende el doble que el salmón (caro):
- * esto pesa cada proteína por sus ventas reales del periodo.
+ * esto pesa cada proteína por sus ventas reales del periodo. Los bowls del 2x1
+ * cuentan con su propio costo y precio: contarlos como bowls normales inflaría
+ * las dos cosas.
  */
-export function weightedMargin(bowls, salesMix) {
+export function weightedMargin(bowls, salesMix, promoMix = {}) {
   let cost = 0;
   let revenue = 0;
   let units = 0;
+  let promoUnits = 0;
 
   for (const bowl of bowls) {
+    if (bowl.total <= 0) continue;
     const sold = Number(salesMix?.[bowl.proteinKey]) || 0;
-    if (sold <= 0 || bowl.total <= 0) continue;
-    cost += bowl.total * sold;
-    revenue += bowl.price * sold;
-    units += sold;
+    if (sold > 0) {
+      cost += bowl.total * sold;
+      revenue += bowl.price * sold;
+      units += sold;
+    }
+    const promoSold = Number(promoMix?.[bowl.proteinKey]) || 0;
+    const promo = bowl.scenarios?.promo2x1;
+    if (promoSold > 0 && promo) {
+      cost += promo.total * promoSold;
+      revenue += promo.price * promoSold;
+      units += promoSold;
+      promoUnits += promoSold;
+    }
   }
 
   if (units === 0) return null;
   return {
     units,
+    promoUnits,
     cost: round2(cost),
     revenue: round2(revenue),
     margin: round2(revenue - cost),
@@ -472,6 +534,13 @@ export function promoVerdict(bowl, config) {
 
   const eligible = bowl.marginPct >= config.promoEligibleMinMarginPct;
   const promoMargin = bowl.scenarios.promo2x1.marginPct;
+
+  if (!bowl.scenarios.promo2x1.eligible) {
+    return {
+      status: "excluida",
+      message: `No entra al 2x1. Si entrara, cada bowl de la promo dejaría ${promoMargin}% de margen.`,
+    };
+  }
 
   if (!eligible) {
     return {

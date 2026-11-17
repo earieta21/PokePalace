@@ -19,6 +19,11 @@ export const TAX_RATE = 0; // IVA incluido en precio
 // proteína/complementos elegidos.
 export const PROMO_2X1_BOWLS_PRICE = 250;
 export const PROMO_2X1_MAX_COMPLEMENTS = 4;
+// Proteínas que no entran al 2x1 (en línea, kiosco y caja). El atún sellado
+// lleva un recargo que el precio plano nunca cobraría; el salmón queda fuera
+// por decisión del negocio (nov 2026).
+export const PROMO_2X1_EXCLUDED_PROTEINS = Object.freeze(["salmon", "seared_tuna"]);
+export const isPromo2x1Protein = (proteinId) => !PROMO_2X1_EXCLUDED_PROTEINS.includes(proteinId);
 
 const round2 = (n) => Math.round(n * 100) / 100;
 

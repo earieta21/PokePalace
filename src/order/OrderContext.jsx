@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAvailability } from "../context/AvailabilityContext";
-import { computeBowlSubtotal, computeExtrasSubtotal, PROMO_2X1_BOWLS_PRICE } from "./pricing";
+import { computeBowlSubtotal, computeExtrasSubtotal, PROMO_2X1_BOWLS_PRICE, isPromo2x1Protein } from "./pricing";
 
 const OrderContext = createContext();
 const ORDER_STORAGE_KEY = "pokePalaceOrderDraft";
@@ -379,7 +379,9 @@ export const OrderProvider = ({ children }) => {
           };
         }
         if (line.kind === "promo2x1") {
-          if (unavailable.has(line.protein)) return null;
+          // Un 2x1 viejo de salmón ya no se puede repetir: la proteína salió
+          // de la promo y el servidor lo rechazaría.
+          if (unavailable.has(line.protein) || !isPromo2x1Protein(line.protein)) return null;
           const bowls = (Array.isArray(line.bowls) ? line.bowls : []).map((bowl) => {
             const bowlBases = Array.isArray(bowl.bases) && bowl.bases.length > 0
               ? bowl.bases

@@ -55,7 +55,7 @@ export default function KioskMenuPage() {
             <strong>
               Hoy se comparte: 2 bowls por ${PROMO_2X1_BOWLS_PRICE} MXN
             </strong>
-            <p>Promo 2x1 · Solo para comer en el restaurante.</p>
+            <p>Promo 2x1 · Solo para comer en el restaurante. No aplica salmón ni atún sellado.</p>
           </div>
           <button type="button" onClick={handleStartPromo2x1}>
             Armar mis 2 bowls <ArrowRight size={18} aria-hidden="true" />

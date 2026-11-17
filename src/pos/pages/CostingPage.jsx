@@ -3,6 +3,7 @@ import { StaffAuthContext } from "../../context/StaffAuthContext";
 import {
   BASE_LABELS, MARINADE_LABELS, SAUCE_LABELS, TOPPING_LABELS,
 } from "../../order/OrderLabels";
+import { PROMO_2X1_MAX_COMPLEMENTS } from "../../order/pricing";
 import { createStaffApi } from "../api";
 import ui from "./CostingPage.module.css";
 
@@ -47,6 +48,7 @@ const VERDICT_STYLE = {
   apto: ui.verdictOk,
   mitad: ui.verdictWarn,
   fuera: ui.verdictBad,
+  excluida: ui.verdictMuted,
   sin_datos: ui.verdictMuted,
 };
 
@@ -435,7 +437,8 @@ export default function CostingPage({ styles }) {
               <div><dt>Precio de menú</dt><dd>{money(b.menuPrice)}</dd></div>
               <div><dt>Sin IVA</dt><dd>{money(b.price)}</dd></div>
               <div className={ui.cardMargin}><dt>Margen por bowl</dt><dd>{missing ? "—" : <>{money(b.margin)} <small>{pct(b.marginPct)}</small></>}</dd></div></dl>
-              <p className={`${ui.verdict} ${VERDICT_STYLE[missing || incompleteComplements.length ? "sin_datos" : b.verdict.status]}`}>{missing ? "Captura el costo de esta proteína para evaluar su margen." : incompleteComplements.length ? "Estimación parcial: completa los costos de complementos para evaluar promociones." : b.verdict.message}</p>
+              {/* Si la proteína ni siquiera entra al 2x1, eso se dice aunque falten complementos. */}
+              <p className={`${ui.verdict} ${VERDICT_STYLE[missing || (incompleteComplements.length && b.verdict.status !== "excluida") ? "sin_datos" : b.verdict.status]}`}>{missing ? "Captura el costo de esta proteína para evaluar su margen." : b.verdict.status === "excluida" ? b.verdict.message : incompleteComplements.length ? "Estimación parcial: completa los costos de complementos para evaluar promociones." : b.verdict.message}</p>
             </article>;
           })}
         </div>
@@ -451,7 +454,9 @@ export default function CostingPage({ styles }) {
                 {bowls.map((b) => (
                   <th key={b.proteinKey}>
                     {b.label}
-                    <span className={ui.sold}>{b.sold30d} registros / 30d</span>
+                    <span className={ui.sold}>
+                      {b.sold30d} registros / 30d{b.soldPromo30d > 0 && ` + ${b.soldPromo30d} en 2x1`}
+                    </span>
                   </th>
                 ))}
               </tr>
@@ -513,16 +518,34 @@ export default function CostingPage({ styles }) {
               </tr>
               <tr>
                 <td className={ui.stickyCol}>
+                  Costo de cada bowl del 2x1
+                  <span className={ui.hint}>
+                    {Math.round((bowls[0]?.scenarios.promo2x1.proteinKg ?? 0) * 1000)} g de proteína, máx. {PROMO_2X1_MAX_COMPLEMENTS} complementos, para comer aquí
+                  </span>
+                </td>
+                {bowls.map((b) => (
+                  <td key={b.proteinKey}>
+                    {b.proteinSource === "falta" ? "—" : money(b.scenarios.promo2x1.total)}
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td className={ui.stickyCol}>
                   Margen en 2x1
                   <span className={ui.hint}>
                     {money(bowls[0]?.scenarios.promo2x1.menuPrice)} c/u · {money(bowls[0]?.scenarios.promo2x1.price)} sin IVA
                   </span>
                 </td>
-                {bowls.map((b) => (
-                  <td key={b.proteinKey} className={b.scenarios.promo2x1.marginPct >= 25 ? ui.ok : ui.bad}>
-                    {b.proteinSource === "falta" ? "—" : <>{money(b.scenarios.promo2x1.margin)} <span className={ui.pctChip}>{pct(b.scenarios.promo2x1.marginPct)}</span></>}
-                  </td>
-                ))}
+                {bowls.map((b) => {
+                  const promo = b.scenarios.promo2x1;
+                  const tone = !promo.eligible ? "" : promo.marginPct >= data.config.promoMinMarginPct ? ui.ok : ui.bad;
+                  return (
+                    <td key={b.proteinKey} className={tone}>
+                      {b.proteinSource === "falta" ? "—" : <>{money(promo.margin)} <span className={ui.pctChip}>{pct(promo.marginPct)}</span></>}
+                      {!promo.eligible && <span className={ui.sold}>no entra · solo referencia</span>}
+                    </td>
+                  );
+                })}
               </tr>
             </tbody>
           </table>
@@ -534,7 +557,9 @@ export default function CostingPage({ styles }) {
           <div className={ui.weighted}>
             <h3 className={ui.sectionTitle}>Estimación según las proteínas más pedidas</h3>
             <p className={ui.subtitle}>
-              Usa {data.weighted.units} registros de proteínas de los últimos {data.salesMixWindowDays} días y los costos actuales. Un bowl puede registrar varias proteínas; estos importes no son las ventas ni la utilidad contable del periodo.
+              Usa {data.weighted.units} registros de proteínas de los últimos {data.salesMixWindowDays} días y los costos actuales
+              {data.weighted.promoUnits > 0 && <> ({data.weighted.promoUnits} de bowls del 2x1, con su precio y costo de promo)</>}.
+              Un bowl puede registrar varias proteínas; estos importes no son las ventas ni la utilidad contable del periodo.
             </p>
             <div className={ui.kpis}>
               <div className={ui.kpi}><span>Venta estimada sin IVA</span><strong>{money(data.weighted.revenue)}</strong></div>

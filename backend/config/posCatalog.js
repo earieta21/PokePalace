@@ -1,5 +1,11 @@
 import { isComboPalaceDay, isPromo2x1Day } from "../utils/promoSchedule.js";
-import { EXTRA_COMPLEMENT_PRICE, EXTRA_SAUCE_PRICE, EXTRA_SCOOP_PRICE, PREMIUM_PROTEIN_PRICES } from "../pricing.js";
+import {
+  EXTRA_COMPLEMENT_PRICE,
+  EXTRA_SAUCE_PRICE,
+  EXTRA_SCOOP_PRICE,
+  PREMIUM_PROTEIN_PRICES,
+  isPromo2x1Protein,
+} from "../pricing.js";
 
 // Protein stock is stored in kilograms. A medium bowl contains 100 g total,
 // a large bowl contains 120 g total, and every extra scoop adds 40 g.
@@ -56,7 +62,8 @@ export const POS_CATALOG = Object.freeze([
     inventoryRecipe: {},
   },
   // Promo 2x1 recurrente, solo martes y jueves (solo en local) — 2 bowls
-  // medianos por el precio de un bowl grande. Misma proteína para los 2,
+  // medianos por el precio de un bowl grande. Misma proteína para los 2 (ni
+  // salmón ni atún sellado: PROMO_2X1_EXCLUDED_PROTEINS),
   // 60 g + 60 g = 120 g total (ver el condicional de proteinKg en
   // addItemDemand más abajo). Complementos limitados a 4 por bowl, pero eso
   // no se rastrea aquí — no se captura la receta, igual que
@@ -280,6 +287,10 @@ export const resolvePosItems = (items, now = new Date()) => {
       throw new PosOrderValidationError("Selecciona la proteína del extra");
     }
 
+    if (catalogItem.catalogId === "promo-2x1-dinein" && protein && !isPromo2x1Protein(protein)) {
+      throw new PosOrderValidationError("El salmón y el atún sellado no entran en la Promo 2x1");
+    }
+
     // Solo el extra de complemento lleva complemento; en cualquier otro
     // producto el campo se ignora.
     let complement;
@@ -324,8 +335,7 @@ export const resolvePosItems = (items, now = new Date()) => {
     // mientras el mismo bowl pedido en línea cobraba $250.
     //
     // La promo 2x1 queda fuera a propósito: se cobra a precio plano por los
-    // 2 bowls, igual que en el armador en línea, donde el atún sellado ni se
-    // ofrece dentro de la promo.
+    // 2 bowls, y el atún sellado ni siquiera entra en ella (se rechaza arriba).
     const chosenProteins = proteins?.length ? proteins : protein ? [protein] : [];
     const proteinUpcharge = catalogItem.catalogId !== "promo-2x1-dinein"
       ? chosenProteins.reduce((sum, id) => sum + (PREMIUM_PROTEIN_PRICES[id] || 0), 0)

@@ -122,36 +122,43 @@ test("una proteina premium sube el precio del bowl de venta rapida", () => {
   assert.equal(scoop.price, 60);
 });
 
-test("la promo 2x1 se queda a precio plano aunque lleve proteina premium", () => {
-  const [promo] = resolvePosItems(
-    [{ catalogId: "promo-2x1-dinein", qty: 1, protein: "seared_tuna" }],
-    MARTES,
-  );
+test("la promo 2x1 de caja no acepta salmon ni atun sellado", () => {
+  for (const protein of ["salmon", "seared_tuna"]) {
+    assert.throws(
+      () => resolvePosItems([{ catalogId: "promo-2x1-dinein", qty: 1, protein }], MARTES),
+      /no entran en la Promo 2x1/,
+    );
+    assert.throws(
+      () => resolvePosItems([{ id: 26, qty: 1, proteins: [protein] }], MARTES),
+      PosOrderValidationError,
+    );
+  }
+  const [promo] = resolvePosItems([{ catalogId: "promo-2x1-dinein", qty: 1, protein: "tuna" }], MARTES);
   assert.equal(promo.price, 250);
 });
 
 test("la caja cobra la 2x1 y el extra de proteina aunque mande la proteina como lista", () => {
   // Así lo manda POSPage: `protein` y también `proteins: [la misma]`.
   const [promo, scoop] = resolvePosItems([
-    { id: 26, qty: 1, protein: "salmon", proteins: ["salmon"] },
+    { id: 26, qty: 1, protein: "shrimp", proteins: ["shrimp"] },
     { id: 27, qty: 1, protein: "seared_tuna", proteins: ["seared_tuna"] },
   ], MARTES);
   assert.equal(promo.catalogId, "promo-2x1-dinein");
   assert.equal(promo.price, 250);
-  assert.equal(promo.protein, "salmon");
+  assert.equal(promo.protein, "shrimp");
   assert.equal(promo.proteins, undefined);
   assert.equal(scoop.price, 60);
-  assert.deepEqual(getPosInventoryDemand({ items: [promo] }), { salmon: 0.12 });
+  assert.deepEqual(getPosInventoryDemand({ items: [promo] }), { shrimp: 0.12 });
 
   // Sin `protein`, la lista de 1 basta.
   assert.equal(resolvePosItems([{ id: 26, proteins: ["tuna"] }], MARTES)[0].protein, "tuna");
   // Pero sigue sin admitir 2 proteínas, ni una lista que contradiga a `protein`.
   assert.throws(
-    () => resolvePosItems([{ id: 26, proteins: ["tuna", "salmon"] }], MARTES),
+    () => resolvePosItems([{ id: 26, proteins: ["tuna", "shrimp"] }], MARTES),
     PosOrderValidationError,
   );
   assert.throws(
-    () => resolvePosItems([{ id: 26, protein: "tuna", proteins: ["salmon"] }], MARTES),
+    () => resolvePosItems([{ id: 26, protein: "tuna", proteins: ["shrimp"] }], MARTES),
     PosOrderValidationError,
   );
 });

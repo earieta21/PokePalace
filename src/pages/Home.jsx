@@ -292,8 +292,8 @@ export default function Home() {
             <h2>{es ? "2 bowls. 1 gran plan." : "2 bowls. 1 great plan."}</h2>
             <p>
               {es
-                ? "Misma proteína en ambos (60 g + 60 g) y hasta 4 complementos por bowl. Solo para comer en el restaurante; no aplica para llevar."
-                : "The same protein in both (60 g + 60 g) and up to 4 add-ins per bowl. Dine-in only; not available for takeout."}
+                ? "Misma proteína en ambos (60 g + 60 g; no aplica salmón ni atún sellado) y hasta 4 complementos por bowl. Solo para comer en el restaurante; no aplica para llevar."
+                : "The same protein in both (60 g + 60 g; salmon and seared tuna not included) and up to 4 add-ins per bowl. Dine-in only; not available for takeout."}
             </p>
           </div>
           <div className={styles.promoAction}>

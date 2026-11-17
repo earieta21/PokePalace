@@ -7,10 +7,14 @@ import {
   computeComboCost,
   computeSharedParts,
   disposablesCost,
+  promoVerdict,
   recipeWeightedCost,
   resolveComplementCosts,
+  weightedMargin,
   withoutIva,
 } from "../utils/bowlCosting.js";
+
+const round = (n) => Math.round(n * 100) / 100;
 
 const emptyConfig = (overrides = {}) => ({
   base: { costPerUnit: 0, unitsPerBowl: 1 },
@@ -128,6 +132,75 @@ test("la merma encarece la proteína y el margen sale contra el precio sin IVA",
   assert.equal(trimmed.price, 198.28);
   assert.equal(trimmed.margin, 148.28);
   assert.equal(trimmed.scenarios.promo2x1.price, withoutIva(125));
+});
+
+test("cada bowl del 2x1 lleva 60 g, tope de complementos y no usa desechables para llevar", () => {
+  const catalog = new Map([
+    ["bowl", { name: "Bowl para llevar", piecesPerPack: 100 }],
+    ["servilleta", { name: "Servilleta", piecesPerPack: 100 }],
+  ]);
+  const config = emptyConfig({
+    complements: { costPerUnit: 2, unitsPerBowl: 5 }, // $10 por bowl normal
+    disposables: [
+      { disposableId: "bowl", packPrice: 500, piecesPerBowl: 1, appliesTo: "togo" },    // $5 al que se va
+      { disposableId: "servilleta", packPrice: 100, piecesPerBowl: 2, appliesTo: "all" }, // $2 a todos
+    ],
+  });
+  const usage = {
+    bowls: 10,
+    frequency: {},
+    frequencyBy: {},
+    averagePerBowl: { sauces: 1 },
+    togoShare: 0.6,
+    complementsCapFactor: 0.8, // quienes piden 5-6 se quedan con 4
+  };
+  const shared = computeSharedParts({ config, usage, disposableCatalog: catalog });
+  assert.equal(shared.rows.packaging, 5); // 5 × 0.6 + 2
+  assert.equal(shared.promoRows.packaging, 2); // para comer aquí: solo la servilleta
+
+  const proteinCosts = { tuna: { costPerKg: 300, source: "inventario" } };
+  const bowl = computeBowlCost({ proteinCosts, proteinKey: "tuna", shared });
+  const promo = bowl.scenarios.promo2x1;
+  assert.equal(bowl.rows.protein, 30); // 100 g
+  assert.equal(promo.rows.protein, 18); // 60 g
+  assert.equal(promo.proteinKg, 0.06);
+  assert.equal(promo.rows.complements, round(shared.rows.complements * 0.8));
+  assert.ok(promo.total < bowl.total);
+  assert.equal(promo.price, withoutIva(125));
+  assert.equal(promo.margin, round(withoutIva(125) - promo.total));
+  assert.equal(promo.eligible, true);
+});
+
+test("el salmón y el atún sellado no entran al 2x1, pero se ve cuánto dejarían", () => {
+  const shared = computeSharedParts({ config: emptyConfig() });
+  const proteinCosts = {
+    salmon: { costPerKg: 500, source: "inventario" },
+    seared_tuna: { costPerKg: 450, source: "inventario" },
+    tuna: { costPerKg: 300, source: "inventario" },
+  };
+  const rules = { promoEligibleMinMarginPct: 40, promoMinMarginPct: 25 };
+  for (const proteinKey of ["salmon", "seared_tuna"]) {
+    const bowl = computeBowlCost({ proteinCosts, proteinKey, shared });
+    assert.equal(bowl.scenarios.promo2x1.eligible, false);
+    assert.equal(bowl.scenarios.promo2x1.rows.protein, round(proteinCosts[proteinKey].costPerKg * 0.06));
+    const verdict = promoVerdict(bowl, rules);
+    assert.equal(verdict.status, "excluida");
+    assert.match(verdict.message, /No entra al 2x1/);
+  }
+  const tuna = computeBowlCost({ proteinCosts, proteinKey: "tuna", shared });
+  assert.equal(promoVerdict(tuna, rules).status, "apto");
+});
+
+test("el margen ponderado cuenta los bowls del 2x1 a su precio y costo de promo", () => {
+  const shared = computeSharedParts({ config: emptyConfig() });
+  const tuna = computeBowlCost({ proteinCosts: { tuna: { costPerKg: 300 } }, proteinKey: "tuna", shared });
+  const result = weightedMargin([tuna], { tuna: 3 }, { tuna: 2 });
+  assert.equal(result.units, 5);
+  assert.equal(result.promoUnits, 2);
+  assert.equal(result.revenue, round(tuna.price * 3 + tuna.scenarios.promo2x1.price * 2));
+  assert.equal(result.cost, round(tuna.total * 3 + tuna.scenarios.promo2x1.total * 2));
+  // Sin ventas del 2x1 queda exactamente como antes.
+  assert.equal(weightedMargin([tuna], { tuna: 3 }).revenue, round(tuna.price * 3));
 });
 
 test("el combo se mide contra su precio sin IVA", () => {
