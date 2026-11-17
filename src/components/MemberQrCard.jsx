@@ -6,6 +6,7 @@ import styles from "./MemberQrCard.module.css";
 export default function MemberQrCard({
   token,
   onBalanceRefresh,
+  points,
   defaultOpen = false,
   language = "es",
   className = "",
@@ -96,7 +97,7 @@ export default function MemberQrCard({
                 ariaLabel={copy.label}
               />
               <strong>{card.member?.name}</strong>
-              <span>{card.member?.points ?? 0} {copy.points}</span>
+              <span>{points ?? card.member?.points ?? 0} {copy.points}</span>
               <small>{copy.security}</small>
             </>
           )}

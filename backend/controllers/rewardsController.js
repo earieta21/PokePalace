@@ -41,6 +41,20 @@ export const getMemberCard = async (req, res) => {
   }
 };
 
+export const getRewardPreview = async (req, res) => {
+  const reward = getRewardById(req.params.rewardId);
+  if (!reward || reward.source === "social_story") return res.status(400).json({ msg: "Premio inválido" });
+  try {
+    await expireStalePoints(req.userId);
+    const user = await User.findById(req.userId).select("points");
+    if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
+    res.set("Cache-Control", "no-store");
+    res.json({ reward, points: user.points, remainingPoints: user.points - reward.cost, validityDays: REDEMPTION_CODE_EXPIRY_DAYS });
+  } catch {
+    res.status(500).json({ msg: "No se pudieron consultar las condiciones del premio" });
+  }
+};
+
 export const redeemReward = async (req, res) => {
   try {
     const rewardId = Number(req.body.rewardId);
@@ -83,6 +97,9 @@ export const redeemReward = async (req, res) => {
       // they are not zero-cost loyalty rewards available through this route.
       if (!reward || reward.source === "social_story") {
         return res.status(400).json({ msg: "Premio inválido" });
+      }
+      if (req.body.expectedPointsCost !== undefined && req.body.expectedPointsCost !== reward.cost) {
+        return res.status(409).json({ msg: "El costo del premio cambió. Revisa las condiciones y confirma nuevamente.", code: "REWARD_CHANGED" });
       }
 
       // Saldo inactivo (12+ meses sin ganar puntos) se resetea antes de dejar gastarlo.
@@ -191,13 +208,14 @@ export const getMyRedemptions = async (req, res) => {
   try {
     // Marca como vencidos (lazy) los códigos activos cuya fecha ya pasó
     await Redemption.updateMany(
-      { user: req.userId, status: "active", expiresAt: { $lt: new Date() } },
+      { user: req.userId, status: "active", expiresAt: { $lte: new Date() } },
       { $set: { status: "expired" } }
     );
 
-    const redemptions = await Redemption.find({ user: req.userId })
-      .sort({ createdAt: -1 })
-      .limit(30);
+    const activeOnly = req.query.status === "active";
+    const query = Redemption.find({ user: req.userId, ...(activeOnly && { status: "active", $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] }) });
+    const redemptions = activeOnly ? await query.sort({ expiresAt: 1, createdAt: -1 }) : await query.sort({ createdAt: -1 }).limit(30);
+    res.set("Cache-Control", "no-store");
     res.json({ redemptions });
   } catch {
     res.status(500).json({ msg: "Error obteniendo tus premios" });

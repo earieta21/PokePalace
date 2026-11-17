@@ -1,7 +1,7 @@
 import express from "express";
 import { protect } from "../middleware/authMiddleware.js";
 import { rateLimit } from "../middleware/rateLimit.js";
-import { claimSocialStoryReward, redeemReward, getMemberCard, getMyRedemptions, reconcileMyLoyaltyPoints } from "../controllers/rewardsController.js";
+import { claimSocialStoryReward, redeemReward, getMemberCard, getMyRedemptions, reconcileMyLoyaltyPoints, getRewardPreview } from "../controllers/rewardsController.js";
 
 const router = express.Router();
 
@@ -17,6 +17,7 @@ router.post("/claim", protect, redeemLimiter, claimSocialStoryReward);
 router.post("/reconcile", protect, redeemLimiter, reconcileMyLoyaltyPoints);
 router.get("/member-card", protect, getMemberCard);
 router.get("/mine", protect, getMyRedemptions);
+router.get("/preview/:rewardId", protect, getRewardPreview);
 
 export default router;
 

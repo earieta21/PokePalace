@@ -1,4 +1,4 @@
-import { createContext, useState } from "react";
+import { createContext, useState, useCallback, useRef } from "react";
 import { API_URL } from "../config";
 
 export const AuthContext = createContext();
@@ -10,6 +10,20 @@ export const AuthProvider = ({ children }) => {
   );
 
   const isLoggedIn = !!token;
+  const balanceVersion = useRef(0);
+  const currentToken = useRef(token);
+  currentToken.current = token;
+
+  const updateRewardsBalance = useCallback((points) => {
+    if (!Number.isFinite(points) || points < 0) return;
+    balanceVersion.current += 1;
+    setUser((previous) => {
+      if (!previous) return previous;
+      const next = { ...previous, points };
+      try { localStorage.setItem("user", JSON.stringify(next)); } catch { /* The live balance still updates if storage is unavailable. */ }
+      return next;
+    });
+  }, []);
 
   const login = async ({ email, password }) => {
     const res = await fetch(`${API_URL}/api/auth/login`, {
@@ -66,21 +80,22 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     if (!token) return;
+    const version = ++balanceVersion.current;
     try {
       const res = await fetch(`${API_URL}/api/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.user) {
+      if (res.ok && data.user && version === balanceVersion.current && token === currentToken.current) {
         setUser(data.user);
         localStorage.setItem("user", JSON.stringify(data.user));
       }
     } catch {
       // silently ignore
     }
-  };
+  }, [token]);
 
   const logout = () => {
     setToken(null);
@@ -99,6 +114,7 @@ export const AuthProvider = ({ children }) => {
         register,
         logout,
         refreshUser,
+        updateRewardsBalance,
       }}
     >
       {children}

@@ -1,10 +1,13 @@
-import { useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useContext, useEffect, useState, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { API_URL } from "../config";
-import { REWARDS } from "../data/rewardsCatalog.js";
+import { REWARDS, SIGNUP_BONUS_POINTS } from "../data/rewardsCatalog.js";
+import { trackEvent } from "../utils/analytics";
 import MemberQrCard from "../components/MemberQrCard";
+import RewardsWallet from "../components/RewardsWallet";
+import { RewardConfirmation, RewardCodeDialog } from "../components/RewardDialogs";
 import styles from "./Promotions.module.css";
 
 const TIERS = [
@@ -98,7 +101,7 @@ function getNextTier(points) {
 }
 
 export default function RewardsPage() {
-  const { isLoggedIn, user, token, refreshUser } = useContext(AuthContext);
+  const { isLoggedIn, user, token, refreshUser, updateRewardsBalance } = useContext(AuthContext);
   const { language, t } = useLanguage();
   const navigate = useNavigate();
   const [redeeming, setRedeeming] = useState(null);   // reward.id currently in flight
@@ -106,6 +109,14 @@ export default function RewardsPage() {
   const [wonCode, setWonCode] = useState(null);        // { code, rewardName, expiresAt }
   const [completedOrderCount, setCompletedOrderCount] = useState(null);
   const [pendingRedemptions, setPendingRedemptions] = useState(loadPendingRedemptions);
+  const [confirmation, setConfirmation] = useState(null);
+  const [previewing, setPreviewing] = useState(null);
+  const [walletRevision, setWalletRevision] = useState(0);
+  const requestBusy = useRef(false);
+  const sessionToken = useRef(token);
+  sessionToken.current = token;
+
+  useEffect(() => { setConfirmation(null); setWonCode(null); setRedeemError(""); }, [token]);
 
   useEffect(() => {
     const syncPending = (event) => {
@@ -135,10 +146,7 @@ export default function RewardsPage() {
       });
 
     return () => controller.abort();
-    // refreshUser is intentionally omitted: AuthContext recreates the function
-    // after each user update, which would otherwise start a reconciliation loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoggedIn, token]);
+  }, [isLoggedIn, token, refreshUser]);
 
   // Personalization uses existing account orders only. It creates no new
   // customer profile fields and never changes prices or awards extra benefits.
@@ -193,9 +201,26 @@ export default function RewardsPage() {
     (pending) => pending.userId === accountUserId && !catalogRewardIds.has(pending.rewardId)
   );
 
+  const startRedeem = async (reward, placement = "catalog") => {
+    if (!accountUserId || requestBusy.current) return;
+    const key = pendingRedemptionKey(accountUserId, reward.id);
+    if (loadPendingRedemptions()[key] || pendingRedemptions[key]) return handleRedeem(reward);
+    requestBusy.current = true; setPreviewing(reward.id); setRedeemError("");
+    trackEvent("select_reward", { reward_id: reward.id, placement });
+    try {
+      const response = await fetch(`${API_URL}/api/rewards/preview/${reward.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.msg || (language === "es" ? "No se pudieron consultar las condiciones." : "Could not load reward terms."));
+      if (sessionToken.current !== token) return;
+      updateRewardsBalance?.(data.points);
+      setConfirmation(data);
+    } catch (e) { if (sessionToken.current === token) setRedeemError(e.message); }
+    finally { requestBusy.current = false; setPreviewing(null); }
+  };
+
   const handleRedeem = async (reward) => {
     const userId = accountUserId;
-    if (!userId || redeeming) return;
+    if (!userId || requestBusy.current) return;
     const pendingKey = pendingRedemptionKey(userId, reward.id);
     let pending = loadPendingRedemptions()[pendingKey] || pendingRedemptions[pendingKey];
     if (!pending && points < reward.cost) return;
@@ -206,11 +231,16 @@ export default function RewardsPage() {
         rewardId: reward.id,
         clientRedemptionId: createClientRedemptionId(),
         createdAt: new Date().toISOString(),
+        expectedPointsCost: reward.cost,
       };
-      const nextPending = savePendingRedemption(pendingKey, pending);
-      setPendingRedemptions(nextPending);
+      try { setPendingRedemptions(savePendingRedemption(pendingKey, pending)); }
+      catch {
+        setRedeemError(language === "es" ? "No se pudo guardar el intento de canje en este dispositivo. Habilita el almacenamiento e intenta de nuevo." : "Could not save this redemption attempt. Enable browser storage and try again.");
+        setConfirmation(null); return;
+      }
     }
 
+    requestBusy.current = true;
     setRedeeming(reward.id);
     setRedeemError("");
     try {
@@ -223,9 +253,11 @@ export default function RewardsPage() {
         body: JSON.stringify({
           rewardId: reward.id,
           clientRedemptionId: pending.clientRedemptionId,
+          ...(Number.isFinite(pending.expectedPointsCost ?? reward.cost) && { expectedPointsCost: pending.expectedPointsCost ?? reward.cost }),
         }),
       });
       const data = await res.json().catch(() => ({}));
+      if (sessionToken.current !== token) return;
       if (!res.ok) {
         const error = new Error(data?.msg || t("rewards.redeemError"));
         error.status = res.status;
@@ -233,21 +265,25 @@ export default function RewardsPage() {
         throw error;
       }
 
-      setWonCode({
-        code: data.redemption.code,
-        rewardName: data.redemption.rewardName || reward.name[language],
-        expiresAt: data.redemption.expiresAt,
-      });
-      const nextPending = clearPendingRedemption(pendingKey);
-      setPendingRedemptions(nextPending);
+      updateRewardsBalance?.(data.points);
+      setWonCode(data.redemption);
+      setConfirmation(null);
+      setWalletRevision((n) => n + 1);
+      if (!data.idempotent) {
+        trackEvent("reward_redeemed", { reward_id: reward.id, points_cost: data.redemption.pointsCost });
+      }
+      try { setPendingRedemptions(clearPendingRedemption(pendingKey)); }
+      catch { setRedeemError(language === "es" ? "Tu premio se guardó. No se pudo limpiar el intento en este dispositivo; conserva tu código." : "Your reward was saved. This device could not clear the pending attempt; keep your code."); }
       await refreshUser();
     } catch (e) {
+      if (sessionToken.current !== token) return;
       if ([400, 409, 422].includes(e.status) && !e.retryable) {
-        const nextPending = clearPendingRedemption(pendingKey);
-        setPendingRedemptions(nextPending);
+        try { setPendingRedemptions(clearPendingRedemption(pendingKey)); } catch { /* Keep the same request for safe recovery. */ }
       }
+      setConfirmation(null);
       setRedeemError(e.message);
     } finally {
+      requestBusy.current = false;
       setRedeeming(null);
     }
   };
@@ -291,24 +327,54 @@ export default function RewardsPage() {
           )}
         </div>
       ) : (
-        <div className={styles.loginBanner}>
-          <p>{t("rewards.loginPrompt")}</p>
-          <button className={styles.loginBtn} onClick={() => navigate("/login")}>
-            {t("more.login")}
-          </button>
-        </div>
+        <section className={`${styles.section} ${styles.personalCard}`} aria-labelledby="welcome-reward-title">
+          <div className={styles.personalTopRow}>
+            <div>
+              <p className={styles.personalEyebrow}>{language === "es" ? "Tu premio de bienvenida" : "Your welcome reward"}</p>
+              <h2 id="welcome-reward-title" className={styles.personalTitle}>
+                {language === "es" ? `Crea tu cuenta y recibe ${SIGNUP_BONUS_POINTS} puntos` : `Create your account and get ${SIGNUP_BONUS_POINTS} points`}
+              </h2>
+              <p className={styles.personalLead}>
+                {language === "es"
+                  ? "Canjéalos por un agua del día gratis con la compra de un bowl. Agrega la bebida a tu orden y muestra tu código en caja."
+                  : "Redeem them for a free agua fresca of the day with a bowl purchase. Add the drink to your order and show your code at the counter."}
+              </p>
+              <p className={styles.welcomeTerms}>
+                {language === "es" ? "Bono al crear una cuenta nueva · Un premio por orden · No acumulable con otras promociones" : "Bonus for new accounts · One reward per order · Cannot be combined with other promotions"}
+              </p>
+            </div>
+            <span className={styles.personalRewardIcon} aria-hidden="true">🥤</span>
+          </div>
+          <div className={styles.personalActions}>
+            <Link
+              className={styles.personalPrimary}
+              to="/register"
+              state={{ from: "/rewards-deals" }}
+              onClick={() => trackEvent("select_rewards_signup", { placement: "welcome_bonus" })}
+            >
+              {language === "es" ? `Crear cuenta y recibir ${SIGNUP_BONUS_POINTS} puntos` : `Create account and get ${SIGNUP_BONUS_POINTS} points`}
+            </Link>
+            <Link className={styles.personalSecondary} to="/login" state={{ from: "/rewards-deals" }}>
+              {language === "es" ? "Ya tengo cuenta" : "I already have an account"}
+            </Link>
+          </div>
+        </section>
       )}
 
       {/* ── Personalized guidance without extra discounts ── */}
       {isLoggedIn && (
         <MemberQrCard
           token={token}
+          key={token}
+          points={points}
           onBalanceRefresh={refreshUser}
           defaultOpen
           language={language}
           className={styles.rewardsMemberQr}
         />
       )}
+
+      {isLoggedIn && <RewardsWallet key={token} token={token} language={language} revision={walletRevision} onShow={setWonCode} />}
 
       {isLoggedIn && personalGoal && (
         <section className={`${styles.section} ${styles.personalCard}`}>
@@ -325,8 +391,8 @@ export default function RewardsPage() {
               <p className={styles.personalLead}>
                 {readyReward
                   ? (language === "es"
-                      ? "Usa los puntos que ya ganaste; no necesitas esperar una promoción adicional."
-                      : "Use the points you already earned; there is no need to wait for another promotion.")
+                      ? `Canjéalo por ${readyReward.cost} puntos. ${readyReward.terms.es}`
+                      : `Redeem it for ${readyReward.cost} points. ${readyReward.terms.en}`)
                   : (language === "es"
                       ? `Te faltan ${pointsMissing} puntos, equivalentes a aproximadamente $${estimatedSpend} MXN en compras futuras.`
                       : `You need ${pointsMissing} more points, about $${estimatedSpend} MXN in future purchases.`)}
@@ -358,55 +424,36 @@ export default function RewardsPage() {
           </div>
 
           <div className={styles.personalActions}>
-            <a className={styles.personalPrimary} href="#rewards-catalog">
-              {readyReward
-                ? (language === "es" ? "Ver premio disponible" : "View available reward")
-                : (language === "es" ? "Ver mi progreso" : "View my progress")}
-            </a>
+            {readyReward ? (
+              <button
+                className={styles.personalPrimary}
+                type="button"
+                disabled={Boolean(redeeming || previewing)}
+                onClick={() => startRedeem(readyReward, "summary")}
+              >
+                {previewing === readyReward.id
+                  ? (language === "es" ? "Consultando condiciones…" : "Loading terms…")
+                  : redeeming === readyReward.id
+                    ? t("rewards.redeeming")
+                    : pendingRedemptions[pendingRedemptionKey(accountUserId, readyReward.id)]
+                      ? (language === "es" ? "Reintentar canje" : "Retry redemption")
+                      : (language === "es" ? `Canjear: ${readyReward.name.es}` : `Redeem: ${readyReward.name.en}`)}
+              </button>
+            ) : (
+              <a className={styles.personalPrimary} href="#rewards-catalog">
+                {language === "es" ? "Ver mi progreso" : "View my progress"}
+              </a>
+            )}
             <button className={styles.personalSecondary} type="button" onClick={() => navigate(favoriteName ? "/mi-cuenta" : "/order")}>
               {favoriteName
                 ? (language === "es" ? "Ver mi bowl favorito" : "View my favorite bowl")
                 : (language === "es" ? "Armar mi bowl" : "Build my bowl")}
             </button>
           </div>
+          {readyReward && <p className={styles.welcomeTerms}>{language === "es" ? "Revisa las condiciones y confirma antes de usar tus puntos." : "Review the terms and confirm before spending your points."}</p>}
+          {redeemError && <p className={styles.redeemErrorBanner} role="alert">{redeemError}</p>}
         </section>
       )}
-
-      {/* ── Social story campaign ── */}
-      <section className={`${styles.section} ${styles.storyCampaign}`}>
-        <div className={styles.storyCampaignHeader}>
-          <span className={styles.storyCampaignIcon} aria-hidden="true">📲</span>
-          <div>
-            <p className={styles.storyCampaignEyebrow}>
-              {language === "es" ? "Comparte y vuelve" : "Share and come back"}
-            </p>
-            <h2 className={styles.storyCampaignTitle}>
-              {language === "es" ? "Sube una historia y recibe una bebida" : "Post a story and get a drink"}
-            </h2>
-            <p className={styles.storyCampaignLead}>
-              {language === "es"
-                ? "Comparte tu bowl, etiqueta la cuenta oficial de Poke Palace y recibe un código para tu próxima visita."
-                : "Share your bowl, tag the official Poke Palace account, and get a code for your next visit."}
-            </p>
-          </div>
-        </div>
-
-        <ol className={styles.storySteps}>
-          <li><span>1</span>{language === "es" ? "Sube una historia pública mostrando tu producto." : "Post a public story showing your product."}</li>
-          <li><span>2</span>{language === "es" ? "Etiqueta la cuenta oficial de Poke Palace." : "Tag the official Poke Palace account."}</li>
-          <li><span>3</span>{language === "es" ? "Incluye #PromocionPokePalace para indicar que recibes un beneficio." : "Include #PokePalacePromotion to disclose the benefit."}</li>
-          <li><span>4</span>{language === "es" ? "Muéstrala al personal mientras siga activa y recibe tu código." : "Show it to staff while it is active and receive your code."}</li>
-        </ol>
-
-        <div className={styles.storyTerms}>
-          <strong>{language === "es" ? "Condiciones" : "Terms"}</strong>
-          <p>
-            {language === "es"
-              ? "Agua del día gratis en la siguiente visita con la compra de un bowl · Código válido por 7 días · Una participación por cuenta cada 30 días · No acumulable · Sujeto a disponibilidad."
-              : "Free agua fresca of the day on your next visit with a bowl purchase · Code valid for 7 days · One entry per account every 30 days · Cannot be combined · Subject to availability."}
-          </p>
-        </div>
-      </section>
 
       {/* ── Recompensas canjeables ── */}
       <section id="rewards-catalog" className={styles.section}>
@@ -415,7 +462,7 @@ export default function RewardsPage() {
         <p className={styles.sectionSub}>
           {language === "es" ? "Un premio por orden · No acumulable con otras promociones" : "One reward per order · Cannot be combined with other promotions"}
         </p>
-        {redeemError && (
+        {redeemError && !(isLoggedIn && personalGoal) && (
           <p className={styles.redeemErrorBanner} role="alert">{redeemError}</p>
         )}
         {orphanedPendingRedemptions.map((pending) => (
@@ -427,7 +474,7 @@ export default function RewardsPage() {
             <button
               type="button"
               className={`${styles.redeemBtn} ${styles.redeemActive}`}
-              disabled={redeeming === pending.rewardId}
+              disabled={Boolean(redeeming || previewing)}
               onClick={() => handleRedeem({ id: pending.rewardId, cost: Infinity, name: {} })}
             >
               {redeeming === pending.rewardId
@@ -460,10 +507,10 @@ export default function RewardsPage() {
 
                 <button
                   className={`${styles.redeemBtn} ${canRedeem ? styles.redeemActive : ""}`}
-                  onClick={() => handleRedeem(r)}
-                  disabled={!canRedeem || isBusy}
+                  onClick={() => startRedeem(r)}
+                  disabled={!canRedeem || Boolean(redeeming || previewing)}
                 >
-                  {isBusy
+                  {previewing === r.id ? (language === "es" ? "Consultando condiciones…" : "Loading terms…") : isBusy
                     ? t("rewards.redeeming")
                     : hasPendingRedemption
                       ? (language === "es" ? "Reintentar canje" : "Retry redemption")
@@ -544,25 +591,8 @@ export default function RewardsPage() {
         )}
       </section>
 
-      {wonCode && (
-        <div className={styles.codeOverlay} onClick={() => setWonCode(null)}>
-          <div className={styles.codeModal} onClick={(e) => e.stopPropagation()}>
-            <p className={styles.codeCheckmark}>✓</p>
-            <p className={styles.codeTitle}>{t("rewards.wonTitle")}</p>
-            <p className={styles.codeRewardName}>{wonCode.rewardName}</p>
-            <p className={styles.codeValue}>{wonCode.code}</p>
-            <p className={styles.codeHint}>{t("rewards.codeHint")}</p>
-            {wonCode.expiresAt && (
-              <p className={styles.codeExpiry}>
-                {t("rewards.expiresOn", { date: new Date(wonCode.expiresAt).toLocaleDateString(language === "es" ? "es-MX" : "en-US") })}
-              </p>
-            )}
-            <button className={styles.codeCloseBtn} onClick={() => setWonCode(null)}>
-              {t("rewards.gotIt")}
-            </button>
-          </div>
-        </div>
-      )}
+      {confirmation && <RewardConfirmation preview={confirmation} language={language} busy={Boolean(redeeming)} error={redeemError} onConfirm={() => handleRedeem(confirmation.reward)} onClose={() => { if (!requestBusy.current) setConfirmation(null); }} />}
+      {wonCode && <RewardCodeDialog reward={wonCode} language={language} onClose={() => setWonCode(null)} />}
 
     </div>
   );
