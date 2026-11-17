@@ -5,6 +5,7 @@ import ExternalWebhookEvent from "../models/ExternalWebhookEvent.js";
 import { restoreInventoryForOrder } from "./orderInventory.js";
 
 const NEW_ORDER_EVENTS = new Set(["orders.notification", "orders.scheduled.notification"]);
+const STORE_DEPROVISIONED_EVENTS = new Set(["store.deprovisioned"]);
 const CANCEL_EVENTS = new Set(["orders.cancel", "orders.failure"]);
 const REFRESH_EVENTS = new Set(["order.fulfillment_issues.resolved"]);
 const MAX_ATTEMPTS = 8;
@@ -29,6 +30,13 @@ export function getUberEatsConfig(env = process.env) {
     tokenUrl: environment === "production"
       ? "https://auth.uber.com/oauth/v2/token"
       : "https://sandbox-login.uber.com/oauth/v2/token",
+    authorizeUrl: environment === "production"
+      ? "https://auth.uber.com/oauth/v2/authorize"
+      : "https://sandbox-login.uber.com/oauth/v2/authorize",
+    // A dónde regresa Uber después de que el dueño autoriza la app. Debe ser
+    // idéntica a la Redirect URI registrada en el Developer Dashboard.
+    redirectUri: String(env.UBER_EATS_REDIRECT_URI
+      || "https://pokepalace.onrender.com/api/integrations/uber/oauth/callback").trim(),
     apiBase: environment === "production"
       ? "https://api.uber.com"
       : "https://test-api.uber.com",
@@ -339,6 +347,12 @@ async function processEvent(event) {
     await processOrderEvent(event);
   } else if (CANCEL_EVENTS.has(event.eventType)) {
     await processCancellationEvent(event);
+  } else if (STORE_DEPROVISIONED_EVENTS.has(event.eventType) && event.resourceId) {
+    // Uber desconectó la tienda (desde su panel o al pausar la integración).
+    await StoreSettings.updateOne(
+      { key: "main", "uberEats.activeStoreId": event.resourceId },
+      { $set: { "uberEats.deactivatedAt": new Date() } }
+    );
   }
 }
 

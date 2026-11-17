@@ -12,7 +12,8 @@ import staffReceipts from "../routes/staffReceipts.js";
 import { sanitizeMongo } from "../middleware/sanitizeMongo.js";
 import { deleteReceipt, updateReceipt, uploadReceipt, listReceipts } from "../controllers/receiptController.js";
 import { receiptListQuery } from "../utils/receiptQueries.js";
-import { detectReceiptDocument, parseReceiptFiles, RECEIPT_BUNDLE_TYPE } from "../utils/receiptDocuments.js";
+import { detectReceiptDocument, parseReceiptFiles, receiptDocuments, RECEIPT_BUNDLE_TYPE } from "../utils/receiptDocuments.js";
+import { receiptDocuments as viewerDocuments } from "../../src/utils/receiptDocuments.js";
 import { summarizeReceipts, buildAccountantEmail, buildReceiptsCsv, receiptDocumentEntries, sendReceiptsToAccountant } from "../utils/accountantReport.js";
 
 const id = "a".repeat(24), expenseId = "b".repeat(24);
@@ -21,6 +22,22 @@ const expense = { _id: expenseId, date: receipt.date, amount: 100, description: 
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]);
 const pdf = Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF");
 const xml = Buffer.from('<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" Total="100"/>');
+
+test("PDF y XML anteriores al soporte de múltiples archivos conservan su tipo y extensión", () => {
+  for (const extension of ["pdf", "xml"]) {
+    const legacy = { ...receipt, publicId: `comprobantes/legacy.${extension}`, imageUrl: `https://res.cloudinary.com/test/raw/upload/v1/comprobantes/legacy.${extension}?download=1` };
+    const document = receiptDocuments(legacy)[0];
+    assert.equal(document.mimeType, `application/${extension}`);
+    assert.equal(document.resourceType, "raw");
+    assert.equal(document.publicId, legacy.publicId);
+    assert.equal(viewerDocuments(legacy)[0].mimeType, document.mimeType);
+    const entry = receiptDocumentEntries(legacy, 0)[0];
+    assert.equal(entry.name, `01_2020-01-01_ticket_efectivo_costco.${extension}`);
+    assert.equal(entry.url, legacy.imageUrl);
+  }
+  assert.equal(receiptDocuments(receipt)[0].resourceType, "image");
+  assert.equal(viewerDocuments(receipt)[0].mimeType, "image/jpeg");
+});
 const req = (overrides = {}) => ({ params: { id }, query: {}, staff: { name: "Test", locationId: "main" }, body: { ...receipt, amount: "100" }, is: () => false, ...overrides });
 const res = () => ({ code: 200, data: null, status(code) { this.code = code; return this; }, json(data) { this.data = data; return this; } });
 const chain = (value) => ({ sort() { return this; }, select() { return this; }, skip() { return this; }, limit() { return this; }, lean: async () => value });

@@ -4,6 +4,7 @@ import { createStaffApi } from "../api";
 import { tijuanaDateKey } from "../../utils/date";
 import ui from "./ReceiptsPage.module.css";
 import { ReceiptSummary, ReceiptViewer, ReceiptDeliveryHistory } from "./ReceiptTools";
+import { receiptDocuments } from "../../utils/receiptDocuments";
 
 /* Comprobantes para el contador: se sube la foto de cada factura, ticket o
    voucher, separada por forma de pago como en el corte de caja, y cada lunes
@@ -698,10 +699,11 @@ export default function ReceiptsPage({ styles }) {
         <ul className={ui.list}>
           {receipts.map((r) => {
             const kind = kindOf(r.kind);
+              const firstDocument = receiptDocuments(r)[0];
             return (
               <li key={r._id} className={ui.item}>
                 <button type="button" onClick={() => setViewer(r)} className={ui.thumb} title="Ver comprobante" aria-label="Ver comprobante">
-                  {!r.documents?.length || r.documents[0].mimeType.startsWith("image/") ? <img src={thumbUrl(r.imageUrl)} alt={`Foto: ${kind.label} ${r.date}`} loading="lazy" /> : <span>{r.documents[0].mimeType === "application/pdf" ? "PDF" : "XML"}</span>}
+                  {firstDocument.mimeType.startsWith("image/") ? <img src={thumbUrl(firstDocument.url)} alt={`Foto: ${kind.label} ${r.date}`} loading="lazy" /> : <span>{firstDocument.mimeType === "application/pdf" ? "PDF" : "XML"}</span>}
                 </button>
                 <div className={ui.itemBody}>
                   <div className={ui.itemTop}>

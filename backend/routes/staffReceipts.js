@@ -28,7 +28,7 @@ const imageBody = (req, res, next) => parseImage(req, res, (err) => {
   if (err.type === "entity.too.large") {
     return res.status(413).json({ message: "El paquete pesa demasiado: máximo 8 MB por archivo y 20 MB en total." });
   }
-  return res.status(400).json({ message: "No se pudo leer la foto." });
+  return res.status(400).json({ message: "No se pudo leer el archivo." });
 });
 
 router.get   ("/settings", seniorStaff, getReceiptSettings);

@@ -53,10 +53,41 @@ export async function uploadImageToCloudinary(buffer, { folder = "facturas", mim
   return { url: data.secure_url, publicId: data.public_id, resourceType };
 }
 
+/* Sube un documento (PDF o XML de una factura) como archivo "raw": se
+   entrega tal cual, sin pasar por las transformaciones de imagen. El
+   public_id lleva la extensión para que se descargue con su tipo correcto.
+   Regresa { url, publicId }. */
+export async function uploadFileToCloudinary(buffer, { folder = "comprobantes", extension = "pdf", mimeType = "application/pdf" } = {}) {
+  if (!cloudinaryConfigured()) throw new Error("Cloudinary no está configurado");
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const publicId = `comprobante_${timestamp}_${Math.random().toString(36).slice(2, 10)}.${extension}`;
+  const signature = signParams({ folder, public_id: publicId, timestamp });
+
+  const form = new FormData();
+  form.append("file", new Blob([buffer], { type: mimeType }), `comprobante.${extension}`);
+  form.append("api_key", process.env.CLOUDINARY_API_KEY);
+  form.append("timestamp", String(timestamp));
+  form.append("folder", folder);
+  form.append("public_id", publicId);
+  form.append("signature", signature);
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/raw/upload`,
+    { method: "POST", body: form }
+  );
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.secure_url) {
+    throw new Error(`Cloudinary upload (raw) falló: ${res.status} ${JSON.stringify(data)}`);
+  }
+  return { url: data.secure_url, publicId: data.public_id, resourceType: "raw" };
+}
+
 /* Borra una imagen subida por nosotros. Regresa true si Cloudinary la borró
    o ya no existía; nunca lanza por un "no encontrado". */
 export async function deleteImageFromCloudinary(publicId, resourceType = "image") {
   if (!cloudinaryConfigured() || !publicId) return false;
+  if (typeof resourceType === "object") resourceType = resourceType?.resourceType || "image";
 
   const timestamp = Math.floor(Date.now() / 1000);
   const form = new FormData();

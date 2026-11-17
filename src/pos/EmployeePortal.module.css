@@ -776,6 +776,8 @@
   font-weight: 700;
   color: #713f12;
   overflow-wrap: anywhere;
+  /* Las notas de Uber (y de cualquier pedido) traen una por renglón. */
+  white-space: pre-line;
 }
 
 /* Lo que cambia la preparación (mitad y mitad, scoop extra, premio). */

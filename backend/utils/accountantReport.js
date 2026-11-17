@@ -112,11 +112,13 @@ export function receiptFileName(receipt, index) {
     receipt.paymentMethod || "sin-pago",
     slug(receipt.vendor),
   ].filter(Boolean);
-  return `${parts.join("_")}.jpg`;
+  // Los documentos (PDF/XML de la factura) conservan su extensión.
+  const extension = String(receipt.imageUrl || "").match(/\/raw\/upload\/.*\.(pdf|xml)(?:$|\?)/i)?.[1]?.toLowerCase() || "jpg";
+  return `${parts.join("_")}.${extension}`;
 }
 
 export function receiptDocumentEntries(receipt, index) {
-  const base = receiptFileName(receipt, index).replace(/\.jpg$/, "");
+  const base = receiptFileName(receipt, index).replace(/\.(jpg|pdf|xml)$/, "");
   return receiptDocuments(receipt).map((doc, documentIndex) => ({
     ...doc,
     name: `${base}${documentIndex ? `_${documentIndex + 1}` : ""}.${doc.mimeType === "application/pdf" ? "pdf" : doc.mimeType === "application/xml" ? "xml" : "jpg"}`,

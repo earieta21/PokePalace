@@ -9,7 +9,7 @@ import { parseReceiptFiles, receiptDocuments, RECEIPT_BUNDLE_TYPE } from "../uti
 export { detectImageType } from "../utils/receiptDocuments.js";
 import Expense, { EXPENSE_CATEGORIES } from "../models/Expense.js";
 import StoreSettings from "../models/StoreSettings.js";
-import { uploadImageToCloudinary, deleteImageFromCloudinary, cloudinaryConfigured } from "../utils/cloudinary.js";
+import { uploadImageToCloudinary, uploadFileToCloudinary, deleteImageFromCloudinary, cloudinaryConfigured } from "../utils/cloudinary.js";
 import { emailConfigured, explainEmailError } from "../utils/notify.js";
 import {
   sendReceiptsToAccountant, nextAccountantSendKey, summarizeReceipts,
@@ -22,6 +22,22 @@ const MAX_ACCOUNTANT_EMAILS = 3;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Se revisan los primeros bytes en vez de confiar en el Content-Type.
+
+// Facturas guardadas en la computadora: el PDF y el XML del CFDI. Igual que
+// con las fotos, se reconocen por su contenido y no por el Content-Type.
+export function detectDocumentType(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 5) return null;
+  if (buffer.toString("ascii", 0, 5) === "%PDF-") return { mimeType: "application/pdf", extension: "pdf" };
+  // El XML puede traer BOM o espacios antes de la declaración.
+  const head = buffer.subarray(0, 256).toString("utf8").replace(/^\uFEFF/, "").trimStart();
+  if (/^<\?xml[\s?]/i.test(head) || /^<cfdi:Comprobante[\s>]/.test(head)) {
+    return { mimeType: "application/xml", extension: "xml" };
+  }
+  return null;
+}
+
+// Los documentos viven en Cloudinary como "raw"; se reconoce por su URL.
+export const isRawReceiptUrl = (url) => typeof url === "string" && url.includes("/raw/upload/");
 
 const cleanText = (value, max) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
@@ -107,7 +123,8 @@ export const getReceiptDeliveries = async (req, res) => {
 };
 
 /* POST /api/staff/receipts?kind=&paymentMethod=&amount=&date=&vendor=&note=&registerExpense=&category=
-   Cuerpo: la foto (image/jpeg | image/png | image/webp). */
+   Cuerpo: la foto (image/jpeg | image/png | image/webp) o el documento de
+   la factura (application/pdf | XML del CFDI). */
 export const uploadReceipt = async (req, res) => {
   const meta = parseReceiptMeta(req.query);
   if (meta.error) return res.status(400).json({ message: meta.error });
@@ -145,7 +162,9 @@ export const uploadReceipt = async (req, res) => {
   const documents = [];
   try {
     for (const file of files) {
-      const asset = await uploadImageToCloudinary(file.buffer, { folder: "comprobantes", mimeType: file.mimeType });
+      const asset = file.mimeType.startsWith("image/")
+        ? await uploadImageToCloudinary(file.buffer, { folder: "comprobantes", mimeType: file.mimeType })
+        : await uploadFileToCloudinary(file.buffer, { folder: "comprobantes", mimeType: file.mimeType, extension: file.mimeType === "application/pdf" ? "pdf" : "xml" });
       documents.push({ ...asset, mimeType: file.mimeType, name: file.name });
     }
   } catch (err) {

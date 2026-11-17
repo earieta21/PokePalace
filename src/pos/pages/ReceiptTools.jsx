@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { receiptDocuments } from "../../utils/receiptDocuments";
 import ui from "./ReceiptsPage.module.css";
 
 const money = (n) => Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
@@ -34,7 +35,7 @@ export function ReceiptViewer({ receipt, onClose }) {
   const [documentIndex, setDocumentIndex] = useState(0);
   const [xml, setXml] = useState("");
   const [imageRatio, setImageRatio] = useState(1);
-  const documents = receipt.documents?.length ? receipt.documents : [{ url: receipt.imageUrl, mimeType: "image/jpeg", name: "Foto del comprobante" }];
+  const documents = receiptDocuments(receipt);
   const document = documents[documentIndex];
   const isImage = document.mimeType.startsWith("image/");
   useEffect(() => {

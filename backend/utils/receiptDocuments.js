@@ -51,5 +51,7 @@ export function parseReceiptFiles(body, bundled = false) {
 }
 
 export function receiptDocuments(receipt) {
-  return receipt.documents?.length ? receipt.documents : [{ url: receipt.imageUrl, publicId: receipt.publicId, mimeType: "image/jpeg", resourceType: "image", name: "comprobante.jpg" }];
+  if (receipt.documents?.length) return receipt.documents;
+  const extension = String(receipt.imageUrl || "").match(/\/raw\/upload\/.*\.(pdf|xml)(?:$|\?)/i)?.[1]?.toLowerCase();
+  return [{ url: receipt.imageUrl, publicId: receipt.publicId, mimeType: extension ? `application/${extension}` : "image/jpeg", resourceType: extension ? "raw" : "image", name: `comprobante.${extension || "jpg"}` }];
 }
