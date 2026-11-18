@@ -8,6 +8,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { comboPalaceSelectionLabels } from "../data/comboPalace";
 import { MXN_PER_POINT, REWARDS, SIGNUP_BONUS_POINTS } from "../data/rewardsCatalog";
 import KioskPairingQr from "../kiosk/KioskPairingQr";
+import CheckoutSuggestions from "./CheckoutSuggestions";
 import kioskPairStyles from "../kiosk/KioskPairingQr.module.css";
 import styles from "./OrderSummary.module.css";
 
@@ -428,6 +429,8 @@ const OrderSummary = ({
                   ? <PromoLineCard key={line.cartId} line={line} />
                   : <BowlLineCard key={line.cartId} line={line} />
             ))}
+
+            <CheckoutSuggestions isKiosk={isKiosk} />
 
             <div className={styles.actionButtons} style={{ marginBottom: 20 }}>
               <button className={styles.restartButton} type="button" onClick={handleAddAnotherBowl}>
