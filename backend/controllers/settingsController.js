@@ -1,6 +1,6 @@
 import BowlCosting from "../models/BowlCosting.js";
 import StoreSettings from "../models/StoreSettings.js";
-import { isComboPalaceDay, isPromo2x1Day } from "../utils/promoSchedule.js";
+import { PROMO_WEEKDAYS, isComboPalaceDay, isPromo2x1Day } from "../utils/promoSchedule.js";
 import {
   DELIVERY_APP_PLATFORMS,
   PosOrderValidationError,
@@ -51,6 +51,8 @@ export const getAvailability = async (req, res) => {
       // sección sin que cada pantalla calcule el día por su cuenta.
       promo2x1Active: isPromo2x1Day(),
       comboPalaceActive: isComboPalaceDay(),
+      // Los días de cada promo, para el letrero del kiosco.
+      promoWeekdays: PROMO_WEEKDAYS,
     });
   } catch {
     res.status(500).json({ msg: "Error al obtener disponibilidad" });

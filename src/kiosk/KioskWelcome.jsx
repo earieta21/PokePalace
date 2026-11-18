@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowRight, Leaf } from "lucide-react";
 import { useOrder } from "../order/OrderContext";
+import { useAvailability } from "../context/AvailabilityContext";
 import useIdleTimeout from "./useIdleTimeout";
+import KioskTodayPromo from "./KioskTodayPromo";
+import { activeKioskPromos, promoScheduleText } from "./todayPromo";
 import { useHalloweenTheme } from "../data/seasonalTheme";
 import { Bat, Pumpkin } from "../components/HalloweenDecor";
 import styles from "./KioskWelcome.module.css";
@@ -46,14 +50,18 @@ function useLandscape() {
 
 export default function KioskWelcome() {
   const navigate = useNavigate();
-  const { resetOrder } = useOrder();
+  const { resetOrder, startPromo2x1 } = useOrder();
+  const availability = useAvailability();
   const [screensaverOn, setScreensaverOn] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
-  const slides = useLandscape() ? LANDSCAPE_SLIDES : PORTRAIT_SLIDES;
+  const landscape = useLandscape();
+  const slides = landscape ? LANDSCAPE_SLIDES : PORTRAIT_SLIDES;
   const activeSlide = slideIndex % slides.length;
   // Se evalúa en cada vuelta a esta pantalla (cada cliente), así el kiosco
   // suelta el tema el 1 de noviembre aunque nadie recargue la página.
   const halloween = useHalloweenTheme();
+  const todayPromos = activeKioskPromos(availability);
+  const schedule = promoScheduleText(availability.promoWeekdays);
 
   // Defensive: wipe any leftover selections from the previous customer
   // every time this idle screen is shown.
@@ -75,34 +83,17 @@ export default function KioskWelcome() {
     return () => clearInterval(interval);
   }, [screensaverOn, slides.length]);
 
+  const startOrder = () => navigate("/kiosk/menu");
+  // Las promos del día tienen su atajo: el 2x1 abre el armador ya en modo
+  // promo y el combo abre el menú con su armador abierto.
+  const start2x1 = () => {
+    startPromo2x1();
+    navigate("/kiosk/order");
+  };
+  const openCombo = () => navigate("/kiosk/menu", { state: { openCombo: true } });
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 28,
-        padding: 24,
-        textAlign: "center",
-        position: "relative",
-        overflow: "hidden",
-        background: halloween
-          ? "radial-gradient(circle at 80% 12%, rgba(255, 138, 43, 0.18), transparent 38%), #1d1426"
-          : "linear-gradient(135deg, #fff7ed 0%, #ffffff 60%)",
-      }}
-    >
-      {halloween && (
-        <div className={styles.spooky} aria-hidden="true">
-          <span className={styles.moon} />
-          <Bat className={`${styles.bat} ${styles.batOne}`} />
-          <Bat className={`${styles.bat} ${styles.batTwo}`} />
-          <Bat className={`${styles.bat} ${styles.batThree}`} />
-          <Pumpkin className={`${styles.pumpkin} ${styles.pumpkinLeft}`} />
-          <Pumpkin className={`${styles.pumpkin} ${styles.pumpkinRight}`} />
-        </div>
-      )}
+    <main className={styles.page}>
       {screensaverOn && (
         <div
           className={styles.screensaver}
@@ -122,46 +113,58 @@ export default function KioskWelcome() {
             {halloween && <Pumpkin className={styles.screensaverPumpkin} />}
             <p className={styles.screensaverBrand}>Poke Palace</p>
             {halloween && <p className={styles.screensaverSeason}>Temporada de Halloween</p>}
+            {todayPromos.map((promo) => (
+              <p key={promo.id} className={styles.screensaverPromo}>
+                Hoy: {promo.title} · {promo.deal}
+              </p>
+            ))}
             <p className={styles.screensaverHint}>Toca la pantalla para ordenar</p>
           </div>
         </div>
       )}
 
-      <div style={{ position: "relative", zIndex: 1 }}>
-        <p style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase", color: halloween ? "#ff8a2b" : "#c2410c" }}>
-          {halloween ? "Poke Palace · Halloween" : "Poke Palace"}
-        </p>
-        <h1 style={{ margin: 0, fontSize: 38, fontWeight: 800, color: halloween ? "#f6ead7" : "#1a1a1a" }}>
-          {halloween ? <>Arma tu bowl <span style={{ color: "#ff8a2b" }}>de miedo</span></> : "Arma tu bowl"}
-        </h1>
-        <p style={{ margin: "10px 0 0", fontSize: 16, color: halloween ? "#cdbfd8" : "#555" }}>
-          Elige base, proteínas y toppings a tu gusto.
-        </p>
+      <div className={styles.photo}>
+        <img src={chopsticksWidePhoto} alt="" />
+        {halloween && (
+          <div className={styles.spooky} aria-hidden="true">
+            <span className={styles.moon} />
+            <Bat className={`${styles.bat} ${styles.batOne}`} />
+            <Bat className={`${styles.bat} ${styles.batTwo}`} />
+            <Bat className={`${styles.bat} ${styles.batThree}`} />
+            <Pumpkin className={`${styles.pumpkin} ${styles.pumpkinLeft}`} />
+            <Pumpkin className={`${styles.pumpkin} ${styles.pumpkinRight}`} />
+          </div>
+        )}
+        <span className={styles.brand}>
+          <Leaf size={30} strokeWidth={1.5} aria-hidden="true" /> Poke Palace
+        </span>
       </div>
 
-      <button
-        type="button"
-        onClick={() => navigate("/kiosk/menu")}
-        style={{
-          position: "relative",
-          zIndex: 1,
-          padding: "22px 56px",
-          borderRadius: 999,
-          border: "none",
-          background: halloween ? "#ff7a1a" : "#1a1a1a",
-          color: halloween ? "#1d1426" : "#fff",
-          fontWeight: 800,
-          fontSize: 20,
-          cursor: "pointer",
-          boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
-        }}
-      >
-        Toca para comenzar
-      </button>
+      <div className={styles.content}>
+        <div>
+          <h1 className={styles.title}>
+            {halloween ? <>Arma tu bowl <span>de miedo</span></> : "Arma tu bowl"}
+          </h1>
+          <p className={styles.subtitle}>
+            Elige base, proteína y toppings a tu gusto. Pagas en caja al terminar.
+          </p>
+        </div>
 
-      <p style={{ position: "relative", zIndex: 1, margin: 0, fontSize: 13, color: halloween ? "#a997b8" : "#888" }}>
-        Pagas en caja al terminar tu pedido
-      </p>
-    </div>
+        <button type="button" className={styles.start} onClick={startOrder}>
+          Toca para ordenar <ArrowRight size={28} aria-hidden="true" />
+        </button>
+
+        <div className={styles.promos}>
+          <KioskTodayPromo size="large" onStart2x1={start2x1} onOpenCombo={openCombo} />
+        </div>
+
+        {schedule && (
+          <p className={styles.schedule}>
+            <strong>Promos de la semana</strong>
+            {schedule}
+          </p>
+        )}
+      </div>
+    </main>
   );
 }

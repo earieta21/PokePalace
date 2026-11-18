@@ -12,6 +12,7 @@ import { ArrowRight, ShoppingBag } from "lucide-react";
 import { BOWL_BASE_PRICE } from "./pricing";
 import { useHalloweenTheme } from "../data/seasonalTheme";
 import { Bat, Pumpkin } from "../components/HalloweenDecor";
+import KioskTodayPromo from "../kiosk/KioskTodayPromo";
 import styles from "./MenuBrowser.module.css";
 import { analyticsItemFromCartLine, trackEvent } from "../utils/analytics";
 
@@ -24,6 +25,13 @@ const CATEGORY_ICONS = {
   Bebidas: "🥤",
   Extras: "🍫",
 };
+
+// En el kiosco "Bowls" a secas se confunde con "Arma tu propio bowl".
+const KIOSK_CATEGORY_LABELS = {
+  Bowls: "Bowls de la casa",
+};
+
+const COMBO_ITEM = CUSTOMER_CATALOG_BY_ID["combo-palace"];
 
 // Pantalla compartida entre la app/sitio web (`src/pages/MenuPage.jsx`) y el
 // kiosco (`src/kiosk/KioskMenuPage.jsx`) — mismo carrito (OrderContext), solo
@@ -41,6 +49,7 @@ const MenuBrowser = ({
     addComboToCart,
     updateCartItemQty,
     startNewBowl,
+    startPromo2x1,
   } = useOrder();
   const { unavailableItems, unavailableCatalogItems, hiddenCatalogItems, comboPalaceActive } = useAvailability();
   const [activeCombo, setActiveCombo] = useState(null);
@@ -104,6 +113,14 @@ const MenuBrowser = ({
     // sentir que volver a entrar era empezar de cero.
     if (!hasBowlDraft) startNewBowl();
     trackEvent("begin_bowl", { source: isKiosk ? "kiosk_menu" : "web_menu", resumed: hasBowlDraft });
+    onBuildBowl();
+  };
+
+  // Botón de la tarjeta "Promo de hoy" del kiosco: arranca el armador ya en
+  // modo 2x1 (startPromo2x1 limpia cualquier bowl a medio armar).
+  const handleStartPromo2x1 = () => {
+    startPromo2x1();
+    trackEvent("begin_bowl", { source: "kiosk_promo_2x1", resumed: false });
     onBuildBowl();
   };
 
@@ -196,9 +213,9 @@ const MenuBrowser = ({
     <div className={`${styles.wrapper} ${isKiosk ? styles.kiosk : ""}`}>
       <div className={styles.container}>
         <div className={styles.header}>
-          {isKiosk && (
-            <p className={`${styles.kioskEyebrow} ${halloween ? styles.kioskEyebrowHalloween : ""}`}>
-              {halloween ? "TEMPORADA DE HALLOWEEN" : "HECHO AL MOMENTO, PARA TI"}
+          {isKiosk && halloween && (
+            <p className={`${styles.kioskEyebrow} ${styles.kioskEyebrowHalloween}`}>
+              TEMPORADA DE HALLOWEEN
             </p>
           )}
           {isKiosk ? (
@@ -206,12 +223,26 @@ const MenuBrowser = ({
           ) : (
             <h1 className={styles.title}>Menú</h1>
           )}
-          <p className={styles.subtitle}>
-            {isKiosk
-              ? "Tu propia combinación o un favorito de la casa. Tú eliges."
-              : "Arma tu bowl o agrega lo que quieras — puedes juntar varios bowls y artículos en un solo pedido."}
-          </p>
+          {/* En el kiosco el título basta: cada tarjeta de abajo ya dice qué es. */}
+          {!isKiosk && (
+            <p className={styles.subtitle}>
+              Arma tu bowl o agrega lo que quieras — puedes juntar varios bowls y artículos en un solo pedido.
+            </p>
+          )}
         </div>
+
+        {/* La promo del día va primero en el kiosco, con su botón directo. El
+            Combo Palace ya no se repite abajo como sección propia. */}
+        {isKiosk && (
+          <div className={styles.kioskPromo}>
+            <KioskTodayPromo
+              onStart2x1={handleStartPromo2x1}
+              onOpenCombo={() => COMBO_ITEM && openComboPicker(COMBO_ITEM)}
+              comboCount={comboCount}
+              comboSoldOut={!COMBO_ITEM || isItemUnavailable(COMBO_ITEM)}
+            />
+          </div>
+        )}
 
         {isKiosk ? (
           <button
@@ -283,19 +314,21 @@ const MenuBrowser = ({
         )}
 
         {isKiosk && (
+          // Se queda pegada arriba al bajar: desde cualquier punto del menú se
+          // salta a otra categoría con un toque.
           <nav className={styles.categoryNav} aria-label="Categorías del menú">
-            {CUSTOMER_CATALOG_CATEGORIES.filter(
-              (category) => category !== "Combos" || comboPalaceActive === true,
-            ).map((category) => (
+            {CUSTOMER_CATALOG_CATEGORIES.filter((category) => category !== "Combos").map((category) => (
               <a key={category} href={`#kiosk-menu-${category}`}>
-                {category}
-                <ArrowRight size={15} aria-hidden="true" />
+                <span aria-hidden="true">{CATEGORY_ICONS[category]}</span>
+                {KIOSK_CATEGORY_LABELS[category] || category}
               </a>
             ))}
           </nav>
         )}
 
         {CUSTOMER_CATALOG_CATEGORIES.map((category) => {
+          // En el kiosco el combo vive en la tarjeta "Promo de hoy".
+          if (isKiosk && category === "Combos") return null;
           const items = CUSTOMER_CATALOG.filter((item) => {
             if (item.category !== category) return false;
             // El Combo Palace solo corre lunes, miércoles y viernes. Como es
@@ -319,7 +352,7 @@ const MenuBrowser = ({
                 {!isKiosk && (
                   <span aria-hidden="true">{CATEGORY_ICONS[category]}</span>
                 )}{" "}
-                {category}
+                {(isKiosk && KIOSK_CATEGORY_LABELS[category]) || category}
               </h3>
               <div className={styles.grid}>
                 {items.map((item) => {

@@ -377,6 +377,59 @@
   white-space: nowrap;
 }
 
+/* Kiosco: "¿Para comer aquí o para llevar?" con dos botones grandes. */
+.fulfillmentChoices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fulfillmentChoice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 14px 18px;
+  border: 2px solid var(--border-md);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fulfillmentChoice span {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.fulfillmentChoice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.fulfillmentChoiceActive {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.kioskPayNote {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 600;
+}
+
 /* Actions */
 .actions {
   margin-top: 20px;

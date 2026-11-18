@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { API_URL } from "../config";
 
-const AvailabilityContext = createContext({ unavailableItems: [], unavailableCatalogItems: [], hiddenIngredients: [], hiddenCatalogItems: [], promo2x1Active: false, comboPalaceActive: false });
+const AvailabilityContext = createContext({ unavailableItems: [], unavailableCatalogItems: [], hiddenIngredients: [], hiddenCatalogItems: [], promo2x1Active: false, comboPalaceActive: false, promoWeekdays: null });
 
 export function AvailabilityProvider({ children }) {
   const [unavailableItems, setUnavailableItems] = useState([]);
@@ -20,6 +20,9 @@ export function AvailabilityProvider({ children }) {
   const [promo2x1Active, setPromo2x1Active] = useState(null);
   // Igual que la 2x1, pero el Combo Palace corre lunes, miércoles y viernes.
   const [comboPalaceActive, setComboPalaceActive] = useState(null);
+  // Qué días corre cada promo ({ promo2x1: [2, 4], comboPalace: [1, 3, 5] },
+  // 0=domingo), para el letrero del kiosco. null si el servidor no lo manda.
+  const [promoWeekdays, setPromoWeekdays] = useState(null);
 
   const fetchAvailability = useCallback(() => {
     fetch(`${API_URL}/api/settings/availability`)
@@ -31,6 +34,7 @@ export function AvailabilityProvider({ children }) {
         setHiddenCatalogItems(d.hiddenCatalogItems ?? []);
         setPromo2x1Active(Boolean(d.promo2x1Active));
         setComboPalaceActive(Boolean(d.comboPalaceActive));
+        setPromoWeekdays(d.promoWeekdays ?? null);
       })
       .catch(() => {});
   }, []);
@@ -42,7 +46,7 @@ export function AvailabilityProvider({ children }) {
   }, [fetchAvailability]);
 
   return (
-    <AvailabilityContext.Provider value={{ unavailableItems, unavailableCatalogItems, hiddenIngredients, hiddenCatalogItems, promo2x1Active, comboPalaceActive, refetch: fetchAvailability }}>
+    <AvailabilityContext.Provider value={{ unavailableItems, unavailableCatalogItems, hiddenIngredients, hiddenCatalogItems, promo2x1Active, comboPalaceActive, promoWeekdays, refetch: fetchAvailability }}>
       {children}
     </AvailabilityContext.Provider>
   );

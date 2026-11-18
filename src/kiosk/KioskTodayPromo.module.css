@@ -1,0 +1,252 @@
+/* Tarjeta "Promo de hoy" del kiosco (bienvenida y menú). Mismo lenguaje que
+   el menú: verde #183e32, lima #e4ecb9, títulos en DM Serif Display. */
+.card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 26px 28px;
+  border-radius: 22px;
+  background: #e4ecb9;
+  color: #183e32;
+  overflow: hidden;
+  text-align: left;
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #183e32;
+  color: #fff9ec;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dce7a3;
+  animation: promoPulse 1.8s ease-in-out infinite;
+}
+
+.title {
+  margin: 14px 0 0;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 38px;
+  font-weight: 400;
+  letter-spacing: -1px;
+  line-height: 1.05;
+  color: inherit;
+}
+
+.deal {
+  margin: 8px 0 0;
+  font-size: 20px;
+  font-weight: 750;
+}
+
+.deal small {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.terms {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #42564b;
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+  margin-top: 18px;
+  padding: 14px 22px;
+  border: 0;
+  border-radius: 12px;
+  background: #183e32;
+  color: #fff9ec;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.cta:active {
+  transform: scale(0.98);
+}
+
+.cta:focus-visible {
+  outline: 3px solid #aa5934;
+  outline-offset: 4px;
+}
+
+.soldOut {
+  margin: 18px 0 0;
+  font-size: 15px;
+  font-weight: 750;
+  color: #8a3b2a;
+}
+
+.inCart {
+  margin-top: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* 2x1: dos bowls encimados con el sello en medio. */
+.pair {
+  position: relative;
+  width: 250px;
+  height: 172px;
+  flex-shrink: 0;
+}
+
+.pair img {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 5px solid #f4f8dc;
+  box-shadow: 0 10px 24px rgba(24, 62, 50, 0.18);
+}
+
+.pair img:first-child {
+  left: 0;
+  top: 20px;
+}
+
+.pair img:nth-child(2) {
+  right: 0;
+  top: 0;
+}
+
+.badge {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: #183e32;
+  color: #e4ecb9;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.single {
+  width: 230px;
+  height: 180px;
+  border-radius: 16px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.single img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Bienvenida: un poco más grande, es lo primero que se ve. */
+.large {
+  padding: 30px 32px;
+}
+
+.large .title {
+  font-size: 46px;
+}
+
+.large .deal {
+  font-size: 22px;
+}
+
+@media (max-width: 620px) {
+  .card {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+
+  .pair,
+  .single {
+    display: none;
+  }
+
+  .title,
+  .large .title {
+    font-size: 32px;
+  }
+
+  .cta {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@keyframes promoPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    animation: none;
+  }
+}
+
+/* Halloween (KioskLayout pone .kioskHalloween). */
+:global(.kioskHalloween) .card {
+  background: #2c2238;
+  border: 1px solid rgba(255, 138, 43, 0.45);
+  color: #f6ead7;
+}
+
+:global(.kioskHalloween) .eyebrow {
+  background: #ff8a2b;
+  color: #1d1426;
+}
+
+:global(.kioskHalloween) .dot {
+  background: #1d1426;
+}
+
+:global(.kioskHalloween) .terms {
+  color: #cdbfd8;
+}
+
+:global(.kioskHalloween) .cta {
+  background: #ff7a1a;
+  color: #1d1426;
+}
+
+:global(.kioskHalloween) .pair img {
+  border-color: #2c2238;
+}
+
+:global(.kioskHalloween) .badge {
+  background: #ff7a1a;
+  color: #1d1426;
+}
+
+:global(.kioskHalloween) .soldOut {
+  color: #ffb36b;
+}

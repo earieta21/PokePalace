@@ -654,7 +654,7 @@
 
 /* Touch menu: the customer website keeps its existing compact cards. */
 .kiosk.wrapper {
-  padding: 32px 0 calc(130px + env(safe-area-inset-bottom));
+  padding: 12px 0 calc(130px + env(safe-area-inset-bottom));
 }
 .kiosk .container {
   width: min(1160px, calc(100% - 56px));
@@ -662,7 +662,16 @@
 .kiosk .header {
   border: 0;
   padding: 0;
-  margin-bottom: 26px;
+  margin-bottom: 20px;
+}
+/* "Promo de hoy" (src/kiosk/KioskTodayPromo.jsx). Sin promo queda vacío. */
+.kioskPromo {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.kioskPromo:empty {
+  display: none;
 }
 .kioskEyebrow {
   display: block;
@@ -880,27 +889,44 @@
     display: none;
   }
 }
+/* Pegada arriba al bajar por el menú. El fondo se estira a todo el ancho
+   (box-shadow + clip-path) para que lo de abajo no se asome por los lados. */
 .categoryNav {
+  position: sticky;
+  top: 0;
+  z-index: 6;
   display: flex;
   gap: 12px;
-  padding: 24px 0;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
+  padding: 14px 0;
+  margin: 22px 0 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: #f7f4ec;
+  box-shadow: 0 0 0 100vmax #f7f4ec;
+  clip-path: inset(0 -100vmax);
+}
+.categoryNav::-webkit-scrollbar {
+  display: none;
 }
 .categoryNav a {
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 30px;
-  min-height: 48px;
-  padding: 12px 20px;
+  justify-content: center;
+  gap: 10px;
+  flex-shrink: 0;
+  min-height: 52px;
+  padding: 12px 22px;
   border: 1px solid #d8dccc;
   border-radius: 999px;
   color: #183e32;
   background: #fffdf7;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 650;
   text-decoration: none;
+}
+.categoryNav a > span {
+  font-size: 19px;
+  line-height: 1;
 }
 .categoryNav a:hover {
   background: #e5edb4;
@@ -908,7 +934,8 @@
 }
 .kiosk .section {
   margin-bottom: 38px;
-  scroll-margin-top: 22px;
+  /* Deja libre la barra de categorías, que se queda pegada arriba. */
+  scroll-margin-top: 96px;
 }
 .kiosk .sectionTitle {
   font-family: "DM Serif Display", Georgia, serif;
@@ -949,6 +976,29 @@
   display: none;
 }
 .kiosk .cardWithPhoto .cardBody {
+  padding: 20px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+/* Sin foto (la Sopa Miso): el ícono toma el lugar de la foto y la tarjeta
+   queda igual que las demás. En una fila no cabían ícono, texto y botón y
+   el texto se partía palabra por palabra. */
+.kiosk .cardIconOnly {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+.kiosk .cardIconOnly .cardIconBadge {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1.65;
+  border-radius: 0;
+  background: #f0f1e8;
+  font-size: 72px;
+}
+.kiosk .cardIconOnly .cardBody {
   padding: 20px;
   flex-direction: column;
   align-items: stretch;
@@ -1063,7 +1113,8 @@
   .kiosk .grid {
     gap: 14px;
   }
-  .kiosk .cardWithPhoto .cardBody {
+  .kiosk .cardWithPhoto .cardBody,
+  .kiosk .cardIconOnly .cardBody {
     padding: 16px;
   }
 }
@@ -1106,10 +1157,9 @@
     gap: 8px;
   }
   .categoryNav a {
-    flex: 1;
-    gap: 10px;
+    gap: 8px;
     padding: 12px 14px;
-    font-size: 12px;
+    font-size: 13px;
   }
   .kiosk .cardName {
     font-size: 16px;
@@ -1117,10 +1167,12 @@
   .kiosk .cardDescription {
     font-size: 12px;
   }
-  .kiosk .cardPhotoWrap {
+  .kiosk .cardPhotoWrap,
+  .kiosk .cardIconOnly .cardIconBadge {
     aspect-ratio: 1.15;
   }
-  .kiosk .cardWithPhoto .cardBody {
+  .kiosk .cardWithPhoto .cardBody,
+  .kiosk .cardIconOnly .cardBody {
     padding: 14px;
   }
   .kiosk .cardPrice {
@@ -1206,6 +1258,10 @@
 :global(.kioskHalloween) .kioskHeroHalloween {
   border: 1px solid rgba(255, 138, 43, 0.3);
 }
+:global(.kioskHalloween) .kiosk .categoryNav {
+  background: #17111e;
+  box-shadow: 0 0 0 100vmax #17111e;
+}
 :global(.kioskHalloween) .kiosk .categoryNav a {
   border-color: rgba(255, 255, 255, 0.16);
   background: #221a2c;
@@ -1223,7 +1279,8 @@
   border-color: rgba(255, 138, 43, 0.55);
 }
 :global(.kioskHalloween) .kiosk .cardPhotoWrap,
-:global(.kioskHalloween) .kiosk .cardPhotoContain {
+:global(.kioskHalloween) .kiosk .cardPhotoContain,
+:global(.kioskHalloween) .kiosk .cardIconOnly .cardIconBadge {
   background: #2c2238;
 }
 :global(.kioskHalloween) .kiosk .addBtn,

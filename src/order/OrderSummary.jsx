@@ -135,6 +135,9 @@ const OrderSummary = ({
   const hasPromo2x1BlockedByFulfillment = cart.some(
     (line) => line.kind === "promo2x1" && order.fulfillment !== "dine_in"
   );
+  // Cómo se llama "comer aquí" en cada pantalla, para que los avisos del 2x1
+  // nombren el mismo botón que el cliente ve.
+  const dineInLabel = isKiosk ? "Para comer aquí" : "Comer en restaurante";
   const chooseFulfillment = (nextFulfillment) => {
     order.updateCheckout("fulfillment", nextFulfillment);
     // La programación de hora solo aplica a "para llevar" — si el cliente
@@ -337,7 +340,7 @@ const OrderSummary = ({
         </div>
         {blockedByFulfillment && (
           <p className={styles.submitError} role="alert" style={{ marginTop: 8 }}>
-            Cambia la entrega a “Comer en restaurante” para conservar el 2x1.
+            Cambia la entrega a “{dineInLabel}” para conservar el 2x1.
           </p>
         )}
         {(line.bowls || []).map((bowl, index) => {
@@ -535,7 +538,7 @@ const OrderSummary = ({
           </div>
 
           <div className={styles.checkoutGrid}>
-            <label className={styles.field}>
+            <label className={styles.field} style={isKiosk ? { gridColumn: "1 / -1" } : undefined}>
               <span>{t("summary.name")}</span>
               <input
                 name="customer"
@@ -562,41 +565,77 @@ const OrderSummary = ({
               </label>
             )}
 
-            <label className={styles.field}>
-              <span>{t("summary.fulfillment")}</span>
-              <select
-                name="fulfillment"
-                value={order.fulfillment === "dine_in" ? "dine_in" : "pickup"}
-                onChange={(e) => chooseFulfillment(e.target.value)}
-              >
-                <option value="pickup">{t("summary.pickup")}</option>
-                <option value="dine_in">{t("summary.dineIn")}</option>
-              </select>
-            </label>
-
-            <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
-              <span>{t("summary.payment")}</span>
-              <div className={styles.paymentOptions}>
-                {paymentOptions.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    className={`${styles.paymentOption} ${
-                      (order.paymentMethod || "pay_at_pickup") === opt.value ? styles.paymentOptionActive : ""
-                    }`}
-                    onClick={() => order.updateCheckout("paymentMethod", opt.value)}
-                  >
-                    {opt.badge && <span className={styles.paymentBadge}>{opt.badge}</span>}
-                    <span className={styles.paymentIcon}>{opt.icon}</span>
-                    <span>{opt.label}</span>
-                  </button>
-                ))}
+            {isKiosk ? (
+              // En el kiosco: dos botones grandes en vez de una lista
+              // desplegable, que en la iPad cuesta atinarle.
+              <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
+                <span id="kiosk-fulfillment-label">¿Para comer aquí o para llevar?</span>
+                <div className={styles.fulfillmentChoices} role="group" aria-labelledby="kiosk-fulfillment-label">
+                  {[
+                    { value: "dine_in", icon: "🍽️", label: "Para comer aquí" },
+                    { value: "pickup", icon: "🛍️", label: "Para llevar" },
+                  ].map((opt) => {
+                    const active = (order.fulfillment === "dine_in" ? "dine_in" : "pickup") === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`${styles.fulfillmentChoice} ${active ? styles.fulfillmentChoiceActive : ""}`}
+                        aria-pressed={active}
+                        onClick={() => chooseFulfillment(opt.value)}
+                      >
+                        <span aria-hidden="true">{opt.icon}</span> {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            ) : (
+              <label className={styles.field}>
+                <span>{t("summary.fulfillment")}</span>
+                <select
+                  name="fulfillment"
+                  value={order.fulfillment === "dine_in" ? "dine_in" : "pickup"}
+                  onChange={(e) => chooseFulfillment(e.target.value)}
+                >
+                  <option value="pickup">{t("summary.pickup")}</option>
+                  <option value="dine_in">{t("summary.dineIn")}</option>
+                </select>
+              </label>
+            )}
+
+            {/* En el kiosco siempre se paga en caja: elegir la forma de pago
+                ahí no cambia nada y solo es un paso más. */}
+            {isKiosk ? (
+              <p className={styles.kioskPayNote} style={{ gridColumn: "1 / -1" }}>
+                <span aria-hidden="true">💳</span> Pagas en caja al terminar, con efectivo o tarjeta.
+              </p>
+            ) : (
+              <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
+                <span>{t("summary.payment")}</span>
+                <div className={styles.paymentOptions}>
+                  {paymentOptions.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={`${styles.paymentOption} ${
+                        (order.paymentMethod || "pay_at_pickup") === opt.value ? styles.paymentOptionActive : ""
+                      }`}
+                      onClick={() => order.updateCheckout("paymentMethod", opt.value)}
+                    >
+                      {opt.badge && <span className={styles.paymentBadge}>{opt.badge}</span>}
+                      <span className={styles.paymentIcon}>{opt.icon}</span>
+                      <span>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Scheduled pickup time — only for pickup */}
-          {order.fulfillment === "pickup" && (
+          {/* Scheduled pickup time — only for pickup, and never at the
+              counter kiosk (the customer is already here). */}
+          {!isKiosk && order.fulfillment === "pickup" && (
             <div className={styles.scheduleSection}>
               <label className={styles.scheduleToggle}>
                 <input
@@ -730,7 +769,7 @@ const OrderSummary = ({
                 onClick={() => chooseFulfillment("dine_in")}
                 style={{ background: "none", border: 0, padding: 0, color: "inherit", font: "inherit", fontWeight: 800, textDecoration: "underline", cursor: "pointer" }}
               >
-                Cambiar a “Comer en restaurante”
+                Cambiar a “{dineInLabel}”
               </button>
             </p>
           )}

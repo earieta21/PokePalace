@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOrder } from "../order/OrderContext";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -44,6 +44,15 @@ export default function KioskOrderPage() {
   }, [resetOrder, navigate]);
 
   useIdleTimeout(goToWelcome, IDLE_TIMEOUT_MS);
+
+  // Cada paso empieza arriba. "Siguiente" vive abajo de la pantalla: sin
+  // esto el paso nuevo se abría a media lista (o hasta el fondo, después de
+  // los complementos) y había que subir a buscar el título.
+  // promoStage: el segundo bowl del 2x1 también vuelve al paso 1.
+  const promoStage = order.promo2x1?.stage ?? 0;
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [step, promoStage]);
 
   // En el stage 2 de la promo 2x1 la proteína ya quedó fija con el primer
   // bowl (compartida) — se salta el paso 1 (proteína), igual que en

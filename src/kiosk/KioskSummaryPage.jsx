@@ -2,7 +2,9 @@ import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import OrderSummary from "../order/OrderSummary";
 import { useOrder } from "../order/OrderContext";
+import KioskHeader from "./KioskHeader";
 import useIdleTimeout from "./useIdleTimeout";
+import pageStyles from "./KioskMenuPage.module.css";
 import { API_URL } from "../config";
 import {
   clearOrderSubmission,
@@ -130,30 +132,10 @@ export default function KioskSummaryPage() {
   };
 
   return (
-    <div style={{ position: "relative" }}>
-      <button
-        type="button"
-        onClick={goToWelcome}
-        style={{
-          position: "fixed",
-          top: 14,
-          right: 14,
-          zIndex: 50,
-          padding: "9px 16px",
-          borderRadius: 999,
-          // Tokens del tema: en Halloween el kiosco va en oscuro y un botón
-          // blanco fijo quedaba como parche.
-          border: "1px solid var(--border-md)",
-          background: "var(--bg-card)",
-          color: "var(--text-2)",
-          fontWeight: 700,
-          fontSize: 12.5,
-          cursor: "pointer",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-        }}
-      >
-        Cancelar pedido
-      </button>
+    // Mismo fondo y encabezado que el menú: antes el "Cancelar pedido" iba
+    // flotando y se encimaba con la esquina de la tarjeta.
+    <main className={pageStyles.page}>
+      <KioskHeader onCancel={goToWelcome} />
       <OrderSummary
         onBuildBowl={onBuildBowl}
         onBrowseMenu={() => navigate("/kiosk/menu")}
@@ -165,6 +147,6 @@ export default function KioskSummaryPage() {
         pairing={pairing}
         onPaired={handlePaired}
       />
-    </div>
+    </main>
   );
 }

@@ -16,3 +16,10 @@ const COMBO_PALACE_WEEKDAYS = new Set([1, 3, 5]);
 export function isComboPalaceDay(date = new Date()) {
   return COMBO_PALACE_WEEKDAYS.has(zonedWeekday(date));
 }
+
+// Qué días corre cada promo (0=domingo). El kiosco lo enseña ("lun, mié y
+// vie: Combo Palace") sin repetir el calendario en el frontend.
+export const PROMO_WEEKDAYS = Object.freeze({
+  promo2x1: Object.freeze([...PROMO_2X1_WEEKDAYS].sort()),
+  comboPalace: Object.freeze([...COMBO_PALACE_WEEKDAYS].sort()),
+});

@@ -1,3 +1,185 @@
+/* Bienvenida del kiosco: foto arriba, un botón grande para ordenar y la
+   promo del día con su atajo. Mismos colores y tipos que el menú. */
+.page {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #f7f4ec;
+  color: #183e32;
+  overflow: hidden;
+}
+
+/* La foto se lleva el espacio que sobre; botones y promo quedan juntos
+   abajo, a la altura de la mano. Sin promo la foto simplemente crece. */
+.photo {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: clamp(240px, 30vh, 420px);
+  overflow: hidden;
+}
+
+.photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 68%;
+}
+
+.photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10, 25, 18, 0.5) 0%, rgba(10, 25, 18, 0) 42%);
+  pointer-events: none;
+}
+
+.brand {
+  position: absolute;
+  z-index: 2;
+  top: 28px;
+  left: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff9ec;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 30px;
+  letter-spacing: -1px;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: min(760px, calc(100% - 64px));
+  margin: 0 auto;
+  padding: 36px 0 32px;
+}
+
+.title {
+  margin: 0;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: clamp(44px, 7vw, 64px);
+  font-weight: 400;
+  letter-spacing: -1.6px;
+  line-height: 1.02;
+  color: #183e32;
+}
+
+.subtitle {
+  margin: 10px 0 0;
+  font-size: 18px;
+  line-height: 1.5;
+  color: #42564b;
+}
+
+.start {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  min-height: 84px;
+  padding: 22px 30px;
+  border: 0;
+  border-radius: 18px;
+  background: #183e32;
+  color: #fff9ec;
+  font: inherit;
+  font-size: 24px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 14px 32px rgba(24, 62, 50, 0.22);
+}
+
+.start:active {
+  transform: scale(0.99);
+}
+
+.start:focus-visible {
+  outline: 3px solid #aa5934;
+  outline-offset: 4px;
+}
+
+.promos {
+  display: grid;
+  gap: 16px;
+}
+
+.promos:empty {
+  display: none;
+}
+
+.schedule {
+  margin: 0;
+  padding-top: 4px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #5d6b60;
+  text-align: center;
+}
+
+.schedule strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: #856047;
+}
+
+/* iPad en horizontal: foto a la izquierda, todo lo demás a la derecha. */
+@media (orientation: landscape) and (min-width: 960px) {
+  .page {
+    flex-direction: row;
+  }
+
+  .photo {
+    flex: 0 0 44%;
+    min-height: 100dvh;
+  }
+
+  .content {
+    flex: 1 1 auto;
+    width: auto;
+    margin: 0;
+    padding: 48px 56px;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 620px) {
+  .brand {
+    top: 20px;
+    left: 20px;
+    font-size: 24px;
+  }
+
+  .content {
+    width: calc(100% - 32px);
+    gap: 20px;
+    padding: 24px 0;
+  }
+
+  .subtitle {
+    font-size: 16px;
+  }
+
+  .start {
+    min-height: 72px;
+    font-size: 20px;
+  }
+}
+
+/* ── Protector de pantalla ── */
+
 .screensaver {
   position: fixed;
   inset: 0;
@@ -41,6 +223,18 @@
   text-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
+/* La promo del día también se anuncia mientras nadie está ordenando. */
+.screensaverPromo {
+  margin: 0 0 8px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  background: #e4ecb9;
+  color: #183e32;
+  font-size: 19px;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
 .screensaverHint {
   margin: 0;
   padding: 14px 30px;
@@ -59,19 +253,56 @@
   50% { transform: scale(1.035); opacity: 0.85; }
 }
 
-/* Halloween (src/data/seasonalTheme.js): luna con murciélagos arriba y dos
-   calabazas abajo, lejos del texto y del botón. */
+/* ── Halloween (src/data/seasonalTheme.js) ── */
+
+:global(.kioskHalloween) .page {
+  background: radial-gradient(circle at 80% 40%, rgba(255, 138, 43, 0.14), transparent 40%), #1d1426;
+  color: #f6ead7;
+}
+
+:global(.kioskHalloween) .photo::after {
+  background: linear-gradient(180deg, rgba(29, 20, 38, 0.6) 0%, rgba(29, 20, 38, 0.35) 100%);
+}
+
+:global(.kioskHalloween) .title {
+  color: #f6ead7;
+}
+
+:global(.kioskHalloween) .title span {
+  color: #ff8a2b;
+}
+
+:global(.kioskHalloween) .subtitle {
+  color: #cdbfd8;
+}
+
+:global(.kioskHalloween) .start {
+  background: #ff7a1a;
+  color: #1d1426;
+}
+
+:global(.kioskHalloween) .schedule {
+  color: #a997b8;
+}
+
+:global(.kioskHalloween) .schedule strong {
+  color: #ff8a2b;
+}
+
+/* Luna con murciélagos y calabazas, sobre la foto: lejos del texto y de los
+   botones. */
 .spooky {
   position: absolute;
   inset: 0;
+  z-index: 1;
   pointer-events: none;
 }
 
 .moon {
   position: absolute;
-  top: 6%;
-  right: 8%;
-  width: clamp(90px, 14vw, 150px);
+  top: 12%;
+  right: 7%;
+  width: clamp(80px, 12vw, 130px);
   aspect-ratio: 1;
   border-radius: 50%;
   background: radial-gradient(circle at 38% 36%, #ffd9a8, #ff9d4a 62%, #f07a24);
@@ -86,47 +317,52 @@
 }
 
 .batOne {
-  top: calc(6% + 26px);
-  right: calc(8% + 30px);
-  width: clamp(50px, 7vw, 72px);
+  top: calc(12% + 22px);
+  right: calc(7% + 26px);
+  width: clamp(46px, 6vw, 64px);
 }
 
 .batTwo {
-  top: calc(6% + 90px);
-  right: calc(8% - 10px);
-  width: clamp(30px, 4vw, 42px);
+  top: calc(12% + 80px);
+  right: calc(7% - 8px);
+  width: clamp(28px, 4vw, 40px);
   animation-delay: -2s;
   animation-duration: 7s;
 }
 
 .batThree {
-  top: 10%;
-  left: 9%;
-  width: clamp(36px, 5vw, 52px);
+  top: 30%;
+  left: 40%;
+  width: clamp(32px, 4.5vw, 46px);
   fill: #4a3657;
   animation-delay: -4s;
 }
 
 .pumpkin {
   position: absolute;
-  bottom: 5%;
+  bottom: 14px;
   filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.4));
 }
 
 .pumpkinLeft {
-  left: 6%;
-  width: clamp(70px, 10vw, 110px);
+  left: 5%;
+  width: clamp(64px, 9vw, 96px);
   transform: rotate(-8deg);
 }
 
 .pumpkinRight {
-  right: 7%;
-  width: clamp(50px, 7vw, 76px);
+  right: 6%;
+  width: clamp(46px, 6vw, 68px);
   transform: rotate(10deg);
 }
 
 .screensaverHalloween {
   background: linear-gradient(180deg, rgba(29, 20, 38, 0.15) 0%, rgba(29, 20, 38, 0.2) 50%, rgba(29, 20, 38, 0.85) 100%);
+}
+
+.screensaverHalloween .screensaverPromo {
+  background: #ff7a1a;
+  color: #1d1426;
 }
 
 .screensaverPumpkin {
@@ -152,7 +388,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bat {
+  .bat,
+  .screensaverHint {
     animation: none;
   }
 }
