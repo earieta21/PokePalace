@@ -53,6 +53,23 @@
   font-size: 11.5px;
 }
 
+.rewardConversion {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--p-border, #dce4df);
+  border-radius: var(--p-radius, 12px);
+  background: var(--p-surface, #fff);
+  color: var(--p-ink, #0d1b0f);
+}
+
+.rewardConversion h2 { margin: 0; font-size: 16px; }
+.rewardConversion p { margin: 6px 0; font-size: 12px; color: var(--p-muted, #6b7b6e); }
+.conversionTable { max-width: 100%; overflow-x: auto; }
+.conversionTable table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.conversionTable th, .conversionTable td { padding: 8px; text-align: right; }
+.conversionTable th:first-child { text-align: left; }
+.conversionTable tbody tr { border-top: 1px solid var(--p-border, #dce4df); }
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;

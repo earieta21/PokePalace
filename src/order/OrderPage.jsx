@@ -11,13 +11,7 @@ import SauceSelection from "./SauceSelection";
 import ToppingsSelection from "./ToppingsSelection";
 import { useOrder } from "./OrderContext";
 import { ITEM_LABELS, getBaseLabel } from "./OrderLabels";
-import {
-  BOWL_BASE_PRICE,
-  computeBowlSubtotal,
-  computeExtrasSubtotal,
-  LARGE_BOWL_UPCHARGE,
-  PROMO_2X1_BOWLS_PRICE,
-} from "./pricing";
+import { bowlDraftPrice } from "./bowlDraftSummary";
 import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./OrderPage.module.css";
@@ -98,19 +92,6 @@ function PausedBanner({ message, t }) {
   );
 }
 
-function priceLabel(order, t) {
-  if (order.promo2x1) {
-    const stageLabel =
-      order.promo2x1.stage === 1 ? "Bowl 1 de 2" : "Bowl 2 de 2";
-    return `${stageLabel} · $${PROMO_2X1_BOWLS_PRICE} MXN por los 2`;
-  }
-  const isLarge = Array.isArray(order.proteins) && order.proteins.length >= 3;
-  const price = isLarge
-    ? BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE
-    : BOWL_BASE_PRICE;
-  return `$${price} MXN${isLarge ? ` · ${t("order.largeBowlSuffix")}` : ""}`;
-}
-
 function bowlSummaryParts({ order, language }) {
   const parts = [];
   const labels = ITEM_LABELS[language] || ITEM_LABELS.es;
@@ -165,6 +146,13 @@ const OrderPage = () => {
     cancelPromo2x1,
   } = useOrder();
   const { language, t } = useLanguage();
+  const { amount, isPromo, isLarge } = bowlDraftPrice(order);
+  const priceCaption = isPromo
+    ? (language === "en" ? "Total for both bowls" : "Total por los dos bowls")
+    : (language === "en" ? "Bowl total" : "Total del bowl");
+  const priceDetail = isPromo
+    ? (language === "en" ? `Bowl ${order.promo2x1.stage} of 2` : `Bowl ${order.promo2x1.stage} de 2`)
+    : (isLarge ? t("order.largeBowlSuffix") : "");
   const cartCount = (order.cart || []).reduce((sum, line) => sum + line.qty, 0);
   const [step, setStep] = useState(() => {
     const savedStep = Number(order.draftStep);
@@ -232,11 +220,11 @@ const OrderPage = () => {
       } else {
         trackEvent("add_to_cart", {
           currency: "MXN",
-          value: PROMO_2X1_BOWLS_PRICE,
+          value: amount,
           items: [analyticsItemFromCartLine({
             kind: "promo2x1",
             catalogId: "promo-2x1-bowls",
-            price: PROMO_2X1_BOWLS_PRICE,
+            price: amount,
             qty: 1,
           })],
         });
@@ -244,19 +232,14 @@ const OrderPage = () => {
       }
       return;
     }
-    const bowlPrice = computeBowlSubtotal(order.bowlSize) + computeExtrasSubtotal({
-      extraScoops: order.extraScoopProteins?.length || 0,
-      complementsCount: order.complements?.length || 0,
-      proteins: order.proteins,
-    });
     addBowlToCart();
     trackEvent("add_to_cart", {
       currency: "MXN",
-      value: bowlPrice,
+      value: amount,
       items: [analyticsItemFromCartLine({
         kind: "bowl",
         bowlSize: order.bowlSize,
-        price: bowlPrice,
+        price: amount,
         qty: 1,
       })],
     });
@@ -371,7 +354,9 @@ const OrderPage = () => {
                 ? "Choose an ingredient to start."
                 : "Elige un ingrediente para empezar."}
           </p>
-          <span className={styles.mobilePrice}>{priceLabel(order, t)}</span>
+          <output className={styles.mobilePrice} aria-live="polite" aria-atomic="true">
+            {priceCaption} · ${amount} MXN{priceDetail && ` · ${priceDetail}`}
+          </output>
           <div className={styles.summary} aria-live="polite">
             {summaryParts.length === 0 && (
               <p className={styles.emptySummary}>
@@ -389,24 +374,10 @@ const OrderPage = () => {
               </React.Fragment>
             ))}
           </div>
-          <div className={styles.priceBlock}>
-            <span className={styles.priceCaption}>
-              {order.promo2x1
-                ? language === "en"
-                  ? "Promotion"
-                  : "Promoción"
-                : language === "en"
-                  ? "Bowl base price"
-                  : "Precio base del bowl"}
-            </span>
-            <span className={styles.price}>{priceLabel(order, t)}</span>
-            {!order.promo2x1 && (
-              <small>
-                {language === "en"
-                  ? "Extras are added in your cart."
-                  : "Los extras se suman en tu carrito."}
-              </small>
-            )}
+          <div className={styles.priceBlock} aria-live="polite" aria-atomic="true">
+            <span className={styles.priceCaption}>{priceCaption}</span>
+            <span className={styles.price}>${amount} MXN</span>
+            {priceDetail && <small>{priceDetail}</small>}
           </div>
           <Link to="/menu" className={styles.previewLink}>
             {language === "en"

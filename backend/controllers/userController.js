@@ -1,11 +1,19 @@
 import User from "../models/User.js";
 import { sanitizeCustomerBowl } from "../utils/customerOrder.js";
+import { recordRewardVisit } from "../utils/rewardConversion.js";
+import { expireStalePoints } from "../utils/loyalty.js";
 
 /* GET /api/users/me — returns fresh user profile (including updated points) */
 export const getMe = async (req, res) => {
   try {
+    const rewardVisit = req.query?.rewardVisit === "1";
+    if (rewardVisit) await expireStalePoints(req.userId);
     const user = await User.findById(req.userId).select("-password");
     if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
+    if (rewardVisit) {
+      await recordRewardVisit(req.userId, user.points);
+      res.set("Cache-Control", "no-store");
+    }
     res.json({ user });
   } catch {
     res.status(500).json({ msg: "Error obteniendo perfil" });

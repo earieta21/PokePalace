@@ -8,6 +8,8 @@
 // 1 punto por cada $10 (awardLoyaltyPoints en utils/loyalty.js).
 export const SIGNUP_BONUS_POINTS = 50;
 export const MXN_PER_POINT = 10;
+export const POINTS_PER_REWARD = 100;
+export const REWARD_VALUE_MXN = 25;
 
 export const REWARDS = [
   {
@@ -47,6 +49,16 @@ export const REWARDS = [
     type: "free_bowl",
   },
 ];
+
+const rewardsByCost = [...REWARDS].sort((a, b) => a.cost - b.cost);
+
+export function getRewardGoals(points) {
+  const available = rewardsByCost.filter((reward) => reward.cost <= points);
+  return {
+    readyReward: available[available.length - 1] ?? null,
+    nextReward: rewardsByCost[available.length] ?? null,
+  };
+}
 
 export const STORY_REWARD = {
   id: 101,

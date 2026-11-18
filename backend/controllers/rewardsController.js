@@ -5,6 +5,7 @@ import Redemption from "../models/Redemption.js";
 import { expireStalePoints, reconcileRecentLoyaltyPoints, REDEMPTION_CODE_EXPIRY_DAYS } from "../utils/loyalty.js";
 import { getRewardById } from "../config/rewardsCatalog.js";
 import { createMemberQr } from "../utils/memberQr.js";
+import { recordRewardVisit } from "../utils/rewardConversion.js";
 
 // Unambiguous charset — no 0/O, 1/I/L — easier for staff to read back a code.
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -48,6 +49,7 @@ export const getRewardPreview = async (req, res) => {
     await expireStalePoints(req.userId);
     const user = await User.findById(req.userId).select("points");
     if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
+    await recordRewardVisit(req.userId, user.points, reward.cost);
     res.set("Cache-Control", "no-store");
     res.json({ reward, points: user.points, remainingPoints: user.points - reward.cost, validityDays: REDEMPTION_CODE_EXPIRY_DAYS });
   } catch {

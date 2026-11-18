@@ -5,6 +5,7 @@ import Redemption from "../models/Redemption.js";
 import { GOLD_TIER_MIN_POINTS } from "../utils/loyalty.js";
 import { DELIVERY_APP_PLATFORMS } from "../config/posCatalog.js";
 import { startOfDateKey, zonedParts } from "../utils/timeZone.js";
+import { rewardConversionForMonth } from "../utils/rewardConversion.js";
 import {
   CUSTOMER_SEGMENTS,
   CUSTOMER_SORTS,
@@ -168,7 +169,7 @@ export const getCustomerSummary = async (req, res) => {
     const { monthStart, previousMonthStart } = monthStartsInRestaurantTime(now);
     const directSale = directSaleSince(new Date(now.getTime() - SALES_WINDOW_DAYS * DAY_MS));
 
-    const [customers, purchaseRows] = await Promise.all([
+    const [customers, purchaseRows, currentRewardConversion, previousRewardConversion] = await Promise.all([
       User.find({ role: "user" }).select("_id createdAt").lean(),
       Order.aggregate([
         { $match: PURCHASE_MATCH },
@@ -181,10 +182,13 @@ export const getCustomerSummary = async (req, res) => {
           },
         },
       ]),
+      rewardConversionForMonth(monthStart, now),
+      rewardConversionForMonth(previousMonthStart, monthStart),
     ]);
 
     return res.json({
       ...summarizeCustomerBase(customers, purchaseRows, { monthStart, previousMonthStart }),
+      rewardConversion: { current: currentRewardConversion, previous: previousRewardConversion },
       monthStart,
       previousMonthStart,
     });

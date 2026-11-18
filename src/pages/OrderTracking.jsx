@@ -8,6 +8,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { clearActiveOrder, getOrderAccessToken, saveActiveOrder } from "../utils/orderAccess";
 import styles from "./OrderTracking.module.css";
 import { comboPalaceSelectionSummary } from "../data/comboPalace";
+import { getRewardGoals, MXN_PER_POINT } from "../data/rewardsCatalog";
 
 const STEP_CONFIG = [
   { key: "pending", icon: "📋", labelKey: "tracking.received", descKey: "tracking.receivedDesc" },
@@ -94,7 +95,7 @@ function Toast({ message, onClose }) {
 
 export default function OrderTracking() {
   const { orderId } = useParams();
-  const { token } = useContext(AuthContext);
+  const { token, user } = useContext(AuthContext);
   const { language, t } = useLanguage();
 
   const [order, setOrder]               = useState(null);
@@ -178,6 +179,25 @@ export default function OrderTracking() {
 
   const orderStatus = order?.status;
   const orderActive = Boolean(order) && orderStatus !== "completed" && orderStatus !== "cancelled";
+  const accountId = user?.id || user?._id;
+  const ownsOrder = Boolean(token && accountId && order?._id === orderId && order.user === accountId);
+  // On older paid orders a positive earned amount is the credit record. New
+  // orders reserve that amount before applying it to the account balance.
+  const credited = ownsOrder && orderStatus !== "cancelled" && order.paymentStatus === "paid" &&
+    order.loyaltyPointsEarned > 0 && ((order.loyaltyCreditLedgerVersion ?? 0) < 1 || Boolean(order.loyaltyCreditAppliedAt));
+  const waitingForCredit = ownsOrder && orderStatus === "completed" && !credited && order.total >= MXN_PER_POINT;
+
+  useEffect(() => {
+    if (!waitingForCredit) return undefined;
+    // Completion and the points entry are written separately. Refresh through
+    // that short interval even though the regular status polling has finished.
+    const retries = [2000, 8000, 30000].map((delay) => window.setTimeout(fetchOrder, delay));
+    window.addEventListener("focus", fetchOrder);
+    return () => {
+      retries.forEach((timer) => window.clearTimeout(timer));
+      window.removeEventListener("focus", fetchOrder);
+    };
+  }, [waitingForCredit, fetchOrder]);
 
   // Respaldo de sondeo — la vía principal es la conexión en tiempo real de
   // abajo, esto solo cubre el rato en que esa conexión se esté reconectando.
@@ -411,6 +431,8 @@ export default function OrderTracking() {
         </div>
       )}
 
+      {credited && <OrderRewards key={`${orderId}-${accountId}`} earned={order.loyaltyPointsEarned} />}
+
       {isDone && !reviewDismissed && (
         <section className={styles.reviewCard} aria-labelledby="google-review-title">
           <div className={styles.reviewStars} aria-hidden="true">★★★★★</div>
@@ -607,6 +629,32 @@ export default function OrderTracking() {
         <Link to="/menu" className={styles.primaryBtn}>{t("tracking.orderAgain")}</Link>
       </div>
     </div>
+  );
+}
+
+function OrderRewards({ earned }) {
+  const { refreshUser } = useContext(AuthContext);
+  const { language } = useLanguage();
+  const [balance, setBalance] = useState(null);
+  const es = language === "es";
+
+  useEffect(() => {
+    let current = true;
+    refreshUser({ rewardVisit: true }).then((profile) => {
+      if (current && Number.isFinite(profile?.points)) setBalance(profile.points);
+    });
+    return () => { current = false; };
+  }, [refreshUser, earned]);
+
+  const { readyReward, nextReward } = getRewardGoals(balance ?? 0);
+  const pointsLabel = es ? (earned === 1 ? "punto" : "puntos") : (earned === 1 ? "point" : "points");
+  return (
+    <section className={styles.earnedCard} aria-labelledby="order-earned-title">
+      <h2 id="order-earned-title">{es ? `Ganaste ${earned} ${pointsLabel} con este pedido` : `You earned ${earned} ${pointsLabel} on this order`}</h2>
+      {balance !== null && readyReward && <p>{es ? `Ya puedes canjear ${readyReward.name.es}.` : `You can now redeem ${readyReward.name.en}.`}</p>}
+      {balance !== null && !readyReward && nextReward && <p>{es ? `Te faltan ${nextReward.cost - balance} pts para ${nextReward.name.es}.` : `${nextReward.cost - balance} more pts to unlock ${nextReward.name.en}.`}</p>}
+      <Link className={styles.reviewPrimaryBtn} to="/rewards-deals">{es ? "Ver mis premios" : "View my rewards"}</Link>
+    </section>
   );
 }
 

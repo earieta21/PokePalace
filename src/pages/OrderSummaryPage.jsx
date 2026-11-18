@@ -13,9 +13,7 @@ import {
   keepOrderSubmissionPayload,
 } from "../utils/orderSubmission";
 import { analyticsItemsFromCart, trackEvent } from "../utils/analytics";
-
-const POINTS_PER_REWARD = 100;
-const REWARD_VALUE_MXN  = 25;
+import { POINTS_PER_REWARD, REWARD_VALUE_MXN } from "../data/rewardsCatalog";
 
 export default function OrderSummaryPage() {
   const navigate = useNavigate();

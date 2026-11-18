@@ -80,21 +80,23 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  const refreshUser = useCallback(async () => {
-    if (!token) return;
+  const refreshUser = useCallback(async ({ rewardVisit = false } = {}) => {
+    if (!token) return null;
     const version = ++balanceVersion.current;
     try {
-      const res = await fetch(`${API_URL}/api/users/me`, {
+      const res = await fetch(`${API_URL}/api/users/me${rewardVisit ? "?rewardVisit=1" : ""}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.user && version === balanceVersion.current && token === currentToken.current) {
         setUser(data.user);
         localStorage.setItem("user", JSON.stringify(data.user));
+        return data.user;
       }
     } catch {
       // silently ignore
     }
+    return null;
   }, [token]);
 
   const logout = () => {

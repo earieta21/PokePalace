@@ -243,6 +243,38 @@
   font-weight: 700;
 }
 
+.otherRewards {
+  margin-top: 16px;
+}
+
+.otherRewards p {
+  margin: 0 0 4px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.otherRewards ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.otherRewards button {
+  min-height: 44px;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 .personalProgressTrack {
   height: 9px;
   flex: 1;

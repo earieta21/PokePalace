@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAvailability } from "../context/AvailabilityContext";
-import { computeBowlSubtotal, computeExtrasSubtotal, PROMO_2X1_BOWLS_PRICE, isPromo2x1Protein } from "./pricing";
+import { priceBowlDraft, PROMO_2X1_BOWLS_PRICE, isPromo2x1Protein } from "./pricing";
 
 const OrderContext = createContext();
 const ORDER_STORAGE_KEY = "pokePalaceOrderDraft";
@@ -25,16 +25,6 @@ const blankBowlDraft = () => ({
 
 let cartIdSeq = 0;
 const generateCartId = () => `line-${Date.now().toString(36)}-${(cartIdSeq++).toString(36)}`;
-
-const round2 = (n) => Math.round(n * 100) / 100;
-
-const priceBowlDraft = (draft) => round2(
-  computeBowlSubtotal(draft.bowlSize) + computeExtrasSubtotal({
-    extraScoops: draft.extraScoopProteins.length,
-    complementsCount: draft.complements.length,
-    proteins: draft.proteins,
-  })
-);
 
 // Quita del bowl cargado (favorito, quick bowl o repetir pedido) cualquier
 // ingrediente que hoy esté marcado como no disponible, para que nunca se

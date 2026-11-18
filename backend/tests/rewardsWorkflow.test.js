@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import Redemption from "../models/Redemption.js";
+import RewardVisit from "../models/RewardVisit.js";
 import SocialStoryParticipant from "../models/SocialStoryParticipant.js";
 import { createSocialStoryReward } from "../controllers/staffRewardsController.js";
 import { getRewardPreview, redeemReward, getMyRedemptions } from "../controllers/rewardsController.js";
@@ -43,12 +44,16 @@ function storyDatabase(t, { beforeInsertFails = false, acknowledgementLost = fal
 }
 
 test("vista previa usa costo y vigencia del servidor sin gastar puntos", async (t) => {
+  const visit = t.mock.method(RewardVisit, "updateOne", async () => ({}));
   const expiryCheck = t.mock.method(User, "updateOne", async (_filter, update) => { assert.deepEqual(update, { $set: { points: 0 } }); });
   t.mock.method(User, "findById", () => select({ points: 125 }));
   const spend = t.mock.method(User, "findOneAndUpdate", () => { throw new Error("No debe gastar"); });
   const res = response(); await getRewardPreview({ userId, params: { rewardId: "1" } }, res);
   assert.equal(res.code, 200); assert.equal(res.data.reward.cost, 50); assert.equal(res.data.remainingPoints, 75); assert.equal(res.data.validityDays, 90);
   assert.equal(res.headers["Cache-Control"], "no-store"); assert.equal(spend.mock.callCount(), 0); assert.equal(expiryCheck.mock.callCount(), 1);
+  assert.equal(visit.mock.callCount(), 1);
+  assert.equal(visit.mock.calls[0].arguments[0].user, userId);
+  assert.ok(visit.mock.calls[0].arguments[1].$min.firstSelectionAt instanceof Date);
   const social = response(); await getRewardPreview({ userId, params: { rewardId: "101" } }, social);
   assert.equal(social.code, 400);
 });

@@ -1,9 +1,9 @@
-import { useContext, useEffect, useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useCallback, useContext, useEffect, useState, useRef } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { API_URL } from "../config";
-import { REWARDS, SIGNUP_BONUS_POINTS } from "../data/rewardsCatalog.js";
+import { getRewardGoals, REWARDS, SIGNUP_BONUS_POINTS } from "../data/rewardsCatalog.js";
 import { trackEvent } from "../utils/analytics";
 import MemberQrCard from "../components/MemberQrCard";
 import RewardsWallet from "../components/RewardsWallet";
@@ -104,6 +104,7 @@ export default function RewardsPage() {
   const { isLoggedIn, user, token, refreshUser, updateRewardsBalance } = useContext(AuthContext);
   const { language, t } = useLanguage();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [redeeming, setRedeeming] = useState(null);   // reward.id currently in flight
   const [redeemError, setRedeemError] = useState("");
   const [wonCode, setWonCode] = useState(null);        // { code, rewardName, expiresAt }
@@ -140,9 +141,9 @@ export default function RewardsPage() {
       headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
     })
-      .then(() => refreshUser?.())
+      .then(() => refreshUser?.({ rewardVisit: true }))
       .catch((error) => {
-        if (error.name !== "AbortError") refreshUser?.();
+        if (error.name !== "AbortError") refreshUser?.({ rewardVisit: true });
       });
 
     return () => controller.abort();
@@ -183,10 +184,9 @@ export default function RewardsPage() {
     ? Math.round(((lifetimePoints - tier.min) / (nextTier.min - tier.min)) * 100)
     : 100;
 
-  const sortedRewards = [...REWARDS].sort((a, b) => a.cost - b.cost);
-  const readyReward = sortedRewards.find((reward) => points >= reward.cost) || null;
-  const nextReward = sortedRewards.find((reward) => points < reward.cost) || null;
-  const personalGoal = readyReward || nextReward || sortedRewards[0];
+  const { readyReward, nextReward } = getRewardGoals(points);
+  const personalGoal = readyReward || nextReward;
+  const smallerRewards = readyReward ? REWARDS.filter((reward) => reward.cost < readyReward.cost) : [];
   const pointsMissing = nextReward ? nextReward.cost - points : 0;
   const earnRate = tier.key === "gold" ? 2 : 1;
   const estimatedSpend = pointsMissing > 0 ? Math.ceil(pointsMissing / earnRate) * 10 : 0;
@@ -201,10 +201,8 @@ export default function RewardsPage() {
     (pending) => pending.userId === accountUserId && !catalogRewardIds.has(pending.rewardId)
   );
 
-  const startRedeem = async (reward, placement = "catalog") => {
+  const previewReward = useCallback(async (reward, placement) => {
     if (!accountUserId || requestBusy.current) return;
-    const key = pendingRedemptionKey(accountUserId, reward.id);
-    if (loadPendingRedemptions()[key] || pendingRedemptions[key]) return handleRedeem(reward);
     requestBusy.current = true; setPreviewing(reward.id); setRedeemError("");
     trackEvent("select_reward", { reward_id: reward.id, placement });
     try {
@@ -216,6 +214,23 @@ export default function RewardsPage() {
       setConfirmation(data);
     } catch (e) { if (sessionToken.current === token) setRedeemError(e.message); }
     finally { requestBusy.current = false; setPreviewing(null); }
+  }, [accountUserId, language, token, updateRewardsBalance]);
+
+  // Links from Mi cuenta open the current terms. Opening a URL never sends a redemption.
+  useEffect(() => {
+    const id = searchParams.get("reward");
+    if (!id || !accountUserId || !token) return;
+    const reward = REWARDS.find((entry) => String(entry.id) === id);
+    const remaining = new URLSearchParams(searchParams);
+    remaining.delete("reward");
+    setSearchParams(remaining, { replace: true });
+    if (reward) previewReward(reward, "reward_link");
+  }, [searchParams, setSearchParams, token, accountUserId, previewReward]);
+
+  const startRedeem = (reward, placement = "catalog") => {
+    const key = pendingRedemptionKey(accountUserId, reward.id);
+    if (loadPendingRedemptions()[key] || pendingRedemptions[key]) return handleRedeem(reward);
+    return previewReward(reward, placement);
   };
 
   const handleRedeem = async (reward) => {
@@ -361,21 +376,6 @@ export default function RewardsPage() {
         </section>
       )}
 
-      {/* ── Personalized guidance without extra discounts ── */}
-      {isLoggedIn && (
-        <MemberQrCard
-          token={token}
-          key={token}
-          points={points}
-          onBalanceRefresh={refreshUser}
-          defaultOpen
-          language={language}
-          className={styles.rewardsMemberQr}
-        />
-      )}
-
-      {isLoggedIn && <RewardsWallet key={token} token={token} language={language} revision={walletRevision} onShow={setWonCode} />}
-
       {isLoggedIn && personalGoal && (
         <section className={`${styles.section} ${styles.personalCard}`}>
           <div className={styles.personalTopRow}>
@@ -408,21 +408,6 @@ export default function RewardsPage() {
             <span>{points} / {personalGoal.cost} pts</span>
           </div>
 
-          <div className={styles.personalFacts}>
-            <div>
-              <strong>{completedOrderCount ?? "—"}</strong>
-              <span>{language === "es" ? "Pedidos completados en tu cuenta" : "Completed account orders"}</span>
-            </div>
-            <div>
-              <strong>{tier.icon} {t(tier.nameKey)}</strong>
-              <span>{language === "es" ? `${earnRate} ${earnRate === 1 ? "punto" : "puntos"} por cada $10` : `${earnRate} ${earnRate === 1 ? "point" : "points"} per $10`}</span>
-            </div>
-            <div>
-              <strong>{favoriteName || (language === "es" ? "Aún sin favorito" : "No favorite yet")}</strong>
-              <span>{language === "es" ? "Bowl guardado para ordenar más rápido" : "Saved bowl for faster ordering"}</span>
-            </div>
-          </div>
-
           <div className={styles.personalActions}>
             {readyReward ? (
               <button
@@ -451,9 +436,53 @@ export default function RewardsPage() {
             </button>
           </div>
           {readyReward && <p className={styles.welcomeTerms}>{language === "es" ? "Revisa las condiciones y confirma antes de usar tus puntos." : "Review the terms and confirm before spending your points."}</p>}
+          {smallerRewards.length > 0 && (
+            <div className={styles.otherRewards}>
+              <p>{language === "es" ? "También puedes elegir" : "Other rewards you can choose"}</p>
+              <ul>
+                {smallerRewards.map((reward) => (
+                  <li key={reward.id}>
+                    <button type="button" disabled={Boolean(redeeming || previewing)} onClick={() => previewReward(reward, "summary")}>
+                      {reward.name[language]} · {reward.cost} pts
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className={styles.personalFacts}>
+            <div>
+              <strong>{completedOrderCount ?? "—"}</strong>
+              <span>{language === "es" ? "Pedidos completados en tu cuenta" : "Completed account orders"}</span>
+            </div>
+            <div>
+              <strong>{tier.icon} {t(tier.nameKey)}</strong>
+              <span>{language === "es" ? `${earnRate} ${earnRate === 1 ? "punto" : "puntos"} por cada $10` : `${earnRate} ${earnRate === 1 ? "point" : "points"} per $10`}</span>
+            </div>
+            <div>
+              <strong>{favoriteName || (language === "es" ? "Aún sin favorito" : "No favorite yet")}</strong>
+              <span>{language === "es" ? "Bowl guardado para ordenar más rápido" : "Saved bowl for faster ordering"}</span>
+            </div>
+          </div>
+
           {redeemError && <p className={styles.redeemErrorBanner} role="alert">{redeemError}</p>}
         </section>
       )}
+
+      {isLoggedIn && (
+        <MemberQrCard
+          token={token}
+          key={token}
+          points={points}
+          onBalanceRefresh={refreshUser}
+          defaultOpen
+          language={language}
+          className={styles.rewardsMemberQr}
+        />
+      )}
+
+      {isLoggedIn && <RewardsWallet key={token} token={token} language={language} revision={walletRevision} onShow={setWonCode} />}
 
       {/* ── Recompensas canjeables ── */}
       <section id="rewards-catalog" className={styles.section}>

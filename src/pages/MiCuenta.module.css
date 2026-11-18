@@ -29,6 +29,33 @@
   flex: 1;
 }
 
+.pointsCard {
+  margin: 14px 0;
+  padding: 16px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+}
+
+.pointsCard h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.balance { display: block; margin: 2px 0 10px; font-size: 28px; line-height: 1.2; }
+.pointsCard p { margin: 4px 0; font-size: 13px; line-height: 1.45; }
+.pointsCard .discountOption { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--accent-border); color: var(--text-2); }
+.rewardLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  margin-top: 6px;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: white;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .badge {
   display: inline-block;
   padding: 4px 10px;

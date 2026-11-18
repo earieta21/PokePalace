@@ -160,6 +160,30 @@ function CustomerKpis({ summary, error }) {
       <p className={ui.kpiNote}>
         Ventas pagadas de los últimos {windowDays} días, sin contar Uber Eats, DiDi Food ni Rappi.
       </p>
+      {summary.rewardConversion && (
+        <section className={ui.rewardConversion} aria-labelledby="reward-conversion-title">
+          <h2 id="reward-conversion-title">Uso de premios en caja</h2>
+          <p>Clientes que vieron una opción de canje en Premios, Mi cuenta o el seguimiento de su pedido. Cada cliente cuenta una vez por columna al mes.</p>
+          <div className={ui.conversionTable}>
+            <table>
+              <thead><tr><th scope="col">Mes</th><th scope="col">Con saldo suficiente</th><th scope="col">Abrieron la confirmación</th><th scope="col">Obtuvieron código</th><th scope="col">Usaron en caja</th><th scope="col">% de quienes tenían saldo</th></tr></thead>
+              <tbody>
+                {[
+                  [summary.monthStart, summary.rewardConversion.current],
+                  [summary.previousMonthStart, summary.rewardConversion.previous],
+                ].map(([start, row]) => (
+                  <tr key={start}>
+                    <th scope="row">{monthName(start)}</th>
+                    <td>{number(row.eligible)}</td><td>{number(row.selected)}</td><td>{number(row.issued)}</td>
+                    <td>{number(row.used)}</td><td><strong>{percent(row.used, row.eligible)}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p>El porcentaje indica cuántos de esos clientes obtuvieron un código después de su visita y lo usaron ese mismo mes en una venta pagada en caja. Se excluyen las ventas canceladas. Los datos se registran desde la activación del reporte.</p>
+        </section>
+      )}
     </>
   );
 }

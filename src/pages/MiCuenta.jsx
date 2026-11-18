@@ -9,6 +9,7 @@ import styles from "./MiCuenta.module.css";
 import { comboPalaceSelectionSummary } from "../data/comboPalace";
 import MemberQrCard from "../components/MemberQrCard";
 import { rewardStatus, rewardStatusLabel } from "../utils/rewardStatus";
+import { getRewardGoals, POINTS_PER_REWARD, REWARD_VALUE_MXN } from "../data/rewardsCatalog";
 
 const getProteinsText = (order, language) => {
   if (Array.isArray(order.proteins) && order.proteins.length > 0) {
@@ -56,7 +57,7 @@ export default function MiCuenta() {
   const [redeemLoading, setRedeemLoading] = useState(false);
 
   // Refresh points on mount so balance is always current
-  useEffect(() => { if (isLoggedIn) refreshUser?.(); }, [isLoggedIn, refreshUser]);
+  useEffect(() => { if (isLoggedIn) refreshUser?.({ rewardVisit: true }); }, [isLoggedIn, refreshUser]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -146,6 +147,10 @@ export default function MiCuenta() {
 
   if (!isLoggedIn) return null;
 
+  const es = language === "es";
+  const points = user?.points ?? 0;
+  const { readyReward, nextReward } = getRewardGoals(points);
+
   return (
     <div className={styles.wrapper}>
       <div className={styles.card}>
@@ -168,57 +173,28 @@ export default function MiCuenta() {
               </div>
             </div>
 
-            {/* Points card */}
-            {(() => {
-              const pts   = user?.points ?? 0;
-              const STEP  = 100;
-              const VALUE = 25;
-              const filled = pts % STEP;
-              const pct    = Math.round((filled / STEP) * 100);
-              const rewards = Math.floor(pts / STEP);
-              return (
-                <div style={{
-                  marginTop: 14, padding: "14px 16px",
-                  background: "linear-gradient(135deg,#4A7A5A 0%,#6aab82 100%)",
-                  borderRadius: 14, color: "#fff",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                    <div>
-                      <p style={{ fontSize: 11, opacity: 0.8, margin: 0, fontWeight: 600, letterSpacing: "0.05em" }}>
-                        TUS PUNTOS
-                      </p>
-                      <p style={{ fontSize: 28, fontWeight: 800, margin: "2px 0 0", lineHeight: 1 }}>
-                        {pts.toLocaleString("es-MX")}
-                      </p>
-                    </div>
-                    {rewards > 0 && (
-                      <div style={{
-                        background: "rgba(255,255,255,0.2)", borderRadius: 8,
-                        padding: "4px 10px", fontSize: 12, fontWeight: 700,
-                      }}>
-                        🎁 {rewards} recompensa{rewards > 1 ? "s" : ""} disponible{rewards > 1 ? "s" : ""}
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ height: 6, background: "rgba(255,255,255,0.25)", borderRadius: 3, overflow: "hidden", marginBottom: 6 }}>
-                    <div style={{
-                      width: `${pct}%`, height: "100%",
-                      background: "#fff", borderRadius: 3, transition: "width 600ms",
-                    }} />
-                  </div>
-                  <p style={{ fontSize: 11, opacity: 0.85, margin: 0 }}>
-                    {filled < STEP
-                      ? `${STEP - filled} puntos más para $${VALUE} MXN de descuento`
-                      : `¡Tienes ${rewards} recompensa${rewards > 1 ? "s" : ""} — úsala${rewards > 1 ? "s" : ""} en tu próximo pedido!`
-                    }
-                  </p>
-                  <p style={{ fontSize: 10, opacity: 0.7, margin: "6px 0 0" }}>
-                    Gana 1 punto por cada $10 MXN · 100 puntos = $25 MXN
-                  </p>
-                </div>
-              );
-            })()}
+            <section className={styles.pointsCard} aria-labelledby="account-points-title">
+              <h3 id="account-points-title">{es ? "Tus puntos" : "Your points"}</h3>
+              <strong className={styles.balance}>{points.toLocaleString(es ? "es-MX" : "en-US")}</strong>
+              {readyReward && <>
+                <p><strong>{readyReward.name[language]} · {readyReward.cost} pts</strong></p>
+                <p>{readyReward.terms[language]}</p>
+                <Link className={styles.rewardLink} to={`/rewards-deals?reward=${readyReward.id}`}>
+                  {readyReward.type === "free_drink"
+                    ? (es ? "Canjear bebida" : "Redeem drink")
+                    : (es ? "Canjear premio" : "Redeem reward")}
+                </Link>
+              </>}
+              {!readyReward && nextReward && <>
+                <p>{es ? `Te faltan ${nextReward.cost - points} pts para ${nextReward.name.es}.` : `${nextReward.cost - points} more pts to unlock ${nextReward.name.en}.`}</p>
+                <Link className={styles.rewardLink} to="/rewards-deals">{es ? "Ver premios" : "View rewards"}</Link>
+              </>}
+              <p className={styles.discountOption}>
+                {es
+                  ? `También puedes usar cada ${POINTS_PER_REWARD} puntos para descontar $${REWARD_VALUE_MXN} MXN al hacer tu pedido.`
+                  : `You can also use every ${POINTS_PER_REWARD} points for $${REWARD_VALUE_MXN} MXN off at checkout.`}
+              </p>
+            </section>
             <MemberQrCard key={token} token={token} points={user?.points ?? 0} onBalanceRefresh={refreshUser} language={language} />
           </div>
 

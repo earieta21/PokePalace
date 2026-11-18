@@ -39,6 +39,14 @@ export const computeExtrasSubtotal = ({ extraScoops = 0, complementsCount = 0, p
   return scoopsCost + extraComplements * EXTRA_COMPLEMENT_PRICE + premiumProteinsCost;
 };
 
+export const priceBowlDraft = (bowl) => round2(
+  computeBowlSubtotal(bowl.bowlSize) + computeExtrasSubtotal({
+    extraScoops: bowl.extraScoopProteins?.length || 0,
+    complementsCount: bowl.complements?.length || 0,
+    proteins: bowl.proteins,
+  })
+);
+
 export const computeDiscount = (subtotal, promo) => {
   if (!promo) return 0;
   const value = Number(promo.discountValue);
@@ -67,11 +75,7 @@ const cartLineSubtotal = (line) => {
   if (line.kind === "promo2x1") {
     return PROMO_2X1_BOWLS_PRICE * (Number(line.qty) || 1);
   }
-  return computeBowlSubtotal(line.bowlSize) + computeExtrasSubtotal({
-    extraScoops: line.extraScoopProteins?.length || 0,
-    complementsCount: line.complements?.length || 0,
-    proteins: line.proteins,
-  });
+  return priceBowlDraft(line);
 };
 
 // Igual que computePricing, pero suma el subtotal de cada línea del carrito

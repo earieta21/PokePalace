@@ -1,9 +1,5 @@
 import { ITEM_LABELS, getBaseLabel } from "./OrderLabels";
-import {
-  BOWL_BASE_PRICE,
-  LARGE_BOWL_UPCHARGE,
-  PROMO_2X1_BOWLS_PRICE,
-} from "./pricing";
+import { priceBowlDraft, PROMO_2X1_BOWLS_PRICE } from "./pricing";
 
 // Resumen del bowl que se está armando: qué lleva hasta ahora y cuánto va
 // costando. Vive aparte porque el armador de la web (OrderPage.jsx) y el del
@@ -45,10 +41,9 @@ export function bowlDraftPrice(order) {
   if (order.promo2x1) {
     return { amount: PROMO_2X1_BOWLS_PRICE, isLarge: false, isPromo: true };
   }
-  const isLarge = Array.isArray(order.proteins) && order.proteins.length >= 3;
   return {
-    amount: isLarge ? BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE : BOWL_BASE_PRICE,
-    isLarge,
+    amount: priceBowlDraft(order),
+    isLarge: order.bowlSize === "large",
     isPromo: false,
   };
 }

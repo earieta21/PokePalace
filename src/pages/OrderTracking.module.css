@@ -105,6 +105,18 @@
   transition: border-color 400ms ease;
 }
 
+.earnedCard {
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-xl);
+  color: var(--text);
+  background: var(--accent-bg);
+}
+.earnedCard h2 { margin: 0; font-size: 18px; line-height: 1.35; }
+.earnedCard p { margin: 6px 0 0; color: var(--text-2); font-size: 14px; }
+.earnedCard a { margin-top: 12px; box-sizing: border-box; }
+
 .statusDone {
   border-color: #38a169;
   box-shadow: 0 0 0 4px rgba(56, 161, 105, 0.08);
