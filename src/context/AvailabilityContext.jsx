@@ -1,9 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { API_URL } from "../config";
 
-const AvailabilityContext = createContext({ unavailableItems: [], unavailableCatalogItems: [], hiddenIngredients: [], hiddenCatalogItems: [], promo2x1Active: false, comboPalaceActive: false, promoWeekdays: null });
+const AvailabilityContext = createContext({ availabilityStatus: "loading", unavailableItems: [], unavailableCatalogItems: [], hiddenIngredients: [], hiddenCatalogItems: [], promo2x1Active: false, comboPalaceActive: false, promoWeekdays: null });
 
 export function AvailabilityProvider({ children }) {
+  const [availabilityStatus, setAvailabilityStatus] = useState("loading");
+  const pendingRequest = useRef(null);
   const [unavailableItems, setUnavailableItems] = useState([]);
   // Productos del catálogo (bowls de la casa, bebidas, extras) que el
   // servidor rechazaría porque llevan algo agotado — lo calcula el backend
@@ -25,8 +27,13 @@ export function AvailabilityProvider({ children }) {
   const [promoWeekdays, setPromoWeekdays] = useState(null);
 
   const fetchAvailability = useCallback(() => {
-    fetch(`${API_URL}/api/settings/availability`)
-      .then((r) => r.json())
+    if (pendingRequest.current) return pendingRequest.current;
+    setAvailabilityStatus((status) => status === "ready" ? status : "loading");
+    pendingRequest.current = fetch(`${API_URL}/api/settings/availability`)
+      .then((r) => {
+        if (!r.ok) throw new Error("Availability request failed");
+        return r.json();
+      })
       .then((d) => {
         setUnavailableItems(d.unavailableItems ?? []);
         setUnavailableCatalogItems(d.unavailableCatalogItems ?? []);
@@ -35,8 +42,11 @@ export function AvailabilityProvider({ children }) {
         setPromo2x1Active(Boolean(d.promo2x1Active));
         setComboPalaceActive(Boolean(d.comboPalaceActive));
         setPromoWeekdays(d.promoWeekdays ?? null);
+        setAvailabilityStatus("ready");
       })
-      .catch(() => {});
+      .catch(() => setAvailabilityStatus("error"))
+      .finally(() => { pendingRequest.current = null; });
+    return pendingRequest.current;
   }, []);
 
   useEffect(() => {
@@ -46,7 +56,7 @@ export function AvailabilityProvider({ children }) {
   }, [fetchAvailability]);
 
   return (
-    <AvailabilityContext.Provider value={{ unavailableItems, unavailableCatalogItems, hiddenIngredients, hiddenCatalogItems, promo2x1Active, comboPalaceActive, promoWeekdays, refetch: fetchAvailability }}>
+    <AvailabilityContext.Provider value={{ availabilityStatus, unavailableItems, unavailableCatalogItems, hiddenIngredients, hiddenCatalogItems, promo2x1Active, comboPalaceActive, promoWeekdays, refetch: fetchAvailability }}>
       {children}
     </AvailabilityContext.Provider>
   );

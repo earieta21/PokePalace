@@ -9,6 +9,7 @@ import {
   Utensils,
 } from "lucide-react";
 import HeroSection from "../components/HeroSection";
+import ReorderButton from "../components/ReorderButton";
 import {
   computeBowlSubtotal,
   COMPLEMENT_FREE_LIMIT,
@@ -38,7 +39,7 @@ export default function Home() {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const es = language === "es";
-  const { addCatalogItem, reorder, startPromo2x1 } = useOrder();
+  const { addCatalogItem, startPromo2x1 } = useOrder();
   const { user, isLoggedIn, token } = useContext(AuthContext);
   const { unavailableItems, unavailableCatalogItems, hiddenCatalogItems, promo2x1Active, comboPalaceActive } = useAvailability();
   // Un bowl de la casa también se agota cuando falta un ingrediente de su
@@ -160,16 +161,10 @@ export default function Home() {
             {lastOrder && <p>{t("home.reorderHint")}</p>}
           </div>
           {lastOrder && (
-            <button
-              className={styles.primaryBtn}
-              onClick={() => {
-                reorder(lastOrder);
-                navigate("/summary");
-              }}
-            >
+            <ReorderButton className={styles.primaryBtn} pastOrder={lastOrder}>
               {t("home.reorderCta")}
-              <ArrowRight size={18} />
-            </button>
+              <ArrowRight size={18} aria-hidden="true" />
+            </ReorderButton>
           )}
         </div>
       )}

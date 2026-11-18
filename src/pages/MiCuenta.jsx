@@ -8,6 +8,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import styles from "./MiCuenta.module.css";
 import { comboPalaceSelectionSummary } from "../data/comboPalace";
 import MemberQrCard from "../components/MemberQrCard";
+import ReorderButton from "../components/ReorderButton";
 import { rewardStatus, rewardStatusLabel } from "../utils/rewardStatus";
 import { getRewardGoals, POINTS_PER_REWARD, REWARD_VALUE_MXN } from "../data/rewardsCatalog";
 
@@ -35,7 +36,7 @@ const cartLineBrief = (line, language) => {
 
 export default function MiCuenta() {
   const { user, token, isLoggedIn, logout, refreshUser } = useContext(AuthContext);
-  const { loadFavorite, reorder } = useOrder();
+  const { loadFavorite } = useOrder();
   const { language, t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -121,11 +122,6 @@ export default function MiCuenta() {
   const handleOrderFromFavorite = (fav) => {
     loadFavorite(fav);
     navigate("/order");
-  };
-
-  const handleReorder = (pastOrder) => {
-    reorder(pastOrder);
-    navigate("/summary");
   };
 
   const handleDeleteFavorite = async (favId) => {
@@ -311,16 +307,11 @@ export default function MiCuenta() {
                       </>
                     )}
 
-                    {/* Reorder button — only for completed orders with a bowl */}
                     {o.status === "completed" && (o.base || o.cartItems?.length > 0) && (
                       <div style={{ marginTop: 10 }}>
-                        <button
-                          className={styles.primaryBtn}
-                          onClick={() => handleReorder(o)}
-                          style={{ fontSize: 13 }}
-                        >
-                          🔄 Repetir pedido
-                        </button>
+                        <ReorderButton className={styles.primaryBtn} pastOrder={o}>
+                          {es ? "Repetir pedido" : "Order again"}
+                        </ReorderButton>
                       </div>
                     )}
                   </div>

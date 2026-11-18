@@ -1,6 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAvailability } from "../context/AvailabilityContext";
-import { priceBowlDraft, PROMO_2X1_BOWLS_PRICE, isPromo2x1Protein } from "./pricing";
+import { priceBowlDraft, PROMO_2X1_BOWLS_PRICE } from "./pricing";
+import { CUSTOMER_CATALOG_BY_ID } from "../data/customerCatalog";
+import { getItemLabel } from "./OrderLabels";
+import { addCartLines, applyReorderPlan, buildReorderPlan } from "./reorder";
 
 const OrderContext = createContext();
 const ORDER_STORAGE_KEY = "pokePalaceOrderDraft";
@@ -64,7 +67,8 @@ const loadSavedOrder = () => {
 
 export const OrderProvider = ({ children }) => {
   const [order, setOrder] = useState(loadSavedOrder);
-  const { unavailableItems, unavailableCatalogItems } = useAvailability();
+  const availability = useAvailability();
+  const { unavailableItems } = availability;
 
   useEffect(() => {
     localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(order));
@@ -216,61 +220,20 @@ export const OrderProvider = ({ children }) => {
 
   // Agrega un artículo del catálogo (bebida, entrada, bowl de la casa) al
   // carrito — si ya estaba, solo suma la cantidad.
-  const addCatalogItem = useCallback((catalogItem, qty = 1) => {
-    setOrder((prev) => {
-      const existingIndex = prev.cart.findIndex(
-        (l) => l.kind === "item" && l.catalogId === catalogItem.catalogId
-      );
-      const cart = existingIndex === -1
-        ? [...prev.cart, {
-            cartId: generateCartId(),
-            kind: "item",
-            catalogId: catalogItem.catalogId,
-            name: catalogItem.name,
-            category: catalogItem.categoryKey || catalogItem.category || "menu",
-            price: catalogItem.price,
-            qty,
-          }]
-        : prev.cart.map((l, i) => (i === existingIndex ? { ...l, qty: l.qty + qty } : l));
-      return { ...prev, cart };
-    });
+  const addCatalogItem = useCallback((catalogItem, qty = 1, selections = {}) => {
+    const line = {
+      kind: "item", catalogId: catalogItem.catalogId, name: catalogItem.name,
+      category: catalogItem.categoryKey || catalogItem.category || "menu",
+      price: catalogItem.price, qty, ...selections,
+    };
+    setOrder((prev) => ({ ...prev, cart: addCartLines(prev.cart, [line], generateCartId) }));
   }, []);
 
-  // Cada combinación se conserva como una línea independiente para que
-  // cocina, inventario y pedidos repetidos sepan exactamente qué incluye.
   const addComboToCart = useCallback((catalogItem, selections, qty = 1) => {
-    const comboBowlId = selections?.comboBowlId;
-    const comboDrinkId = selections?.comboDrinkId;
-    const comboRiceCakeId = selections?.comboRiceCakeId;
+    const { comboBowlId, comboDrinkId, comboRiceCakeId } = selections || {};
     if (!comboBowlId || !comboDrinkId || !comboRiceCakeId) return;
-
-    setOrder((prev) => {
-      const matchesCombo = (line) =>
-        line.kind === "item"
-        && line.catalogId === catalogItem.catalogId
-        && line.comboBowlId === comboBowlId
-        && line.comboDrinkId === comboDrinkId
-        && line.comboRiceCakeId === comboRiceCakeId;
-      const existingIndex = prev.cart.findIndex(matchesCombo);
-      const cart = existingIndex === -1
-        ? [...prev.cart, {
-            cartId: generateCartId(),
-            kind: "item",
-            catalogId: catalogItem.catalogId,
-            name: catalogItem.name,
-            category: catalogItem.categoryKey || catalogItem.category || "combos",
-            price: catalogItem.price,
-            qty,
-            comboBowlId,
-            comboDrinkId,
-            comboRiceCakeId,
-          }]
-        : prev.cart.map((line, index) => (
-            index === existingIndex ? { ...line, qty: line.qty + qty } : line
-          ));
-      return { ...prev, cart };
-    });
-  }, []);
+    addCatalogItem(catalogItem, qty, { comboBowlId, comboDrinkId, comboRiceCakeId });
+  }, [addCatalogItem]);
 
   const updateCartItemQty = useCallback((cartId, qty) => {
     setOrder((prev) => ({
@@ -325,128 +288,13 @@ export const OrderProvider = ({ children }) => {
     }));
   }, [unavailableItems]);
 
-  // Reconstruye un carrito completo a partir de un pedido anterior — usa
-  // `cartItems` si el pedido ya lo trae; envuelve un pedido legado de un
-  // solo bowl en un carrito de 1 línea. Salta cualquier línea que ya no
-  // pueda armarse (ej. todas sus proteínas dejaron de estar disponibles).
-  const reorder = useCallback((pastOrder) => {
-    const unavailable = new Set(unavailableItems);
-    // Productos que se agotan por receta (ej. The OG sin salmón), incluidas
-    // las elecciones de un Combo Palace.
-    const unavailableCatalog = new Set([...unavailableItems, ...unavailableCatalogItems]);
+  const prepareReorder = useCallback((pastOrder, language = "es") =>
+    buildReorderPlan(pastOrder, availability, language, CUSTOMER_CATALOG_BY_ID, getItemLabel),
+  [availability]);
 
-    const sourceLines = Array.isArray(pastOrder.cartItems) && pastOrder.cartItems.length > 0
-      ? pastOrder.cartItems
-      : [{
-          kind: "bowl",
-          base: pastOrder.base,
-          bases: pastOrder.bases,
-          proteins: pastOrder.proteins,
-          bowlSize: pastOrder.bowlSize,
-          marinades: pastOrder.marinades,
-          complements: pastOrder.complements,
-          sauces: pastOrder.sauces,
-          toppings: pastOrder.toppings,
-        }];
-
-    const cart = sourceLines
-      .map((line) => {
-        if (line.kind === "item") {
-          const lineIds = [line.catalogId, line.comboBowlId, line.comboDrinkId, line.comboRiceCakeId];
-          if (lineIds.some((id) => id && unavailableCatalog.has(id))) return null;
-          return {
-            cartId: generateCartId(),
-            kind: "item",
-            catalogId: line.catalogId,
-            name: line.name,
-            price: line.price,
-            qty: line.qty || 1,
-            ...(line.catalogId === "combo-palace" ? {
-              comboBowlId: line.comboBowlId,
-              comboDrinkId: line.comboDrinkId,
-              comboRiceCakeId: line.comboRiceCakeId,
-            } : {}),
-          };
-        }
-        if (line.kind === "promo2x1") {
-          // Un 2x1 viejo de salmón ya no se puede repetir: la proteína salió
-          // de la promo y el servidor lo rechazaría.
-          if (unavailable.has(line.protein) || !isPromo2x1Protein(line.protein)) return null;
-          const bowls = (Array.isArray(line.bowls) ? line.bowls : []).map((bowl) => {
-            const bowlBases = Array.isArray(bowl.bases) && bowl.bases.length > 0
-              ? bowl.bases
-              : bowl.base ? [bowl.base] : [];
-            const bases = filterAvailable(bowlBases, unavailable);
-            if (bases.length === 0) return null;
-            return {
-              base: bases[0],
-              bases,
-              marinades: filterAvailable(bowl.marinades, unavailable),
-              complements: filterAvailable(bowl.complements, unavailable),
-              sauces: filterAvailable(bowl.sauces, unavailable),
-              toppings: filterAvailable(bowl.toppings, unavailable),
-            };
-          });
-          if (bowls.length !== 2 || bowls.some((b) => b === null)) return null;
-          return {
-            cartId: generateCartId(),
-            kind: "promo2x1",
-            catalogId: "promo-2x1-bowls",
-            protein: line.protein,
-            bowls,
-            price: PROMO_2X1_BOWLS_PRICE,
-            qty: 1,
-          };
-        }
-        const proteins = filterAvailable(line.proteins, unavailable);
-        if (proteins.length === 0) return null;
-        const lineBases = Array.isArray(line.bases) && line.bases.length > 0
-          ? line.bases
-          : line.base ? [line.base] : [];
-        const bases = filterAvailable(lineBases, unavailable);
-        if (bases.length === 0) return null;
-        const bowlDraft = {
-          ...blankBowlDraft(),
-          bases,
-          proteins,
-          bowlSize: proteins.length === 3 ? "large" : "normal",
-          marinades: filterAvailable(line.marinades, unavailable),
-          complements: filterAvailable(line.complements, unavailable),
-          sauces: filterAvailable(line.sauces, unavailable),
-          toppings: filterAvailable(line.toppings, unavailable),
-        };
-        return {
-          cartId: generateCartId(),
-          kind: "bowl",
-          base: bases[0],
-          bases,
-          proteins,
-          bowlSize: bowlDraft.bowlSize,
-          marinades: bowlDraft.marinades,
-          complements: bowlDraft.complements,
-          sauces: bowlDraft.sauces,
-          toppings: bowlDraft.toppings,
-          extraScoopProteins: [],
-          price: priceBowlDraft(bowlDraft),
-          qty: 1,
-        };
-      })
-      .filter(Boolean);
-
-    setOrder((prev) => ({
-      ...prev,
-      ...blankBowlDraft(),
-      editingCartId: null,
-      cart,
-      customer: pastOrder.customer || prev.customer,
-      phone: pastOrder.phone || prev.phone,
-      fulfillment: pastOrder.fulfillment || "pickup",
-      paymentMethod: "pay_at_pickup",
-      promoCode: "",
-      notes: "",
-      draftStep: 0,
-    }));
-  }, [unavailableItems, unavailableCatalogItems]);
+  const applyReorder = useCallback((pastOrder, plan, mode) => {
+    setOrder((prev) => applyReorderPlan(prev, pastOrder, plan, mode, generateCartId));
+  }, []);
 
   // Used by the self-service kiosk to wipe a session clean between customers.
   const resetOrder = useCallback(() => {
@@ -482,13 +330,14 @@ export const OrderProvider = ({ children }) => {
       updateCartItemQty,
       removeCartLine,
       loadFavorite,
-      reorder,
+      prepareReorder,
+      applyReorder,
       resetOrder,
     }),
     [
       order, hasBowlDraft, updateOrder, addBowlToCart, startPromo2x1, cancelPromo2x1, confirmPromoBowl,
       startNewBowl, editCartBowl, addCatalogItem, addComboToCart,
-      updateCartItemQty, removeCartLine, loadFavorite, reorder, resetOrder, updateCheckout,
+      updateCartItemQty, removeCartLine, loadFavorite, prepareReorder, applyReorder, resetOrder, updateCheckout,
     ]
   );
 
