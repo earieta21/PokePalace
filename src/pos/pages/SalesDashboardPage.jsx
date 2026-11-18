@@ -3,6 +3,7 @@ import { Download, RefreshCw } from "lucide-react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { REFERRAL_SOURCE_LABELS } from "../../data/referralSources.js";
 import { DELIVERY_PLATFORMS, DELIVERY_PLATFORM_LABELS } from "../../data/deliveryPlatforms.js";
+import { ORDER_CHANNEL_LABELS } from "../../data/orderChannels.js";
 
 const DELIVERY_APPS = DELIVERY_PLATFORMS.filter((platform) => platform.app);
 import { downloadCSV } from "../../utils/csv";
@@ -16,7 +17,15 @@ const fmtHour = (h) => {
   return `${hh}${ampm}`;
 };
 
-const SOURCE_LABEL = { pos: "POS", online: "En línea", whatsapp: "WhatsApp", delivery: "Delivery" };
+const MONTH_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+// "16–22 nov" o "27 oct – 2 nov", a partir de llaves YYYY-MM-DD.
+const fmtWeek = (startKey, endKey) => {
+  const [, startMonth, startDay] = startKey.split("-").map(Number);
+  const [, endMonth, endDay] = endKey.split("-").map(Number);
+  return startMonth === endMonth
+    ? `${startDay}–${endDay} ${MONTH_SHORT[endMonth - 1]}`
+    : `${startDay} ${MONTH_SHORT[startMonth - 1]} – ${endDay} ${MONTH_SHORT[endMonth - 1]}`;
+};
 const FULFILLMENT_LABEL = { pickup: "Pickup", dine_in: "Comer aquí", delivery: "Delivery" };
 const PAYMENT_LABEL = {
   cash: "Efectivo",
@@ -147,6 +156,7 @@ export default function SalesDashboardPage({ styles }) {
   const referralSources = analytics?.referralSources ?? EMPTY_LIST;
   const bobaTickets = analytics?.bobaTickets ?? { count: 0, revenue: 0, given: 0 };
   const sourceMix = analytics?.sourceMix ?? EMPTY_LIST;
+  const kioskWeeks = analytics?.kioskWeeks ?? EMPTY_LIST;
   const fulfillmentMix = analytics?.fulfillmentMix ?? EMPTY_LIST;
   const deliveryPlatforms = analytics?.deliveryPlatforms ?? EMPTY_LIST;
   const paymentMethods = analytics?.paymentMethods ?? EMPTY_LIST;
@@ -192,6 +202,15 @@ export default function SalesDashboardPage({ styles }) {
   const sourceTotal = sourceMix.reduce((sum, item) => sum + (item.count ?? 0), 0);
   const fulfillmentTotal = fulfillmentMix.reduce((sum, item) => sum + (item.count ?? 0), 0);
   const paymentTotal = paymentMethods.reduce((sum, item) => sum + (item.revenue ?? 0), 0);
+  // La semana en curso arriba. Ticket = ventas cobradas / pedidos cobrados;
+  // "% del total" = pedidos del kiosco / pedidos de todos los canales.
+  const kioskRows = [...kioskWeeks].reverse().map((week) => ({
+    ...week,
+    label: fmtWeek(week.weekStart, week.weekEnd),
+    ticket: week.paidOrders ? week.revenue / week.paidOrders : null,
+    share: week.allOrders ? Math.round((week.orders / week.allOrders) * 100) : null,
+  }));
+  const kioskHasOrders = kioskRows.some((week) => week.orders > 0);
 
   const actions = [
     summary.activeQueue > 0 && {
@@ -226,6 +245,18 @@ export default function SalesDashboardPage({ styles }) {
       [],
       ["Producto POS", "Unidades", "Ingreso"],
       ...topPosItems.map((item) => [item._id, item.count, item.revenue ?? 0]),
+      [],
+      ["Canal (30 días)", "Órdenes", "Ingresos"],
+      ...sourceMix.map((item) => [ORDER_CHANNEL_LABELS[item._id] || item._id || "Sin canal", item.count, item.revenue ?? 0]),
+      [],
+      ["Kiosco por semana", "Pedidos", "Ventas cobradas", "Ticket promedio", "% del total"],
+      ...kioskRows.map((week) => [
+        `${week.weekStart} a ${week.weekEnd}${week.current ? " (en curso)" : ""}`,
+        week.orders,
+        week.revenue,
+        week.ticket === null ? "" : Math.round(week.ticket),
+        week.share === null ? "" : `${week.share}%`,
+      ]),
     ]);
   };
 
@@ -429,7 +460,7 @@ export default function SalesDashboardPage({ styles }) {
                 const pct = sourceTotal ? Math.round((item.count / sourceTotal) * 100) : 0;
                 return (
                   <div key={item._id || "unknown"} className={styles.salesMixItem}>
-                    <span>{SOURCE_LABEL[item._id] || item._id || "Sin canal"}</span>
+                    <span>{ORDER_CHANNEL_LABELS[item._id] || item._id || "Sin canal"}</span>
                     <strong>{pct}%</strong>
                     <small>{item.count} órdenes · {fmtMXN(item.revenue).replace(" MXN", "")}</small>
                   </div>
@@ -477,6 +508,46 @@ export default function SalesDashboardPage({ styles }) {
             </div>
           )}
         </div>
+      </div>
+
+      <div className={styles.card} style={{ marginBottom: 20 }}>
+        <div className={styles.salesCardHeader}>
+          <p className={styles.cardTitle}>Kiosco por semana</p>
+          <span>Pedidos hechos en el iPad</span>
+        </div>
+        {loading ? (
+          <EmptyState styles={styles}>Cargando...</EmptyState>
+        ) : !kioskHasOrders ? (
+          <EmptyState styles={styles}>Sin pedidos del kiosco en las últimas semanas.</EmptyState>
+        ) : (
+          <div className={styles.tableWrap} style={{ boxShadow: "none" }}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Semana</th>
+                  <th>Pedidos</th>
+                  <th>Ventas</th>
+                  <th>Ticket prom.</th>
+                  <th>% del total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {kioskRows.map((week) => (
+                  <tr key={week.weekStart}>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {week.label}
+                      {week.current && <div className={styles.tdMuted}>en curso</div>}
+                    </td>
+                    <td><strong>{fmtNumber(week.orders)}</strong></td>
+                    <td>{fmtMXN(week.revenue).replace(" MXN", "")}</td>
+                    <td>{week.ticket === null ? "—" : fmtMXN(week.ticket).replace(" MXN", "")}</td>
+                    <td>{week.share === null ? "—" : `${week.share}%`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className={styles.card} style={{ marginBottom: 20 }}>

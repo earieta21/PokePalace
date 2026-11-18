@@ -119,6 +119,12 @@ const orderSchema = new mongoose.Schema(
     paymentRequestId: { type: String, default: null },
     paymentRequestUrl: { type: String, default: null },
     source:   { type: String, enum: ["online", "pos", "whatsapp", "delivery"], default: "online" },
+    // Pedido hecho en el iPad del local (true) o en la web (false). Los del
+    // kiosco siguen siendo source "online" porque se comportan igual; esto
+    // solo separa el canal en Ventas (ver utils/orderChannel.js). Sin default
+    // a propósito: en los pedidos de antes de la marca el campo no existe, y
+    // así se distinguen de los de la web.
+    fromKiosk: { type: Boolean },
     total:    { type: Number, default: null },  // in MXN
 
     // Identidad y estado del pedido en una plataforma conectada. La pareja

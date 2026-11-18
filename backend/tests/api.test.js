@@ -571,6 +571,52 @@ test("el QR de seguimiento del kiosco puede autenticarse con ?ot= en vez del hea
   assert.equal((await viaQuery.json()).order.customer, "Cliente de kiosco");
 });
 
+test("Ventas separa los pedidos del kiosco, también los de antes de la marca", async () => {
+  const analytics = async () => {
+    const response = await staffRequest("manager", "/api/staff/orders/analytics");
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+  const channelCount = (data, channel) => data.sourceMix.find((row) => row._id === channel)?.count ?? 0;
+  const thisWeek = (data) => data.kioskWeeks[data.kioskWeeks.length - 1];
+  const bowl = { cart: [{ base: "white_rice", proteins: ["salmon"] }], scheduledPickupTime: tomorrowAt15() };
+
+  const before = await analytics();
+
+  const kiosk = await postCustomerOrder({ ...bowl, customer: "Kiosco CI", fromKiosk: true }, "kiosk-channel");
+  assert.equal(kiosk.status, 201);
+  const { order: kioskOrder } = await kiosk.json();
+  // Para todo lo demás (puntos, cancelar, cobrar) sigue siendo un pedido en línea.
+  assert.equal(kioskOrder.source, "online");
+  assert.equal(kioskOrder.fromKiosk, true);
+  assert.equal(kioskOrder.phone, "");
+
+  const web = await postCustomerOrder({ ...bowl, customer: "Web CI", phone: "6630000003" }, "web-channel");
+  assert.equal(web.status, 201);
+  assert.equal((await web.json()).order.fromKiosk, false);
+
+  // Solo el booleano del kiosco quita el teléfono; un "true" de texto no.
+  const textFlag = await postCustomerOrder({ ...bowl, customer: "Web CI", fromKiosk: "true" }, "text-flag");
+  assert.equal(textFlag.status, 400);
+
+  // Pedido del kiosco de antes de la marca: en línea, sin teléfono y sin el campo.
+  await Order.create({
+    clientOrderId: `ci-web:legacy-kiosk:${Date.now()}:${Math.random().toString(16).slice(2)}`,
+    customer: "Kiosco de antes CI",
+    phone: "",
+    source: "online",
+    total: 230,
+  });
+
+  const after = await analytics();
+  assert.equal(channelCount(after, "kiosk") - channelCount(before, "kiosk"), 2);
+  assert.equal(channelCount(after, "online") - channelCount(before, "online"), 1);
+  assert.equal(after.kioskWeeks.length, 8);
+  assert.equal(thisWeek(after).current, true);
+  assert.equal(thisWeek(after).orders - thisWeek(before).orders, 2);
+  assert.equal(thisWeek(after).allOrders - thisWeek(before).allOrders, 3);
+});
+
 test("solo el dueño ve su orden y cancelar revierte puntos/promo exactamente una vez", async () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const ownerRegistration = await postJSON("/api/auth/register", {

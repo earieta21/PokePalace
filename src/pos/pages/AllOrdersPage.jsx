@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
 import { createStaffApi } from "../api";
+import { orderChannelLabel } from "../../data/orderChannels.js";
 
 const STATUS_CFG = {
   pending:   { cls: "badgeYellow", label: "Nuevo" },
@@ -9,8 +10,6 @@ const STATUS_CFG = {
   completed: { cls: "badgeGreen",  label: "Completado" },
   cancelled: { cls: "badgeRed",    label: "Cancelado" },
 };
-
-const SOURCE_LABEL = { online: "En línea", pos: "POS", whatsapp: "WhatsApp", delivery: "Delivery" };
 
 export default function AllOrdersPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
@@ -101,7 +100,7 @@ export default function AllOrdersPage({ styles }) {
                   <td style={{ fontWeight: 500 }}>{cliente}</td>
                   <td>
                     <span className={`${styles.badge} ${styles.badgeGray}`}>
-                      {SOURCE_LABEL[o.source] ?? o.source}
+                      {orderChannelLabel(o)}
                     </span>
                   </td>
                   <td className={styles.tdMono}>{o.total != null ? `$${o.total.toLocaleString("es-MX")} MXN` : "—"}</td>

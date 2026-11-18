@@ -5,13 +5,13 @@ import { REFERRAL_SOURCE_LABELS } from "../../data/referralSources.js";
 import Receipt, { PAYMENT_METHOD_LABELS } from "../Receipt.jsx";
 import { orderLines, itemBrief } from "../orderLines";
 import { DELIVERY_PLATFORM_LABELS } from "../../data/deliveryPlatforms.js";
+import { orderChannelLabel } from "../../data/orderChannels.js";
 
 const STATUS_CFG = {
   completed: { cls: "badgeGreen", label: "Completado" },
   cancelled: { cls: "badgeRed",   label: "Cancelado" },
 };
 
-const SOURCE_LABEL = { online: "En línea", pos: "POS", whatsapp: "WhatsApp", delivery: "Delivery" };
 const FULFILLMENT_LABEL = { pickup: "Para llevar", dine_in: "En restaurante", delivery: "Delivery" };
 const PAYMENT_STATUS_LABEL = { paid: "Pagado", pending: "Pendiente de pago" };
 
@@ -75,7 +75,7 @@ function OrderDetailModal({ order, styles, onClose, onPrint }) {
         <div style={{ display: "flex", gap: 6, margin: "10px 0 16px", flexWrap: "wrap" }}>
           <span className={`${styles.badge} ${styles[cls]}`} style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700 }}>{label}</span>
           <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: "rgba(0,0,0,0.06)", color: "var(--p-muted)" }}>
-            {SOURCE_LABEL[order.source] ?? order.source}
+            {orderChannelLabel(order)}
           </span>
           {order.fulfillment && (
             <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: "rgba(0,0,0,0.06)", color: "var(--p-muted)" }}>
@@ -304,7 +304,7 @@ export default function OrderHistoryPage({ styles }) {
                     </td>
                     <td>
                       <span className={`${styles.badge} ${styles.badgeGray}`}>
-                        {SOURCE_LABEL[o.source] ?? o.source}
+                        {orderChannelLabel(o)}
                       </span>
                     </td>
                     <td className={styles.tdMono}>

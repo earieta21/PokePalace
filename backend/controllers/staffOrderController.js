@@ -26,10 +26,18 @@ import {
   RESTAURANT_TIME_ZONE,
   dateKeyInTimeZone,
   dayRangeInTimeZone,
+  mondayOfDateKey,
   nextDateKey,
+  shiftDateKey,
   startOfDateKey,
   zonedParts,
 } from "../utils/timeZone.js";
+import {
+  IS_KIOSK_ORDER_EXPR,
+  KIOSK_WEEKS,
+  ORDER_CHANNEL_EXPR,
+  buildKioskWeeks,
+} from "../utils/orderChannel.js";
 
 import { deductInventory, restoreInventoryForOrder } from "../services/orderInventory.js";
 import { cancelUberEatsOrder } from "../services/uberEats.js";
@@ -214,12 +222,6 @@ export const scanRewardCustomer = async (req, res) => {
 };
 
 /* ── helpers ── */
-const shiftDateKey = (dateKey, days) => {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const shifted = new Date(Date.UTC(year, month - 1, day + days));
-  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
-};
-
 const monthStartKeyAtOffset = (date, offset) => {
   const { year, month } = zonedParts(date, RESTAURANT_TIME_ZONE);
   const shifted = new Date(Date.UTC(year, month - 1 + offset, 1));
@@ -363,7 +365,7 @@ export const getUnpaidOrders = async (req, res) => {
     })
       .sort({ createdAt: 1 })
       .limit(50)
-      .select("customer source status fulfillment total items cartItems base bowlSize createdAt paymentMethod")
+      .select("customer source fromKiosk status fulfillment total items cartItems base bowlSize createdAt paymentMethod")
       .lean();
     res.json({ orders });
   } catch (err) {
@@ -987,11 +989,13 @@ export const getAnalytics = async (req, res) => {
       { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: "$total" }, given: { $sum: "$discountAmount" } } },
     ]);
 
+    // Canal de venta; los pedidos del kiosco salen aparte de "online"
+    // aunque se guarden así (ver utils/orderChannel.js).
     const sourceAgg = await Order.aggregate([
       { $match: last30Match },
       {
         $group: {
-          _id: "$source",
+          _id: ORDER_CHANNEL_EXPR,
           count: { $sum: 1 },
           revenue: {
             $sum: {
@@ -1006,6 +1010,40 @@ export const getAnalytics = async (req, res) => {
       },
       { $sort: { revenue: -1, count: -1 } },
     ]);
+
+    // Kiosco por semana (lunes a domingo): para ver si un cambio en el
+    // kiosco movió sus ventas. Mongo agrupa por día en hora de Tijuana y por
+    // si el pedido fue del kiosco; las semanas se arman con las mismas
+    // llaves de fecha que "Ingresos por día".
+    const kioskWeeksStartKey = shiftDateKey(mondayOfDateKey(currentDateKey), -7 * (KIOSK_WEEKS - 1));
+    const kioskDayAgg = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfDateKey(kioskWeeksStartKey, RESTAURANT_TIME_ZONE) },
+          status: { $ne: "cancelled" },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            day: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt", timezone: RESTAURANT_TIME_ZONE } },
+            kiosk: IS_KIOSK_ORDER_EXPR,
+          },
+          count: { $sum: 1 },
+          paidCount: { $sum: { $cond: [{ $eq: ["$paymentStatus", "paid"] }, 1, 0] } },
+          revenue: {
+            $sum: {
+              $cond: [
+                { $eq: ["$paymentStatus", "paid"] },
+                { $ifNull: ["$total", 0] },
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+    const kioskWeeks = buildKioskWeeks(kioskDayAgg, currentDateKey, KIOSK_WEEKS);
 
     const fulfillmentAgg = await Order.aggregate([
       { $match: last30Match },
@@ -1125,6 +1163,7 @@ export const getAnalytics = async (req, res) => {
         given: bobaTicketAgg?.given ?? 0,
       },
       sourceMix: sourceAgg,
+      kioskWeeks,
       fulfillmentMix: fulfillmentAgg,
       deliveryPlatforms: deliveryPlatformAgg,
       paymentMethods: paymentMethodAgg,

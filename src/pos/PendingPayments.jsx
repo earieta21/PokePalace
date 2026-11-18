@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, CreditCard, Banknote, RefreshCw } from "lucide-react";
 import { StaffAuthContext } from "../context/StaffAuthContext";
 import { createStaffApi } from "./api";
+import { orderChannelLabel } from "../data/orderChannels.js";
 import ui from "./PendingPayments.module.css";
 
 // Pedidos que se pagan en caja (kiosco, en línea con pago al recoger,
@@ -9,7 +10,6 @@ import ui from "./PendingPayments.module.css";
 // efectivo entra al corte de caja — marcarlos "Entregado" en cocina los da
 // por pagados sin saber cómo.
 
-const SOURCE_LABEL = { online: "Kiosco / en línea", pos: "POS", whatsapp: "WhatsApp" };
 const STATUS_LABEL = { pending: "Nuevo", preparing: "Preparando", ready: "Listo", completed: "Entregado" };
 const money = (n) => `$${Number(n || 0).toLocaleString("es-MX", { maximumFractionDigits: 2 })}`;
 const code = (order) => `#${String(order._id).slice(-5).toUpperCase()}`;
@@ -98,7 +98,7 @@ export default function PendingPayments() {
               <li key={order._id} className={ui.row}>
                 <div className={ui.info}>
                   <strong>{code(order)} · {order.customer || "Cliente"}</strong>
-                  <small>{SOURCE_LABEL[order.source] || order.source} · {STATUS_LABEL[order.status] || order.status} · {new Date(order.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</small>
+                  <small>{orderChannelLabel(order)} · {STATUS_LABEL[order.status] || order.status} · {new Date(order.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</small>
                   <small className={ui.items}>{summary(order)}</small>
                 </div>
                 <strong className={ui.amount}>{money(order.total)}</strong>

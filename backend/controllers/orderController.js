@@ -330,9 +330,12 @@ export const createOrder = async (req, res) => {
     const cleanCustomer = typeof customer === "string" ? customer.trim() : "";
     const cleanPhone = typeof phone === "string" ? phone.trim() : "";
     const cleanNotes = typeof notes === "string" ? notes.trim() : "";
+    // Solo el kiosco manda fromKiosk (booleano). Se guarda para separar el
+    // canal en Ventas; el pedido sigue siendo "online" para todo lo demás.
+    const isKioskOrder = fromKiosk === true;
     // El kiosco no pide teléfono — el cliente está parado ahí mismo, no hace
     // falta poder contactarlo después (SMS/WhatsApp ya no aplican sin uno).
-    if (!cleanCustomer || (!cleanPhone && !fromKiosk)) {
+    if (!cleanCustomer || (!cleanPhone && !isKioskOrder)) {
       return res.status(400).json({ msg: "Agrega tu nombre y teléfono para confirmar" });
     }
 
@@ -399,6 +402,7 @@ export const createOrder = async (req, res) => {
       paymentMethod: paymentMethod === "online" ? "online" : "pay_at_pickup",
       paymentStatus: "pending",
       source: "online",
+      fromKiosk: isKioskOrder,
       cartItems: safeCart,
       items: legacyItems,
       base: firstBowl?.base ?? null,

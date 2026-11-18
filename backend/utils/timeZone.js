@@ -93,6 +93,22 @@ export function nextDateKey(dateKey) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
 }
 
+// Mueve una llave "YYYY-MM-DD" n días (negativo = hacia atrás). Trabaja
+// sobre la fecha del calendario, sin horas, así que el cambio de horario no
+// la afecta.
+export function shiftDateKey(dateKey, days) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
+}
+
+// Lunes de la semana de esa fecha (semanas de lunes a domingo).
+export function mondayOfDateKey(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay(); // 0 = domingo
+  return shiftDateKey(dateKey, -((weekday + 6) % 7));
+}
+
 export function dayRangeInTimeZone(date = new Date(), timeZone = RESTAURANT_TIME_ZONE) {
   const key = dateKeyInTimeZone(date, timeZone);
   return {
