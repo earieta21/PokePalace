@@ -32,37 +32,25 @@ export const getFavorites = async (req, res) => {
 
 export const saveFavorite = async (req, res) => {
   try {
-    const { name, base, bases, protein, proteins, marinades, complements, sauces, toppings, extraScoopProteins } = req.body;
-    if (!name?.trim()) return res.status(400).json({ msg: "El nombre del favorito es requerido" });
+    const { name } = req.body;
+    if (typeof name !== "string" || !name.trim()) return res.status(400).json({ msg: "El nombre del favorito es requerido" });
 
     let bowl;
     try {
-      bowl = sanitizeCustomerBowl({ base, bases, protein, proteins, marinades, complements, sauces, toppings, extraScoopProteins });
+      bowl = sanitizeCustomerBowl(req.body);
     } catch (err) {
       return res.status(400).json({ msg: err.message || "El bowl no es válido" });
     }
 
-    const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ msg: "Usuario no encontrado" });
-
-    if (user.favoriteBowls.length >= 10) {
-      return res.status(400).json({ msg: "Máximo 10 bowls favoritos permitidos" });
+    const user = await User.findOneAndUpdate(
+      { _id: req.userId, "favoriteBowls.9": { $exists: false } },
+      { $push: { favoriteBowls: { name: name.trim(), ...bowl } } },
+      { new: true, runValidators: true, projection: { favoriteBowls: 1 } }
+    );
+    if (!user) {
+      if (!await User.exists({ _id: req.userId })) return res.status(404).json({ msg: "Usuario no encontrado" });
+      return res.status(400).json({ code: "favorite_limit", msg: "Máximo 10 bowls favoritos permitidos" });
     }
-
-    user.favoriteBowls.push({
-      name: name.trim(),
-      base: bowl.base,
-      bases: bowl.bases,
-      proteins: bowl.proteins,
-      bowlSize: bowl.bowlSize,
-      marinades: bowl.marinades,
-      complements: bowl.complements,
-      sauces: bowl.sauces,
-      toppings: bowl.toppings,
-      extraScoopProteins: bowl.extraScoopProteins,
-    });
-
-    await user.save();
     res.status(201).json({ favorites: user.favoriteBowls });
   } catch {
     res.status(500).json({ msg: "Error guardando favorito" });

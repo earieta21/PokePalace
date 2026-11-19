@@ -175,6 +175,7 @@ const orderSchema = new mongoose.Schema(
     // Scheduled pickup
     scheduledPickupTime: { type: Date, default: null },
     isScheduled:         { type: Boolean, default: false },
+    estimatedReadyAt:    { type: Date, default: null },
 
     // Loyalty
     loyaltyPointsEarned: { type: Number, default: 0 },

@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import OrderSummary from "../order/OrderSummary";
 import { AuthContext } from "../context/AuthContext";
@@ -7,8 +7,11 @@ import { API_URL } from "../config";
 import { useLanguage } from "../i18n/LanguageContext";
 import { saveActiveOrder } from "../utils/orderAccess";
 import { computeCartPricing } from "../order/pricing";
+import { getPickupOptions } from "../order/pickupOptions";
+import { useStoreSnapshot } from "../hooks/useStoreSnapshot";
 import {
   clearOrderSubmission,
+  getPendingOrderSubmission,
   getOrCreateOrderSubmission,
   keepOrderSubmissionPayload,
 } from "../utils/orderSubmission";
@@ -35,7 +38,13 @@ export default function OrderSummaryPage() {
   const isGuest = Boolean(location.state?.guest);
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [waitMinutes, setWaitMinutes] = useState(null);
+  const store = useStoreSnapshot();
+  const { waitMinutes } = store;
+  const { fulfillment, isScheduled, scheduledPickupTime } = order;
+  const pickup = useMemo(() => getPickupOptions({ fulfillment, isScheduled, scheduledPickupTime }, store.now),
+    [fulfillment, isScheduled, scheduledPickupTime, store.now]);
+  const actor = isLoggedIn ? `user:${user?._id || user?.id || "authenticated"}` : "guest";
+  const pendingSubmission = getPendingOrderSubmission(actor);
 
   // Points redemption state
   const [usePoints, setUsePoints] = useState(false);
@@ -90,14 +99,6 @@ export default function OrderSummaryPage() {
     if (redeemableBlocks < 1) setUsePoints(false);
   }, [redeemableBlocks]);
 
-  // Fetch current wait time estimate
-  useEffect(() => {
-    fetch(`${API_URL}/api/orders/wait-time`)
-      .then((r) => r.json())
-      .then((d) => setWaitMinutes(d.waitMinutes ?? null))
-      .catch(() => {});
-  }, []);
-
   useEffect(() => {
     if (!Array.isArray(order?.cart) || order.cart.length === 0) return;
     trackEvent("begin_checkout", {
@@ -115,9 +116,6 @@ export default function OrderSummaryPage() {
   };
 
   const onRestart = () => {
-    const actor = isLoggedIn
-      ? `user:${user?._id || user?.id || "authenticated"}`
-      : "guest";
     clearOrderSubmission(actor);
     resetOrder();
     navigate("/order?step=0", { state: { guest: isGuest }, replace: true });
@@ -134,8 +132,15 @@ export default function OrderSummaryPage() {
       return;
     }
 
-    if (order?.isScheduled && !order?.scheduledPickupTime) {
-      setSubmitError(t("summary.missingSchedule"));
+    const currentPickup = getPickupOptions(order);
+    if (!pendingSubmission && (store.ordersPaused || currentPickup.errorKey)) {
+      store.refreshClock();
+      setSubmitError(store.ordersPaused ? store.pausedMessage || t("summary.ordersPaused") : t(currentPickup.errorKey));
+      return;
+    }
+    if (!pendingSubmission && currentPickup.scheduledAt !== pickup.scheduledAt) {
+      store.refreshClock();
+      setSubmitError(t("summary.reviewPickupTime"));
       return;
     }
 
@@ -151,9 +156,6 @@ export default function OrderSummaryPage() {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const actor = isLoggedIn
-        ? `user:${user?._id || user?.id || "authenticated"}`
-        : "guest";
       let submission = getOrCreateOrderSubmission(actor);
       if (!isLoggedIn) headers["X-Order-Token"] = submission.orderToken;
 
@@ -169,10 +171,8 @@ export default function OrderSummaryPage() {
         fulfillment: order.fulfillment,
         paymentMethod: order.paymentMethod,
         promoCode: order.promoCode,
-        isScheduled: order.isScheduled,
-        scheduledPickupTime: order.isScheduled && order.scheduledPickupTime
-          ? new Date(order.scheduledPickupTime).toISOString()
-          : undefined,
+        isScheduled: Boolean(currentPickup.scheduledAt),
+        scheduledPickupTime: currentPickup.scheduledAt || undefined,
         pointsToRedeem: usePoints && isLoggedIn ? pointsToRedeem : 0,
         clientOrderId: submission.clientOrderId,
       });
@@ -276,7 +276,7 @@ export default function OrderSummaryPage() {
       )}
 
       {/* Wait time estimate */}
-      {waitMinutes !== null && (
+      {store.acceptingOrders && !isScheduled && waitMinutes !== null && (
         <div style={{ maxWidth: 560, margin: "16px auto 0", padding: "0 16px" }}>
           <div role="status" aria-live="polite" style={{
             display: "flex", alignItems: "center", gap: 10,
@@ -298,6 +298,9 @@ export default function OrderSummaryPage() {
       )}
 
       <OrderSummary
+        pickup={pickup}
+        pausedMessage={store.ordersPaused ? store.pausedMessage || t("summary.ordersPaused") : ""}
+        retrying={Boolean(pendingSubmission)}
         onBuildBowl={onBuildBowl}
         onBrowseMenu={() => navigate("/menu")}
         onRestart={onRestart}

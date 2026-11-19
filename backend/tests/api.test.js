@@ -129,6 +129,19 @@ const postJSON = (url, body, extraHeaders = {}) =>
     body: JSON.stringify(body),
   });
 
+async function createCustomerFixture(name, points = 0) {
+  const user = await User.create({
+    name,
+    email: `ci-pos-security-customer-${new mongoose.Types.ObjectId()}@example.test`,
+    password: await bcrypt.hash("prueba-segura-123", 10),
+    points,
+    lifetimePoints: points,
+    pointsLastEarnedAt: new Date(),
+  });
+  const token = jwt.sign({ id: user.id, type: "customer" }, process.env.JWT_SECRET || "ci-test-secret", { expiresIn: "10m" });
+  return { user, token };
+}
+
 const customerAttempt = (label) => ({
   clientOrderId: `ci-web:${label}:${Date.now()}:${Math.random().toString(16).slice(2)}`,
   orderToken: randomBytes(32).toString("base64url"),
@@ -309,11 +322,12 @@ test("solo gerencia puede consultar clientes registrados y sus puntos", async ()
 
 test("crear orden valida: el precio lo pone el servidor, no el cliente", async () => {
   const attempt = customerAttempt("price");
+  const scheduled = tomorrowAt15();
   const r = await postJSON("/api/orders", {
     cart: [{ base: "white_rice", proteins: ["salmon"] }],
     customer: "Prueba CI",
     phone: "6630000000",
-    scheduledPickupTime: tomorrowAt15(),
+    scheduledPickupTime: scheduled,
     total: 1, // intento de manipular el precio — debe ignorarse
     clientOrderId: attempt.clientOrderId,
   }, { "X-Order-Token": attempt.orderToken });
@@ -322,6 +336,31 @@ test("crear orden valida: el precio lo pone el servidor, no el cliente", async (
   assert.equal(order.total, 230); // precio real del bowl mediano
   assert.equal(order.paymentStatus, "pending");
   assert.equal(order.source, "online");
+  assert.equal(order.scheduledPickupTime, scheduled);
+  assert.equal(order.estimatedReadyAt, null);
+});
+
+test("la espera de cocina cuenta los pedidos en preparación y los programados que toca preparar", async () => {
+  const wait = async () => {
+    const response = await fetch(`${BASE}/api/orders/wait-time`);
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+  const initial = await wait();
+  const common = { customer: "Cola de prueba", phone: "6630000000", isScheduled: true };
+  const tomorrow = new Date(tomorrowAt15());
+  const orders = await Order.create([
+    { ...common, status: "pending", scheduledPickupTime: tomorrow },
+    { ...common, status: "pending", scheduledPickupTime: new Date(Date.now() + 60_000) },
+    { ...common, status: "preparing", scheduledPickupTime: tomorrow },
+  ]);
+  try {
+    const updated = await wait();
+    assert.equal(updated.activeOrders - initial.activeOrders, 2);
+    assert.equal(updated.waitMinutes - initial.waitMinutes, 6);
+  } finally {
+    await Order.deleteMany({ _id: { $in: orders.map((order) => order._id) } });
+  }
 });
 
 test("rutas de cliente solo aceptan tokens de tipo cliente", async () => {
@@ -346,6 +385,39 @@ test("rutas de cliente solo aceptan tokens de tipo cliente", async () => {
     const other = jwt.sign({ id: account._id, type }, secret, { expiresIn: "10m" });
     assert.equal((await getMe(other)).status, 401, `type ${type} no debe pasar como cliente`);
   }
+});
+
+test("guardar bowls en paralelo conserva la receta elegida y el límite de diez favoritos", async () => {
+  const account = await User.create({
+    name: "Favoritos CI",
+    email: `ci-pos-security-favorites-${new mongoose.Types.ObjectId()}@example.test`,
+    password: await bcrypt.hash("prueba-segura-123", 10),
+    favoriteBowls: Array.from({ length: 9 }, (_, n) => ({ name: `Guardado ${n + 1}` })),
+  });
+  const token = jwt.sign({ id: account._id, type: "customer" }, process.env.JWT_SECRET || "ci-test-secret");
+  const recipes = ["tuna", "salmon"].map((protein) => ({
+    name: `Bowl de ${protein}`,
+    base: "white_rice",
+    bases: ["white_rice", "quinoa"],
+    proteins: [protein],
+    bowlSize: "normal",
+    marinades: ["citrus_marinade"],
+    complements: ["mango"],
+    sauces: ["soy_sauce"],
+    toppings: ["sesame_seeds"],
+    extraScoopProteins: [protein, protein],
+  }));
+  const responses = await Promise.all(recipes.map((recipe) =>
+    postJSON("/api/users/me/favorites", recipe, { Authorization: `Bearer ${token}` })
+  ));
+  assert.deepEqual(responses.map((response) => response.status).sort(), [201, 400]);
+  const rejected = await responses.find((response) => response.status === 400).json();
+  assert.equal(rejected.code, "favorite_limit");
+  const { favoriteBowls } = await User.findById(account._id).lean();
+  assert.equal(favoriteBowls.length, 10);
+  const expected = recipes[responses.findIndex((response) => response.status === 201)];
+  const saved = favoriteBowls.at(-1);
+  for (const [key, value] of Object.entries(expected)) assert.deepEqual(saved[key], value);
 });
 
 test("checkout rechaza ingredientes agotados antes de reservar promo o puntos", async () => {
@@ -631,13 +703,7 @@ test("solo el dueño ve su orden y cancelar revierte puntos/promo exactamente un
   assert.equal(notOptedIn.marketingOptIn, false);
   assert.equal(notOptedIn.marketingOptInAt, null);
 
-  const strangerRegistration = await postJSON("/api/auth/register", {
-    name: "Otro cliente CI",
-    email: `stranger-${suffix}@example.test`,
-    password: "prueba-segura-123",
-  });
-  assert.equal(strangerRegistration.status, 201);
-  const stranger = await strangerRegistration.json();
+  const stranger = await createCustomerFixture("Otro cliente CI");
 
   await User.updateOne({ _id: owner.user.id }, { $set: { points: 200 } });
   const promo = await PromoCode.create({
@@ -744,14 +810,7 @@ test("solo el dueño ve su orden y cancelar revierte puntos/promo exactamente un
 
 test("una cancelación anterior se adopta sin devolver los puntos por segunda vez", async () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const registration = await postJSON("/api/auth/register", {
-    name: "Cliente cancelación anterior",
-    email: `ci-legacy-cancel-${suffix}@example.test`,
-    password: "prueba-segura-123",
-  });
-  assert.equal(registration.status, 201);
-  const account = await registration.json();
-  await User.updateOne({ _id: account.user.id }, { $set: { points: 200 } });
+  const account = await createCustomerFixture("Cliente cancelación anterior", 200);
 
   const promo = await PromoCode.create({
     code: `LEGACY${Date.now()}${Math.floor(Math.random() * 1000)}`,
@@ -801,17 +860,10 @@ test("una cancelación anterior se adopta sin devolver los puntos por segunda ve
 
 test("un retry recupera reservas confirmadas sin gastar promo ni puntos dos veces", async () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const registration = await postJSON("/api/auth/register", {
-    name: "Cliente ACK perdido",
-    email: `ci-order-reservation-${suffix}@example.test`,
-    password: "prueba-segura-123",
-  });
-  assert.equal(registration.status, 201);
-  const account = await registration.json();
+  const account = await createCustomerFixture("Cliente ACK perdido", 200);
 
   const clientOrderId = `ci-web:ack:${suffix}`;
   const attemptOrderId = stableCustomerOrderObjectId(clientOrderId);
-  await User.updateOne({ _id: account.user.id }, { $set: { points: 200 } });
   // Simula que Mongo aplicó el decremento + ledger atómicos y se perdió solo
   // el ACK: el saldo ya quedó en 100 antes de que el checkout sea reintentado.
   await User.updateOne(
@@ -879,14 +931,7 @@ test("un retry recupera reservas confirmadas sin gastar promo ni puntos dos vece
 
 test("un canje Rewards concurrente descuenta y genera un solo código", async () => {
   const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  const registration = await postJSON("/api/auth/register", {
-    name: "Cliente Rewards idempotente",
-    email: `ci-pos-security-reward-${suffix}@example.test`,
-    password: "prueba-segura-123",
-  });
-  assert.equal(registration.status, 201);
-  const account = await registration.json();
-  await User.updateOne({ _id: account.user.id }, { $set: { points: 100 } });
+  const account = await createCustomerFixture("Cliente Rewards idempotente", 100);
 
   const clientRedemptionId = `reward:ci-${suffix}`;
   const redeem = (rewardId = 1) => postJSON(

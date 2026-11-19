@@ -1,6 +1,8 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import { useLanguage } from "../i18n/LanguageContext";
+import { getOrderTiming } from "../utils/orderTiming";
 import { API_URL } from "../config";
 import {
   ACTIVE_ORDER_STORAGE_KEY,
@@ -12,14 +14,15 @@ import {
 const POLL_MS = 8000;
 
 const STATUS_CONFIG = {
-  pending:   { label: "Pedido recibido",       sub: "Esperando confirmación…", color: "#6b7280", bg: "#f3f4f6", pulse: false },
-  preparing: { label: "Preparando tu bowl 👨‍🍳", sub: "8–12 min estimados",     color: "#d97706", bg: "#fffbeb", pulse: false },
-  ready:     { label: "¡Tu bowl está listo! 🔔", sub: "Pasa a recogerlo",       color: "#166534", bg: "#dcfce7", pulse: true  },
+  pending:   { label: "tracking.receivedDesc",  color: "#6b7280", bg: "#f3f4f6", pulse: false },
+  preparing: { label: "tracking.preparingDesc", color: "#d97706", bg: "#fffbeb", pulse: false },
+  ready:     { label: "tracking.readyDesc",     color: "#166534", bg: "#dcfce7", pulse: true  },
 };
 
 export default function ActiveOrderBanner() {
   const location = useLocation();
   const { token } = useContext(AuthContext);
+  const { language, t } = useLanguage();
   const [orderId, setOrderId]   = useState(getActiveOrderId);
   const [order, setOrder]       = useState(null);
   const [loaded, setLoaded]     = useState(false);
@@ -85,6 +88,7 @@ export default function ActiveOrderBanner() {
 
   const cfg = STATUS_CONFIG[order.status];
   if (!cfg) return null;
+  const timing = getOrderTiming(order, language);
 
   return (
     <Link
@@ -121,13 +125,13 @@ export default function ActiveOrderBanner() {
           margin: 0, fontSize: 14, fontWeight: 800,
           color: cfg.color, lineHeight: 1.2, whiteSpace: "nowrap",
         }}>
-          {cfg.label}
+          {t(cfg.label)}
         </p>
         <p style={{
           margin: 0, fontSize: 11, color: cfg.color, opacity: 0.8,
-          whiteSpace: "nowrap",
         }}>
-          {cfg.sub} · toca para ver
+          {timing && <>{timing.label} <time dateTime={timing.dateTime}>{timing.time}</time> · </>}
+          {language === "en" ? "Track order" : "Ver seguimiento"}
         </p>
       </div>
       <span style={{ fontSize: 16, flexShrink: 0, color: cfg.color }}>→</span>

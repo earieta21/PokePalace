@@ -503,8 +503,7 @@
 
 /* Save favorite */
 .favoriteSection {
-  padding: 14px 0 6px;
-  border-top: 1px solid var(--border);
+  margin-top: 10px;
 }
 
 .favBtn {
@@ -599,6 +598,19 @@
   accent-color: var(--accent);
   cursor: pointer;
 }
+
+.pickupChoices {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius-md);
+}
+
+.pickupChoices legend { padding-inline: 4px; font-weight: 700; }
+.pickupChoices label { min-height: 36px; }
+.pickupChoices input { accent-color: var(--accent); }
 
 /* Promo code */
 .promoSection {

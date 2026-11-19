@@ -10,6 +10,7 @@ import { createPaymentLink, getPaymentLinkStatus, isValidWebhookAuth } from "../
 import { deductInventory, restoreInventoryForOrder } from "../services/orderInventory.js";
 import { expireStalePoints } from "../utils/loyalty.js";
 import { isPromo2x1Day } from "../utils/promoSchedule.js";
+import { PICKUP_LEAD_MINUTES, scheduledPickupProblem } from "../utils/pickupSchedule.js";
 import {
   generateOrderAccessToken,
   hashOrderAccessToken,
@@ -54,15 +55,26 @@ const sendOrderNotFound = (res) => res.status(404).json({ msg: "Orden no encontr
 
 const isWithinBusinessHours = (date) => isWithinRestaurantHours(date);
 
+const BASE_PREP_MINUTES = 8;
+
+async function readKitchenWait() {
+  const prepCutoff = new Date(Date.now() + BASE_PREP_MINUTES * 60_000);
+  const activeOrders = await Order.countDocuments({
+    $or: [
+      { status: "preparing" },
+      { status: "pending", scheduledPickupTime: null },
+      { status: "pending", scheduledPickupTime: { $lte: prepCutoff } },
+    ],
+  });
+  return { activeOrders, waitMinutes: BASE_PREP_MINUTES + activeOrders * 3 };
+}
+
 const validateScheduledTime = (scheduledPickupTime) => {
   const scheduled = new Date(scheduledPickupTime);
-  if (isNaN(scheduled.getTime())) return "Hora programada inválida";
-
-  const now = new Date();
-  const minTime = new Date(now.getTime() + 15 * 60 * 1000);
-  if (scheduled < minTime) return "La hora debe ser al menos 15 minutos desde ahora";
-
-  if (!isWithinBusinessHours(scheduled)) {
+  const problem = scheduledPickupProblem(scheduled);
+  if (problem === "invalid") return "Hora programada inválida";
+  if (problem === "tooSoon") return `La hora debe ser al menos ${PICKUP_LEAD_MINUTES} minutos desde ahora`;
+  if (problem === "closed") {
     return `El restaurante acepta pedidos de ${restaurantOpenHour(scheduled)}:00 a ${RESTAURANT_CLOSE_HOUR}:00 ese día`;
   }
 
@@ -355,6 +367,12 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    // Una recogida programada ya tiene hora. Para las inmediatas se guarda
+    // la estimación antes de sumar este pedido a la fila de cocina.
+    const estimatedReadyAt = isScheduled ? null : new Date(
+      Date.now() + (await readKitchenWait()).waitMinutes * 60_000
+    );
+
     // The reservation marker and usedCount increment share one atomic write.
     // If Mongo applies it but the acknowledgement is lost, the same stable
     // attempt id recovers the marker instead of consuming another use.
@@ -423,6 +441,7 @@ export const createOrder = async (req, res) => {
       total:          finalTotal,
       pointsRedeemed: redeemedPoints,
       scheduledPickupTime: resolvedScheduledTime,
+      estimatedReadyAt,
       isScheduled,
     });
 
@@ -727,11 +746,7 @@ export const cancelOrder = async (req, res) => {
 
 export const getWaitTime = async (req, res) => {
   try {
-    const activeOrders = await Order.countDocuments({
-      status: { $in: ["pending", "preparing"] },
-    });
-    const waitMinutes = Math.max(8, 8 + activeOrders * 3);
-    res.json({ activeOrders, waitMinutes });
+    res.json(await readKitchenWait());
   } catch {
     res.status(500).json({ msg: "Error" });
   }

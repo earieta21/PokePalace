@@ -1,4 +1,4 @@
-import { zonedParts } from "./timeZone.js";
+export { RESTAURANT_OPEN_HOUR, RESTAURANT_CLOSE_HOUR, restaurantOpenHour, isWithinRestaurantHours } from "./pickupSchedule.js";
 import {
   computeBowlSubtotal,
   computeExtrasSubtotal,
@@ -334,23 +334,6 @@ export function normalizeCustomerOrderId(value) {
     throw new TypeError("clientOrderId no es válido");
   }
   return normalized;
-}
-
-// Abre los 7 días de 11:00 a 21:00. Si cambia, actualizar también
-// index.html (lo que lee Google), utils/notify.js, services/whatsappAgent.js,
-// el selector de hora de src/order/OrderSummary.jsx y los textos de
-// src/i18n/LanguageContext.jsx y src/data/pageMeta.js.
-export const RESTAURANT_OPEN_HOUR = 11;
-export const RESTAURANT_CLOSE_HOUR = 21;
-
-export function restaurantOpenHour() {
-  return RESTAURANT_OPEN_HOUR;
-}
-
-export function isWithinRestaurantHours(date = new Date()) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
-  const { hour } = zonedParts(date);
-  return hour >= restaurantOpenHour(date) && hour < RESTAURANT_CLOSE_HOUR;
 }
 
 export function isCustomerManagedOrder(order) {

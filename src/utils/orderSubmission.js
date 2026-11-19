@@ -48,6 +48,11 @@ const writeSubmissions = (submissions) => {
   localStorage.setItem(SUBMISSION_STORAGE_KEY, JSON.stringify(submissions));
 };
 
+export const getPendingOrderSubmission = (actor) => {
+  const saved = readSubmissions()[actor];
+  return isValidSubmission(saved, actor) && saved.payload ? saved : null;
+};
+
 export const getOrCreateOrderSubmission = (actor) => {
   const submissions = readSubmissions();
   if (isValidSubmission(submissions[actor], actor)) return submissions[actor];

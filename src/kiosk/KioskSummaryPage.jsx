@@ -63,11 +63,6 @@ export default function KioskSummaryPage() {
       return;
     }
 
-    if (order?.isScheduled && !order?.scheduledPickupTime) {
-      setSubmitError("Elige la fecha y hora para tu pedido programado.");
-      return;
-    }
-
     try {
       setSaving(true);
       setSubmitError("");
@@ -82,10 +77,7 @@ export default function KioskSummaryPage() {
         fulfillment: order.fulfillment,
         paymentMethod: order.paymentMethod,
         promoCode: order.promoCode,
-        isScheduled: order.isScheduled,
-        scheduledPickupTime: order.isScheduled && order.scheduledPickupTime
-          ? new Date(order.scheduledPickupTime).toISOString()
-          : undefined,
+        isScheduled: false,
         clientOrderId: submission.clientOrderId,
       });
 

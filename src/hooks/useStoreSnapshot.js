@@ -1,60 +1,55 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_URL } from "../config";
+import { isWithinRestaurantHours, restaurantOpenHour } from "../../backend/utils/pickupSchedule.js";
+import { zonedParts } from "../../backend/utils/timeZone.js";
 
-const STORE_TIME_ZONE = "America/Tijuana";
-const OPEN_HOUR = 11;
-const CLOSE_HOUR = 21;
-
-function storeClock(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: STORE_TIME_ZONE,
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-  return Number(values.hour) + Number(values.minute) / 60;
-}
-
-export function isStoreOpen(date = new Date()) {
-  const hour = storeClock(date);
-  return hour >= OPEN_HOUR && hour < CLOSE_HOUR;
-}
+export { isWithinRestaurantHours as isStoreOpen };
 
 export function useStoreSnapshot() {
   const [now, setNow] = useState(() => new Date());
   const [storeStatus, setStoreStatus] = useState(null);
   const [waitMinutes, setWaitMinutes] = useState(null);
+  const refreshClock = useCallback(() => setNow(new Date()), []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    Promise.allSettled([
-      fetch(`${API_URL}/api/settings/store-status`, { signal: controller.signal })
-        .then((response) => response.ok ? response.json() : Promise.reject(new Error("store status"))),
-      fetch(`${API_URL}/api/orders/wait-time`, { signal: controller.signal })
-        .then((response) => response.ok ? response.json() : Promise.reject(new Error("wait time"))),
-    ]).then(([statusResult, waitResult]) => {
-      if (statusResult.status === "fulfilled") setStoreStatus(statusResult.value);
-      if (waitResult.status === "fulfilled") setWaitMinutes(waitResult.value.waitMinutes ?? null);
-    });
-    return () => controller.abort();
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 60_000);
-    return () => window.clearInterval(timer);
+    let controller;
+    let timer;
+    function refresh() {
+      window.clearTimeout(timer);
+      controller?.abort();
+      if (document.hidden) return;
+      controller = new AbortController();
+      setNow(new Date());
+      const options = { signal: controller.signal };
+      fetch(`${API_URL}/api/settings/store-status`, options)
+        .then(async (response) => { if (response.ok) setStoreStatus(await response.json()); })
+        .catch(() => {});
+      fetch(`${API_URL}/api/orders/wait-time`, options)
+        .then(async (response) => {
+          if (response.ok) setWaitMinutes((await response.json()).waitMinutes ?? null);
+        })
+        .catch(() => {});
+      timer = window.setTimeout(refresh, 60_000 - Date.now() % 60_000);
+    }
+    refresh();
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      controller?.abort();
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
 
   return useMemo(() => {
-    const open = isStoreOpen(now);
+    const open = isWithinRestaurantHours(now);
     const ordersPaused = Boolean(storeStatus?.ordersPaused);
     return {
-      open,
+      now, open, refreshClock,
       ordersPaused,
       acceptingOrders: open && !ordersPaused,
       pausedMessage: storeStatus?.pausedMessage || "",
       waitMinutes,
-      beforeOpening: storeClock(now) < OPEN_HOUR,
+      beforeOpening: zonedParts(now).hour < restaurantOpenHour(now),
     };
-  }, [now, storeStatus, waitMinutes]);
+  }, [now, storeStatus, waitMinutes, refreshClock]);
 }

@@ -9,6 +9,7 @@ import { comboPalaceSelectionLabels } from "../data/comboPalace";
 import { MXN_PER_POINT, REWARDS, SIGNUP_BONUS_POINTS } from "../data/rewardsCatalog";
 import KioskPairingQr from "../kiosk/KioskPairingQr";
 import CheckoutSuggestions from "./CheckoutSuggestions";
+import SaveFavoriteBowl from "./SaveFavoriteBowl";
 import kioskPairStyles from "../kiosk/KioskPairingQr.module.css";
 import styles from "./OrderSummary.module.css";
 
@@ -22,6 +23,9 @@ const OrderSummary = ({
   onBrowseMenu,
   onRestart,
   onConfirm,
+  pickup,
+  pausedMessage = "",
+  retrying = false,
   onPromoChange,
   pointsDiscount = 0,
   saving = false,
@@ -48,15 +52,6 @@ const OrderSummary = ({
   // El campo de código arranca escondido: la mayoría no trae código y
   // tenerlo abierto solo agrega ruido al checkout.
   const [showPromo, setShowPromo] = useState(Boolean(order?.promoCode));
-
-  // Save favorite state — solo tiene sentido cuando el carrito es 1 solo
-  // bowl (los favoritos siguen siendo de un bowl, no de un carrito entero).
-  const [showSaveFavorite, setShowSaveFavorite] = useState(false);
-  const [favoriteName, setFavoriteName] = useState("");
-  const [savingFavorite, setSavingFavorite] = useState(false);
-  const [favoriteMsg, setFavoriteMsg] = useState("");
-  const [favoriteSuccess, setFavoriteSuccess] = useState(false);
-  const soleBowlLine = cart.length === 1 && cart[0].kind === "bowl" ? cart[0] : null;
 
   // Delivery is temporarily unavailable until the checkout can collect an address.
   // Normalize old saved drafts so they cannot silently submit as delivery orders.
@@ -133,9 +128,8 @@ const OrderSummary = ({
   // 2x1 en Bowls es solo para comer en el restaurante — el servidor rechaza
   // igual esta combinación, pero bloquear aquí evita que el cliente llegue
   // hasta el envío para enterarse.
-  const hasPromo2x1BlockedByFulfillment = cart.some(
-    (line) => line.kind === "promo2x1" && order.fulfillment !== "dine_in"
-  );
+  const hasDineInPromo = cart.some((line) => line.kind === "promo2x1");
+  const hasPromo2x1BlockedByFulfillment = hasDineInPromo && order.fulfillment !== "dine_in";
   // Cómo se llama "comer aquí" en cada pantalla, para que los avisos del 2x1
   // nombren el mismo botón que el cliente ve.
   const dineInLabel = isKiosk ? "Para comer aquí" : "Comer en restaurante";
@@ -149,16 +143,9 @@ const OrderSummary = ({
       order.updateCheckout("scheduledPickupTime", "");
     }
   };
-  // Time picker helpers — mantiene el rango en línea con lo que de verdad
-  // acepta el backend (11:00 a 21:00 todos los días), para no dejar elegir
-  // una hora que luego se va a rechazar al confirmar. Usa la hora LOCAL del
-  // navegador (no toISOString, que da UTC y desfasa el límite varias horas).
-  const OPEN_HOUR = 11;
-  const CLOSE_HOUR = 21;
-
-  const toLocalDatetimeValue = (date) => {
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const choosePickupTime = (custom) => {
+    updateCheckout("isScheduled", custom);
+    updateCheckout("scheduledPickupTime", custom ? order.scheduledPickupTime || pickup.min : "");
   };
 
   const paymentOptions = [
@@ -169,25 +156,6 @@ const OrderSummary = ({
     { value: "cash", icon: "💵", label: t("summary.cash") },
     { value: "card_terminal", icon: "💳", label: t("summary.cardTerminal") },
   ];
-
-  const getMinTime = () => {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() + 15);
-    if (now.getHours() < OPEN_HOUR) {
-      now.setHours(OPEN_HOUR, 0, 0, 0);
-    } else if (now.getHours() >= CLOSE_HOUR) {
-      now.setDate(now.getDate() + 1);
-      now.setHours(OPEN_HOUR, 0, 0, 0);
-    }
-    return toLocalDatetimeValue(now);
-  };
-
-  const getMaxTime = () => {
-    const now = new Date();
-    now.setHours(CLOSE_HOUR - 1, 45, 0, 0);
-    if (now < new Date()) now.setDate(now.getDate() + 1);
-    return toLocalDatetimeValue(now);
-  };
 
   const handleApplyPromo = async () => {
     if (!promoInput.trim()) return;
@@ -236,46 +204,7 @@ const OrderSummary = ({
     onBuildBowl?.();
   };
 
-  const handleSaveFavorite = async () => {
-    if (!favoriteName.trim() || !soleBowlLine) return;
-    setSavingFavorite(true);
-    setFavoriteMsg("");
-    setFavoriteSuccess(false);
-    try {
-      const res = await fetch(`${API_URL}/api/users/me/favorites`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: favoriteName.trim(),
-          base: soleBowlLine.base,
-          bases: soleBowlLine.bases,
-          proteins: soleBowlLine.proteins,
-          bowlSize: soleBowlLine.bowlSize,
-          marinades: soleBowlLine.marinades,
-          complements: soleBowlLine.complements,
-          sauces: soleBowlLine.sauces,
-          toppings: soleBowlLine.toppings,
-          extraScoopProteins: soleBowlLine.extraScoopProteins,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.msg || t("summary.favoriteSaveError"));
-      setFavoriteMsg(t("summary.favoriteSaved"));
-      setFavoriteSuccess(true);
-      setFavoriteName("");
-      setShowSaveFavorite(false);
-    } catch (e) {
-      setFavoriteMsg(e.message);
-      setFavoriteSuccess(false);
-    } finally {
-      setSavingFavorite(false);
-    }
-  };
-
-  const BowlLineCard = ({ line }) => {
+  const renderBowlLine = (line) => {
     const proteinLabels = proteinLabelsFor(line.proteins);
     const marinadesLabels = getListLabels(labels.marinade, line.marinades);
     const complementsLabels = getListLabels(labels.complement, line.complements);
@@ -296,7 +225,7 @@ const OrderSummary = ({
     ].join(" \u00b7 ");
 
     return (
-      <div className={styles.section}>
+      <div className={styles.section} key={line.cartId}>
         <div className={styles.sectionHeader}>
           <div>
             <h3 className={styles.subTitle}>
@@ -314,8 +243,11 @@ const OrderSummary = ({
             </button>
           </div>
         </div>
-        <p className={styles.detailMain}>{headline}</p>
+        <p className={styles.detailMain} id={`bowl-${line.cartId}`}>{headline}</p>
         {extras && <p className={styles.detailExtras}>{extras}</p>}
+        {isLoggedIn && !isKiosk && (
+          <SaveFavoriteBowl line={line} token={token} descriptionId={`bowl-${line.cartId}`} />
+        )}
       </div>
     );
   };
@@ -339,7 +271,7 @@ const OrderSummary = ({
             {t("summary.remove")}
           </button>
         </div>
-        {blockedByFulfillment && (
+        {blockedByFulfillment && (!pickup || pickup.open) && (
           <p className={styles.submitError} role="alert" style={{ marginTop: 8 }}>
             Cambia la entrega a “{dineInLabel}” para conservar el 2x1.
           </p>
@@ -427,7 +359,7 @@ const OrderSummary = ({
                 ? <ItemLineCard key={line.cartId} line={line} />
                 : line.kind === "promo2x1"
                   ? <PromoLineCard key={line.cartId} line={line} />
-                  : <BowlLineCard key={line.cartId} line={line} />
+                  : renderBowlLine(line)
             ))}
 
             <CheckoutSuggestions isKiosk={isKiosk} />
@@ -441,52 +373,6 @@ const OrderSummary = ({
               </button>
             </div>
           </>
-        )}
-
-        {/* Save as favorite — solo si el carrito es 1 solo bowl */}
-        {isLoggedIn && soleBowlLine && (
-          <div className={styles.favoriteSection}>
-            {!showSaveFavorite ? (
-              <button
-                className={styles.favBtn}
-                type="button"
-                onClick={() => { setShowSaveFavorite(true); setFavoriteMsg(""); setFavoriteSuccess(false); }}
-              >
-                {t("summary.saveFavorite")}
-              </button>
-            ) : (
-              <div className={styles.favoriteRow}>
-                <input
-                  className={styles.favoriteInput}
-                  placeholder={t("summary.favoritePlaceholder")}
-                  aria-label={t("summary.favoritePlaceholder")}
-                  value={favoriteName}
-                  onChange={(e) => setFavoriteName(e.target.value)}
-                  maxLength={40}
-                />
-                <button
-                  className={styles.favSaveBtn}
-                  type="button"
-                  onClick={handleSaveFavorite}
-                  disabled={savingFavorite || !favoriteName.trim()}
-                >
-                  {savingFavorite ? t("summary.savingFavorite") : t("summary.save")}
-                </button>
-                <button
-                  className={styles.favCancelBtn}
-                  type="button"
-                  onClick={() => { setShowSaveFavorite(false); setFavoriteName(""); setFavoriteMsg(""); setFavoriteSuccess(false); }}
-                >
-                  {t("summary.cancel")}
-                </button>
-              </div>
-            )}
-            {favoriteMsg && (
-              <p className={favoriteSuccess ? styles.promoSuccess : styles.promoError} role="status" aria-live="polite">
-                {favoriteMsg}
-              </p>
-            )}
-          </div>
         )}
 
         {isKiosk && (
@@ -638,19 +524,28 @@ const OrderSummary = ({
 
           {/* Scheduled pickup time — only for pickup, and never at the
               counter kiosk (the customer is already here). */}
-          {!isKiosk && order.fulfillment === "pickup" && (
+          {pickup && !pausedMessage && fulfillment === "pickup" && (pickup.open || !hasDineInPromo) && (
             <div className={styles.scheduleSection}>
-              <label className={styles.scheduleToggle}>
+              {pickup.open ? <label className={styles.scheduleToggle}>
                 <input
                   type="checkbox"
                   checked={order.isScheduled || false}
-                  onChange={(e) => {
-                    order.updateCheckout("isScheduled", e.target.checked);
-                    if (!e.target.checked) order.updateCheckout("scheduledPickupTime", "");
-                  }}
+                  onChange={(e) => choosePickupTime(e.target.checked)}
                 />
                 <span>{t("summary.schedulePickup")}</span>
-              </label>
+              </label> : (
+                <fieldset className={styles.pickupChoices}>
+                  <legend>{t("summary.closedPickup")}</legend>
+                  <label className={styles.scheduleToggle}>
+                    <input type="radio" name="pickup-slot" checked={!order.isScheduled} onChange={() => choosePickupTime(false)} />
+                    {t(pickup.today ? "summary.pickupToday" : "summary.pickupTomorrow", { time: pickup.time })}
+                  </label>
+                  <label className={styles.scheduleToggle}>
+                    <input type="radio" name="pickup-slot" checked={Boolean(order.isScheduled)} onChange={() => choosePickupTime(true)} />
+                    {t("summary.choosePickupTime")}
+                  </label>
+                </fieldset>
+              )}
 
               {order.isScheduled && (
                 <label className={styles.field}>
@@ -659,13 +554,16 @@ const OrderSummary = ({
                     type="datetime-local"
                     value={order.scheduledPickupTime || ""}
                     onChange={(e) => order.updateCheckout("scheduledPickupTime", e.target.value)}
-                    min={getMinTime()}
-                    max={getMaxTime()}
+                    min={pickup.min}
+                    max={pickup.max}
+                    aria-invalid={Boolean(pickup.errorKey)}
+                    aria-describedby={pickup.errorKey ? "pickup-time-error" : undefined}
                     required
                     aria-required="true"
                   />
                 </label>
               )}
+              {pickup.errorKey && <p id="pickup-time-error" className={styles.promoError} role="status">{t(pickup.errorKey)}</p>}
             </div>
           )}
 
@@ -758,13 +656,20 @@ const OrderSummary = ({
         </div>
 
         <div className={styles.actions}>
+          {pausedMessage && <p className={styles.submitError} role="status">{pausedMessage}</p>}
+          {!pausedMessage && hasDineInPromo && pickup && !pickup.open && (
+            <p className={styles.submitError} role="status">{t("summary.closedDineInPromo")}</p>
+          )}
+          {!pausedMessage && !hasDineInPromo && pickup?.errorKey === "summary.closedDineIn" && (
+            <p className={styles.submitError} role="status">{t(pickup.errorKey)}</p>
+          )}
           {submitError && (
             <p className={styles.submitError} role="alert">{submitError}</p>
           )}
           {/* El botón de confirmar queda apagado mientras el 2x1 esté "para
               llevar" — se explica aquí, junto al botón, y no solo arriba en
               la tarjeta de la promo, que en pantallas chicas ni se ve. */}
-          {hasPromo2x1BlockedByFulfillment && (
+          {hasPromo2x1BlockedByFulfillment && (!pickup || pickup.open) && (
             <p className={styles.submitError} role="alert">
               El 2x1 es solo para comer en el restaurante.{" "}
               <button
@@ -789,10 +694,10 @@ const OrderSummary = ({
               className={styles.confirmButton}
               onClick={onConfirm}
               type="button"
-              disabled={saving || cart.length === 0 || hasPromo2x1BlockedByFulfillment}
+              disabled={saving || cart.length === 0 || hasPromo2x1BlockedByFulfillment || (!retrying && Boolean(pausedMessage || pickup?.errorKey))}
               aria-busy={saving}
             >
-              {saving ? t("summary.sending") : `${t("summary.confirm")} — $${finalTotal.toFixed(2)}`}
+              {saving ? t("summary.sending") : retrying ? t("summary.retryConfirm") : `${t("summary.confirm")} — $${finalTotal.toFixed(2)}`}
             </button>
           </div>
         </div>

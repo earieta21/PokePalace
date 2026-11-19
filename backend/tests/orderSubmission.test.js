@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   clearOrderSubmission,
   getOrCreateOrderSubmission,
+  getPendingOrderSubmission,
   keepOrderSubmissionPayload,
 } from "../../src/utils/orderSubmission.js";
 
@@ -18,8 +19,10 @@ test("cada actor conserva su intento y payload sin sobrescribir a otro", () => {
   const guest = getOrCreateOrderSubmission("guest");
   const account = getOrCreateOrderSubmission("user:123");
   assert.notEqual(guest.clientOrderId, account.clientOrderId);
+  assert.equal(getPendingOrderSubmission("guest"), null);
 
   const frozenGuest = keepOrderSubmissionPayload(guest, { base: "white_rice" });
+  assert.deepEqual(getPendingOrderSubmission("guest"), frozenGuest);
   keepOrderSubmissionPayload(account, { base: "quinoa" });
 
   assert.equal(getOrCreateOrderSubmission("guest").clientOrderId, guest.clientOrderId);
@@ -31,5 +34,6 @@ test("cada actor conserva su intento y payload sin sobrescribir a otro", () => {
   clearOrderSubmission("guest", "web:otro-intento");
   assert.equal(getOrCreateOrderSubmission("guest").clientOrderId, guest.clientOrderId);
   clearOrderSubmission("user:123", account.clientOrderId);
+  assert.equal(getPendingOrderSubmission("user:123"), null);
   assert.equal(getOrCreateOrderSubmission("guest").clientOrderId, guest.clientOrderId);
 });

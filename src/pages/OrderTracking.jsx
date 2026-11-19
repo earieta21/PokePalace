@@ -6,6 +6,8 @@ import { GOOGLE_REVIEW_URL } from "../config";
 import { getItemLabel, getBaseLabel } from "../order/OrderLabels";
 import { useLanguage } from "../i18n/LanguageContext";
 import { clearActiveOrder, getOrderAccessToken, saveActiveOrder } from "../utils/orderAccess";
+import { getOrderTiming } from "../utils/orderTiming";
+import { RESTAURANT_TIME_ZONE } from "../../backend/utils/timeZone.js";
 import styles from "./OrderTracking.module.css";
 import { comboPalaceSelectionSummary } from "../data/comboPalace";
 import { getRewardGoals, MXN_PER_POINT } from "../data/rewardsCatalog";
@@ -320,6 +322,7 @@ export default function OrderTracking() {
   const currentStep = isCancelled ? -1 : (STEP_INDEX[order.status] ?? 0);
   const isDone      = order.status === "completed";
   const isPending   = order.status === "pending";
+  const timing = getOrderTiming(order, language);
   const ageMs       = Date.now() - new Date(order.createdAt).getTime();
   const canCancel   = isPending && ageMs < CANCEL_WINDOW_MS;
   const minsLeft    = canCancel ? Math.ceil((CANCEL_WINDOW_MS - ageMs) / 60000) : 0;
@@ -331,9 +334,12 @@ export default function OrderTracking() {
       <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>{t("tracking.title")}</h1>
         <p className={styles.pageSubtitle}>
-          Pedido #{order._id.slice(-6).toUpperCase()}
+          {language === "es" ? "Pedido" : "Order"} #{order._id.slice(-6).toUpperCase()}
           {" · "}
-          {new Date(order.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+          {new Date(order.createdAt).toLocaleTimeString(language === "es" ? "es-MX" : "en-US", {
+            timeZone: RESTAURANT_TIME_ZONE, hourCycle: language === "es" ? "h23" : "h12",
+            hour: "numeric", minute: "2-digit",
+          })}
         </p>
       </div>
 
@@ -363,27 +369,16 @@ export default function OrderTracking() {
         </div>
       )}
 
-      {/* Scheduled pickup notice */}
-      {order.isScheduled && order.scheduledPickupTime && (
+      {timing && (
         <div className={styles.scheduledNotice}>
-          <span className={styles.scheduledIcon}>🕐</span>
+          <span className={styles.scheduledIcon} aria-hidden="true">🕐</span>
           <div>
-            <p className={styles.scheduledLabel}>Recogida programada</p>
+            <p className={styles.scheduledLabel}>{timing.label}</p>
             <p className={styles.scheduledTime}>
-              {new Date(order.scheduledPickupTime).toLocaleString("es-MX", {
-                weekday: "short", month: "short", day: "numeric",
-                hour: "2-digit", minute: "2-digit",
-              })}
+              <time dateTime={timing.dateTime}>{timing.time}</time>
+              {language === "es" ? " · hora de Tijuana" : " · Tijuana time"}
             </p>
           </div>
-        </div>
-      )}
-
-      {/* Estimated time */}
-      {(order.status === "pending" || order.status === "preparing") && (
-        <div className={styles.estimatedTime}>
-          <span>⏱</span>
-          <span>Tiempo estimado de preparación: <strong>8–12 min</strong></span>
         </div>
       )}
 
