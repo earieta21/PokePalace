@@ -151,3 +151,11 @@
   .dispName { grid-column: 1 / -1; }
   .dispCost { align-items: flex-start; }
 }
+/* ---- Pendientes ---- */
+.pendingCard { display: flex; justify-content: space-between; align-items: center; gap: 16px 24px; flex-wrap: wrap; margin: 0 0 18px; padding: 18px 20px; border: 1px solid #ecd5a2; border-radius: 14px; background: #fffaf0; }
+.pendingCard > div:first-child { flex: 1; min-width: min(100%, 280px); }
+.pendingActions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .pendingActions { width: 100%; }
+  .pendingActions > button { flex: 1; }
+}

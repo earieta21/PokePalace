@@ -64,6 +64,33 @@ const bowlCostingSchema = new mongoose.Schema(
       default: {},
     },
 
+    // "¿Cuánto lleva una porción?" de cada opción del menú (base, complemento,
+    // salsa, marinado o topping), por su llave. El costo por porción NO se
+    // captura: sale de multiplicar esto por el precio de compra, que se lee en
+    // vivo del inventario (inventoryItemId, o el que empate por nombre) y solo
+    // si no hay, del precio escrito a mano. Ver utils/portionCost.js.
+    portions: {
+      type: Map,
+      of: new mongoose.Schema(
+        {
+          amount: { type: Number, default: 0, min: 0 },
+          unit: { type: String, enum: ["g", "ml", "pz"], default: "g" },
+          inventoryItemId: { type: mongoose.Schema.Types.ObjectId, ref: "Inventory", default: null },
+          // Precio a mano: lo que cuesta UNA unidad de compra (kg, l, pieza…).
+          price: { type: Number, default: 0, min: 0 },
+          priceUnit: { type: String, enum: ["kg", "g", "l", "ml", "pz"], default: "kg" },
+          // true = usar el precio a mano aunque haya un artículo de inventario.
+          useManualPrice: { type: Boolean, default: false },
+          // Si se compra por pieza (botella, bolsa) y la porción va en g o ml:
+          // cuánto trae cada pieza.
+          contentAmount: { type: Number, default: 0, min: 0 },
+          contentUnit: { type: String, enum: ["g", "ml", "kg", "l"], default: "g" },
+        },
+        { _id: false }
+      ),
+      default: {},
+    },
+
     // Ingredientes que el negocio no maneja. Se ocultan del costeo para no
     // llenar la tabla de cosas que nunca van a tener costo. Es distinto de
     // "agotado hoy" (eso vive en StoreSettings.unavailableItems): esto es

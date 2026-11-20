@@ -1,6 +1,11 @@
 import express from "express";
 import { requireStaffAuth } from "../middleware/requireStaffAuth.js";
-import { getCosting, updateCosting } from "../controllers/costingController.js";
+import {
+  applyCostingTemplate,
+  getCosting,
+  previewCostingTemplate,
+  updateCosting,
+} from "../controllers/costingController.js";
 
 const router = express.Router();
 
@@ -9,5 +14,7 @@ const managementOnly = requireStaffAuth(["manager", "admin", "owner"]);
 
 router.get("/", managementOnly, getCosting);
 router.put("/", managementOnly, updateCosting);
+router.get("/template", managementOnly, previewCostingTemplate);
+router.post("/template", managementOnly, applyCostingTemplate);
 
 export default router;

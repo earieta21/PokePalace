@@ -4,6 +4,7 @@ import {
   BASE_LABELS, MARINADE_LABELS, SAUCE_LABELS, COMPLEMENT_LABELS, PROTEIN_LABELS, TOPPING_LABELS,
 } from "../../order/OrderLabels";
 import { createStaffApi } from "../api";
+import { isMeasurable, measureOf } from "../../../backend/utils/portionCost.js";
 import ui from "./PreparationsPage.module.css";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
@@ -66,19 +67,69 @@ const toDraft = (prep) => ({
   })),
 });
 
-// Misma cuenta que hace el servidor, para que el costo se vea al momento de
-// capturar sin tener que guardar primero. Se redondea por línea igual que allá,
-// si no el total del editor sale un centavo distinto al ya guardado.
-const TO_BASE = { kg: 1000, gr: 1, lt: 1000, ml: 1, pz: 1 };
+// Misma cuenta que hace el servidor (backend/utils/preparationCost.js), para
+// que el costo se vea al momento de capturar sin tener que guardar primero.
+// Se redondea por línea igual que allá, si no el total del editor sale un
+// centavo distinto al ya guardado.
 const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+// Ligada al inventario, la línea toma el precio de UNA unidad del inventario
+// (un kg, un litro, una pieza). Si se compra por peso o volumen la
+// presentación es esa unidad; si se compra por pieza, la presentación dice
+// cuánto trae cada pieza.
+const liveLine = (line, inventoryById) => {
+  const linked = line.inventoryItemId ? inventoryById.get(line.inventoryItemId) : null;
+  if (!linked) return line;
+  const live = { ...line, unitPrice: Number(linked.cost) || 0 };
+  if (isMeasurable(linked.unit)) return { ...live, unit: linked.unit, presentation: 1 };
+  return isMeasurable(line.unit) ? live : { ...live, unit: linked.unit, presentation: Number(line.presentation) || 1 };
+};
+
 const lineCost = (line) => {
   const flat = Number(line.flatCost) || 0;
   if (flat > 0) return round2(flat);
-  const base = (Number(line.presentation) || 0) * (TO_BASE[line.unit] ?? 1);
+  const base = (Number(line.presentation) || 0) * measureOf(line.unit).base;
   const recipe = Number(line.recipeAmount) || 0;
   const price = Number(line.unitPrice) || 0;
   return base > 0 && recipe > 0 && price > 0 ? round2((recipe / base) * price) : 0;
 };
+
+// Más de esto por línea o por porción casi siempre es un error de captura
+// (precio de un paquete donde iba el de un kilo, kilos donde iban gramos…).
+const LINE_WARN_AT = 500;
+const PORTION_WARN_AT = 20;
+
+/** "Un lote rinde 1.25 L y la porción es de 30 ml" → 41 porciones. */
+function YieldHelper({ onUse }) {
+  const [batch, setBatch] = useState("");
+  const [batchUnit, setBatchUnit] = useState("lt");
+  const [portion, setPortion] = useState("30");
+  const [portionUnit, setPortionUnit] = useState("ml");
+  const total = (Number(batch) || 0) * measureOf(batchUnit).base;
+  const each = (Number(portion) || 0) * measureOf(portionUnit).base;
+  const result = total > 0 && each > 0 ? Math.floor(total / each) : 0;
+  return (
+    <div className={ui.yieldHelper}>
+      <span>¿No sabes cuántas porciones rinde? Un lote da</span>
+      <input type="number" min="0" step="any" inputMode="decimal" value={batch} placeholder="1.25"
+        onChange={(e) => setBatch(e.target.value)} aria-label="Cuánto rinde un lote" />
+      <select value={batchUnit} onChange={(e) => setBatchUnit(e.target.value)} aria-label="Unidad del lote">
+        {["lt", "ml", "kg", "gr"].map((u) => <option key={u} value={u}>{u}</option>)}
+      </select>
+      <span>y cada porción es de</span>
+      <input type="number" min="0" step="any" inputMode="decimal" value={portion}
+        onChange={(e) => setPortion(e.target.value)} aria-label="Tamaño de una porción" />
+      <select value={portionUnit} onChange={(e) => setPortionUnit(e.target.value)} aria-label="Unidad de la porción">
+        {["ml", "gr", "lt", "kg"].map((u) => <option key={u} value={u}>{u}</option>)}
+      </select>
+      {result > 0 && (
+        <button type="button" className={ui.linkBtn} onClick={() => onUse(String(result))}>
+          = {result} porciones · usar
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function PreparationsPage({ styles }) {
   const { staffToken } = useContext(StaffAuthContext);
@@ -132,10 +183,12 @@ export default function PreparationsPage({ styles }) {
         if (i !== index) return line;
         if (field === "inventoryItemId") {
           const item = (data.inventory || []).find((inv) => inv.id === value);
-          // Al ligar con el inventario, el precio y la unidad vienen de ahí.
-          return item
-            ? { ...line, inventoryItemId: value, name: line.name || item.item, unit: item.unit || line.unit, unitPrice: String(item.cost || "") }
-            : { ...line, inventoryItemId: "" };
+          if (!item) return { ...line, inventoryItemId: "" };
+          // Al ligar con el inventario el precio viene de ahí. Si se compra
+          // por kg o litro, eso es la presentación (1 kg, 1 litro); si se
+          // compra por pieza, falta saber cuánto trae cada una.
+          const linked = { ...line, inventoryItemId: value, name: line.name || item.item, unitPrice: String(item.cost || "") };
+          return isMeasurable(item.unit) ? { ...linked, unit: item.unit, presentation: "1" } : linked;
         }
         return { ...line, [field]: value };
       }),
@@ -181,8 +234,11 @@ export default function PreparationsPage({ styles }) {
   if (loading) return <p className={ui.muted}>Cargando recetas…</p>;
   if (!data) return <p className={ui.error}>{error || "No se pudieron cargar las recetas."}</p>;
 
-  const batchCost = draft ? draft.ingredients.reduce((sum, l) => sum + lineCost(l), 0) : 0;
+  const inventoryById = new Map((data.inventory || []).map((inv) => [inv.id, inv]));
+  const draftLines = draft ? draft.ingredients.map((l) => liveLine(l, inventoryById)) : [];
+  const batchCost = draftLines.reduce((sum, l) => sum + lineCost(l), 0);
   const portions = Number(draft?.yieldPortions) || 0;
+  const draftPortionCost = portions > 0 ? batchCost / portions : 0;
 
   const taken = new Set(data.preparations.map((p) => p.menuKey).filter(Boolean));
   const pendientes = MENU_GROUPS
@@ -344,49 +400,73 @@ export default function PreparationsPage({ styles }) {
                   onChange={(e) => setDraft({ ...draft, yieldPortions: e.target.value })} placeholder="40" />
               </label>
             </div>
+            <YieldHelper onUse={(value) => setDraft((prev) => ({ ...prev, yieldPortions: value }))} />
+            <p className={ui.hintLine}>
+              Presentación: lo que trae lo que compras (5 kg, una botella de 793 gr). Receta: cuánto entra al
+              lote en gramos o ml (o piezas). Si lo ligas al inventario, el precio se actualiza solo.
+            </p>
 
             <div className={ui.tableWrap}>
               <table className={ui.table}>
                 <thead>
                   <tr>
                     <th>Ingrediente</th><th>Del inventario</th><th>Unidad</th>
-                    <th>Presentación</th><th>Receta</th><th>Precio unitario</th>
+                    <th>Presentación</th><th>Receta <small>g, ml o pz</small></th><th>Precio unitario</th>
                     <th>Costo directo</th><th>Costo</th><th />
                   </tr>
                 </thead>
                 <tbody>
-                  {draft.ingredients.map((line, index) => (
-                    <tr key={index}>
-                      <td><input value={line.name} onChange={(e) => setLine(index, "name", e.target.value)} placeholder="Crema" /></td>
-                      <td>
-                        <select value={line.inventoryItemId} onChange={(e) => setLine(index, "inventoryItemId", e.target.value)}>
-                          <option value="">— a mano —</option>
-                          {(data.inventory || []).map((inv) => (
-                            <option key={inv.id} value={inv.id}>{inv.item}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        <select value={line.unit} onChange={(e) => setLine(index, "unit", e.target.value)}>
-                          {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-                        </select>
-                      </td>
-                      <td><input type="number" min="0" step="0.01" value={line.presentation} onChange={(e) => setLine(index, "presentation", e.target.value)} placeholder="5" /></td>
-                      <td><input type="number" min="0" step="1" value={line.recipeAmount} onChange={(e) => setLine(index, "recipeAmount", e.target.value)} placeholder="417" /></td>
-                      <td>
-                        <input type="number" min="0" step="0.01" value={line.unitPrice}
-                          disabled={Boolean(line.inventoryItemId)}
-                          onChange={(e) => setLine(index, "unitPrice", e.target.value)} placeholder="357" />
-                      </td>
-                      <td><input type="number" min="0" step="0.5" value={line.flatCost} onChange={(e) => setLine(index, "flatCost", e.target.value)} placeholder="—" /></td>
-                      <td className={ui.cost}>{money(lineCost(line))}</td>
-                      <td>
-                        <button type="button" className={ui.removeRow}
-                          onClick={() => setDraft({ ...draft, ingredients: draft.ingredients.filter((_, i) => i !== index) })}
-                          aria-label="Quitar ingrediente">×</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {draft.ingredients.map((line, index) => {
+                    const linked = line.inventoryItemId ? inventoryById.get(line.inventoryItemId) : null;
+                    const byWeight = linked && isMeasurable(linked.unit);
+                    const byPiece = linked && !byWeight;
+                    const live = draftLines[index];
+                    const cost = lineCost(live);
+                    const unitOptions = UNITS.includes(live.unit) ? UNITS : [live.unit, ...UNITS];
+                    return (
+                      <tr key={index} className={cost > LINE_WARN_AT ? ui.rowWarn : ""}>
+                        <td><input value={line.name} onChange={(e) => setLine(index, "name", e.target.value)} placeholder="Crema" /></td>
+                        <td>
+                          <select value={line.inventoryItemId} onChange={(e) => setLine(index, "inventoryItemId", e.target.value)}>
+                            <option value="">— a mano —</option>
+                            {(data.inventory || []).map((inv) => (
+                              <option key={inv.id} value={inv.id}>{inv.item}{inv.cost > 0 ? ` · ${money(inv.cost)}/${inv.unit}` : ""}</option>
+                            ))}
+                          </select>
+                          {byWeight && <small className={ui.cellHint}>precio por {linked.unit} del inventario</small>}
+                        </td>
+                        <td>
+                          <select value={live.unit} disabled={byWeight} onChange={(e) => setLine(index, "unit", e.target.value)}>
+                            {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                        </td>
+                        <td>
+                          <input type="number" min="0" step="any" inputMode="decimal"
+                            value={byWeight ? "1" : line.presentation} disabled={byWeight}
+                            onChange={(e) => setLine(index, "presentation", e.target.value)}
+                            placeholder={byPiece ? "¿cuánto trae?" : "5"}
+                            aria-label={byPiece ? `Cuánto trae cada ${linked.unit}, en ${line.unit}` : "Presentación"} />
+                          {byPiece && <small className={ui.cellHint}>{line.unit} que trae cada {linked.unit}</small>}
+                        </td>
+                        <td><input type="number" min="0" step="any" inputMode="decimal" value={line.recipeAmount} onChange={(e) => setLine(index, "recipeAmount", e.target.value)} placeholder="417" /></td>
+                        <td>
+                          <input type="number" min="0" step="0.01" value={linked ? String(linked.cost || 0) : line.unitPrice}
+                            disabled={Boolean(linked)}
+                            onChange={(e) => setLine(index, "unitPrice", e.target.value)} placeholder="357" />
+                        </td>
+                        <td><input type="number" min="0" step="0.5" value={line.flatCost} onChange={(e) => setLine(index, "flatCost", e.target.value)} placeholder="—" /></td>
+                        <td className={ui.cost}>
+                          {money(cost)}
+                          {cost > LINE_WARN_AT && <small className={ui.cellWarn}>¿seguro? revisa presentación y receta</small>}
+                        </td>
+                        <td>
+                          <button type="button" className={ui.removeRow}
+                            onClick={() => setDraft({ ...draft, ingredients: draft.ingredients.filter((_, i) => i !== index) })}
+                            aria-label="Quitar ingrediente">×</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -400,9 +480,15 @@ export default function PreparationsPage({ styles }) {
               <div><span>Elaboración (lote)</span><strong>{money(batchCost)}</strong></div>
               <div className={portions > 0 ? ui.destacado : ui.pendiente}>
                 <span>Costo por porción</span>
-                <strong>{portions > 0 ? money(batchCost / portions) : "falta rendimiento"}</strong>
+                <strong>{portions > 0 ? money(draftPortionCost) : "falta rendimiento"}</strong>
               </div>
             </div>
+            {draftPortionCost > PORTION_WARN_AT && (
+              <p className={ui.warn} role="alert">
+                {money(draftPortionCost)} por porción es mucho para un aderezo o marinado. ¿El rendimiento está en
+                porciones (no en litros) y la receta en gramos o ml?
+              </p>
+            )}
 
             <button className={ui.saveBtn} type="button" onClick={save} disabled={saving}>
               {saving ? "Guardando…" : "Guardar receta"}

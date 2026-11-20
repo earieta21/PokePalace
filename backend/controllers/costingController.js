@@ -5,8 +5,10 @@ import Inventory from "../models/Inventory.js";
 import Order from "../models/Order.js";
 import Preparation from "../models/Preparation.js";
 import {
+  ALL_INGREDIENT_KEYS,
   COMPLEMENT_KEYS,
   COMPLEMENT_LABELS,
+  INGREDIENT_CATEGORIES,
   IVA_RATE,
   PROTEIN_KEYS,
   PROTEIN_LABELS,
@@ -16,10 +18,18 @@ import {
   computeSharedParts,
   promoVerdict,
   resolveComplementCosts,
+  resolveIngredientCosts,
   resolveProteinCosts,
   weightedMargin,
 } from "../utils/bowlCosting.js";
 import { preparationCost, withLivePrices } from "../utils/preparationCost.js";
+import { PORTION_UNITS, PURCHASE_UNITS } from "../utils/portionCost.js";
+import {
+  TEMPLATE_DISPOSABLES,
+  TEMPLATE_PORTIONS,
+  TEMPLATE_RECIPES,
+  planCostingTemplate,
+} from "../config/costingTemplate.js";
 import { PROMO_2X1_MAX_COMPLEMENTS } from "../pricing.js";
 
 const CONFIG_ID = "bowl-costing";
@@ -185,6 +195,7 @@ const loadRecipeCosts = async (inventoryItems) => {
   for (const prep of preps) {
     const cost = preparationCost(withLivePrices(prep, inventoryById));
     status[prep.menuKey] = {
+      id: String(prep._id),
       name: prep.name,
       costPerPortion: cost.costPerPortion,
       // Una receta sin rendimiento solo sabe lo que cuesta el lote: no sirve
@@ -196,6 +207,39 @@ const loadRecipeCosts = async (inventoryItems) => {
   }
   return { costs, status };
 };
+
+const portionsOf = (config) => Object.fromEntries(
+  [...(config.portions || [])].map(([key, entry]) => [key, {
+    amount: Number(entry?.amount) || 0,
+    unit: entry?.unit || "g",
+    inventoryItemId: entry?.inventoryItemId ? String(entry.inventoryItemId) : null,
+    price: Number(entry?.price) || 0,
+    priceUnit: entry?.priceUnit || "kg",
+    useManualPrice: Boolean(entry?.useManualPrice),
+    contentAmount: Number(entry?.contentAmount) || 0,
+    contentUnit: entry?.contentUnit || "g",
+  }])
+);
+
+const CONTENT_UNITS = ["g", "ml", "kg", "l"];
+const boundedNumber = (value, max) => Math.min(max, Math.max(0, Number(value) || 0));
+
+/** Limpia una porción capturada. Regresa null si viene vacía (se borra). */
+export function cleanPortion(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const entry = {
+    amount: boundedNumber(raw.amount, 5000),
+    unit: PORTION_UNITS.includes(raw.unit) ? raw.unit : "g",
+    inventoryItemId: raw.inventoryItemId && mongoose.isValidObjectId(raw.inventoryItemId) ? String(raw.inventoryItemId) : null,
+    price: boundedNumber(raw.price, 100000),
+    priceUnit: PURCHASE_UNITS.includes(raw.priceUnit) ? raw.priceUnit : "kg",
+    useManualPrice: raw.useManualPrice === true,
+    contentAmount: boundedNumber(raw.contentAmount, 100000),
+    contentUnit: CONTENT_UNITS.includes(raw.contentUnit) ? raw.contentUnit : "g",
+  };
+  const empty = entry.amount === 0 && entry.price === 0 && !entry.inventoryItemId;
+  return empty ? null : entry;
+}
 
 const disposableLinesOf = (config) => (config.disposables || []).map((line) => ({
   disposableId: String(line.disposableId),
@@ -229,6 +273,19 @@ const buildReport = async (config) => {
   );
   const complementCosts = resolveComplementCosts(inventoryItems, capturedComplements, recipes.costs);
 
+  // Cuánto lleva una porción de cada opción × su precio de compra.
+  const portions = portionsOf(config);
+  const ingredientCosts = Object.fromEntries(Object.keys(INGREDIENT_CATEGORIES).map((category) => [
+    category,
+    resolveIngredientCosts({
+      category,
+      inventoryItems,
+      portions,
+      recipeCosts: recipes.costs,
+      recipeStatus: recipes.status,
+      legacyComplements: category === "complements" ? complementCosts : null,
+    }),
+  ]));
   const disabledProteins = new Set(config.disabledProteins || []);
   const disabledComplements = new Set(config.disabledComplements || []);
 
@@ -239,6 +296,7 @@ const buildReport = async (config) => {
     complementCosts,
     recipeCosts: recipes.costs,
     disposableCatalog,
+    ingredientCosts,
   });
 
   const bowls = PROTEIN_KEYS.filter((key) => !disabledProteins.has(key)).map((proteinKey) => {
@@ -272,6 +330,7 @@ const buildReport = async (config) => {
       proteinCostPerKgOverride: Object.fromEntries(config.proteinCostPerKgOverride || []),
       proteinYieldPct: proteinYields,
       complementCosts: capturedComplements,
+      portions,
       disposables: disposableLinesOf(config),
       disabledProteins: [...disabledProteins],
       disabledComplements: [...disabledComplements],
@@ -303,6 +362,23 @@ const buildReport = async (config) => {
     },
     proteinLabels: Object.fromEntries(PROTEIN_KEYS.map((key) => [key, PROTEIN_LABELS[key]])),
     complementCosts,
+    // Cada opción del menú con su porción, su precio y qué tan seguido se pide,
+    // en el orden de la pantalla.
+    ingredients: Object.fromEntries(Object.entries(INGREDIENT_CATEGORIES).map(([category, keys]) => [
+      category,
+      keys
+        .filter((key) => category !== "complements" || !disabledComplements.has(key))
+        .map((key) => ({
+          ...ingredientCosts[category][key],
+          frequency: category === "complements"
+            ? Number(usage.frequency?.[key]) || 0
+            : Number(usage.frequencyBy?.[category]?.[key]) || 0,
+        })),
+    ])),
+    // Para elegir de qué artículo sale el precio de cada porción.
+    inventoryOptions: inventoryItems
+      .map((item) => ({ id: String(item._id), item: item.item, unit: item.unit, cost: Number(item.cost) || 0 }))
+      .sort((a, b) => a.item.localeCompare(b.item, "es")),
   };
 };
 
@@ -361,6 +437,16 @@ export const updateCosting = async (req, res) => {
         } else {
           config.complementCosts.set(key, { costPerUnit, portionsPerUnit });
         }
+      }
+    }
+
+    if (req.body?.portions && typeof req.body.portions === "object") {
+      const allowed = new Set(ALL_INGREDIENT_KEYS);
+      for (const [key, raw] of Object.entries(req.body.portions)) {
+        if (!allowed.has(key)) continue;
+        const entry = cleanPortion(raw);
+        if (entry) config.portions.set(key, entry);
+        else config.portions.delete(key);
       }
     }
 
@@ -436,5 +522,82 @@ export const updateCosting = async (req, res) => {
   } catch (err) {
     console.error("updateCosting error:", err);
     res.status(500).json({ msg: "No se pudo guardar el costeo" });
+  }
+};
+
+/* ---------- Plantilla de la hoja de insumos ---------- */
+
+const templateState = async (config) => {
+  const [preparations, disposables] = await Promise.all([
+    Preparation.find({ menuKey: { $ne: null } }, { menuKey: 1 }).lean(),
+    Disposable.find({}, { name: 1 }).lean(),
+  ]);
+  return { preparations, portions: portionsOf(config), disposables, lines: config.disposables || [] };
+};
+
+/* GET /api/staff/costing/template — qué cargaría, sin tocar nada. */
+export const previewCostingTemplate = async (req, res) => {
+  try {
+    const config = await loadConfig();
+    res.json(planCostingTemplate(await templateState(config)));
+  } catch (err) {
+    console.error("previewCostingTemplate error:", err);
+    res.status(500).json({ msg: "No se pudo revisar la plantilla" });
+  }
+};
+
+/* POST /api/staff/costing/template — carga solo lo que falta. Nunca
+   sobrescribe una receta, una porción ni un desechable ya capturado. */
+export const applyCostingTemplate = async (req, res) => {
+  try {
+    const config = await loadConfig();
+    const plan = planCostingTemplate(await templateState(config));
+    const staffName = req.staff?.name || null;
+
+    for (const recipe of TEMPLATE_RECIPES) {
+      const step = plan.recipes.find((entry) => entry.menuKey === recipe.menuKey);
+      if (step?.action !== "crear") continue;
+      await Preparation.create({ ...recipe, yieldPortions: 0, updatedBy: staffName });
+    }
+
+    for (const step of plan.portions) {
+      if (step.action !== "crear") continue;
+      const entry = cleanPortion(TEMPLATE_PORTIONS[step.key]);
+      if (entry) config.portions.set(step.key, entry);
+    }
+
+    for (const template of TEMPLATE_DISPOSABLES) {
+      const step = plan.disposables.find((entry) => entry.name === template.name);
+      if (!step || step.action === "existe") continue;
+      let id = step.existingId;
+      let piecesPerPack = template.piecesPerPack;
+      if (!id) {
+        const created = await Disposable.create({
+          name: template.name,
+          category: template.category,
+          piecesPerPack: template.piecesPerPack,
+          pieces: 0,
+        });
+        id = String(created._id);
+      } else {
+        piecesPerPack = (await Disposable.findById(id, { piecesPerPack: 1 }).lean())?.piecesPerPack || piecesPerPack;
+      }
+      if ((config.disposables || []).length >= MAX_DISPOSABLE_LINES) break;
+      config.disposables.push({
+        disposableId: id,
+        name: step.existingName || template.name,
+        piecesPerPack,
+        packPrice: template.packPrice,
+        piecesPerBowl: 1,
+        appliesTo: template.appliesTo,
+      });
+    }
+
+    config.updatedBy = staffName;
+    await config.save();
+    res.json(await buildReport(config));
+  } catch (err) {
+    console.error("applyCostingTemplate error:", err);
+    res.status(500).json({ msg: "No se pudo cargar la plantilla" });
   }
 };

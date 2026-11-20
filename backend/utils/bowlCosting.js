@@ -10,6 +10,8 @@ import {
   PROMO_2X1_BOWLS_PRICE,
   isPromo2x1Protein,
 } from "../pricing.js";
+import { BOWL_CATALOG as CUSTOMER_BOWL_CHOICES } from "./customerOrder.js";
+import { portionCostOf } from "./portionCost.js";
 
 export const BOWL_PRICE = BOWL_BASE_PRICE;                                // bowl mediano
 export const LARGE_BOWL_PRICE = BOWL_BASE_PRICE + LARGE_BOWL_UPCHARGE;   // 3 proteínas
@@ -34,11 +36,17 @@ export const COMPLEMENT_KEYS = [
 
 // Las demás partes del bowl que el cliente elige. Cada una se pondera por qué
 // tan seguido la piden y, si ya tiene receta estándar, usa su costo real.
+// Se juntan las opciones del POS y las del sitio/kiosco: el Marinado Dulce,
+// por ejemplo, solo se pide desde el kiosco y antes quedaba fuera de la cuenta.
+const choicesOf = (field) => [...new Set([
+  ...(BOWL_CHOICE_KEYS[field] || []),
+  ...(CUSTOMER_BOWL_CHOICES[field] || []),
+])];
 export const RECIPE_PARTS = {
-  base: [...BOWL_CHOICE_KEYS.base],
-  marinades: [...BOWL_CHOICE_KEYS.marinades],
-  sauces: [...BOWL_CHOICE_KEYS.sauces],
-  toppings: [...BOWL_CHOICE_KEYS.toppings],
+  base: choicesOf("base"),
+  marinades: choicesOf("marinades"),
+  sauces: choicesOf("sauces"),
+  toppings: choicesOf("toppings"),
 };
 
 export const COMPLEMENT_LABELS = {
@@ -101,6 +109,45 @@ const COMPLEMENT_INVENTORY_ALIASES = {
   pineapple: ["pina"],
   chia_seeds: ["chia delgada", "chia", "semillas de chia"],
 };
+
+// Mismo respaldo por nombre para la base, los toppings y las salsas que se
+// compran hechas. Las que se preparan en casa se costean con su receta.
+const INGREDIENT_INVENTORY_ALIASES = {
+  ...COMPLEMENT_INVENTORY_ALIASES,
+  white_rice: ["arroz", "arroz blanco", "arroz para sushi", "arroz sushi"],
+  brown_rice: ["arroz integral"],
+  quinoa: ["quinoa", "quinua"],
+  spring_mix: ["mezcla de lechugas", "spring mix", "lechuga", "ensalada", "ensalada organica"],
+  sesame_seeds: ["ajonjoli", "ajonjoli tostado", "ajonjoli blanco"],
+  crispy_onions: ["cebolla crujiente"],
+  nori_strips: ["alga nori", "nori", "tiras de alga nori"],
+  red_pepper_flakes: ["chile quebrado", "hojuelas de chile", "pimienta roja en hojuelas"],
+  black_olives: ["aceitunas", "aceitunas negras"],
+  toasted_peanuts: ["cacahuate", "cacahuate tostado"],
+  masago: ["masago"],
+  croutons: ["crotones"],
+  pickled_radish: ["rabano encurtido"],
+  toasted_coconut: ["coco", "coco tostado", "coco rallado"],
+  pumpkin_seeds: ["pepitas", "semilla de calabaza"],
+  furikake: ["furikake"],
+  sriracha: ["sriracha", "siracha"],
+  soy_sauce: ["soya", "salsa de soya"],
+  sweet_chili: ["salsa de chile dulce", "chile dulce"],
+};
+
+// Los grupos de ingredientes que se costean por porción, en el orden en que
+// se muestran en la pantalla de Costeo.
+export const INGREDIENT_CATEGORIES = {
+  base: RECIPE_PARTS.base,
+  complements: COMPLEMENT_KEYS,
+  sauces: RECIPE_PARTS.sauces,
+  marinades: RECIPE_PARTS.marinades,
+  toppings: RECIPE_PARTS.toppings,
+};
+export const ALL_INGREDIENT_KEYS = [...new Set(Object.values(INGREDIENT_CATEGORIES).flat())];
+
+// Salsas y marinados se porcionan por volumen; lo demás por peso.
+export const defaultPortionUnit = (category) => (["sauces", "marinades"].includes(category) ? "ml" : "g");
 
 const normalize = (value) => String(value || "")
   .trim()
@@ -318,6 +365,161 @@ export function disposablesCost(lines = [], catalogById = new Map(), { togoShare
   return { total: round2(total), detail };
 }
 
+const round4 = (value) => Math.round((Number(value) || 0) * 10000) / 10000;
+
+/**
+ * Costo por porción de cada opción de un grupo (base, complementos, salsas,
+ * marinados o toppings), con este orden:
+ *   1. receta estándar con rendimiento (pestaña Recetas),
+ *   2. "cuánto lleva una porción" × el precio de compra. El precio sale del
+ *      artículo de inventario elegido; si no se eligió, del que empata por
+ *      menuKeys o por nombre, y si no hay, del precio capturado a mano. Así
+ *      el precio se actualiza solo cada vez que se recibe mercancía.
+ *   3. para complementos, el costo por unidad ÷ porciones capturado antes.
+ * Lo que falta se explica en palabras (`reason`) para que se pueda completar.
+ */
+export function resolveIngredientCosts({
+  category,
+  keys = INGREDIENT_CATEGORIES[category] || [],
+  inventoryItems = [],
+  portions = {},
+  recipeCosts = {},
+  recipeStatus = {},
+  legacyComplements = null,
+}) {
+  const byId = new Map(inventoryItems.map((item) => [String(item._id), item]));
+  const result = {};
+
+  for (const key of keys) {
+    const entry = portions?.[key] || {};
+    const portion = { amount: Number(entry.amount) || 0, unit: entry.unit || defaultPortionUnit(category) };
+    const content = { contentAmount: Number(entry.contentAmount) || 0, contentUnit: entry.contentUnit || "g" };
+
+    const aliases = INGREDIENT_INVENTORY_ALIASES[key] || [];
+    const autoItem = inventoryItems.find((item) => (item.menuKeys || []).includes(key))
+      || inventoryItems.find((item) => aliases.includes(normalize(item.item)));
+    const explicitItem = entry.inventoryItemId ? byId.get(String(entry.inventoryItemId)) : null;
+
+    const fromItem = (item) => (item && Number(item.cost) > 0
+      ? { price: Number(item.cost), unit: item.unit, ...content, source: "inventario", itemId: String(item._id), itemName: item.item }
+      : null);
+    const manual = Number(entry.price) > 0
+      ? { price: Number(entry.price), unit: entry.priceUnit || "kg", ...content, source: "manual" }
+      : null;
+
+    const candidates = (explicitItem
+      ? [fromItem(explicitItem)]
+      : entry.useManualPrice ? [manual] : [fromItem(autoItem), manual]
+    ).filter(Boolean);
+
+    let chosen = null;
+    let portionCost = 0;
+    let reason = null;
+    for (const candidate of candidates) {
+      const attempt = portionCostOf(portion, candidate);
+      if (attempt.cost > 0) { chosen = candidate; portionCost = attempt.cost; reason = null; break; }
+      if (!chosen) { chosen = candidate; reason = attempt.reason; }
+    }
+    if (candidates.length === 0) {
+      reason = portion.amount > 0
+        ? "Falta el precio de compra."
+        : "Falta cuánto lleva una porción y su precio de compra.";
+    }
+
+    const recipe = Number(recipeCosts?.[key]) || 0;
+    const recipeInfo = recipeStatus?.[key] || null;
+    const legacy = Number(legacyComplements?.[key]?.costPerPortion) || 0;
+    const legacyFromRecipe = legacyComplements?.[key]?.source === "receta";
+
+    let source = "falta";
+    let costPerPortion = 0;
+    if (recipe > 0) { source = "receta"; costPerPortion = recipe; reason = null; }
+    else if (portionCost > 0) { source = "porcion"; costPerPortion = portionCost; }
+    else if (legacy > 0 && !legacyFromRecipe) { source = "porcion"; costPerPortion = legacy; reason = null; }
+    else if (recipeInfo?.missingYield) {
+      reason = `Falta cuántas porciones rinde la receta "${recipeInfo.name}".`;
+    }
+
+    result[key] = {
+      key,
+      source,
+      costPerPortion: round4(costPerPortion),
+      reason,
+      amount: portion.amount,
+      unit: portion.unit,
+      price: chosen?.price || 0,
+      priceUnit: chosen?.unit || null,
+      priceSource: chosen?.source || null,
+      itemId: chosen?.itemId || null,
+      itemName: chosen?.itemName || null,
+      autoItemId: autoItem ? String(autoItem._id) : null,
+      autoItemName: autoItem?.item || null,
+      recipeId: recipeInfo?.id || null,
+      recipeName: recipeInfo?.name || null,
+      recipeMissingYield: Boolean(recipeInfo?.missingYield),
+      usesOldComplementEntry: source === "porcion" && portionCost <= 0,
+    };
+  }
+  return result;
+}
+
+/**
+ * Costo de un grupo en un bowl promedio: cada opción pesa según qué tan
+ * seguido la piden. Las que todavía no tienen costo se estiman con el
+ * promedio de las que sí (mucho más fiel que un monto general escrito a
+ * mano); el monto viejo solo se usa si ninguna opción tiene costo todavía.
+ * Sin ventas para saber qué piden: promedio conocido × cuántas lleva un bowl.
+ */
+export function categoryCost({
+  keys,
+  frequency = {},
+  costs = {},
+  disabled = new Set(),
+  fallbackPerServing = 0,
+  fallbackTotal = 0,
+  unitsPerBowl = 1,
+}) {
+  const active = keys.filter((key) => !disabled.has(key));
+  const known = active.map((key) => Number(costs?.[key]) || 0).filter((cost) => cost > 0);
+  const average = known.length > 0 ? known.reduce((sum, cost) => sum + cost, 0) / known.length : 0;
+  const hasUsage = active.some((key) => (Number(frequency?.[key]) || 0) > 0);
+
+  if (!hasUsage) {
+    if (average > 0) {
+      return { cost: round2(average * unitsPerBowl), source: "estimado", coveragePct: 0, missing: [], estimatePerPortion: round2(average), estimateFrom: "promedio" };
+    }
+    return { cost: round2(fallbackTotal), source: fallbackTotal > 0 ? "manual" : "falta", coveragePct: 0, missing: [], estimatePerPortion: 0, estimateFrom: null };
+  }
+
+  const estimate = average > 0 ? average : Number(fallbackPerServing) || 0;
+  let cost = 0;
+  let covered = 0;
+  let uncovered = 0;
+  const missing = [];
+  for (const key of active) {
+    const freq = Number(frequency?.[key]) || 0;
+    if (freq <= 0) continue;
+    const own = Number(costs?.[key]) || 0;
+    if (own > 0) {
+      cost += own * freq;
+      covered += freq;
+    } else {
+      cost += estimate * freq;
+      uncovered += freq;
+      missing.push({ key, frequency: freq });
+    }
+  }
+
+  return {
+    cost: round2(cost),
+    source: uncovered === 0 ? "completo" : covered > 0 ? "mixto" : estimate > 0 ? "manual" : "falta",
+    coveragePct: round2((covered / (covered + uncovered)) * 100),
+    missing: missing.sort((a, b) => b.frequency - a.frequency),
+    estimatePerPortion: uncovered > 0 ? round2(estimate) : 0,
+    estimateFrom: uncovered > 0 ? (average > 0 ? "promedio" : estimate > 0 ? "monto viejo" : null) : null,
+  };
+}
+
 /**
  * Todo lo que cuesta un bowl sin contar la proteína: es igual para cualquier
  * proteína, así que se calcula una vez y se reparte a cada columna.
@@ -328,29 +530,43 @@ export function computeSharedParts({
   complementCosts = null,
   recipeCosts = {},
   disposableCatalog = new Map(),
+  ingredientCosts = null,
 }) {
   const freq = usage?.frequencyBy || {};
 
-  const base = recipeWeightedCost({
+  // Costo por porción de cada opción. Sin el detalle ya resuelto (pruebas,
+  // datos viejos), solo cuentan las recetas y lo capturado por complemento.
+  const costsOf = (category) => Object.fromEntries(INGREDIENT_CATEGORIES[category].map((key) => [
+    key,
+    ingredientCosts?.[category]
+      ? Number(ingredientCosts[category][key]?.costPerPortion) || 0
+      : category === "complements"
+        ? Number(complementCosts?.[key]?.costPerPortion) || 0
+        : Number(recipeCosts?.[key]) || 0,
+  ]));
+
+  const base = categoryCost({
     keys: RECIPE_PARTS.base,
     frequency: freq.base,
-    recipeCosts,
+    costs: costsOf("base"),
     // La base se sirve una por bowl: lo capturado por kilo ya es "por porción".
     fallbackPerServing: baseCost(config),
     fallbackTotal: baseCost(config),
+    unitsPerBowl: 1,
   });
 
-  const fromParts = (field, keys) => recipeWeightedCost({
-    keys,
+  const fromParts = (field) => categoryCost({
+    keys: RECIPE_PARTS[field],
     frequency: freq[field],
-    recipeCosts,
+    costs: costsOf(field),
     fallbackPerServing: Number(config?.[field]?.costPerUnit) || 0,
     fallbackTotal: partCost(config?.[field]),
+    unitsPerBowl: Number(config?.[field]?.unitsPerBowl) || 1,
   });
 
-  const marinades = fromParts("marinades", RECIPE_PARTS.marinades);
-  const sauces = fromParts("sauces", RECIPE_PARTS.sauces);
-  const toppings = fromParts("toppings", RECIPE_PARTS.toppings);
+  const marinades = fromParts("marinades");
+  const sauces = fromParts("sauces");
+  const toppings = fromParts("toppings");
 
   const lines = config?.disposables || [];
   const disposables = disposablesCost(lines, disposableCatalog, {
@@ -363,7 +579,16 @@ export function computeSharedParts({
     ? { cost: disposables.total, source: "desglose", detail: disposables.detail }
     : { cost: partCost(config?.packaging), source: "manual", detail: [] };
 
-  const complements = complementsCost(config, usage, complementCosts);
+  const complementsPart = categoryCost({
+    keys: COMPLEMENT_KEYS,
+    frequency: usage?.bowls > 0 ? usage.frequency : {},
+    costs: costsOf("complements"),
+    disabled: new Set(config?.disabledComplements || []),
+    fallbackPerServing: Number(config?.complements?.costPerUnit) || 0,
+    fallbackTotal: partCost(config?.complements),
+    unitsPerBowl: Number(config?.complements?.unitsPerBowl) || 4,
+  });
+  const complements = complementsPart.cost;
 
   // Un bowl del 2x1 es distinto de uno normal en dos cosas que sí cuestan:
   //   - máximo PROMO_2X1_MAX_COMPLEMENTS complementos: se recorta lo que
@@ -395,7 +620,7 @@ export function computeSharedParts({
       complements: round2(complements * capFactor),
       packaging: dineInDisposables,
     },
-    detail: { base, marinades, sauces, toppings, packaging },
+    detail: { base, marinades, complements: complementsPart, sauces, toppings, packaging },
   };
 }
 

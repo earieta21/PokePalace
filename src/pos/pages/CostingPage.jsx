@@ -1,25 +1,20 @@
-import { useState, useEffect, useContext, useCallback } from "react";
+import { useState, useEffect, useContext, useCallback, useMemo } from "react";
 import { StaffAuthContext } from "../../context/StaffAuthContext";
-import {
-  BASE_LABELS, MARINADE_LABELS, SAUCE_LABELS, TOPPING_LABELS,
-} from "../../order/OrderLabels";
 import { PROMO_2X1_MAX_COMPLEMENTS } from "../../order/pricing";
 import { createStaffApi } from "../api";
+import { PendingWizard, PortionSection, TemplateDialog } from "./CostingPortions";
+import {
+  CATEGORIES, CATEGORY_BY_KEY, initialPortion, pendingSteps, portionToPayload,
+} from "./costingPortionsModel";
 import ui from "./CostingPage.module.css";
 
 const money = (n) => `$${(Number(n) || 0).toFixed(2)}`;
 const pct = (n) => `${(Number(n) || 0).toFixed(1)}%`;
 
-// Las partes del bowl que se capturan a mano: el inventario todavía no sabe
-// cuántas porciones rinde un paquete, así que esto se define una vez aquí.
-// La base no va aquí: se captura por kilo + gramos en su propio bloque. El
-// empaque tampoco: se desglosa desechable por desechable en su sección.
-const PARTS = [
-  { key: "marinades", label: "Marinados", hint: "Costo por marinado — solo para los que aún no tienen receta" },
-  { key: "complements", label: "Complementos", hint: "Respaldo: solo se usa si ningún complemento tiene costo propio" },
-  { key: "sauces", label: "Salsas", hint: "Costo por salsa — solo para las que aún no tienen receta" },
-  { key: "toppings", label: "Toppings", hint: "Costo por topping — solo para los que aún no tienen receta" },
-];
+// Montos generales que se capturaban antes ("costo × por bowl"). Ya no se
+// editan: solo quedan de respaldo mientras ninguna opción del grupo tiene su
+// porción, y se pueden quitar desde la pantalla de porciones.
+const LEGACY_PARTS = ["marinades", "complements", "sauces", "toppings"];
 
 const ROW_LABELS = {
   marinades: "Marinados",
@@ -29,14 +24,9 @@ const ROW_LABELS = {
   packaging: "Desechables",
 };
 
-// Las partes que pueden costearse con receta estándar, con los nombres que ve
-// el cliente para decir cuáles faltan.
-const RECIPE_PART_LABELS = {
-  base: { label: "Base", names: BASE_LABELS },
-  marinades: { label: "Marinados", names: MARINADE_LABELS },
-  sauces: { label: "Salsas", names: SAUCE_LABELS },
-  toppings: { label: "Toppings", names: TOPPING_LABELS },
-};
+// Arriba de esto por bowl promedio, lo más probable es que se haya capturado
+// el precio de un paquete o de un lote entero como si fuera una porción.
+const ROW_WARN_AT = { base: 25, marinades: 15, complements: 40, sauces: 20, toppings: 15, packaging: 20 };
 
 const APPLIES_TO = [
   { value: "all", label: "Todos los bowls" },
@@ -55,39 +45,52 @@ const VERDICT_STYLE = {
 const CHECK_STYLE = { ok: ui.checkOk, partial: ui.checkPartial, missing: ui.checkMissing };
 const CHECK_ICON = { ok: "✓", partial: "◐", missing: "✕" };
 
-/** Etiqueta corta de dónde sale el costo de una fila (receta, a mano…). */
+/** Etiqueta corta de dónde sale el costo de una fila. */
 function SourceBadge({ part }) {
   if (!part) return null;
-  if (part.source === "receta") return <span className={`${ui.badge} ${ui.badgeAuto}`}>receta</span>;
-  if (part.source === "desglose") return <span className={`${ui.badge} ${ui.badgeAuto}`}>desglose</span>;
-  if (part.source === "mixto") {
-    return <span className={`${ui.badge} ${ui.badgeManual}`}>{Math.round(part.coveragePct)}% receta</span>;
-  }
-  return <span className={`${ui.badge} ${ui.badgeManual}`}>a mano</span>;
+  const auto = `${ui.badge} ${ui.badgeAuto}`;
+  const manual = `${ui.badge} ${ui.badgeManual}`;
+  if (part.source === "completo" || part.source === "receta") return <span className={auto}>completo</span>;
+  if (part.source === "desglose") return <span className={auto}>desglose</span>;
+  if (part.source === "mixto") return <span className={manual}>{Math.round(part.coveragePct)}% con costo</span>;
+  if (part.source === "estimado") return <span className={manual}>estimado</span>;
+  if (part.source === "falta") return <span className={manual}>falta</span>;
+  return <span className={manual}>monto anterior</span>;
 }
 
-/** Qué falta para que una parte quede 100% con receta, en palabras. */
-function coverageText(part, names) {
-  if (!part) return "";
-  if (part.source === "receta") return "Todo lo que se sirve ya tiene receta estándar.";
-  if (part.source === "manual") {
-    return "Sin recetas todavía: se usa el costo capturado aquí. Dalas de alta en la pestaña Recetas.";
+/** Qué tan completo está un grupo (base, salsas…), en palabras. */
+function categoryCheck(key, part, rowCost) {
+  const { label, labels } = CATEGORY_BY_KEY[key];
+  const names = (list) => {
+    const shown = list.slice(0, 3).map((m) => labels[m.key] || m.key).join(", ");
+    return list.length > 3 ? `${shown} y ${list.length - 3} más` : shown;
+  };
+  if (!part) return { status: "missing", label, detail: "Sin datos." };
+  if (part.source === "completo") return { status: "ok", label, detail: "Todo lo que se pide tiene su costo por porción." };
+  if (part.source === "mixto") {
+    return {
+      status: "partial",
+      label,
+      detail: `${Math.round(part.coveragePct)}% de lo que se sirve tiene costo. Faltan: ${names(part.missing || [])} (se estiman con el promedio).`,
+    };
   }
-  const missing = (part.missing || []).slice(0, 4)
-    .map((m) => `${names?.[m.key] || m.key} (${Math.round(m.frequency * 100)}%)`)
-    .join(", ");
-  const more = (part.missing || []).length > 4 ? ` y ${part.missing.length - 4} más` : "";
-  return `Con receta: ${Math.round(part.coveragePct)}% de lo que se sirve. Sin receta (usan el costo de aquí): ${missing}${more}.`;
+  if (part.source === "estimado") return { status: "partial", label, detail: "Sin ventas registradas todavía: se estima con el promedio." };
+  if (part.source === "manual" && rowCost > 0) {
+    return { status: "partial", label, detail: "Ninguna opción tiene su porción: se usa un monto general capturado antes." };
+  }
+  return { status: "missing", label, detail: "Sin costo: hoy cuenta como $0." };
 }
+
+const inventoryIndex = (report) => new Map((report?.inventoryOptions || []).map((option) => [option.id, option]));
 
 const openSection = (id) => requestAnimationFrame(() => {
   const section = document.getElementById(id);
   if (section) { section.open = true; section.scrollIntoView({ block: "start" }); }
 });
 
-export default function CostingPage({ styles }) {
+export default function CostingPage({ styles, onOpenRecipes = null }) {
   const { staffToken } = useContext(StaffAuthContext);
-  const api = createStaffApi(staffToken);
+  const api = useMemo(() => createStaffApi(staffToken), [staffToken]);
 
   const [data, setData] = useState(null);
   const [form, setForm] = useState(null);
@@ -100,16 +103,27 @@ export default function CostingPage({ styles }) {
   const [search, setSearch] = useState("");
   const [onlyMissing, setOnlyMissing] = useState(false);
   const [loadVersion, setLoadVersion] = useState(0);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [templatePlan, setTemplatePlan] = useState(null);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const [templateError, setTemplateError] = useState("");
   const dirty = Boolean(form && JSON.stringify(form) !== savedForm);
 
   const hydrate = useCallback((report) => {
     setData(report);
     const proteinKeys = Object.keys(report.proteinLabels || {});
     const nextForm = {
-      ...Object.fromEntries(PARTS.map(({ key }) => [key, {
+      ...Object.fromEntries(LEGACY_PARTS.map((key) => [key, {
         costPerUnit: String(report.config[key]?.costPerUnit ?? 0),
         unitsPerBowl: String(report.config[key]?.unitsPerBowl ?? 0),
       }])),
+      portions: Object.fromEntries(CATEGORIES.flatMap(({ key: category }) =>
+        (report.ingredients?.[category] || []).map((item) => [
+          item.key,
+          initialPortion({ saved: report.config.portions?.[item.key], item, inventoryById: inventoryIndex(report), category }),
+        ])
+      )),
       baseCostPerKg: String(report.config.baseCostPerKg ?? 0),
       baseGramsPerPortion: String(report.config.baseGramsPerPortion ?? 0),
       comboDrinkCost: String(report.config.comboDrinkCost ?? 0),
@@ -154,6 +168,12 @@ export default function CostingPage({ styles }) {
     return () => { alive = false; };
   }, [staffToken, hydrate, loadVersion]);
 
+  // Cuántos datos de la hoja de insumos faltan por cargar (para el botón).
+  const refreshTemplatePlan = useCallback(() => {
+    api.get("/api/staff/costing/template").then(setTemplatePlan).catch(() => setTemplatePlan(null));
+  }, [api]);
+  useEffect(() => { refreshTemplatePlan(); }, [refreshTemplatePlan, loadVersion]);
+
   useEffect(() => {
     if (!dirty) return;
     const warn = (event) => { event.preventDefault(); event.returnValue = ""; };
@@ -169,8 +189,16 @@ export default function CostingPage({ styles }) {
       ? prev[field].filter((value) => value !== key) : [...prev[field], key] }));
   };
 
-  const setPart = (partKey, field, value) =>
-    setForm((prev) => ({ ...prev, [partKey]: { ...prev[partKey], [field]: value } }));
+  const setPortion = (key, changes) => {
+    setSavedMsg("");
+    setForm((prev) => ({ ...prev, portions: { ...prev.portions, [key]: { ...prev.portions[key], ...changes } } }));
+  };
+
+  // Quita el monto general de antes para que el grupo se calcule solo con las
+  // porciones capturadas (y avise lo que falta en vez de esconderlo).
+  const clearLegacy = (category) => setForm((prev) => (category === "base"
+    ? { ...prev, baseCostPerKg: "0", baseGramsPerPortion: "0" }
+    : { ...prev, [category]: { ...prev[category], costPerUnit: "0" } }));
 
   const setDisposable = (index, field, value) =>
     setForm((prev) => ({
@@ -188,7 +216,7 @@ export default function CostingPage({ styles }) {
     setForm((prev) => ({ ...prev, disposables: prev.disposables.filter((_, i) => i !== index) }));
 
   const save = async () => {
-    if (saving || !dirty) return;
+    if (saving || !dirty) return !dirty;
     const inputs = document.querySelectorAll("#costing-editor input[type=number]");
     const invalid = [...inputs].find((input) => !input.validity.valid);
     if (invalid) {
@@ -199,23 +227,31 @@ export default function CostingPage({ styles }) {
       if (section) section.open = true;
       setError("Revisa el campo señalado: usa un número válido, mayor o igual a cero. Los porcentajes no pueden superar 100 y el rendimiento va de 20 a 100.");
       requestAnimationFrame(() => { invalid.focus(); invalid.reportValidity(); });
-      return;
+      return false;
     }
     if (form.disposables.some((line) => !line.disposableId)) {
       setView("costs");
       setError("Elige el desechable en cada renglón (o quita los renglones vacíos).");
       openSection("costing-disposables");
-      return;
+      return false;
     }
     setSaving(true);
     setError("");
     setSavedMsg("");
     try {
+      const saved = JSON.parse(savedForm || "{}");
       const payload = {
-        ...Object.fromEntries(PARTS.map(({ key }) => [key, {
+        ...Object.fromEntries(LEGACY_PARTS.map((key) => [key, {
           costPerUnit: Number(form[key].costPerUnit) || 0,
           unitsPerBowl: Number(form[key].unitsPerBowl) || 0,
         }])),
+        // Solo las porciones que cambiaron: así no se pisa lo que otra persona
+        // haya guardado mientras tanto en otras opciones.
+        portions: Object.fromEntries(
+          Object.entries(form.portions || {})
+            .filter(([key, entry]) => JSON.stringify(entry) !== JSON.stringify(saved.portions?.[key]))
+            .map(([key, entry]) => [key, portionToPayload(entry)])
+        ),
         baseCostPerKg: Number(form.baseCostPerKg) || 0,
         baseGramsPerPortion: Number(form.baseGramsPerPortion) || 0,
         comboDrinkCost: Number(form.comboDrinkCost) || 0,
@@ -240,13 +276,58 @@ export default function CostingPage({ styles }) {
         })),
       };
       hydrate(await api.put("/api/staff/costing", payload));
+      refreshTemplatePlan();
       setSavedMsg("Guardado. Los márgenes ya están actualizados.");
+      return true;
     } catch (e) {
       setError(e.message);
+      return false;
     } finally {
       setSaving(false);
     }
   };
+
+  // El asistente y la plantilla guardan por su cuenta y recargan todo: antes
+  // se guarda lo que esté a medias para no perderlo.
+  const saveFirst = async () => {
+    if (!dirty) return true;
+    if (!window.confirm("Tienes cambios sin guardar. ¿Guardarlos antes de seguir?")) return false;
+    return save();
+  };
+
+  const openWizard = async () => {
+    if (await saveFirst()) { setSavedMsg(""); setWizardOpen(true); }
+  };
+
+  const openTemplate = async () => {
+    if (!(await saveFirst())) return;
+    setTemplateError("");
+    try {
+      setTemplatePlan(await api.get("/api/staff/costing/template"));
+      setTemplateOpen(true);
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const applyTemplate = async () => {
+    setTemplateBusy(true);
+    setTemplateError("");
+    try {
+      hydrate(await api.post("/api/staff/costing/template", {}));
+      refreshTemplatePlan();
+      setTemplateOpen(false);
+      setSavedMsg("Listo: se cargaron los datos de la hoja. Revisa lo que quedó pendiente.");
+    } catch (e) {
+      setTemplateError(e.message);
+    } finally {
+      setTemplateBusy(false);
+    }
+  };
+
+  const goToRecipes = onOpenRecipes
+    ? () => { if (!dirty || window.confirm("Tienes cambios sin guardar que se perderán. ¿Ir a Recetas de todos modos?")) onOpenRecipes(); }
+    : null;
 
   if (loading) return <p className={ui.muted}>Cargando costeo…</p>;
   if (!data || !form) return <div className={ui.page}><p className={ui.error} role="alert">{error || "No se pudo cargar el costeo."}</p><button type="button" className={ui.secondaryBtn} onClick={() => setLoadVersion((value) => value + 1)}>Reintentar</button></div>;
@@ -259,23 +340,14 @@ export default function CostingPage({ styles }) {
     ...(!bowls[0]?.rows.base ? ["base"] : []),
     ...Object.entries(ROW_LABELS).filter(([key]) => !bowls[0]?.rows[key]).map(([, label]) => label.toLowerCase()),
   ];
-  const incompleteComplements = (usage.keys || []).filter((key) =>
-    (usage.frequency?.[key] || 0) > 0 && !(data.complementCosts?.[key]?.costPerPortion > 0)
+  const incompleteComplements = (data.ingredients?.complements || []).filter((item) =>
+    item.frequency > 0 && !(item.costPerPortion > 0)
   );
-  // Cuántos de cada cosa lleva un bowl de verdad, para no capturar a ojo.
   const realAvg = usage.averagePerBowl || {};
   const ivaPct = Math.round((data.ivaRate ?? 0.16) * 100);
-  const normalize = (value) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const visibleComplements = (usage.keys || []).filter((key) => {
-    const matches = normalize(usage.labels?.[key] || key).includes(normalize(search));
-    const resolved = data.complementCosts?.[key] || {};
-    const entry = form.complementCosts?.[key] || {};
-    const inventoryCost = resolved.inventoryCostPerUnit ?? (resolved.source === "inventario" ? resolved.costPerUnit : 0);
-    const missing = resolved.source !== "receta" && (
-      !(Number(entry.costPerUnit) > 0 || inventoryCost > 0) || !(Number(entry.portionsPerUnit) > 0)
-    );
-    return matches && (!onlyMissing || missing);
-  });
+  const inventoryOptions = data.inventoryOptions || [];
+  const inventoryById = inventoryIndex(data);
+  const steps = pendingSteps(data);
 
   // Mismo prorrateo de desechables que hace el servidor, para ver el costo al
   // capturar sin tener que guardar primero.
@@ -295,29 +367,21 @@ export default function CostingPage({ styles }) {
   const takenDisposables = new Set(form.disposables.map((line) => line.disposableId).filter(Boolean));
 
   // ---- Qué tan exacto es el costo: lo que ya está y lo que falta ----
-  const usedComplements = (usage.keys || []).filter((key) => (usage.frequency?.[key] || 0) > 0);
-  const complementsWithCost = usedComplements.filter((key) => (data.complementCosts?.[key]?.costPerPortion || 0) > 0);
   const yieldsCaptured = bowls.filter((b) => data.config.proteinYieldPct?.[b.proteinKey] !== undefined);
   const recipesWithoutYield = Object.values(data.recipeStatus || {}).filter((r) => r.missingYield);
   const disposablesWithoutPrice = (parts.packaging?.detail || []).filter((line) => line.missingPrice);
-  const recipeCheck = (key) => {
-    const part = parts[key];
-    const { label } = RECIPE_PART_LABELS[key];
-    const hasCost = (bowls[0]?.rows?.[key] || 0) > 0;
-    if (part?.source === "receta") return { status: "ok", label, detail: "Todo lo que se sirve tiene receta estándar." };
-    if (part?.source === "mixto") {
-      return { status: "partial", label, detail: `${Math.round(part.coveragePct)}% de lo que se sirve tiene receta; el resto usa el costo capturado.` };
-    }
-    return {
-      status: hasCost ? "partial" : "missing",
-      label,
-      detail: hasCost
-        ? key === "base"
-          ? "Un solo costo capturado a mano para arroz, integral, quinoa y ensalada."
-          : "Un solo costo capturado a mano, sin receta."
-        : "Sin costo: hoy cuenta como $0.",
-    };
-  };
+  const recipeCheck = (key) => categoryCheck(key, parts[key], bowls[0]?.rows?.[key] || 0);
+
+  // ---- Avisos de números que no cuadran ----
+  const rowLabel = (key) => (key === "base" ? "Base" : ROW_LABELS[key]);
+  const sanityWarnings = [
+    ...bowls
+      .filter((b) => b.proteinSource !== "falta" && b.total > b.price)
+      .map((b) => `El bowl de ${b.label} cuesta ${money(b.total)} y se vende en ${money(b.price)} sin IVA: algo está capturado de más.`),
+    ...Object.entries(ROW_WARN_AT)
+      .filter(([key, limit]) => (bowls[0]?.rows?.[key] || 0) > limit)
+      .map(([key]) => `${rowLabel(key)} suma ${money(bowls[0].rows[key])} por bowl, más de lo normal. ¿Quedó el precio de un paquete o de un lote entero como si fuera una porción?`),
+  ];
   const checks = [
     {
       status: missingCosts.length === 0 ? "ok" : "missing",
@@ -335,12 +399,7 @@ export default function CostingPage({ styles }) {
     },
     recipeCheck("base"),
     recipeCheck("marinades"),
-    {
-      status: usedComplements.length > 0 && complementsWithCost.length === usedComplements.length
-        ? "ok" : complementsWithCost.length > 0 ? "partial" : "missing",
-      label: "Complementos",
-      detail: `${complementsWithCost.length} de ${usedComplements.length} complementos que sí se piden tienen costo por porción.`,
-    },
+    recipeCheck("complements"),
     recipeCheck("sauces"),
     recipeCheck("toppings"),
     {
@@ -353,7 +412,7 @@ export default function CostingPage({ styles }) {
           ? `Sin precio: ${disposablesWithoutPrice.map((line) => line.name).join(", ")}.`
           : `${parts.packaging.detail.length} desechables desglosados.`
         : (bowls[0]?.rows?.packaging || 0) > 0
-          ? "Un solo monto general; desglósalo en Editar costos."
+          ? "Un solo monto general; desglósalo en Porciones y precios."
           : "Sin capturar: hoy cuentan como $0.",
     },
   ];
@@ -361,7 +420,7 @@ export default function CostingPage({ styles }) {
     checks.push({
       status: "partial",
       label: "Recetas sin rendimiento",
-      detail: `${recipesWithoutYield.map((r) => r.name).join(", ")}: sin porciones por lote no entran al costo del bowl.`,
+      detail: `${recipesWithoutYield.map((r) => r.name).join(", ")}: falta cuántas porciones rinde un lote.`,
     });
   }
   const pendingChecks = checks.filter((c) => c.status !== "ok").length;
@@ -375,7 +434,7 @@ export default function CostingPage({ styles }) {
         </header>
 
         <nav className={ui.tabs} aria-label="Secciones de costeo">
-          {[["summary", "Resumen"], ["costs", "Editar costos"], ["ingredients", "Ingredientes del menú"]].map(([key, label]) => (
+          {[["summary", "Resumen"], ["costs", "Porciones y precios"], ["ingredients", "Ingredientes del menú"]].map(([key, label]) => (
             <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}>{label}</button>
           ))}
         </nav>
@@ -389,6 +448,16 @@ export default function CostingPage({ styles }) {
           <button type="button" className={ui.secondaryBtn} onClick={() => setView("costs")}>Actualizar costos →</button>
         </div>
         {dirty && <p className={ui.warnBox}>Tienes cambios pendientes. Este resumen muestra los últimos costos guardados.</p>}
+
+        <PendingCard steps={steps} templatePending={templatePlan?.pending || 0} onWizard={openWizard} onTemplate={openTemplate} />
+
+        {sanityWarnings.length > 0 && (
+          <div className={ui.warnBox} role="alert">
+            <strong>Revisa estos números:</strong>
+            <ul>{sanityWarnings.map((text) => <li key={text}>{text}</li>)}</ul>
+            <button type="button" className={ui.secondaryBtn} onClick={() => setView("costs")}>Ir a Porciones y precios →</button>
+          </div>
+        )}
 
         {/* ---- Qué tan exacto es el número ---- */}
         <details className={`${ui.disclosure} ${ui.checklist}`} open>
@@ -410,22 +479,6 @@ export default function CostingPage({ styles }) {
         </details>
 
         {bowls.length > 0 && zeroParts.length > 0 && <p className={ui.warnBox}>Costos en cero: {zeroParts.join(", ")}. Revisa si faltan datos; el margen puede parecer mayor al real.</p>}
-        {incompleteComplements.length > 0 && <div className={ui.warnBox}>
-          <p>Hay {incompleteComplements.length} complemento(s) con uso registrado sin costo por porción. Completa sus costos y rendimientos antes de tomar decisiones con estos márgenes.</p>
-          <button type="button" className={ui.secondaryBtn} onClick={() => { setView("costs"); setOnlyMissing(true); setSearch(""); openSection("costing-complements"); }}>Revisar complementos pendientes →</button>
-        </div>}
-
-        {missingCosts.length > 0 && (
-          <div className={ui.warnBox}>
-            <strong>Faltan costos de proteína:</strong>
-            <ul>
-              {missingCosts.map((b) => (
-                <li key={b.proteinKey}>{b.label} — {b.proteinNote}</li>
-              ))}
-            </ul>
-            <button type="button" className={ui.secondaryBtn} onClick={() => { setView("costs"); requestAnimationFrame(() => { const section = document.getElementById("costing-proteins"); if (section) { section.open = true; section.scrollIntoView({ block: "center" }); section.querySelector("input")?.focus({ preventScroll: true }); } }); }}>Completar costos de proteína →</button>
-          </div>
-        )}
 
         {bowls.length === 0 && <p className={ui.warnBox}>No hay proteínas activas. Actívalas en Ingredientes del menú para ver su costeo.</p>}
         <div className={ui.bowlCards}>
@@ -438,7 +491,7 @@ export default function CostingPage({ styles }) {
               <div><dt>Sin IVA</dt><dd>{money(b.price)}</dd></div>
               <div className={ui.cardMargin}><dt>Margen por bowl</dt><dd>{missing ? "—" : <>{money(b.margin)} <small>{pct(b.marginPct)}</small></>}</dd></div></dl>
               {/* Si la proteína ni siquiera entra al 2x1, eso se dice aunque falten complementos. */}
-              <p className={`${ui.verdict} ${VERDICT_STYLE[missing || (incompleteComplements.length && b.verdict.status !== "excluida") ? "sin_datos" : b.verdict.status]}`}>{missing ? "Captura el costo de esta proteína para evaluar su margen." : b.verdict.status === "excluida" ? b.verdict.message : incompleteComplements.length ? "Estimación parcial: completa los costos de complementos para evaluar promociones." : b.verdict.message}</p>
+              <p className={`${ui.verdict} ${VERDICT_STYLE[missing || (incompleteComplements.length && b.verdict.status !== "excluida") ? "sin_datos" : b.verdict.status]}`}>{missing ? "Captura el costo de esta proteína para evaluar su margen." : b.verdict.status === "excluida" ? b.verdict.message : incompleteComplements.length ? "Estimación parcial: faltan porciones de complementos para evaluar promociones." : b.verdict.message}</p>
             </article>;
           })}
         </div>
@@ -587,88 +640,52 @@ export default function CostingPage({ styles }) {
 
         {/* ---- Captura ---- */}
         <fieldset id="costing-editor" className={ui.editor} disabled={saving} hidden={view !== "costs"}>
-          <h3 className={ui.sectionTitle}>Costos capturados</h3>
-          <p className={ui.subtitle}>
-            Cuánto cuesta cada parte y cuántas van en un bowl. Para sacar el costo por porción:
-            lo que costó el paquete ÷ cuántas porciones rinde. Marinados, salsas, toppings y base
-            usan el costo de su receta estándar cuando ya la tienen.
-          </p>
-
-          <details className={ui.disclosure} open>
-          <summary>1. Base y costos por bowl <small>Base, marinados, salsas y toppings</small></summary>
-          <div className={ui.baseBlock}>
-            <label>Base <span className={ui.hint}>Arroz, quinoa o ensalada</span></label>
-            <div className={ui.baseRow}>
-              <div className={ui.field}>
-                <span className={ui.hint}>Costo por kilo</span>
-                <input
-                  type="number" min="0" step="any" inputMode="decimal"
-                  value={form.baseCostPerKg}
-                  onChange={(e) => setForm((p) => ({ ...p, baseCostPerKg: e.target.value }))}
-                  aria-label="Costo por kilo de la base"
-                />
-              </div>
-              <div className={ui.field}>
-                <span className={ui.hint}>Gramos por porción</span>
-                <input
-                  type="number" min="0" step="any" inputMode="decimal"
-                  value={form.baseGramsPerPortion}
-                  onChange={(e) => setForm((p) => ({ ...p, baseGramsPerPortion: e.target.value }))}
-                  aria-label="Gramos por porción de la base"
-                />
-              </div>
-              <div className={ui.baseResult}>
-                <span className={ui.hint}>Costo por porción</span>
-                <strong>
-                  {money(((Number(form.baseCostPerKg) || 0) / 1000) * (Number(form.baseGramsPerPortion) || 0))}
-                </strong>
-              </div>
+          <div className={ui.overview}>
+            <div>
+              <h3 className={ui.sectionTitle}>¿Cuánto lleva una porción?</h3>
+              <p className={ui.subtitle}>
+                Para cada opción del menú solo pon cuánto se sirve en un bowl (gramos, ml o piezas). El precio sale
+                del inventario y se actualiza solo cada vez que se recibe mercancía; la app multiplica.
+                {hasUsage
+                  ? ` Cuántas lleva un bowl se calcula con ${usage.bowls} bowls reales de los últimos ${usage.windowDays} días.`
+                  : " Cuando haya ventas, cuántas lleva un bowl se calcula solo con lo que piden los clientes."}
+              </p>
             </div>
-            <p className={ui.coverage}>{coverageText(parts.base, BASE_LABELS)}</p>
+            {steps.length > 0 && (
+              <button type="button" className={ui.saveBtn} onClick={openWizard}>Completar pendientes ({steps.length})</button>
+            )}
+          </div>
+          {templatePlan?.pending > 0 && (
+            <p className={ui.coverage}>
+              <button type="button" className={ui.secondaryBtn} onClick={openTemplate}>Cargar datos de la hoja de insumos ({templatePlan.pending})</button>
+            </p>
+          )}
+          <div className={ui.filters}>
+            <label>Buscar<input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ej. aguacate, spicy mayo…" /></label>
+            <label className={ui.checkbox}><input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} /> Solo lo que falta</label>
           </div>
 
-          <div className={ui.grid}>
-            {PARTS.map(({ key, label, hint }) => (
-              <div key={key} className={ui.field}>
-                <label>{label}</label>
-                <span className={ui.hint}>
-                  {hint}
-                  {realAvg[key] !== undefined && ` · promedio real: ${realAvg[key]} por bowl`}
-                </span>
-                <div className={ui.inputRow}>
-                  <label><span className={ui.hint}>Costo ($)</span>
-                  <input
-                    type="number" min="0" step="any" inputMode="decimal"
-                    value={form[key].costPerUnit}
-                    onChange={(e) => setPart(key, "costPerUnit", e.target.value)}
-                    aria-label={`Costo por unidad de ${label}`}
-                  />
-                  </label>
-                  <span className={ui.times}>×</span>
-                  <label><span className={ui.hint}>Por bowl</span>
-                  <input
-                    type="number" min="0" step="any" inputMode="decimal"
-                    value={form[key].unitsPerBowl}
-                    onChange={(e) => setPart(key, "unitsPerBowl", e.target.value)}
-                    aria-label={`Unidades por bowl de ${label}`}
-                  />
-                  </label>
-                  <span className={ui.subtotal}>
-                    = {money((Number(form[key].costPerUnit) || 0) * (Number(form[key].unitsPerBowl) || 0))}
-                  </span>
-                </div>
-                {RECIPE_PART_LABELS[key] && (
-                  <p className={ui.coverage}>{coverageText(parts[key], RECIPE_PART_LABELS[key].names)}</p>
-                )}
-              </div>
-            ))}
-          </div>
-          <p className={ui.hint}>El costo general de complementos se usa como respaldo cuando no hay costos individuales disponibles.</p>
-
-          </details>
+          {CATEGORIES.map(({ key }) => (
+            <PortionSection
+              key={key}
+              category={key}
+              items={[...(data.ingredients?.[key] || [])].sort((a, b) => b.frequency - a.frequency)}
+              part={parts[key] ? { ...parts[key], cost: bowls[0]?.rows?.[key] ?? parts[key].cost } : null}
+              form={form.portions}
+              setPortion={setPortion}
+              inventoryOptions={inventoryOptions}
+              inventoryById={inventoryById}
+              hasUsage={hasUsage}
+              search={search}
+              onlyMissing={onlyMissing}
+              onOpenRecipes={goToRecipes}
+              onClearLegacy={() => clearLegacy(key)}
+              legacyCleared={key === "base" ? !(Number(form.baseCostPerKg) > 0) : !(Number(form[key]?.costPerUnit) > 0)}
+            />
+          ))}
 
           <details id="costing-disposables" className={ui.disclosure} open>
-          <summary>2. Desechables <small>Contenedor, tapa, cubiertos, vasitos y bolsa</small></summary>
+          <summary>Desechables <small>Contenedor, tapa, cubiertos, vasitos y bolsa</small></summary>
           <p className={ui.subtitle}>
             Todo lo que se va con el bowl. Pon el precio del paquete como lo compras; las piezas por
             paquete salen del catálogo de Inventario → Desechables.
@@ -769,99 +786,8 @@ export default function CostingPage({ styles }) {
           </p>
           </details>
 
-          <details id="costing-complements" className={ui.disclosure} open>
-          <summary>3. Complementos <small>Costo de compra y rendimiento</small></summary>
-          <h4 className={ui.subhead}>
-            Costo por complemento
-            <span className={ui.hint}>
-              Pon lo que te cuesta la unidad que compras (kilo, pieza o paquete) y cuántas
-              porciones rinde — la app saca el costo por porción. El costo sale del inventario
-              cuando ya está capturado ahí, y de la receta estándar si el complemento tiene una.
-              Se pondera por qué tan seguido lo piden, según
-              {" "}{usage.bowls} bowls reales de los últimos {usage.windowDays} días.
-            </span>
-          </h4>
-          <div className={ui.filters}>
-            <label>Buscar complemento<input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Ej. aguacate, pepino…" /></label>
-            <label className={ui.checkbox}><input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} /> Solo pendientes de completar</label>
-          </div>
-          {visibleComplements.length === 0 && <p className={ui.muted}>No hay complementos que coincidan con estos filtros.</p>}
-          <div className={ui.complementGrid}>
-            {(usage.keys || []).map((key) => {
-              const label = usage.labels?.[key] || key;
-              const freq = usage.frequency?.[key] || 0;
-              const resolved = data.complementCosts?.[key] || {};
-              const entry = form.complementCosts?.[key] || {};
-              const fromRecipe = resolved.source === "receta";
-              const inventoryCost = resolved.inventoryCostPerUnit ?? (resolved.source === "inventario" ? resolved.costPerUnit : 0);
-              const costPerUnit = Number(entry.costPerUnit) || inventoryCost || 0;
-              const portions = Number(entry.portionsPerUnit) || 0;
-              const perPortion = fromRecipe
-                ? resolved.costPerPortion
-                : costPerUnit > 0 && portions > 0 ? costPerUnit / portions : 0;
-              return (
-                <div key={key} className={ui.complementCard} hidden={!visibleComplements.includes(key)}>
-                  <div className={ui.complementHead}>
-                    <span className={ui.complementLabel}>{label}</span>
-                    <span className={ui.freq}>{Math.round(freq * 100)}% de los bowls</span>
-                  </div>
-                  {fromRecipe ? (
-                    <p className={ui.coverage}>Usa el costo de su receta estándar (pestaña Recetas).</p>
-                  ) : (
-                    <div className={ui.complementInputs}>
-                      <label>
-                        <span className={ui.hint}>
-                          Costo por {resolved.unit || "unidad"}
-                          {!Number(entry.costPerUnit) && inventoryCost > 0 && " · del inventario"}
-                        </span>
-                        <input
-                          type="number" min="0" step="any" inputMode="decimal"
-                          placeholder={inventoryCost ? String(inventoryCost) : "0"}
-                          value={entry.costPerUnit ?? ""}
-                          onChange={(e) => setForm((p) => ({
-                            ...p,
-                            complementCosts: {
-                              ...p.complementCosts,
-                              [key]: { ...p.complementCosts[key], costPerUnit: e.target.value },
-                            },
-                          }))}
-                          aria-label={`Costo por unidad de ${label}`}
-                        />
-                      </label>
-                      <label>
-                        <span className={ui.hint}>Porciones que rinde</span>
-                        <input
-                          type="number" min="0" step="any" inputMode="decimal"
-                          placeholder="0"
-                          value={entry.portionsPerUnit ?? ""}
-                          onChange={(e) => setForm((p) => ({
-                            ...p,
-                            complementCosts: {
-                              ...p.complementCosts,
-                              [key]: { ...p.complementCosts[key], portionsPerUnit: e.target.value },
-                            },
-                          }))}
-                          aria-label={`Porciones por unidad de ${label}`}
-                        />
-                      </label>
-                    </div>
-                  )}
-                  <div className={ui.complementFoot}>
-                    <span>{perPortion > 0 ? `${money(perPortion)} por porción` : "Falta costo o rendimiento"}</span>
-                    <strong title="Costo por porción multiplicado por la frecuencia de uso">{money(perPortion * freq)} / bowl promedio</strong>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <p className={ui.complementTotal}>
-            Costo guardado de complementos por bowl promedio:
-            <strong>{money(data.bowls[0]?.rows.complements || 0)}</strong>
-          </p>
-          </details>
-
           <details id="costing-proteins" className={ui.disclosure} open>
-          <summary>4. Proteínas <small>Costo por kilo y rendimiento</small></summary>
+          <summary>Proteínas <small>Costo por kilo y rendimiento</small></summary>
           <p className={ui.subtitle}>
             El costo del inventario se usa automáticamente. Un importe manual lo reemplaza; déjalo vacío
             para volver a usar el inventario. El rendimiento es qué porcentaje del kilo que compras termina
@@ -912,7 +838,7 @@ export default function CostingPage({ styles }) {
           </div>
           </details>
           <details className={ui.disclosure}>
-          <summary>5. Combo y reglas de margen <small>Bebida, rice cake y objetivos</small></summary>
+          <summary>Combo y reglas de margen <small>Bebida, rice cake y objetivos</small></summary>
 
           <div className={ui.grid}>
             {[
@@ -979,7 +905,58 @@ export default function CostingPage({ styles }) {
             <button type="button" className={ui.saveBtn} onClick={save} disabled={saving || !dirty}>{saving ? "Guardando…" : "Guardar cambios"}</button>
           </div>
         </footer>
+
+        {wizardOpen && (
+          <PendingWizard
+            data={data}
+            api={api}
+            onReport={hydrate}
+            onClose={() => { setWizardOpen(false); refreshTemplatePlan(); }}
+            onOpenRecipes={goToRecipes}
+          />
+        )}
+        {templateOpen && templatePlan && (
+          <TemplateDialog
+            plan={templatePlan}
+            applying={templateBusy}
+            error={templateError}
+            onApply={applyTemplate}
+            onClose={() => setTemplateOpen(false)}
+          />
+        )}
       </div>
     </section>
+  );
+}
+
+/** "Faltan N cosas": lo primero que se ve, con el camino más corto para completarlas. */
+function PendingCard({ steps, templatePending, onWizard, onTemplate }) {
+  if (steps.length === 0 && templatePending === 0) return null;
+  const preview = steps.slice(0, 4).map((step) => step.label);
+  return (
+    <div className={ui.pendingCard}>
+      <div>
+        <span className={ui.eyebrow}>Para que el costo sea exacto</span>
+        <h3 className={ui.sectionTitle}>
+          {steps.length === 0
+            ? "Todo lo que se vende tiene costo"
+            : `Faltan ${steps.length} dato${steps.length === 1 ? "" : "s"}`}
+        </h3>
+        {steps.length > 0 && (
+          <p className={ui.subtitle}>
+            {preview.join(", ")}{steps.length > preview.length ? ` y ${steps.length - preview.length} más` : ""}.
+            {" "}Se preguntan uno por uno, lo que más pesa primero; toma un par de minutos.
+          </p>
+        )}
+      </div>
+      <div className={ui.pendingActions}>
+        {steps.length > 0 && <button type="button" className={ui.saveBtn} onClick={onWizard}>Completar uno por uno</button>}
+        {templatePending > 0 && (
+          <button type="button" className={ui.secondaryBtn} onClick={onTemplate}>
+            Cargar datos de la hoja ({templatePending})
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

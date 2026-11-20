@@ -5,6 +5,7 @@ import {
   deletePreparation,
   listPreparations,
   updatePreparation,
+  updatePreparationYield,
 } from "../controllers/preparationController.js";
 
 const router = express.Router();
@@ -15,6 +16,7 @@ const managementOnly = requireStaffAuth(["manager", "admin", "owner"]);
 router.get("/", managementOnly, listPreparations);
 router.post("/", managementOnly, createPreparation);
 router.put("/:id", managementOnly, updatePreparation);
+router.patch("/:id/yield", managementOnly, updatePreparationYield);
 router.delete("/:id", managementOnly, deletePreparation);
 
 export default router;

@@ -17,7 +17,9 @@ const buildResponse = async () => {
       const withPrices = withLivePrices(prep, inventoryById);
       return { ...withPrices, ...preparationCost(withPrices) };
     }),
-    inventory: inventory.map((i) => ({ id: String(i._id), item: i.item, unit: i.unit, cost: i.cost })),
+    inventory: inventory
+      .map((i) => ({ id: String(i._id), item: i.item, unit: i.unit, cost: i.cost }))
+      .sort((a, b) => String(a.item).localeCompare(String(b.item), "es")),
   };
 };
 
@@ -76,6 +78,29 @@ export const updatePreparation = async (req, res) => {
   } catch (err) {
     console.error("updatePreparation error:", err);
     res.status(500).json({ msg: "No se pudo guardar la receta" });
+  }
+};
+
+/* PATCH /api/staff/preparations/:id/yield — solo cuántas porciones rinde un
+   lote. Lo usa el asistente de pendientes del Costeo: preguntar una cosa a la
+   vez sin abrir la receta completa. */
+export const updatePreparationYield = async (req, res) => {
+  try {
+    const yieldPortions = Number(req.body?.yieldPortions);
+    if (!Number.isFinite(yieldPortions) || yieldPortions <= 0 || yieldPortions > 10000) {
+      return res.status(400).json({ msg: "Escribe cuántas porciones rinde (un número mayor a 0)" });
+    }
+    const updated = await Preparation.findByIdAndUpdate(
+      req.params.id,
+      { yieldPortions, updatedBy: req.staff?.name || null },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ msg: "Esa receta ya no existe" });
+    res.json(await buildResponse());
+  } catch (err) {
+    if (err?.name === "CastError") return res.status(404).json({ msg: "Esa receta ya no existe" });
+    console.error("updatePreparationYield error:", err);
+    res.status(500).json({ msg: "No se pudo guardar el rendimiento" });
   }
 };
 

@@ -1,11 +1,12 @@
+import { isMeasurable, measureOf } from "./portionCost.js";
+
 const round2 = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
 // Todo se lleva a la unidad base (gramos o mililitros) para poder dividir
 // receta entre presentación aunque estén en escalas distintas: la hoja de
-// costeo anota la presentación en kg pero la receta en gramos.
-const TO_BASE = { kg: 1000, gr: 1, g: 1, lt: 1000, l: 1000, ml: 1, pz: 1, pieza: 1, mnj: 1, diente: 1 };
-
-const factorOf = (unit) => TO_BASE[String(unit || "").trim().toLowerCase()] ?? 1;
+// costeo anota la presentación en kg pero la receta en gramos. Piezas,
+// manojos, botellas… valen 1.
+const factorOf = (unit) => measureOf(unit).base;
 
 /**
  * Costo de una línea: cuánto del paquete entra al lote, por lo que cuesta el
@@ -35,13 +36,25 @@ export function withLivePrices(prep, inventoryById) {
   doc.ingredients = (doc.ingredients || []).map((line) => {
     const linked = line.inventoryItemId && inventoryById.get(String(line.inventoryItemId));
     if (!linked) return { ...line, priceSource: "manual" };
-    return {
+    const live = {
       ...line,
       unitPrice: Number(linked.cost) || 0,
-      unit: line.unit || linked.unit,
       priceSource: "inventario",
       inventoryItemName: linked.item,
+      inventoryUnit: linked.unit,
     };
+    // El inventario guarda el precio de UNA unidad (un kg, un litro, una
+    // pieza), no del paquete. Si se compra por peso o volumen, la
+    // "presentación" es esa unidad: antes se tomaba la presentación capturada
+    // (p. ej. 5 kg) y el costo salía 5 veces más bajo, o una botella se leía
+    // como gramos y salía miles de veces más alto.
+    if (isMeasurable(linked.unit)) return { ...live, unit: linked.unit, presentation: 1 };
+    // Por pieza (botella, lata, paquete…): la presentación dice cuánto trae
+    // cada pieza en la unidad de la línea. Si la línea también va en piezas,
+    // la receta cuenta piezas.
+    return isMeasurable(line.unit)
+      ? live
+      : { ...live, unit: linked.unit, presentation: Number(line.presentation) || 1 };
   });
   return doc;
 }

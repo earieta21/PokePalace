@@ -650,7 +650,7 @@ export default function UnifiedStaffApp() {
             {tab === "corte"   && <CashCutPage styles={posStyles} />}
             {tab === "fin"     && <FinancePage styles={posStyles} />}
             {tab === "comprobantes" && <ReceiptsPage styles={posStyles} />}
-            {tab === "costeo"  && <CostingPage styles={posStyles} />}
+            {tab === "costeo"  && <CostingPage styles={posStyles} onOpenRecipes={myTabs.includes("recetas") ? () => setTab("recetas") : null} />}
 
             {tab === "recetas" && <PreparationsPage styles={posStyles} />}
             {tab === "fiscal"  && <FiscalPage styles={posStyles} />}

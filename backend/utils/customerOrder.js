@@ -10,7 +10,9 @@ import { getUnavailablePosSelections, resolvePosItems } from "../config/posCatal
 
 export const CUSTOMER_ORDER_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,99}$/;
 
-const BOWL_CATALOG = Object.freeze({
+// También lo usa el costeo (utils/bowlCosting.js) para no dejar fuera de la
+// cuenta opciones que solo se piden desde el sitio o el kiosco.
+export const BOWL_CATALOG = Object.freeze({
   base: new Set(["white_rice", "brown_rice", "quinoa", "spring_mix"]),
   proteins: new Set(["tuna", "salmon", "shrimp", "tofu", "octopus", "seared_tuna"]),
   marinades: new Set(["citrus_marinade", "spicy_marinade", "sweet_marinade"]),
